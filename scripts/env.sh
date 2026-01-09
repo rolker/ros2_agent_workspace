@@ -1,7 +1,18 @@
-#!/bin/bash
+# 1. Base ROS 2 Environment
+# Ensure we start from a clean Jazzy base.
+if [ -f "/opt/ros/jazzy/setup.bash" ]; then
+    # Check if a workspace is already sourced that IS NOT this one or the base
+    if [ ! -z "$COLCON_PREFIX_PATH" ] && [[ ! "$COLCON_PREFIX_PATH" == *"/opt/ros/jazzy"* ]]; then
+        echo "  ! Warning: Another ROS 2 workspace might be active. Sourcing Jazzy base now."
+    fi
+    source /opt/ros/jazzy/setup.bash
+else
+    echo "  ! Error: /opt/ros/jazzy/setup.bash not found. Please install ROS 2 Jazzy."
+    return 1 2>/dev/null || exit 1
+fi
 
-# Define the order of workspaces to source
-# You can customize this list. Order determines overlay priority (last one is top).
+# 2. Workspace Layers
+# Define the order of workspaces to source. Order determines overlay priority (last one is top).
 LAYERS=("underlay" "core" "ui")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,9 +26,6 @@ for layer in "${LAYERS[@]}"; do
         echo "  - Sourcing $layer..."
         source "$SETUP_FILE"
     else
-        # Fallback to local_setup if install/setup.bash isn't fully ready or for specific overlay behavior
-        # But generally source install/setup.bash to get the chain.
-        # If the layer hasn't been built yet, warn.
         if [ -d "$ROOT_DIR/workspaces/${layer}_ws/src" ]; then
              echo "  ! Warning: $layer exists but is not built (setup.bash not found)."
         fi
