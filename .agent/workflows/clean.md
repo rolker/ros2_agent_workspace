@@ -15,16 +15,19 @@ rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
 ```
 
 ### 2. Prune Removed Repositories
-To remove directories in `src/` that are no longer tracked in your `.repos` files, you can use the following approach for each layer:
+To remove directories in `src/` that are no longer tracked in your `.repos` files, use this script for each layer:
 
 ```bash
-# Example for underlay layer
-cd workspaces/underlay_ws/src
-vcs status | grep "^?" | awk '{print $2}' | xargs rm -rf
+# Example for core layer
+cd workspaces/core_ws/src
+# 1. Identify all directories in src
+# 2. Identify all paths in the config file
+# 3. Remove directories not in the config
+vcs vcs export --type path | sort > /tmp/tracked.txt
+ls -d */ | sed 's/\///' | sort > /tmp/current.txt
+comm -23 /tmp/current.txt /tmp/tracked.txt | xargs -r rm -rf
 cd - > /dev/null
 ```
-
-*Note: `vcs status` marks untracked directories with `?`.*
 
 ### 3. Full Reset (Optional)
 If you want to completely re-import everything and ensure a clean state:
