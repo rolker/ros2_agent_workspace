@@ -7,10 +7,12 @@ To build the workspaces, use the standard `colcon` workflow.
 1. **Determine Workspace**: Identify if you are building `underlay_ws`, a specific overlay (e.g., `core_ws`), or all of them.
 2. **Navigate**: Go to the workspace root: `workspaces/<name>_ws`.
 3. **Build Command**:
+   Navigate to the workspace directory and run build:
    ```bash
+   cd workspaces/<name>_ws
    colcon build --symlink-install
    ```
-   *Note: Using `--symlink-install` allows changes in Python scripts and launch files to take effect without rebuilding.*
+   *Note: This keeps build, install, and log directories contained within the workspace.*
 4. **Error Handling**: 
    - If packages are missing dependencies, run:
      ```bash

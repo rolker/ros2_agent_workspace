@@ -9,3 +9,6 @@ build/
 install/
 log/
 COLCON_IGNORE
+
+# IDE settings
+.vscode/
