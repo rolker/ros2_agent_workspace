@@ -21,5 +21,6 @@ To build the workspaces, use the standard `colcon` workflow.
    - If CMake errors occur, check `package.xml` for missing dependencies.
 
 ## Verification
-- Check for `Summary: <N> packages finished [s]`.
-- Source the setup file: `source install/setup.bash`.
+- **Check Summary**: Look for the final output: `Summary: <N> packages finished [s]`.
+- **Identify Failures**: If the summary says `<M> packages failed`, search the log for `--- stderr` to identify the specific error.
+- **Source**: Source the setup file: `source install/setup.bash`.

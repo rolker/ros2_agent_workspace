@@ -25,17 +25,23 @@ This workflow guides you through adding a new Git repository to an existing or n
        version: <branch_or_tag>
    ```
 
-3. **Run Setup**: Execute the setup script for that layer to import the code.
+4. **Register Layer (If New)**: If you created a new `.repos` file, add the layer name to the `LAYERS` array in `scripts/env.sh` to ensure it is sourced.
+   ```bash
+   # In scripts/env.sh
+   LAYERS=("underlay" "core" "ui" "new_layer")
+   ```
+
+5. **Run Setup**: Execute the setup script for that layer to import the code.
    ```bash
    ./scripts/setup.sh <layer_name>
    ```
 
-4. **Verify**: Check that the repository was cloned into `workspaces/<layer_name>_ws/src/<repo_name>`.
+6. **Verify**: Check that the repository was cloned into `workspaces/<layer_name>_ws/src/<repo_name>`.
    ```bash
    ls workspaces/<layer_name>_ws/src/<repo_name>
    ```
 
-5. **Build (Optional)**: Build the workspace to ensure the new package is compatible.
+7. **Build (Optional)**: Build the workspace to ensure the new package is compatible.
    ```bash
    cd workspaces/<layer_name>_ws
    colcon build --symlink-install
