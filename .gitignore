@@ -1,0 +1,11 @@
+# Ignore ROS2 workspaces because they are managed by vcs and .repos files
+workspaces/*/src/
+workspaces/*/build/
+workspaces/*/install/
+workspaces/*/log/
+
+# Ignore colcon/ROS artifacts in root if any
+build/
+install/
+log/
+COLCON_IGNORE
