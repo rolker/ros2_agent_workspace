@@ -15,18 +15,43 @@ rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
 ```
 
 ### 2. Prune Removed Repositories
-To remove directories in `src/` that are no longer tracked in your `.repos` files, use this script for each layer:
+To safely remove directories in `src/` that are no longer tracked in your `.repos` files:
 
 ```bash
-# Example for core layer
-cd workspaces/core_ws/src
-# 1. Identify all directories in src
-# 2. Identify all paths in the config file
-# 3. Remove directories not in the config
-vcs vcs export --type path | sort > /tmp/tracked.txt
-ls -d */ | sed 's/\///' | sort > /tmp/current.txt
-comm -23 /tmp/current.txt /tmp/tracked.txt | xargs -r rm -rf
-cd - > /dev/null
+# Identify untracked repositories by comparing src/ with the .repos config
+source scripts/env.sh
+for layer in "${LAYERS[@]}"; do
+    [ -z "$layer" ] && continue
+    WORKSPACE_DIR="workspaces/${layer}_ws"
+    SRC_DIR="$WORKSPACE_DIR/src"
+    REPO_CONFIG="configs/${layer}.repos"
+    
+    if [ -d "$SRC_DIR" ] && [ -f "$REPO_CONFIG" ]; then
+        # Extract tracked repo names from config
+        grep "^  [a-zA-Z0-9_\-]*:" "$REPO_CONFIG" | sed 's/  \(.*\):/\1/' | sort > /tmp/tracked.txt
+        # List actual directories in src
+        ls -d "$SRC_DIR"/*/ 2>/dev/null | xargs -n 1 basename | sort > /tmp/current.txt
+        
+        UNTRACKED=$(comm -23 /tmp/current.txt /tmp/tracked.txt)
+        
+        if [ ! -z "$UNTRACKED" ]; then
+            echo "----------------------------------------"
+            echo "Found untracked directories in $SRC_DIR:"
+            echo "$UNTRACKED"
+            echo "----------------------------------------"
+            read -p "Are you sure you want to remove these directories? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                for d in $UNTRACKED; do
+                    rm -rf "$SRC_DIR/$d"
+                done
+                echo "Removed."
+            else
+                echo "Skipped."
+            fi
+        fi
+    fi
+done
 ```
 
 ### 3. Full Reset (Optional)
