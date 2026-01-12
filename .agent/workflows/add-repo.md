@@ -36,12 +36,17 @@ This workflow guides you through adding a new Git repository to an existing or n
    ./scripts/setup.sh <layer_name>
    ```
 
-6. **Verify**: Check that the repository was cloned into `workspaces/<layer_name>_ws/src/<repo_name>`.
+6. **Install Dependencies**: Use `rosdep` to install any missing system dependencies for the new code.
+   ```bash
+   rosdep install --from-paths workspaces/<layer_name>_ws/src --ignore-src -r -y
+   ```
+
+7. **Verify**: Check that the repository was cloned into `workspaces/<layer_name>_ws/src/<repo_name>`.
    ```bash
    ls workspaces/<layer_name>_ws/src/<repo_name>
    ```
 
-7. **Build (Optional)**: Build the workspace to ensure the new package is compatible.
+8. **Build (Optional)**: Build the workspace to ensure the new package is compatible.
    ```bash
    cd workspaces/<layer_name>_ws
    colcon build --symlink-install

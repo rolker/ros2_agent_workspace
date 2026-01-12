@@ -13,7 +13,7 @@ fi
 
 # 2. Workspace Layers
 # Define the order of workspaces to source. Order determines overlay priority (last one is top).
-LAYERS=("underlay" "core" "ui")
+LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"

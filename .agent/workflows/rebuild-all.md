@@ -1,14 +1,19 @@
 ---
-description: Build all workspace layers in the correct order
+description: Clean all build artifacts then build all layers
 ---
 // turbo-all
-# Build All Workspace Layers
+# Rebuild All Workspaces
 
-This workflow dynamically builds all workspace layers in the order defined in `scripts/env.sh`. It handles "from scratch" builds by sourcing each layer as soon as it is built.
+This workflow combines the cleanup of build artifacts and the sequential building of all workspace layers. It is useful for ensuring a completely fresh build state.
 
 ## Steps
 
-1. **Build all layers**: Run the following logic to iterate through all defined layers.
+1. **Clean Build Artifacts**: Remove `build`, `install`, and `log` directories from all workspace layers.
+   ```bash
+   rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
+   ```
+
+2. **Build All Layers**: Iterate through all defined layers, building them in order and sourcing the environment incrementally.
    ```bash
    # 0. Initialize Report
    REPORT_FILE="ai_workspace/build_report.md"
@@ -80,7 +85,7 @@ This workflow dynamically builds all workspace layers in the order defined in `s
    done
 
    echo "========================================"
-   echo "BUILD ALL SUMMARY"
+   echo "REBUILD ALL SUMMARY"
    echo "========================================"
    echo "Build report generated at: $REPORT_FILE"
    cat "$REPORT_FILE"
@@ -89,10 +94,6 @@ This workflow dynamically builds all workspace layers in the order defined in `s
        echo "All layers built successfully."
    else
        echo "Failed layers:$FAILED_PACKAGES"
-       echo "Please check the logs for the specific failed packages within those layers."
+       echo "Please review the errors above and the report."
    fi
    ```
-
-## Verification
-- Check that each workspace now has `build`, `install`, and `log` directories.
-- Run `source scripts/env.sh` to load the final entire workspace chain.
