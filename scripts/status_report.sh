@@ -121,7 +121,7 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
                 sync_status=""
                 branch="unknown"
             elif [[ "$line" =~ ^##\ ([^.]*)(\.\.\.([^\ ]*))?(\ \[(.*)\])? ]]; then
-                # Parse branch line: ## main...origin/main [ahead 1]
+                 # Parse branch line: ## main...origin/main [ahead 1]
                  branch="${BASH_REMATCH[1]}"
                  # ${BASH_REMATCH[5]} captures "ahead 1" or "ahead 1, behind 2"
                  if [ -n "${BASH_REMATCH[5]}" ]; then
