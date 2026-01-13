@@ -2,7 +2,7 @@
 # Ensure we start from a clean Jazzy base.
 if [ -f "/opt/ros/jazzy/setup.bash" ]; then
     # Check if a workspace is already sourced that IS NOT this one or the base
-    if [ ! -z "$COLCON_PREFIX_PATH" ] && [[ ! "$COLCON_PREFIX_PATH" == *"/opt/ros/jazzy"* ]]; then
+    if [ ! -z "${COLCON_PREFIX_PATH:-}" ] && [[ ! "${COLCON_PREFIX_PATH:-}" == *"/opt/ros/jazzy"* ]]; then
         echo "  ! Warning: Another ROS 2 workspace might be active. Sourcing Jazzy base now."
     fi
     source /opt/ros/jazzy/setup.bash

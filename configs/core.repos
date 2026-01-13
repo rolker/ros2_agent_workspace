@@ -35,3 +35,7 @@ repositories:
     type: git
     url: git@github.com:rolker/unh_marine_navigation.git
     version: jazzy
+  s57_tools:
+    type: git
+    url: git@github.com:rolker/s57_tools.git
+    version: jazzy

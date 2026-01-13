@@ -15,3 +15,7 @@ repositories:
     type: git
     url: git@github.com:rolker/rviz_sonar_image.git
     version: jazzy
+  joy_to_helm:
+    type: git
+    url: git@github.com:rolker/joy_to_helm.git
+    version: jazzy

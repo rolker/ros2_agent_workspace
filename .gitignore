@@ -12,3 +12,4 @@ COLCON_IGNORE
 
 # IDE settings
 .vscode/
+ai_workspace/
