@@ -19,3 +19,12 @@ This directory contains symbolic links to key documentation found throughout the
 
 ---
 *Note: This index is manually maintained via the `index_knowledge` workflow. If you add new major components, please update this file and create the corresponding symlinks.*
+
+# 🔍 Search Tips for Agents
+> **Important**: The source code in `workspaces/` is **gitignored** (managed by `vcs`).
+> Tools like `find_by_name` will **not** find files in `src/` if searching from the root.
+>
+> **Best Practice**:
+> 1. Use `list_dir` to explore directories (it sees everything).
+> 2. Search specifically in subdirectories if needed.
+> 3. Rely on this Knowledge Index for high-level navigation.
