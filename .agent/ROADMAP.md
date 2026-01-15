@@ -1,7 +1,9 @@
 # Workspace Roadmap
 
 ## Active Tasks
-<!-- No active tasks currently -->
+- [TASK-002] **Consolidate Packages** (Status: In Progress)
+    - **Goal**: Refactor `unh_marine_autonomy` and `camp` to consolidate functionality.
+    - **Context**: Work is currently dirty in `configs/` and source repositories.
 
 ## Backlog
 
