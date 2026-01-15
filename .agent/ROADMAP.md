@@ -1,18 +1,23 @@
 # Workspace Roadmap
 
 ## Active Tasks
-- [TASK-002] **Consolidate Packages** (Status: In Progress)
-    - **Goal**: Refactor `unh_marine_autonomy` and `camp` to consolidate functionality.
-    - **Context**: Work is currently dirty in `configs/` and source repositories.
+
+
 
 ## Backlog
+
+### 🔥 High Priority
+- [TASK-010] **CAMP Architecture Refactor** (Status: Planned)
+    - **Goal**: Refactor `camp` to separate Core (Headless) from Desktop (Qt Widgets). 
+    - **Context**: Split from TASK-002.
 
 ### 🤖 Agent Infrastructure
 - [TASK-001] **Multi-Distro Support** (Status: Planned)
     - **Goal**: Support multiple ROS 2 distributions (Jazzy, Kilted, Rolling) simultaneously.
-- [TASK-003] **Bootstrap Automation** (Status: Planned)
+- [TASK-003] **Bootstrap Automation** (Status: Done)
     - **Goal**: Automate workspace setup (vcstool, colcon, rosdep) to support Codespaces/DevContainers.
     - **Source**: Issues #3, #4.
+    - **Resolution**: Created `scripts/bootstrap.sh` matching official ROS 2 docs. Verified via Docker.
 - [TASK-004] **AI Identity Strategy** (Status: Done)
     - **Goal**: Establish a mechanism for agents to commit/PR as a distinct identity to enable peer review.
     - **Source**: Issue #5.
@@ -32,7 +37,12 @@
 
 ### Unsorted
 <!-- New tasks go here -->
+- [TASK-009] **Evaluate ros2_mcp** (Status: Planned)
+    - **Goal**: Consider `ros2_mcp` to help with automated testing and debugging.
+
 
 ## Completed
+- [TASK-002] **Rebranding & Consolidation** (Status: Done)
+    - **Outcome**: Successfully rebranded `project11` -> `marine_autonomy`. Repositories consolidated and upstream URLs updated.
 - [TASK-000] **Workspace Optimization** (Status: Done)
     - Implemented Resource Locking, Unified Testing, and Knowledge Indexing.
