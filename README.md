@@ -41,6 +41,20 @@ To source the workspaces in the correct order (Underlay -> ... -> Overlay):
 source scripts/env.sh
 ```
 
+## Getting Started for Humans (Agentic Coding)
+
+This workspace is designed to be used with an AI Agent. If you are new to agentic coding, here is how you should interact with this repository:
+
+1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
+2.  **Slash Commands**: The agent has a set of workflows it can execute. You can trigger these by asking for them by name (e.g., "run the clean workflow") or by using the slash command directly if your interface supports it.
+    *   `/add-repo`: Add a new repository to a layer.
+    *   `/build-all`: Build all layers in the correct order.
+    *   `/clean`: specific clean up of build artifacts.
+    *   `/rebuild-all`: Clean and rebuild everything.
+    *   `/submit-pr`: Create a PR for your changes.
+    *   *See `.agent/workflows/` for the full list.*
+3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `workspaces/`, configs in `configs/`). Trust it to place files in the correct location.
+
 ## Adding New Layers
 1. Create a `<new_layer>.repos` file in `configs/`.
 2. Run `./scripts/setup.sh <new_layer>`.
