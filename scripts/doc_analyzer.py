@@ -8,8 +8,9 @@ from datetime import datetime
 
 # Configuration
 # Explicitly listing workspaces based on previous context, but could be dynamic
-WORKSPACES_ROOT = '/home/roland/ai/antigravity-projects/ros2_agent_workspace/workspaces'
-REPORT_FILE = '/home/roland/ai/antigravity-projects/ros2_agent_workspace/ai_workspace/documentation_quality_report.md'
+BASE_DIR = Path(__file__).resolve().parent
+WORKSPACES_ROOT = BASE_DIR.parent / 'workspaces'
+REPORT_FILE = BASE_DIR.parent / 'ai_workspace' / 'documentation_quality_report.md'
 
 # Scoring Weights
 WEIGHT_README_EXISTS = 40
