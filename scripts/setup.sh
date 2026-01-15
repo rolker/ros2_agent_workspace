@@ -29,4 +29,10 @@ else
 fi
 
 echo "Setup complete for $WORKSPACE_NAME."
-echo "To build: colcon build --symlink-install --base-paths $WORKSPACE_DIR"
+echo "To build manually:"
+echo "  cd $WORKSPACE_DIR"
+echo "  colcon build --symlink-install"
+echo ""
+echo "Or use the unified build script:"
+echo "  ./scripts/build.sh"
+

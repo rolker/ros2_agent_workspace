@@ -13,6 +13,18 @@ REPORT_FILE="$ROOT_DIR/ai_workspace/build_report.md"
 
 # Ensure ai_workspace exists
 mkdir -p "$ROOT_DIR/ai_workspace"
+LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+
+# Check for Lock
+if [ -f "$LOCK_FILE" ]; then
+    echo "❌ Workspace is LOCKED."
+    echo "This script cannot run because another agent/task is active."
+    echo "Lock details:"
+    cat "$LOCK_FILE"
+    echo ""
+    echo "If you are sure this is a stale lock, run: ./scripts/unlock.sh"
+    exit 1
+fi
 
 # Header for the Report
 echo "# Build Report - $(date)" > "$REPORT_FILE"

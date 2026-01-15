@@ -2,6 +2,14 @@
 
 This repository allows for the management of multiple layered ROS2 workspaces, configured specifically for use with AI agents like Antigravity.
 
+**It is pre-configured to host the UNH Marine Autonomy Framework.**
+
+The core configuration (`configs/core.repos`) includes repositories for:
+- **Project11**: Main autonomy system.
+- **Marine AIS**: AIS message decoding and handling.
+- **UNH Marine Navigation**: Navigation tools and utilities.
+- **Mission/Helm Managers**: Core logic for autonomy control.
+
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
@@ -16,7 +24,10 @@ To initialize a workspace layer defined in `configs/<name>.repos`:
 
 ```bash
 ./scripts/setup.sh <name>
-# Example: ./scripts/setup.sh core
+./scripts/setup.sh core
+# Examples:
+# ./scripts/setup.sh core   (Installs Project11, Marine AIS, etc.)
+# ./scripts/setup.sh ui     (Installs RQT and visualization tools)
 ```
 
 This will:

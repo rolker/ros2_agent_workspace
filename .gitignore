@@ -13,3 +13,7 @@ COLCON_IGNORE
 # IDE settings
 .vscode/
 ai_workspace/
+
+# Generated Knowledge (Keep README)
+.agent/knowledge/*
+!.agent/knowledge/README.md

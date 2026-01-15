@@ -7,3 +7,7 @@ repositories:
     type: git
     url: git@github.com:rolker/cube_bathymetry.git
     version: jazzy
+  unh_marine_perception:
+    type: git
+    url: git@github.com:rolker/unh_marine_perception.git
+    version: jazzy
