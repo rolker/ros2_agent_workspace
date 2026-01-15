@@ -49,7 +49,7 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
 2.  **Slash Commands**: The agent has a set of workflows it can execute. You can trigger these by asking for them by name (e.g., "run the clean workflow") or by using the slash command directly if your interface supports it.
     *   `/add-repo`: Add a new repository to a layer.
     *   `/build-all`: Build all layers in the correct order.
-    *   `/clean`: specific clean up of build artifacts.
+    *   `/clean`: specific cleanup of build artifacts.
     *   `/rebuild-all`: Clean and rebuild everything.
     *   `/submit-pr`: Create a PR for your changes.
     *   *See `.agent/workflows/` for the full list.*
