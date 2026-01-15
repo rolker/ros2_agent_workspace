@@ -9,7 +9,7 @@ To prevent conflicts and "messy" workspaces when multiple agents are active:
 1.  **Branch Isolation**:
     *   **NEVER** commit directly to `main`, `master`, or `jazzy`.
     *   **ALWAYS** create a new branch for your task:
-        *   Features: `feature/TASK-<ID>-<description>`
+        *   Features: `feature/TASK-<ID>-<description>` (e.g., `feature/TASK-001-multi-distro`)
         *   Fixes: `fix/<description>`
     *   *exception*: If you are just updating documentation or non-code artifacts, you may use your discretion, but a branch is still preferred.
 

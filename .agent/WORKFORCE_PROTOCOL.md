@@ -2,16 +2,16 @@
 
 **Goal**: Enable multiple AI agents to work accurately and safely within the same workspace without stepping on each other's toes.
 
-## 1. Task Locking (The `task.md` Authority)
-The `.agent/task.md` (or equivalent roadmap file) is the **Source of Truth** for what is being worked on.
+## 1. Task Locking (The `ROADMAP.md` Authority)
+The `.agent/ROADMAP.md` is the **Source of Truth** for what is being worked on.
 
 *   **Before Starting**:
-    *   Check `task.md` for items marked `[/]` (In Progress).
+    *   Check `.agent/ROADMAP.md` for items marked `(Status: Active)` or `(Status: In Progress)`.
     *   **Do not** pick up a task effectively "owned" by another active agent session unless explicitly instructed to "Join" or "Collaborate".
 *   **During Work**:
-    *   Mark your specific item as `[/]`.
+    *   Update your specific item to `(Status: Active)`.
 *   **Finishing**:
-    *   Mark item as `[x]`.
+    *   Update item to `(Status: Done)`.
 
 ## 2. The "Clean Handover" Standard
 Every agent invocation is a "shift". When your shift ends (you call `notify_user` or terminate), the workspace must be in a clean state.
