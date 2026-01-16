@@ -22,15 +22,20 @@ import yaml
 import json
 import glob
 
-WORKSPACE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORKSPACE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIGS_DIR = os.path.join(WORKSPACE_ROOT, "configs")
 IGNORED_FILES = ["underlay.repos"]
 
 def get_overlay_repos():
     repos_list = []
     
-    # Find all .repos files in configs/
+    # Find all .repos files in configs/ and migrated location
     repo_files = glob.glob(os.path.join(CONFIGS_DIR, "*.repos"))
+    
+    migrated_dir = os.path.join(WORKSPACE_ROOT, "workspaces/core_ws/src/unh_marine_autonomy/config/repos")
+    if os.path.isdir(migrated_dir):
+        repo_files.extend(glob.glob(os.path.join(migrated_dir, "*.repos")))
+
     
     for repo_file in repo_files:
         filename = os.path.basename(repo_file)
