@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+"""
+List Overlay Repositories
+
+This script scans the configs/ directory for .repos files and outputs a JSON
+list of all repositories defined across all layers (excluding underlay.repos).
+
+Usage:
+    python3 list_overlay_repos.py
+
+Output:
+    JSON array containing:
+    - Repository name
+    - URL
+    - Version/branch
+    - Source .repos file
+"""
 
 import os
 import sys

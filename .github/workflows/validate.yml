@@ -1,0 +1,111 @@
+name: Workspace Validation
+
+on:
+  push:
+    branches: [ main, jazzy, 'feature/**', 'fix/**' ]
+  pull_request:
+    branches: [ main, jazzy ]
+
+jobs:
+  validate-scripts:
+    name: Validate Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shellcheck scripts/*.sh || exit 0
+
+      - name: Validate Python syntax
+        run: |
+          python3 -m py_compile scripts/*.py
+
+      - name: Check Python formatting
+        run: |
+          black --check --line-length 100 scripts/*.py || exit 0
+
+      - name: Run flake8
+        run: |
+          flake8 --max-line-length=100 --extend-ignore=E203,W503 scripts/*.py || exit 0
+
+  validate-configs:
+    name: Validate Configuration Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install YAML validator
+        run: |
+          pip install pyyaml yamllint
+
+      - name: Validate YAML syntax
+        run: |
+          yamllint -d '{extends: default, rules: {line-length: {max: 120}, document-start: disable}}' configs/*.repos
+
+      - name: Validate .repos files structure
+        run: |
+          python3 -c "
+          import yaml
+          import sys
+          import glob
+          
+          errors = []
+          for f in glob.glob('configs/*.repos'):
+              try:
+                  with open(f, 'r') as file:
+                      data = yaml.safe_load(file)
+                      if 'repositories' not in data:
+                          errors.append(f'{f}: Missing repositories key')
+              except Exception as e:
+                  errors.append(f'{f}: {str(e)}')
+          
+          if errors:
+              for e in errors:
+                  print(e)
+              sys.exit(1)
+          print('All .repos files are valid')
+          "
+
+  validate-documentation:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for required documentation
+        run: |
+          required_files="README.md CONTRIBUTING.md SECURITY.md ARCHITECTURE.md"
+          for file in $required_files; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required file: $file"
+              exit 1
+            fi
+          done
+          echo "All required documentation files present"
+
+      - name: Validate markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          config-file: '.github/markdown-link-check.json'
+        continue-on-error: true

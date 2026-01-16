@@ -10,6 +10,19 @@ The core configuration (`configs/core.repos`) includes repositories for:
 - **UNH Marine Navigation**: Navigation tools and utilities.
 - **Mission/Helm Managers**: Core logic for autonomy control.
 
+## Quick Start
+
+**New to this workspace?** See [QUICKSTART.md](QUICKSTART.md) for a step-by-step setup guide.
+
+**Experienced users?** Jump to [Usage](#usage) below.
+
+## Documentation
+
+- 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes
+- 🏗️ [Architecture Guide](ARCHITECTURE.md) - Understanding the layered workspace system
+- 🤝 [Contributing Guide](CONTRIBUTING.md) - Development workflow and best practices
+- 🔒 [Security Policy](SECURITY.md) - Security guidelines and reporting
+
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
@@ -58,3 +71,87 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
 ## Adding New Layers
 1. Create a `<new_layer>.repos` file in `configs/`.
 2. Run `./scripts/setup.sh <new_layer>`.
+
+## Troubleshooting
+
+### Common Issues
+
+#### VCS Command Not Found
+If you see "vcs command not found":
+```bash
+pip install vcstool
+# or
+sudo apt install python3-vcstool
+```
+
+#### ROS 2 Jazzy Not Found
+Ensure ROS 2 Jazzy is installed:
+```bash
+./scripts/bootstrap.sh
+```
+
+#### Build Failures
+1. Check the build report: `cat ai_workspace/build_report.md`
+2. Try building a single layer:
+   ```bash
+   cd workspaces/core_ws
+   colcon build --symlink-install
+   ```
+3. Check for missing dependencies:
+   ```bash
+   rosdep install --from-paths workspaces/core_ws/src --ignore-src -r -y
+   ```
+
+#### Workspace Locked
+If you see "Workspace is LOCKED":
+```bash
+./scripts/unlock.sh
+```
+
+#### Environment Not Sourced
+If ROS commands aren't working:
+```bash
+source scripts/env.sh
+```
+
+#### Permission Denied
+Make sure scripts are executable:
+```bash
+chmod +x scripts/*.sh
+```
+
+### Getting Help
+
+- Review [ARCHITECTURE.md](ARCHITECTURE.md) for system design
+- Check [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+- See [SECURITY.md](SECURITY.md) for security policies
+- Open an issue on GitHub for bugs or feature requests
+
+## Development Tools
+
+### Makefile
+Common operations are available via make:
+```bash
+make help          # Show all available targets
+make health-check  # Run comprehensive health check
+make bootstrap     # Install ROS2 and dependencies
+make setup-all     # Setup all workspace layers
+make build         # Build all layers
+make test          # Run all tests
+make clean         # Clean build artifacts
+make status        # Show workspace status
+make lint          # Run linters
+```
+
+### Pre-commit Hooks
+Install pre-commit hooks for automatic validation:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### Validation
+Validate configuration files:
+```bash
+python3 scripts/validate_repos.py
+```

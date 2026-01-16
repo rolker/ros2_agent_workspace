@@ -1,7 +1,18 @@
 #!/bin/bash
-
 # scripts/test.sh
 # Unified test script for ROS2 Agent Workspace
+#
+# Usage: ./scripts/test.sh
+#
+# This script will:
+# 1. Check for workspace locks (multi-agent coordination)
+# 2. Run tests on all workspace layers in order
+# 3. Generate a detailed test report in ai_workspace/test_report.md
+# 4. Continue testing other layers even if one fails (for full status)
+#
+# Exit codes:
+#   0 - All tests passed
+#   1 - Tests failed in one or more layers
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
