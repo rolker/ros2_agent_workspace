@@ -13,8 +13,18 @@ else
 fi
 
 # 2. Workspace Layers
+# 2. Workspace Layers
 # Define the order of workspaces to source. Order determines overlay priority (last one is top).
-LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+LAYERS_CONFIG="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/layers.txt"
+
+if [ -f "$LAYERS_CONFIG" ]; then
+    # Read non-empty lines into array
+    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#')
+else
+    # Fallback/Bootstrap layers
+    echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
+    LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
