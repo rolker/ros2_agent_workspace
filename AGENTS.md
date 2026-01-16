@@ -75,6 +75,7 @@ For detailed ROS2 CLI usage, see `.agent/knowledge/ros2_cli_best_practices.md`.
 - Remove or modify working tests
 - Change production configurations without approval
 - Commit credentials or secrets
+- Make broad refactoring changes without discussion
 
 ### ALWAYS
 - Check `.agent/ROADMAP.md` before starting work to avoid conflicts
