@@ -14,6 +14,8 @@ COLCON_IGNORE
 .vscode/
 ai_workspace/
 
-# Generated Knowledge (Keep README)
+# Generated Knowledge (Keep README and permanent knowledge files)
 .agent/knowledge/*
 !.agent/knowledge/README.md
+!.agent/knowledge/ros2_cli_best_practices.md
+!.agent/knowledge/ros2_development_patterns.md
