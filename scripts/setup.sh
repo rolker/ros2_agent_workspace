@@ -25,7 +25,8 @@ if command -v vcs &> /dev/null; then
     vcs import "$WORKSPACE_DIR/src" < "$CONFIG_FILE"
 else
     echo "Warning: 'vcs' command not found. Skipping repository import."
-    echo "Please install python3-vcstool to automatically import repositories."
+    echo "To install all necessary dependencies, run:"
+    echo "  ./scripts/bootstrap.sh"
 fi
 
 echo "Setup complete for $WORKSPACE_NAME."
