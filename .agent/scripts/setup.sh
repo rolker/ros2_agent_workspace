@@ -21,17 +21,45 @@ set -e
 
 WORKSPACE_NAME=$1
 WORKSPACE_DIR="workspaces/${WORKSPACE_NAME}_ws"
-CONFIG_FILE="configs/${WORKSPACE_NAME}.repos"
+
+# Bootstrapping Configuration
+BOOTSTRAP_REPO_DIR="workspaces/core_ws/src/unh_marine_autonomy"
+BOOTSTRAP_CONFIG="configs/bootstrap.repos"
 
 if [ -z "$WORKSPACE_NAME" ]; then
     echo "Usage: $0 <workspace_name>"
     echo "Available configs:"
-    ls configs/*.repos | xargs -n 1 basename | sed 's/.repos//'
+    # Check both old and new locations for listing
+    ls configs/*.repos "$BOOTSTRAP_REPO_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort | uniq
     exit 1
 fi
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: Configuration file $CONFIG_FILE not found."
+# 1. Bootstrap if necessary (ensure unh_marine_autonomy exists)
+# We need this repo to access the other .repos files
+if [ ! -d "$BOOTSTRAP_REPO_DIR" ]; then
+    if [ -f "$BOOTSTRAP_CONFIG" ]; then
+        echo "Bootstrapping: Cloning unh_marine_autonomy..."
+        mkdir -p workspaces/core_ws/src
+        if command -v vcs &> /dev/null; then
+            vcs import workspaces/core_ws/src < "$BOOTSTRAP_CONFIG"
+        else
+            echo "Error: 'vcs' command not found. Please run .agent/scripts/bootstrap.sh"
+            exit 1
+        fi
+    else
+        echo "Warning: Bootstrap config $BOOTSTRAP_CONFIG not found."
+    fi
+fi
+
+# 2. Locate the configuration file
+if [ -f "configs/${WORKSPACE_NAME}.repos" ]; then
+    CONFIG_FILE="configs/${WORKSPACE_NAME}.repos"
+elif [ -f "$BOOTSTRAP_REPO_DIR/config/repos/${WORKSPACE_NAME}.repos" ]; then
+    CONFIG_FILE="$BOOTSTRAP_REPO_DIR/config/repos/${WORKSPACE_NAME}.repos"
+else
+    echo "Error: Configuration file for '$WORKSPACE_NAME' not found."
+    echo "Checked: configs/${WORKSPACE_NAME}.repos"
+    echo "Checked: $BOOTSTRAP_REPO_DIR/config/repos/${WORKSPACE_NAME}.repos"
     exit 1
 fi
 
