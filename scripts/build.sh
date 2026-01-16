@@ -27,10 +27,12 @@ if [ -f "$LOCK_FILE" ]; then
 fi
 
 # Header for the Report
-echo "# Build Report - $(date)" > "$REPORT_FILE"
-echo "" >> "$REPORT_FILE"
-echo "| Layer | Packages (Total/OK) | Output (Warnings/Errors) | Status |" >> "$REPORT_FILE"
-echo "|---|---|---|---|" >> "$REPORT_FILE"
+{
+    echo "# Build Report - $(date)"
+    echo ""
+    echo "| Layer | Packages (Total/OK) | Output (Warnings/Errors) | Status |"
+    echo "|---|---|---|---|"
+} > "$REPORT_FILE"
 
 # Load Layer Definitions
 source "$SCRIPT_DIR/env.sh" > /dev/null

@@ -31,7 +31,8 @@ sudo apt update && sudo apt install -y curl
 
 # Install ros2-apt-source (Handles GPG/Repo automatically)
 echo "Installing ros2-apt-source..."
-export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
+ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
+export ROS_APT_SOURCE_VERSION
 if [ -z "${ROS_APT_SOURCE_VERSION}" ]; then
     echo "Error: Failed to determine ROS apt source version from GitHub API." >&2
     exit 1
