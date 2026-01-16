@@ -51,12 +51,7 @@ source scripts/env.sh
 - **Agent-specific content** goes in `.agent/` subdirectories
 
 ### Git Hygiene
-- Always use feature branches (e.g., `feature/description`)
-- Make atomic commits with descriptive messages
-- Do not commit build artifacts or temporary files
-- Agent commits should use:
-  - Name: `Antigravity Agent`
-  - Email: `roland+antigravity@ccom.unh.edu`
+See `.agent/rules/git-hygiene.md` for complete git workflow rules.
 
 ### Code Boundaries
 - **Do not modify** files within `workspaces/*/src/` unless explicitly asked
@@ -93,6 +88,13 @@ Layers build on each other in the order defined in `scripts/env.sh`.
 3. **Test in layers** - Build and test individual layers before building everything
 4. **Document changes** - Update relevant documentation when making structural changes
 5. **Follow ROS2 conventions** - Use standard ROS2 package structure and naming
+
+## Important Files to Review
+
+- `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination and task locking
+- `.agent/AI_IDENTITY_STRATEGY.md` - Git identity for agent commits
+- `.agent/rules/` - Specific rules for builds, git hygiene, and file organization
+- `.agent/knowledge/ros2_cli_best_practices.md` - ROS2 CLI usage guide
 
 ## Security
 
