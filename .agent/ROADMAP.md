@@ -22,6 +22,9 @@
     - **Goal**: Establish a mechanism for agents to commit/PR as a distinct identity to enable peer review.
     - **Source**: Issue #5.
     - **Resolution**: Implemented Git Authorship Distinction + Reduced Review Requirements.
+- [TASK-019] **Enhanced Status Reporting** (Status: In Progress)
+    - **Goal**: Enable agents to check both local workspace status and remote GitHub status (PRs/Issues) without external dependencies.
+    - **Source**: User Request.
 
 ### 🚤 Project Work
 - [TASK-005] **Sensor Frames Support** (Status: Planned)
