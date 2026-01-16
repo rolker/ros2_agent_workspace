@@ -29,7 +29,8 @@ RUN apt-get update && apt-get install -y \
 
 # Pre-install python deps
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt --break-system-packages
+RUN chown $USERNAME:$USERNAME /tmp/requirements.txt
 
 USER $USERNAME
+RUN pip3 install --user --break-system-packages -r /tmp/requirements.txt
 CMD ["/bin/bash"]
