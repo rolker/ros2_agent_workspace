@@ -22,7 +22,13 @@
     - **Goal**: Establish a mechanism for agents to commit/PR as a distinct identity to enable peer review.
     - **Source**: Issue #5.
     - **Resolution**: Implemented Git Authorship Distinction + Reduced Review Requirements.
-- [TASK-019] **Enhanced Status Reporting** (Status: In Progress)
+- [TASK-008] **Framework Vision Refactor** (Status: In Progress)
+    - **Goal**: Rename and modularize `project11` ecosystem to `marine` framework.
+    - **Source**: Existing uncommitted work.
+- [TASK-020] **Workspace Maintenance** (Status: In Progress)
+    - **Goal**: Clean up minor build issues and standardize branches.
+    - **Source**: Workspace Status Check.
+- [TASK-019] **Enhanced Status Reporting** (Status: Done)
     - **Goal**: Enable agents to check both local workspace status and remote GitHub status (PRs/Issues) without external dependencies.
     - **Source**: User Request.
 
