@@ -1,5 +1,0 @@
-repositories:
-  unh_marine_autonomy:
-    type: git
-    url: git@github.com:rolker/unh_marine_autonomy.git
-    version: feature/migrate-repos-to-autonomy
