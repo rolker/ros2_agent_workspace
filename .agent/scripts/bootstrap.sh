@@ -66,4 +66,4 @@ if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
 fi
 rosdep update
 
-echo "Bootstrap complete! You can now run './scripts/setup.sh <workspace_name>'."
+echo "Bootstrap complete! You can now run './.agent/scripts/setup.sh <workspace_name>'."

@@ -2,7 +2,7 @@
 # scripts/lock.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
 
 # Ensure ai_workspace exists

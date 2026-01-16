@@ -14,7 +14,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 echo "========================================"
 echo "ROS2 Agent Workspace Health Check"
@@ -46,7 +46,7 @@ echo "1. Checking ROS2 Installation..."
 if [ -f "/opt/ros/jazzy/setup.bash" ]; then
     check_pass "ROS2 Jazzy found at /opt/ros/jazzy"
 else
-    check_fail "ROS2 Jazzy not found. Run: ./scripts/bootstrap.sh"
+    check_fail "ROS2 Jazzy not found. Run: ./.agent/scripts/bootstrap.sh"
     ((FAILED_CHECKS++))
 fi
 echo ""
@@ -113,11 +113,11 @@ else
     ((FAILED_CHECKS++))
 fi
 
-if [ -d "$ROOT_DIR/scripts" ]; then
-    SCRIPT_COUNT=$(ls -1 "$ROOT_DIR/scripts"/*.sh 2>/dev/null | wc -l)
-    check_pass "scripts/ directory exists with $SCRIPT_COUNT shell scripts"
+if [ -d "$ROOT_DIR/.agent/scripts" ]; then
+    SCRIPT_COUNT=$(ls -1 "$ROOT_DIR/.agent/scripts"/*.sh 2>/dev/null | wc -l)
+    check_pass "scripts/ directory exists in .agent/scripts with $SCRIPT_COUNT shell scripts"
 else
-    check_fail "scripts/ directory not found"
+    check_fail ".agent/scripts/ directory not found"
     ((FAILED_CHECKS++))
 fi
 
@@ -135,7 +135,7 @@ if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     if python3 "$SCRIPT_DIR/validate_repos.py" &>/dev/null; then
         check_pass "All .repos files are valid"
     else
-        check_fail "Some .repos files have errors. Run: python3 scripts/validate_repos.py"
+        check_fail "Some .repos files have errors. Run: python3 .agent/scripts/validate_repos.py"
         ((FAILED_CHECKS++))
     fi
 else
@@ -188,7 +188,7 @@ if [ -d "$ROOT_DIR/workspaces" ]; then
             fi
         done
     else
-        check_warn "No workspace layers set up. Run: ./scripts/setup.sh <layer>"
+        check_warn "No workspace layers set up. Run: ./.agent/scripts/setup.sh <layer>"
     fi
 else
     check_warn "workspaces/ directory not found (will be created on setup)"
@@ -201,7 +201,7 @@ LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
 if [ -f "$LOCK_FILE" ]; then
     check_warn "Workspace is LOCKED:"
     cat "$LOCK_FILE"
-    echo "    Run: ./scripts/unlock.sh to unlock"
+    echo "    Run: ./.agent/scripts/unlock.sh to unlock"
 else
     check_pass "Workspace is unlocked"
 fi

@@ -22,7 +22,7 @@
 # set -u removed to allow sourcing upstream setup.bash which has unbound variables
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 REPORT_FILE="$ROOT_DIR/ai_workspace/build_report.md"
 
 # Ensure ai_workspace exists

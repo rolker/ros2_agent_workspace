@@ -44,7 +44,7 @@ if command -v vcs &> /dev/null; then
 else
     echo "Warning: 'vcs' command not found. Skipping repository import."
     echo "To install all necessary dependencies, run:"
-    echo "  ./scripts/bootstrap.sh"
+    echo "  ./.agent/scripts/bootstrap.sh"
 fi
 
 echo "Setup complete for $WORKSPACE_NAME."
@@ -53,5 +53,5 @@ echo "  cd $WORKSPACE_DIR"
 echo "  colcon build --symlink-install"
 echo ""
 echo "Or use the unified build script:"
-echo "  ./scripts/build.sh"
+echo "  ./.agent/scripts/build.sh"
 

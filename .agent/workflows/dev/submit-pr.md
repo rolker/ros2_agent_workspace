@@ -13,14 +13,18 @@ Use this workflow when you are ready to submit your changes for review.
     -   Create a new branch: `git checkout -b feature/<task-id>-<short-description>`
     -   *Example*: `git checkout -b feature/TASK-001-multi-distro-support`
 
-2.  **Commit**
+2.  **Validate**
+    -   Run local quality checks: `make lint` or `pre-commit run --all-files`
+    -   **Requirement**: You MUST fix any errors before proceeding.
+
+3.  **Commit**
     -   Stage files: `git add <files>`
     -   Commit with a conventional message: `git commit -m "feat: <description>"`
 
-3.  **Push**
+4.  **Push**
     -   Push to origin: `git push -u origin HEAD`
 
-4.  **Create Pull Request**
+5.  **Create Pull Request**
     -   **Option A: GitHub MCP (Preferred)**
         -   Use `github.create_pull_request`.
         -   Title: `feat: <description>`
@@ -31,5 +35,5 @@ Use this workflow when you are ready to submit your changes for review.
         -   The `git push` command usually outputs a URL to create a PR.
         -   **Action**: Display that URL to the user.
 
-5.  **Request Review**
+6.  **Request Review**
     -   If the repo is configured, comment `/copilot review` on the PR (if supported) or assign the relevant reviewers.
