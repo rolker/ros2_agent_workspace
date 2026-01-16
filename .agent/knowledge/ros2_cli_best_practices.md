@@ -60,7 +60,7 @@ This guide outlines how to use the `ros2` command-line interface (CLI) effective
     ```
     *Example*: `ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}, angular: {z: 0.0}}" --once`
 
-### 4. invoking Services
+### 4. Invoking Services
 
 **Goal**: Trigger an immediate action or computation.
 
