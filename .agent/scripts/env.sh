@@ -12,6 +12,10 @@ else
     return 1 2>/dev/null || exit 1
 fi
 
+# Determine workspace root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
 # 2. Workspace Layers
 # 2. Workspace Layers
 # Define the order of workspaces to source. Order determines overlay priority (last one is top).
@@ -25,9 +29,6 @@ else
     echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
     LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 echo "Sourcing ROS2 Agent Workspace layers..."
 
