@@ -16,6 +16,13 @@ The core configuration (`configs/core.repos`) includes repositories for:
 
 **Experienced users?** Jump to [Usage](#usage) below.
 
+## Sandboxed Development (Recommended)
+
+This workspace supports **DevContainers**, allowing you to run the entire environment in a Docker container. This is the **preferred method** for AI Agents and users who want a clean, safe setup.
+
+- **GitHub Codespaces**: Open this repo in Codespaces for a zero-setup cloud desktop.
+- **VS Code Local**: Install the "Dev Containers" extension and choose "Reopen in Container".
+
 ## Documentation
 
 - 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes

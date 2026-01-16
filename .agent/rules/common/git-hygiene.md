@@ -13,7 +13,20 @@ To prevent conflicts and "messy" workspaces when multiple agents are active:
         *   Fixes: `fix/<description>`
     *   *exception*: If you are just updating documentation or non-code artifacts, you may use your discretion, but a branch is still preferred.
 
-2.  **Clean Handovers**:
+## Development Workflows
+
+### 1. Sandboxed (Recommended)
+We provide a `.devcontainer` configuration that sets up a full ROS 2 Jazzy environment with all dependencies.
+- **Prerequisites**: Docker Desktop (or equivalent) + VS Code + Dev Containers Extension.
+- **Benefits**: No need to install ROS 2 on your host machine. Safe for AI agents.
+- **Usage**: Click "Reopen in Container" in VS Code.
+
+### 2. Native (Advanced)
+If you prefer developing natively on Ubuntu 24.04:
+- Run `./.agent/scripts/bootstrap.sh` to install dependencies.
+- Source the environment: `source .agent/scripts/env.sh`.
+
+## Git Hygiene
     *   **Before you finish** (i.e., before `notify_user` or ending a session):
     *   Run `status_report.sh` or `vcs status`.
     *   **Ensure there are NO uncommitted changes** (staged or unstaged) in any repository, unless you are specifically asking the user to review a "work in progress".

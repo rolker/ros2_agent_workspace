@@ -1,0 +1,35 @@
+{
+  "name": "ROS 2 Agent Workspace",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "true"
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-iot.vscode-ros",
+        "ms-python.python",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "redhat.vscode-yaml",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "tamasfe.even-better-toml",
+        "esbenp.prettier-vscode",
+        "timonwong.shellcheck"
+      ]
+    }
+  },
+  "remoteUser": "ros",
+  "runArgs": [
+    "--userns=host"
+  ]
+}
