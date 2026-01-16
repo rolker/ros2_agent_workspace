@@ -27,19 +27,19 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          shellcheck scripts/*.sh || exit 0
+          shellcheck .agent/scripts/*.sh || exit 0
 
       - name: Validate Python syntax
         run: |
-          python3 -m py_compile scripts/*.py
+          python3 -m py_compile .agent/scripts/*.py
 
       - name: Check Python formatting
         run: |
-          black --check --line-length 100 scripts/*.py || exit 0
+          black --check --line-length 100 .agent/scripts/*.py || exit 0
 
       - name: Run flake8
         run: |
-          flake8 --max-line-length=100 --extend-ignore=E203,W503 scripts/*.py || exit 0
+          flake8 --max-line-length=100 --extend-ignore=E203,W503 .agent/scripts/*.py || exit 0
 
   validate-configs:
     name: Validate Configuration Files
