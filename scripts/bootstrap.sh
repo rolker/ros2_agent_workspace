@@ -9,7 +9,7 @@ echo "Bootstrapping ROS 2 Agent Workspace..."
 
 # 1. Locale Check
 echo "Checking locale..."
-if ! locale | grep -q "UTF-8"; then
+if ! locale | grep -q 'LC_ALL=.*UTF-8'; then
     echo "Locale does not appear to support UTF-8. Attempting to set it..."
     sudo apt update && sudo apt install -y locales
     sudo locale-gen en_US en_US.UTF-8
@@ -32,7 +32,16 @@ sudo apt update && sudo apt install -y curl
 # Install ros2-apt-source (Handles GPG/Repo automatically)
 echo "Installing ros2-apt-source..."
 export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
-curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
+if [ -z "${ROS_APT_SOURCE_VERSION}" ]; then
+    echo "Error: Failed to determine ROS apt source version from GitHub API." >&2
+    exit 1
+fi
+curl -fL -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
+
+if [ ! -s /tmp/ros2-apt-source.deb ]; then
+    echo "Error: Failed to download ros2-apt-source .deb or file is empty." >&2
+    exit 1
+fi
 sudo dpkg -i /tmp/ros2-apt-source.deb
 rm /tmp/ros2-apt-source.deb
 
