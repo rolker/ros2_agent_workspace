@@ -4,7 +4,7 @@
 # Generates a concise Markdown report of the root git repo and all sub-repos.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WORKSPACES_DIR="$ROOT_DIR/workspaces"
 
 # Helper function to print a table row

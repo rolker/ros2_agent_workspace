@@ -27,7 +27,7 @@ The core configuration (`configs/core.repos`) includes repositories for:
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
 - **`configs/`**: Contains `.repos` files (YAML) defining the packages for each workspace layer.
-- **`scripts/`**: Helper scripts for setup and environment sourcing.
+- **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
 - **`workspaces/`**: The actual ROS2 workspaces (source code and build artifacts).
 
 ## Usage
@@ -36,11 +36,11 @@ The core configuration (`configs/core.repos`) includes repositories for:
 To initialize a workspace layer defined in `configs/<name>.repos`:
 
 ```bash
-./scripts/setup.sh <name>
-./scripts/setup.sh core
+./.agent/scripts/setup.sh <name>
+./.agent/scripts/setup.sh core
 # Examples:
-# ./scripts/setup.sh core   (Installs Project11, Marine AIS, etc.)
-# ./scripts/setup.sh ui     (Installs RQT and visualization tools)
+# ./.agent/scripts/setup.sh core   (Installs Project11, Marine AIS, etc.)
+# ./.agent/scripts/setup.sh ui     (Installs RQT and visualization tools)
 ```
 
 This will:
@@ -51,7 +51,7 @@ This will:
 To source the workspaces in the correct order (Underlay -> ... -> Overlay):
 
 ```bash
-source scripts/env.sh
+source .agent/scripts/env.sh
 ```
 
 ## Getting Started for Humans (Agentic Coding)
@@ -70,7 +70,7 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
 
 ## Adding New Layers
 1. Create a `<new_layer>.repos` file in `configs/`.
-2. Run `./scripts/setup.sh <new_layer>`.
+2. Run `./.agent/scripts/setup.sh <new_layer>`.
 
 ## Troubleshooting
 
@@ -87,7 +87,7 @@ sudo apt install python3-vcstool
 #### ROS 2 Jazzy Not Found
 Ensure ROS 2 Jazzy is installed:
 ```bash
-./scripts/bootstrap.sh
+./.agent/scripts/bootstrap.sh
 ```
 
 #### Build Failures
@@ -105,19 +105,19 @@ Ensure ROS 2 Jazzy is installed:
 #### Workspace Locked
 If you see "Workspace is LOCKED":
 ```bash
-./scripts/unlock.sh
+./.agent/scripts/unlock.sh
 ```
 
 #### Environment Not Sourced
 If ROS commands aren't working:
 ```bash
-source scripts/env.sh
+source .agent/scripts/env.sh
 ```
 
 #### Permission Denied
 Make sure scripts are executable:
 ```bash
-chmod +x scripts/*.sh
+chmod +x .agent/scripts/*.sh
 ```
 
 ### Getting Help
@@ -153,5 +153,5 @@ pre-commit install
 ### Validation
 Validate configuration files:
 ```bash
-python3 scripts/validate_repos.py
+python3 .agent/scripts/validate_repos.py
 ```

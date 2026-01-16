@@ -22,10 +22,10 @@ help:
 	@echo ""
 
 health-check:
-	@./scripts/health_check.sh
+	@./.agent/scripts/health_check.sh
 
 bootstrap:
-	@./scripts/bootstrap.sh
+	@./.agent/scripts/bootstrap.sh
 
 install-deps:
 	@echo "Installing Python dependencies..."
@@ -33,30 +33,30 @@ install-deps:
 	@echo "Done."
 
 setup-core:
-	@./scripts/setup.sh core
+	@./.agent/scripts/setup.sh core
 
 setup-all: setup-underlay setup-core setup-platforms setup-sensors setup-simulation setup-ui
 
 setup-underlay:
-	@./scripts/setup.sh underlay
+	@./.agent/scripts/setup.sh underlay
 
 setup-platforms:
-	@./scripts/setup.sh platforms
+	@./.agent/scripts/setup.sh platforms
 
 setup-sensors:
-	@./scripts/setup.sh sensors
+	@./.agent/scripts/setup.sh sensors
 
 setup-simulation:
-	@./scripts/setup.sh simulation
+	@./.agent/scripts/setup.sh simulation
 
 setup-ui:
-	@./scripts/setup.sh ui
+	@./.agent/scripts/setup.sh ui
 
 build:
-	@./scripts/build.sh
+	@./.agent/scripts/build.sh
 
 test:
-	@./scripts/test.sh
+	@./.agent/scripts/test.sh
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -66,29 +66,29 @@ clean:
 	@echo "Done."
 
 status:
-	@./scripts/status_report.sh
+	@./.agent/scripts/status_report.sh
 
 lock:
-	@./scripts/lock.sh "Manual lock via Makefile"
+	@./.agent/scripts/lock.sh "Manual lock via Makefile"
 
 unlock:
-	@./scripts/unlock.sh
+	@./.agent/scripts/unlock.sh
 
 format:
 	@echo "Formatting Python code with black..."
-	@black --line-length 100 scripts/*.py
+	@black --line-length 100 .agent/scripts/*.py
 	@echo "Done."
 
 lint: lint-shell lint-python
 
 lint-shell:
 	@echo "Running shellcheck on shell scripts..."
-	@shellcheck scripts/*.sh || true
+	@shellcheck .agent/scripts/*.sh || true
 	@echo "Done."
 
 lint-python:
 	@echo "Running flake8 on Python scripts..."
-	@flake8 --max-line-length=100 --extend-ignore=E203,W503 scripts/*.py || true
+	@flake8 --max-line-length=100 --extend-ignore=E203,W503 .agent/scripts/*.py || true
 	@echo "Running pylint on Python scripts..."
-	@pylint --max-line-length=100 --disable=C0114,C0115,C0116 scripts/*.py || true
+	@pylint --max-line-length=100 --disable=C0114,C0115,C0116 .agent/scripts/*.py || true
 	@echo "Done."
