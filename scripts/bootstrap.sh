@@ -37,7 +37,7 @@ if [ -z "${ROS_APT_SOURCE_VERSION}" ]; then
     echo "Error: Failed to determine ROS apt source version from GitHub API." >&2
     exit 1
 fi
-curl -fL -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
+curl -fL -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo "${UBUNTU_CODENAME:-${VERSION_CODENAME}}")_all.deb"
 
 if [ ! -s /tmp/ros2-apt-source.deb ]; then
     echo "Error: Failed to download ros2-apt-source .deb or file is empty." >&2

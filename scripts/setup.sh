@@ -1,4 +1,22 @@
 #!/bin/bash
+# scripts/setup.sh
+# Sets up a ROS2 workspace layer by importing repositories from a .repos file
+#
+# Usage: ./scripts/setup.sh <workspace_name>
+# Example: ./scripts/setup.sh core
+#
+# This script will:
+# 1. Create workspaces/<workspace_name>_ws/src directory
+# 2. Import repositories from configs/<workspace_name>.repos using vcs tool
+#
+# Available workspace layers:
+#   - underlay: Additional dependencies
+#   - core: Main autonomy framework (Project11, AIS, Navigation)
+#   - platforms: Platform-specific packages
+#   - sensors: Sensor drivers and perception
+#   - simulation: Simulation tools
+#   - ui: Visualization and user interfaces
+
 set -e
 
 WORKSPACE_NAME=$1

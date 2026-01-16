@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint
+.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check
 
 # Default target
 help:
@@ -6,6 +6,7 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  help          - Show this help message"
+	@echo "  health-check  - Run comprehensive workspace health check"
 	@echo "  bootstrap     - Install ROS2 and dependencies"
 	@echo "  install-deps  - Install Python dependencies"
 	@echo "  setup-core    - Setup core workspace layer"
@@ -19,6 +20,9 @@ help:
 	@echo "  format        - Format Python code with black"
 	@echo "  lint          - Run linters on all code"
 	@echo ""
+
+health-check:
+	@./scripts/health_check.sh
 
 bootstrap:
 	@./scripts/bootstrap.sh

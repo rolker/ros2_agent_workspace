@@ -1,7 +1,21 @@
 #!/bin/bash
-
 # scripts/build.sh
 # Unified build script for ROS2 Agent Workspace
+#
+# Usage: ./scripts/build.sh
+#
+# This script will:
+# 1. Check for workspace locks (multi-agent coordination)
+# 2. Build all workspace layers in dependency order
+# 3. Generate a detailed build report in ai_workspace/build_report.md
+# 4. Source each layer after successful build for cascading overlays
+#
+# The build order follows the layer hierarchy defined in scripts/env.sh:
+#   underlay -> core -> platforms -> sensors -> simulation -> ui
+#
+# Exit codes:
+#   0 - All layers built successfully
+#   1 - Build failed in one or more layers
 
 # Exit on any error to prevent cascading failures in strict mode, 
 # though we want to handle build failures gracefully for reporting.

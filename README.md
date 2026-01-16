@@ -10,6 +10,19 @@ The core configuration (`configs/core.repos`) includes repositories for:
 - **UNH Marine Navigation**: Navigation tools and utilities.
 - **Mission/Helm Managers**: Core logic for autonomy control.
 
+## Quick Start
+
+**New to this workspace?** See [QUICKSTART.md](QUICKSTART.md) for a step-by-step setup guide.
+
+**Experienced users?** Jump to [Usage](#usage) below.
+
+## Documentation
+
+- 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes
+- 🏗️ [Architecture Guide](ARCHITECTURE.md) - Understanding the layered workspace system
+- 🤝 [Contributing Guide](CONTRIBUTING.md) - Development workflow and best practices
+- 🔒 [Security Policy](SECURITY.md) - Security guidelines and reporting
+
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
@@ -120,6 +133,7 @@ chmod +x scripts/*.sh
 Common operations are available via make:
 ```bash
 make help          # Show all available targets
+make health-check  # Run comprehensive health check
 make bootstrap     # Install ROS2 and dependencies
 make setup-all     # Setup all workspace layers
 make build         # Build all layers

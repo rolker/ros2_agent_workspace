@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+"""
+Build Report Generator for ROS2 Agent Workspace
+
+This script parses colcon's events.log file and generates a markdown table row
+summarizing the build results for a single workspace layer.
+
+Usage:
+    python3 build_report_generator.py --log-dir <path> --layer-name <name>
+
+Output:
+    Prints a markdown table row with:
+    - Layer name
+    - Package counts (total/successful)
+    - Failed/warning packages
+    - Status emoji
+
+Security Note:
+    This script uses eval() to parse Python repr() output from colcon logs.
+    This is acceptable since the logs are generated locally by colcon, but
+    be cautious when processing logs from untrusted sources.
+"""
 
 import argparse
 import os
