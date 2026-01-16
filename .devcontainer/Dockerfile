@@ -27,7 +27,9 @@ RUN apt-get update && apt-get install -y \
     python3-vcstool \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-install python deps
+# Pre-install python deps.
+# NOTE: This assumes a requirements.txt file exists at the repository root.
+# If it is missing, the devcontainer build will fail at this COPY/RUN step.
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt --break-system-packages
 
