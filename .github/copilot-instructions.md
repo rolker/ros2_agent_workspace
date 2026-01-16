@@ -1,103 +1,22 @@
-# GitHub Copilot Instructions for ROS2 Agent Workspace
+# GitHub Copilot Instructions
 
-This repository manages multiple layered ROS2 workspaces configured for use with AI agents. It hosts the UNH Marine Autonomy Framework.
+**Start here:** Read `README.md` for repository overview, structure, and usage.
 
-## Repository Structure
+## Essential Documentation
 
-```
-.
-├── .agent/           # Agent-specific workflows, knowledge, and rules
-├── configs/          # .repos files (YAML) defining workspace layers
-├── scripts/          # Setup and environment sourcing scripts
-└── workspaces/       # ROS2 workspaces (source code and build artifacts)
-```
+Before starting any work, review these files in order:
 
-## Key Technologies
+1. **`README.md`** - Repository structure, commands, and getting started
+2. **`.agent/WORKFORCE_PROTOCOL.md`** - Task coordination and clean handover standards
+3. **`.agent/rules/git-hygiene.md`** - Git workflow requirements
+4. **`.agent/rules/build-location.md`** - Where to run builds
+5. **`.agent/rules/clean-root.md`** - Keep workspace root clean
+6. **`.agent/ROADMAP.md`** - Active tasks and backlog
 
-- **ROS 2** (Robot Operating System 2)
-- **vcstool** for repository management
-- **colcon** for building ROS2 workspaces
-- **Layered workspace architecture** with underlay/overlay pattern
+## Workflows
 
-## Building and Testing
+Custom slash commands are in `.agent/workflows/` (e.g., `/add-repo`, `/build-all`, `/clean`, `/submit-pr`).
 
-### Setup a Workspace Layer
-```bash
-./scripts/setup.sh <layer_name>
-# Example: ./scripts/setup.sh core
-```
+## ROS2 Knowledge
 
-### Build All Layers
-```bash
-./scripts/build.sh
-```
-
-### Source the Environment
-```bash
-source scripts/env.sh
-```
-
-### Check Status
-```bash
-./scripts/status_report.sh
-```
-
-## Important Conventions
-
-### File Organization
-- **Never place build artifacts in the root directory** - use `workspaces/<layer>_ws/`
-- **Configuration files** go in `configs/` as `.repos` files
-- **Helper scripts** go in `scripts/`
-- **Agent-specific content** goes in `.agent/` subdirectories
-
-### Git Hygiene
-See `.agent/rules/git-hygiene.md` for complete git workflow rules.
-
-### Code Boundaries
-- **Do not modify** files within `workspaces/*/src/` unless explicitly asked
-- **Do not remove** working code or tests
-- **Keep changes minimal** and focused on the specific task
-
-## Workflow Integration
-
-This repository uses custom agent workflows defined in `.agent/workflows/`. Common workflows:
-- `/add-repo` - Add a new repository to a layer
-- `/build-all` - Build all layers in correct order
-- `/clean` - Clean build artifacts
-- `/rebuild-all` - Clean and rebuild everything
-- `/submit-pr` - Create a PR for changes
-
-See `.agent/workflows/` for the complete list.
-
-## Layer Management
-
-Workspace layers are defined in `configs/*.repos` files:
-- `underlay.repos` - Base ROS2 dependencies
-- `core.repos` - Project11, Marine AIS, Navigation tools
-- `ui.repos` - RQT and visualization tools
-- `sensors.repos` - Sensor-specific packages
-- `platforms.repos` - Platform-specific packages
-- `simulation.repos` - Simulation environments
-
-Layers build on each other in the order defined in `scripts/env.sh`.
-
-## Best Practices
-
-1. **Check the ROADMAP** - Review `.agent/ROADMAP.md` before starting work to avoid conflicts
-2. **Use existing tools** - Leverage vcstool and colcon commands rather than manual operations
-3. **Test in layers** - Build and test individual layers before building everything
-4. **Document changes** - Update relevant documentation when making structural changes
-5. **Follow ROS2 conventions** - Use standard ROS2 package structure and naming
-
-## Important Files to Review
-
-- `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination and task locking
-- `.agent/AI_IDENTITY_STRATEGY.md` - Git identity for agent commits
-- `.agent/rules/` - Specific rules for builds, git hygiene, and file organization
-- `.agent/knowledge/ros2_cli_best_practices.md` - ROS2 CLI usage guide
-
-## Security
-
-- Never commit credentials or secrets
-- Do not modify security-sensitive configurations without explicit approval
-- Review changes carefully before committing to shared repositories
+For ROS2 CLI usage and patterns, see `.agent/knowledge/ros2_cli_best_practices.md`.
