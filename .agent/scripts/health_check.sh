@@ -107,7 +107,15 @@ echo "4. Checking Workspace Structure..."
 
 if [ -d "$ROOT_DIR/configs" ]; then
     REPOS_COUNT=$(ls -1 "$ROOT_DIR/configs"/*.repos 2>/dev/null | wc -l)
-    check_pass "configs/ directory exists with $REPOS_COUNT .repos files"
+    
+    # Check for migrated repos
+    MIGRATED_DIR="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/repos"
+    if [ -d "$MIGRATED_DIR" ]; then
+        MIGRATED_COUNT=$(ls -1 "$MIGRATED_DIR"/*.repos 2>/dev/null | wc -l)
+        REPOS_COUNT=$((REPOS_COUNT + MIGRATED_COUNT))
+    fi
+
+    check_pass "configs/ (and migrated) directories exist with $REPOS_COUNT .repos files"
 else
     check_fail "configs/ directory not found"
     ((FAILED_CHECKS++))
@@ -132,10 +140,25 @@ echo ""
 # Check 5: Validate Configuration Files
 echo "5. Validating Configuration Files..."
 if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
-    if python3 "$SCRIPT_DIR/validate_repos.py" &>/dev/null; then
+    VALIDATION_PASSED=true
+    
+    # Validate configs/ (bootstrap)
+    if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$ROOT_DIR/configs" --strict &>/dev/null; then
+         VALIDATION_PASSED=false
+    fi
+
+    # Validate migrated repos (if exist)
+    MIGRATED_DIR="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/repos"
+    if [ -d "$MIGRATED_DIR" ]; then
+        if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$MIGRATED_DIR" --strict &>/dev/null; then
+             VALIDATION_PASSED=false
+        fi
+    fi
+
+    if [ "$VALIDATION_PASSED" = true ]; then
         check_pass "All .repos files are valid"
     else
-        check_fail "Some .repos files have errors. Run: python3 .agent/scripts/validate_repos.py"
+        check_fail "Some .repos files have errors. Run: python3 .agent/scripts/validate_repos.py --configs-dir <dir>"
         ((FAILED_CHECKS++))
     fi
 else
