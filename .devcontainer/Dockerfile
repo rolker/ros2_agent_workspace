@@ -34,4 +34,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt --break-system-packages
 
 USER $USERNAME
+COPY --chown=$USERNAME:$USERNAME requirements.txt /home/$USERNAME/requirements.txt
+RUN pip3 install --user --break-system-packages -r /home/$USERNAME/requirements.txt \
+    && rm /home/$USERNAME/requirements.txt
 CMD ["/bin/bash"]
