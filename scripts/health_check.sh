@@ -90,6 +90,13 @@ echo ""
 echo "3. Checking Python Dependencies..."
 if python3 -c "import yaml" 2>/dev/null; then
     check_pass "PyYAML installed"
+    
+    # Verify validate_repos.py can run
+    if python3 "$SCRIPT_DIR/validate_repos.py" --help &>/dev/null; then
+        check_pass "validate_repos.py is functional"
+    else
+        check_warn "validate_repos.py may have issues"
+    fi
 else
     check_warn "PyYAML not found. Install: pip install -r requirements.txt"
 fi

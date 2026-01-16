@@ -68,6 +68,16 @@ def validate_repos_file(file_path):
                     f"must be one of {valid_types}"
                 )
 
+        # Validate URL format
+        if "url" in repo_data:
+            url = repo_data["url"]
+            valid_url_prefixes = ["https://", "http://", "git@", "ssh://", "file://"]
+            if not any(url.startswith(prefix) for prefix in valid_url_prefixes):
+                errors.append(
+                    f"Repository '{repo_name}': URL '{url}' should start with one of: "
+                    f"{', '.join(valid_url_prefixes)}"
+                )
+
     return len(errors) == 0, errors
 
 
