@@ -15,7 +15,7 @@ To prevent conflicts when multiple agents/users work in the same repo:
 ## Automated Review Workflow
 Every PR must go through an automated review cycle:
 1.  **Submit PR**: Use the `submit-pr` workflow.
-2.  **Request Copilot Review**: The workflow automatically triggers `github.request_copilot_review`.
+2.  **Request Copilot Review**: If the repo is configured, comment `/copilot review` on the PR (if supported) or assign the relevant reviewers.
 3.  **Monitor & Respond**:
     *   **Poll**: Periodically check the PR status (e.g., every few minutes or after notification).
     *   **Review Comments**: Read and analyze all reviewer comments.
