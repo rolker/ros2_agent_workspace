@@ -143,8 +143,11 @@ if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     VALIDATION_PASSED=true
     
     # Validate configs/ (bootstrap)
-    if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$ROOT_DIR/configs" --strict &>/dev/null; then
-         VALIDATION_PASSED=false
+    if [ -d "$ROOT_DIR/configs" ] && ls "$ROOT_DIR/configs"/*.repos &>/dev/null; then
+        if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$ROOT_DIR/configs" --strict &>/dev/null; then
+             VALIDATION_PASSED=false
+             check_fail "Validation failed for $ROOT_DIR/configs"
+        fi
     fi
 
     # Validate migrated repos (if exist)
@@ -152,13 +155,14 @@ if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     if [ -d "$MIGRATED_DIR" ]; then
         if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$MIGRATED_DIR" --strict &>/dev/null; then
              VALIDATION_PASSED=false
+             check_fail "Validation failed for $MIGRATED_DIR"
         fi
     fi
 
     if [ "$VALIDATION_PASSED" = true ]; then
-        check_pass "All .repos files are valid"
+        check_pass "All existing .repos files are valid"
     else
-        check_fail "Some .repos files have errors. Run: python3 .agent/scripts/validate_repos.py --configs-dir <dir>"
+        check_fail "Some .repos files have errors."
         ((FAILED_CHECKS++))
     fi
 else

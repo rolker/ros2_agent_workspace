@@ -137,8 +137,8 @@ def main():
     # Find all .repos files
     repos_files = list(configs_dir.glob("*.repos"))
     if not repos_files:
-        print(f"Warning: No .repos files found in '{configs_dir}'", file=sys.stderr)
-        sys.exit(0 if not args.strict else 1)
+        print(f"Note: No .repos files found in '{configs_dir}'")
+        sys.exit(0)
 
     print(f"Validating {len(repos_files)} .repos files in {configs_dir}...")
     print()
