@@ -83,6 +83,8 @@ This workspace can be configured to bootstrap from a "Key Repository" of your ch
    ```text
    https://raw.githubusercontent.com/your-org/your-repo/main/config/bootstrap.yaml
    ```
+   > [!CAUTION]
+   > **Security Warning**: executes code (via `vcs import`) based on the configuration downloaded from this URL. Ensure you trust the source URL and that it is not compromised. Always use HTTPS.
 
 2. Ensure your Key Repo has the following structure:
    - `config/bootstrap.yaml`:

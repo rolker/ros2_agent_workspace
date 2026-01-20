@@ -28,7 +28,7 @@ BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
 # Default to assuming core_ws/src/unh_marine_autonomy if we can't determine otherwise yet,
 # but really we should read this from the fetched config.
 # For now, we'll assume the Key Repo goes into core_ws/src/unh_marine_autonomy until we parse the config.
-KEY_REPO_TARGET_DIR="workspaces/core_ws/src/unh_marine_autonomy" 
+KEY_REPO_TARGET_DIR="workspaces/core_ws/src/unh_marine_autonomy"
 
 if [ -z "$WORKSPACE_NAME" ]; then
     echo "Usage: $0 <workspace_name>"
@@ -49,12 +49,12 @@ if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
         # Create a temp file for the config
         TEMP_CONFIG=$(mktemp)
         if curl -sSLf "$REMOTE_CONFIG_URL" -o "$TEMP_CONFIG"; then
-            # Parse YAML (simple grep/awk approach for now, assuming simple structure)
-            # Expected format:
-            # git_url: <url>
-            # branch: <branch>
-            KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | awk '{print $2}')
-            KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | awk '{print $2}')
+            # Parse YAML (robust grep/awk approach)
+            # 1. grep for key
+            # 2. cut at comment (#)
+            # 3. awk to print value (handles leading/trailing whitespace)
+            KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+            KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
             
             rm "$TEMP_CONFIG"
 
@@ -72,7 +72,7 @@ if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
             exit 1
         fi
     elif [ -f "configs/bootstrap.repos" ]; then
-         # Fallback to legaccy behavior if file exists
+         # Fallback to legacy behavior if file exists
          echo "Warning: Using legacy configs/bootstrap.repos"
          mkdir -p workspaces/core_ws/src
          vcs import workspaces/core_ws/src < configs/bootstrap.repos
