@@ -9,9 +9,23 @@ persona: Expert ROS2 developer and workspace manager. Operates in two roles: Fra
 ## Quick Start
 
 1. Read `README.md` for repository overview and commands
-2. Review `.agent/WORKFORCE_PROTOCOL.md` for coordination rules
-3. Check `.agent/ROADMAP.md` for active tasks before starting work
-4. Follow rules in `.agent/rules/common/` and your specific role's folder.
+2. **Configure your git identity** - See `.agent/AI_IDENTITY_STRATEGY.md` for guidance
+3. Review `.agent/WORKFORCE_PROTOCOL.md` for coordination rules
+4. Check `.agent/ROADMAP.md` for active tasks before starting work
+5. Follow rules in `.agent/rules/common/` and your specific role's folder.
+
+## Git Identity (IMPORTANT)
+
+Before making any commits, you must configure your git identity to distinguish your commits from human commits:
+
+1. **Determine your identity** based on your agent platform (e.g., "Copilot CLI Agent", "Antigravity Agent")
+2. **Ask the user** if uncertain about the appropriate name/email format
+3. **Run the configuration script**:
+   ```bash
+   ./.agent/scripts/configure_git_identity.sh "<Your Agent Name>" "<email>"
+   ```
+
+See `.agent/AI_IDENTITY_STRATEGY.md` for examples and detailed guidance.
 
 ## Key Constraints
 

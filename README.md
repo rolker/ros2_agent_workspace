@@ -1,6 +1,6 @@
 # ROS2 Agent Workspace
 
-This repository allows for the management of multiple layered ROS2 workspaces, configured specifically for use with AI agents like Antigravity.
+This repository allows for the management of multiple layered ROS2 workspaces, configured specifically for use with AI agents like GitHub Copilot and Antigravity.
 
 **It is pre-configured to host the UNH Marine Autonomy Framework.**
 
