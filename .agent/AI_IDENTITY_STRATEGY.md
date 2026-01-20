@@ -3,7 +3,7 @@
 ## Problem Statement
 Currently, AI agents operate using the user's personal GitHub credentials (PAT). This causes two issues:
 1.  **Identity Confusion**: Commits and PRs appear as if they were created by the user (`rolker`), making it difficult to distinguish between human-generated and agent-generated code in the history.
-2.  **Review Blocking**: GitHub prevents users from approving their own Pull Requests. identifying issues and PRs submitted by AI agents. Since the agent-created PR is owned by `rolker`, `rolker` cannot approve it, hindering the desired peer-review workflow.
+2.  **Review Blocking**: GitHub prevents users from approving their own Pull Requests, making it difficult to identify issues and PRs submitted by AI agents. Since the agent-created PR is owned by `rolker`, `rolker` cannot approve it, hindering the desired peer-review workflow.
 
 ## Agent Identity Configuration
 

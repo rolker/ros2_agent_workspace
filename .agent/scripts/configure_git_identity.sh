@@ -35,13 +35,17 @@ echo "  ✓ Workspace repository configured"
 # Configure all repositories in workspaces/
 if [ -d "workspaces" ]; then
     REPO_COUNT=0
-    while IFS= read -r -d '' repo_dir; do
+    while IFS= read -r -d '' git_dir; do
+        repo_dir="${git_dir%/.git}"
         if [ -d "$repo_dir/.git" ]; then
             echo "Configuring $repo_dir..."
-            (cd "$repo_dir" && git config user.name "$AGENT_NAME" && git config user.email "$AGENT_EMAIL")
+            if ! (cd "$repo_dir" && git config user.name "$AGENT_NAME" && git config user.email "$AGENT_EMAIL"); then
+                echo "  ✗ Failed to configure $repo_dir" >&2
+                exit 1
+            fi
             ((REPO_COUNT++))
         fi
-    done < <(find workspaces -type d -name ".git" -print0 | sed 's/\/.git\x0/\x0/g')
+    done < <(find workspaces -type d -name ".git" -print0)
     
     if [ $REPO_COUNT -gt 0 ]; then
         echo "  ✓ Configured $REPO_COUNT repositories in workspaces/"
