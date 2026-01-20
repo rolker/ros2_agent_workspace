@@ -36,7 +36,7 @@ The workspace uses a hierarchical overlay system where each layer builds upon pr
 
 ### Source Order
 
-The `scripts/env.sh` sources workspaces in this order:
+The `.agent/scripts/env.sh` sources workspaces in this order:
 1. ROS 2 Jazzy base (`/opt/ros/jazzy`)
 2. Underlay workspace
 3. Core workspace
@@ -54,6 +54,7 @@ ros2_agent_workspace/
 ├── .agent/                    # Agent intelligence
 │   ├── workflows/            # Executable workflows (e.g., /build-all)
 │   ├── rules/                # Always-on guidelines for agents
+│   ├── scripts/              # Automation scripts (setup, build, test, etc.)
 │   ├── templates/            # Templates for various tasks
 │   └── knowledge/            # Auto-generated knowledge links
 │
@@ -64,17 +65,6 @@ ros2_agent_workspace/
 │   ├── sensors.repos         # Sensor packages
 │   ├── simulation.repos      # Simulation tools
 │   └── ui.repos              # Visualization & user interfaces
-│
-├── scripts/                   # Automation scripts
-│   ├── bootstrap.sh          # Initial system setup (installs ROS2, tools)
-│   ├── setup.sh              # Setup a specific workspace layer
-│   ├── env.sh                # Environment sourcing (use: source scripts/env.sh)
-│   ├── build.sh              # Unified build script (all layers)
-│   ├── test.sh               # Unified test script (all layers)
-│   ├── status_report.sh      # Git status across all repos
-│   ├── lock.sh / unlock.sh   # Workspace locking for coordination
-│   ├── generate_knowledge.sh # Create knowledge symlinks
-│   └── *.py                  # Python utilities
 │
 ├── workspaces/                # Generated workspace directories (gitignored)
 │   ├── underlay_ws/
@@ -144,7 +134,7 @@ This is parsed from colcon's `events.log` by `build_report_generator.py`.
 
 ### Auto-Generated Knowledge
 
-The `scripts/generate_knowledge.sh` creates symbolic links in `.agent/knowledge/` pointing to important documentation across all workspace layers:
+The `.agent/scripts/generate_knowledge.sh` creates symbolic links in `.agent/knowledge/` pointing to important documentation across all workspace layers:
 
 - System overviews
 - Component documentation
@@ -162,7 +152,7 @@ This allows agents to quickly access relevant documentation without traversing a
 
 ### Multi-Agent Locking
 
-The workspace supports a locking mechanism (`scripts/lock.sh`, `scripts/unlock.sh`) to prevent conflicts when multiple agents or processes might work simultaneously:
+The workspace supports a locking mechanism (`.agent/scripts/lock.sh`, `.agent/scripts/unlock.sh`) to prevent conflicts when multiple agents or processes might work simultaneously:
 
 - Creates `ai_workspace/workspace.lock` with:
   - User/Agent ID
@@ -172,7 +162,7 @@ The workspace supports a locking mechanism (`scripts/lock.sh`, `scripts/unlock.s
 
 ### Status Reporting
 
-`scripts/status_report.sh` generates a comprehensive report using `vcs` to show:
+`.agent/scripts/status_report.sh` generates a comprehensive report using `vcs` to show:
 - Root repository status
 - All sub-repository statuses
 - Modified files
@@ -194,14 +184,14 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 
 1. Create `configs/new_layer.repos`
 2. Define repositories in YAML format
-3. Run `./scripts/setup.sh new_layer`
-4. Optionally add to `LAYERS` array in `env.sh` for auto-sourcing
+3. Run `./.agent/scripts/setup.sh new_layer`
+4. The layer will be automatically configured when you run setup
 5. Update knowledge links in `generate_knowledge.sh` if needed
 
 ### Adding New Scripts
 
-- Place in `scripts/` directory
-- Make executable: `chmod +x scripts/new_script.sh`
+- Place in `.agent/scripts/` directory
+- Make executable: `chmod +x .agent/scripts/new_script.sh`
 - Follow existing patterns (lock checking, error handling)
 - Update CONTRIBUTING.md with usage
 
@@ -215,7 +205,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 
 ## Design Principles
 
-1. **Separation of Concerns**: Configuration (configs/), automation (scripts/), intelligence (.agent/)
+1. **Separation of Concerns**: Configuration (configs/), automation (.agent/scripts/), intelligence (.agent/)
 2. **GitOps**: Workspace structure defined in version control, generated artifacts are gitignored
 3. **Reproducibility**: Bootstrap and setup scripts ensure consistent environments
 4. **Agent-Friendly**: Clear structure, comprehensive documentation, executable workflows

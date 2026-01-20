@@ -25,15 +25,11 @@ This workflow guides you through adding a new Git repository to an existing or n
        version: <branch_or_tag>
    ```
 
-4. **Register Layer (If New)**: If you created a new `.repos` file, add the layer name to the `LAYERS` array in `scripts/env.sh` to ensure it is sourced.
-   ```bash
-   # In scripts/env.sh
-   LAYERS=("underlay" "core" "ui" "new_layer")
-   ```
+4. **Register Layer (If New)**: If you created a new `.repos` file, the layer will be automatically registered when you run setup. The layer configuration is managed dynamically.
 
 5. **Run Setup**: Execute the setup script for that layer to import the code.
    ```bash
-   ./scripts/setup.sh <layer_name>
+   ./.agent/scripts/setup.sh <layer_name>
    ```
 
 6. **Install Dependencies**: Use `rosdep` to install any missing system dependencies for the new code.

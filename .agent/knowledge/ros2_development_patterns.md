@@ -85,7 +85,7 @@ source workspaces/core_ws/install/setup.bash
 # ... additional layers
 ```
 
-The `scripts/env.sh` script handles this automatically.
+The `.agent/scripts/env.sh` script handles this automatically.
 
 ## Dependencies
 

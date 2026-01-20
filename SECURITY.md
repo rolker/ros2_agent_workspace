@@ -35,4 +35,4 @@ When working with this workspace:
 ## Known Security Considerations
 
 - The `build_report_generator.py` script uses `eval()` on colcon log output. This is acceptable since logs are generated locally, but be aware when processing logs from untrusted sources.
-- Scripts require sudo for system package installation during bootstrap. Review `scripts/bootstrap.sh` before running.
+- Scripts require sudo for system package installation during bootstrap. Review `.agent/scripts/bootstrap.sh` before running.

@@ -19,7 +19,7 @@ To safely remove directories in `src/` that are no longer tracked in your `.repo
 
 ```bash
 # Identify untracked repositories by comparing src/ with the .repos config
-source scripts/env.sh
+source .agent/scripts/env.sh
 for layer in "${LAYERS[@]}"; do
     [ -z "$layer" ] && continue
     WORKSPACE_DIR="workspaces/${layer}_ws"
@@ -61,9 +61,9 @@ If you want to completely re-import everything and ensure a clean state:
 rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
 
 # 2. Run setup for all layers to ensure configs match local src
-source scripts/env.sh
+source .agent/scripts/env.sh
 for layer in "${LAYERS[@]}"; do
-    ./scripts/setup.sh "$layer"
+    ./.agent/scripts/setup.sh "$layer"
 done
 ```
 
