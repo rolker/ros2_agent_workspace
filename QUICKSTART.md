@@ -21,7 +21,7 @@ cd ros2_agent_workspace
 This installs ROS 2 Jazzy and all required tools:
 
 ```bash
-./scripts/bootstrap.sh
+./.agent/scripts/bootstrap.sh
 ```
 
 This will:
@@ -49,7 +49,7 @@ make install-deps
 Verify your setup:
 
 ```bash
-./scripts/health_check.sh
+./.agent/scripts/health_check.sh
 ```
 
 Or using make:
@@ -64,7 +64,7 @@ This will check that all required tools are installed and the workspace is prope
 Import and setup the core autonomy packages:
 
 ```bash
-./scripts/setup.sh core
+./.agent/scripts/setup.sh core
 ```
 
 Or using make:
@@ -84,7 +84,7 @@ This will:
 Build all packages:
 
 ```bash
-./scripts/build.sh
+./.agent/scripts/build.sh
 ```
 
 Or using make:
@@ -104,13 +104,13 @@ This will:
 After building, source the workspace to use the packages:
 
 ```bash
-source scripts/env.sh
+source .agent/scripts/env.sh
 ```
 
 You'll need to do this in every new terminal, or add it to your `~/.bashrc`:
 
 ```bash
-echo "source ~/ros2_agent_workspace/scripts/env.sh" >> ~/.bashrc
+echo "source ~/ros2_agent_workspace/.agent/scripts/env.sh" >> ~/.bashrc
 ```
 
 ## Step 8: Verify Installation
@@ -131,16 +131,16 @@ Depending on your needs, setup additional workspace layers:
 
 ```bash
 # Platform-specific packages (e.g., for Ben robot)
-./scripts/setup.sh platforms
+./.agent/scripts/setup.sh platforms
 
 # Sensor drivers and perception
-./scripts/setup.sh sensors
+./.agent/scripts/setup.sh sensors
 
 # Simulation tools
-./scripts/setup.sh simulation
+./.agent/scripts/setup.sh simulation
 
 # User interfaces and visualization
-./scripts/setup.sh ui
+./.agent/scripts/setup.sh ui
 ```
 
 Or setup all layers at once:
@@ -153,7 +153,7 @@ make setup-all
 Ensure everything is working:
 
 ```bash
-./scripts/test.sh
+./.agent/scripts/test.sh
 # or
 make test
 ```
@@ -163,7 +163,7 @@ make test
 See the status of all repositories:
 
 ```bash
-./scripts/status_report.sh
+./.agent/scripts/status_report.sh
 # or
 make status
 ```
@@ -182,8 +182,8 @@ This workspace is designed for AI-assisted development. If using with an AI agen
 ### Add a New Repository
 
 1. Edit the appropriate `.repos` file in `configs/`
-2. Run `./scripts/setup.sh <layer>` to import the new repo
-3. Build: `./scripts/build.sh`
+2. Run `./.agent/scripts/setup.sh <layer>` to import the new repo
+3. Build: `./.agent/scripts/build.sh`
 
 ### Clean Build Artifacts
 
@@ -197,7 +197,7 @@ make clean
 cd workspaces/core_ws/src
 vcs pull
 cd ../../..
-./scripts/build.sh
+./.agent/scripts/build.sh
 ```
 
 ### Create a Feature Branch
@@ -213,7 +213,7 @@ git commit -am "Add new feature"
 If you encounter issues, see the [Troubleshooting](README.md#troubleshooting) section in the main README or run:
 
 ```bash
-./scripts/health_check.sh
+./.agent/scripts/health_check.sh
 ```
 
 ## Getting Help

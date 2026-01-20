@@ -75,6 +75,27 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
     *   *See `.agent/workflows/` for the full list.*
 3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `workspaces/`, configs in `configs/`). Trust it to place files in the correct location.
 
+## Using with Custom Projects
+
+This workspace can be configured to bootstrap from a "Key Repository" of your choice (e.g., your project's main repo).
+
+1. Create a `configs/project_bootstrap.url` file containing the raw URL to your bootstrap configuration:
+   ```text
+   https://raw.githubusercontent.com/your-org/your-repo/main/config/bootstrap.yaml
+   ```
+   > [!CAUTION]
+   > **Security Warning**: executes code (via `vcs import`) based on the configuration downloaded from this URL. Ensure you trust the source URL and that it is not compromised. Always use HTTPS.
+
+2. Ensure your Key Repo has the following structure:
+   - `config/bootstrap.yaml`:
+     ```yaml
+     git_url: https://github.com/your-org/your-repo.git
+     branch: main
+     ```
+   - `config/repos/`: Directory containing `.repos` files (e.g., `core.repos`, `ui.repos`).
+
+3. Run `./.agent/scripts/setup.sh <layer>` to import repositories defined in your Key Repo.
+
 ## Adding New Layers
 1. Create a `<new_layer>.repos` file in `configs/`.
 2. Run `./.agent/scripts/setup.sh <new_layer>`.

@@ -3,7 +3,7 @@ description: Launches the basic simulator which includes a simulated USV, robot 
 ---
 
 1. Source the environment
-source scripts/env.sh
+source .agent/scripts/env.sh
 
 2. Launch the simulator
 // turbo

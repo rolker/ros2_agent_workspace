@@ -16,8 +16,8 @@ We are committed to providing a welcoming and inclusive environment. Please be r
    ```
 3. **Set up the development environment**:
    ```bash
-   ./scripts/bootstrap.sh
-   ./scripts/setup.sh core
+   ./.agent/scripts/bootstrap.sh
+   ./.agent/scripts/setup.sh core
    ```
 
 ## Development Workflow
@@ -40,8 +40,8 @@ git checkout -b feature/TASK-123-add-new-layer
 2. **Run builds in layer directories**, not the root
 3. **Test your changes**:
    ```bash
-   ./scripts/build.sh
-   ./scripts/test.sh
+   ./.agent/scripts/build.sh
+   ./.agent/scripts/test.sh
    ```
 
 ### Code Quality
@@ -63,7 +63,7 @@ git checkout -b feature/TASK-123-add-new-layer
 ### Testing
 
 - Add tests for new functionality when appropriate
-- Ensure existing tests pass: `./scripts/test.sh`
+- Ensure existing tests pass: `./.agent/scripts/test.sh`
 - Test on a clean workspace if possible
 
 ### Documentation
@@ -120,9 +120,9 @@ git checkout -b feature/TASK-123-add-new-layer
 To add a new workspace layer:
 
 1. Create `configs/<layer-name>.repos` with repository definitions
-2. Update `LAYERS` array in `scripts/env.sh` if the layer should be auto-sourced
+2. Update `LAYERS` array in `.agent/scripts/env.sh` if the layer should be auto-sourced (note: this is now configured via `layers.txt`)
 3. Document the layer in README.md
-4. Test setup: `./scripts/setup.sh <layer-name>`
+4. Test setup: `./.agent/scripts/setup.sh <layer-name>`
 
 ## Questions or Issues?
 

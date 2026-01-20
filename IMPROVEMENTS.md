@@ -48,13 +48,13 @@ The workspace has been transformed from a functional ROS2 workspace into a **pro
    - Easy-to-use interface: `make help`, `make build`, `make test`
    - Simplifies repetitive tasks
 
-2. **scripts/health_check.sh** (5.8KB)
+2. **.agent/scripts/health_check.sh** (5.8KB)
    - Comprehensive workspace validation
    - Checks: ROS2, tools, dependencies, structure, configs, git, locks
    - Color-coded output with clear pass/fail/warn indicators
    - Helpful suggestions for fixing issues
 
-3. **scripts/validate_repos.py** (5.1KB → 5.3KB enhanced)
+3. **.agent/scripts/validate_repos.py** (5.1KB → 5.3KB enhanced)
    - Validates all .repos files in configs/
    - Checks YAML syntax, required fields, field values
    - Validates URL formats and repository types
@@ -104,36 +104,36 @@ The workspace has been transformed from a functional ROS2 workspace into a **pro
    - Added Development Tools section (Make, pre-commit, validation)
    - Better organized with clear hierarchy
 
-2. **scripts/env.sh**
+2. **.agent/scripts/env.sh**
    - Added shebang for proper shell detection
    - Fixed shellcheck warning (use -n instead of ! -z)
    - Improved code quality
 
-3. **scripts/bootstrap.sh**
+3. **.agent/scripts/bootstrap.sh**
    - Fixed shellcheck warning (separate declare/assign)
    - Fixed variable quoting issue
    - Added comprehensive header documentation
 
-4. **scripts/build.sh**
+4. **.agent/scripts/build.sh**
    - Fixed shellcheck warning (grouped redirects)
    - Added comprehensive header documentation
    - Improved readability
 
-5. **scripts/test.sh**
+5. **.agent/scripts/test.sh**
    - Added comprehensive header documentation
    - Clarified usage and exit codes
 
-6. **scripts/setup.sh**
+6. **.agent/scripts/setup.sh**
    - Added comprehensive header documentation
    - Listed all available workspace layers
    - Clarified script purpose and usage
 
-7. **scripts/build_report_generator.py**
+7. **.agent/scripts/build_report_generator.py**
    - Added module docstring
    - Documented security consideration (eval usage)
    - Improved code clarity
 
-8. **scripts/list_overlay_repos.py**
+8. **.agent/scripts/list_overlay_repos.py**
    - Added module docstring
    - Clarified purpose and output format
 
