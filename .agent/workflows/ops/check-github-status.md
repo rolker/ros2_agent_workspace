@@ -11,9 +11,9 @@ python3 scripts/list_overlay_repos.py
 // turbo-all
 Group repositories into batches (e.g., 5-10 repositories per batch) to avoid rate limits.
 For each batch:
-   - Construct a query string: `repo:owner/name repo:owner/name ... is:pr is:open`
+   - Construct a query string: `repo:owner1/name1 OR repo:owner2/name2 ... is:pr is:open`
    - Call `github-mcp-server` tool `search_pull_requests` with the combined query.
-   - Construct a query string: `repo:owner/name repo:owner/name ... is:issue is:open`
+   - Construct a query string: `repo:owner1/name1 OR repo:owner2/name2 ... is:issue is:open`
    - Call `github-mcp-server` tool `search_issues` with the combined query.
 
 3. Report Summary
