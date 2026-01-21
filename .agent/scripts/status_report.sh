@@ -27,6 +27,7 @@ echo "## Root Repository"
 cd "$ROOT_DIR"
 if command -v git &> /dev/null; then
     # Check for modifications
+    git fetch -q
     if [ -n "$(git status --porcelain)" ]; then
         echo "- **Status**: ⚠️ Modified"
         echo "- **Branch**: $(git branch --show-current)"
@@ -65,6 +66,9 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
         #  M file
         # ?? file
         
+        # Fetch updates
+        vcs custom --git --args fetch -q > /dev/null
+
         raw_output=$(vcs custom --git --args status --porcelain -b)
         
         clean_count=0
