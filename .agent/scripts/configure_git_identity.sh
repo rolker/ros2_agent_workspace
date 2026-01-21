@@ -32,7 +32,7 @@ git config user.email "$AGENT_EMAIL"
 echo "  ✓ Workspace repository configured"
 
 # Configure all repositories in workspaces/
-# Configure all repositories in workspaces/
+
 if [ -d "workspaces" ]; then
     REPO_COUNT=0
     # Use process substitution with find to be robust against weird filenames

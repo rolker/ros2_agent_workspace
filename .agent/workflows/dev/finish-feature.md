@@ -1,5 +1,5 @@
 ---
-description: clean up workspace after submitting a PR by returning to default branch
+description: Clean up workspace after submitting a PR by returning to default branch
 ---
 
 # Finish Feature Workflow

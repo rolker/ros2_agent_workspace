@@ -1,5 +1,5 @@
 ---
-description: safely start a new feature branch from a clean, up-to-date default state
+description: Safely start a new feature branch from a clean, up-to-date default state
 ---
 
 # Start Feature Workflow
