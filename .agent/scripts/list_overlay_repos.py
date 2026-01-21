@@ -21,12 +21,12 @@ import sys
 import yaml
 import json
 import glob
+import argparse
 
 WORKSPACE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIGS_DIR = os.path.join(WORKSPACE_ROOT, "configs")
 IGNORED_FILES = ["underlay.repos"]
 
-import argparse
 
 def get_overlay_repos(include_underlay=False):
     repos_list = []

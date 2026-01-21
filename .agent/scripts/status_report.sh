@@ -27,7 +27,9 @@ echo "## Root Repository"
 cd "$ROOT_DIR"
 if command -v git &> /dev/null; then
     # Check for modifications
-    git fetch -q
+    if ! git fetch -q 2>/dev/null; then
+        echo "- **Note**: \`git fetch\` failed/skipped; status may not reflect latest remote state."
+    fi
     if [ -n "$(git status --porcelain)" ]; then
         echo "- **Status**: ⚠️ Modified"
         echo "- **Branch**: $(git branch --show-current)"
@@ -53,10 +55,14 @@ if ! command -v vcs &> /dev/null; then
 fi
 
 # Fetch expected repositories (including underlay) for tracking checks
+# Fetch expected repositories (including underlay) for tracking checks
 EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names)
-# Always expect the key configuration repository
-EXPECTED_REPOS="$EXPECTED_REPOS
-unh_marine_autonomy"
+if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+    echo "## Workspaces"
+    echo "**Error**: Failed to list expected repositories. Tracking check disabled."
+    EXPECTED_REPOS=""
+    # Don't exit, just continue without tracking info
+fi
 
 for ws_dir in "$WORKSPACES_DIR"/*; do
     if [ -d "$ws_dir/src" ]; then
@@ -73,7 +79,13 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
         # ?? file
         
         # Fetch updates
-        vcs custom --git --args fetch -q > /dev/null
+        if ! vcs custom --git --args fetch -q >/dev/null 2>&1; then
+             # Just warn once per workspace or rely on VCS output if verbose?
+             # For status report, we suppress but maybe log if needed.
+             # We won't echo here to keep report clean, or minimal warning:
+             # echo "<!-- Warning: Fetch failed for some repos in $ws_name -->"
+             true
+        fi
 
         raw_output=$(vcs custom --git --args status --porcelain -b)
         
