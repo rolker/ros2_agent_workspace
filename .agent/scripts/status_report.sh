@@ -93,12 +93,25 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
                     fi
                 fi
                 
-                # Check for non-jazzy branch
-                if [ "$branch" != "jazzy" ] && [ "$branch" != "unknown" ]; then
+                # Fetch expected branch from config
+                expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo")
+                
+                # Check for branch mismatch
+                if [ "$expected_branch" != "unknown" ]; then
+                     if [ "$branch" != "$expected_branch" ]; then
+                        warning="🔀 $branch (Want: $expected_branch)"
+                        if [ "$status_str" != "" ]; then
+                            status_str="$status_str, $warning"
+                        else
+                            status_str="$warning"
+                        fi
+                     fi
+                elif [ "$branch" != "jazzy" ] && [ "$current_repo" != "ros2_agent_workspace" ]; then
+                     # Fallback for repos not in config (assume Jazzy default)
                      if [ "$status_str" != "" ]; then
-                        status_str="$status_str, 🔀 Non-Jazzy"
+                        status_str="$status_str, 🔀 Non-Jazzy?"
                      else
-                        status_str="🔀 Non-Jazzy"
+                        status_str="🔀 Non-Jazzy?"
                      fi
                 fi
                 

@@ -12,6 +12,7 @@ python3 scripts/list_overlay_repos.py
 Group repositories into batches (e.g., 5-10 repositories per batch) to avoid rate limits.
 For each batch:
    - Construct a query string: `repo:owner1/name1 OR repo:owner2/name2 ... is:pr is:open`
+   - **Crucial**: Always include the root repository `rolker/ros2_agent_workspace` in the first batch.
    - Call `github-mcp-server` tool `search_pull_requests` with the combined query.
    - Construct a query string: `repo:owner1/name1 OR repo:owner2/name2 ... is:issue is:open`
    - Call `github-mcp-server` tool `search_issues` with the combined query.
