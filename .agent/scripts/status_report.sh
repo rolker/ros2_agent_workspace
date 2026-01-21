@@ -52,6 +52,12 @@ if ! command -v vcs &> /dev/null; then
     exit 1
 fi
 
+# Fetch expected repositories (including underlay) for tracking checks
+EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names)
+# Always expect the key configuration repository
+EXPECTED_REPOS="$EXPECTED_REPOS
+unh_marine_autonomy"
+
 for ws_dir in "$WORKSPACES_DIR"/*; do
     if [ -d "$ws_dir/src" ]; then
         ws_name=$(basename "$ws_dir" | sed 's/_ws//')
@@ -103,6 +109,14 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
                         status_str="$status_str, 🔀 Non-Jazzy"
                      else
                         status_str="🔀 Non-Jazzy"
+                     fi
+                fi
+
+                if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
+                     if [ "$status_str" != "" ]; then
+                        status_str="$status_str, ❓ Untracked"
+                     else
+                        status_str="❓ Untracked"
                      fi
                 fi
                 
