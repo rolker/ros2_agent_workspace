@@ -37,3 +37,7 @@ Use this workflow when you are ready to submit your changes for review.
 
 6.  **Request Review**
     -   If the repo is configured, comment `/copilot review` on the PR (if supported) or assign the relevant reviewers.
+
+7.  **Finish & Unlock**
+    -   Run the `finish-feature` workflow to return the repository to a clean state.
+    -   Step: `git checkout <default-branch>` && `git pull`

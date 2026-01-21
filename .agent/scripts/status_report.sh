@@ -55,7 +55,7 @@ if ! command -v vcs &> /dev/null; then
 fi
 
 # Fetch expected repositories (including underlay) for tracking checks
-# Fetch expected repositories (including underlay) for tracking checks
+
 EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names)
 if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
     echo "## Workspaces"
