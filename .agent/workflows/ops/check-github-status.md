@@ -9,12 +9,15 @@ python3 scripts/list_overlay_repos.py
 
 2. Fetch GitHub Data
 // turbo-all
-For each repository in the JSON output from step 1:
-   - Call `github-mcp-server` tool `search_pull_requests` with query: `repo:<owner>/<name> is:pr is:open`
-   - Call `github-mcp-server` tool `search_issues` with query: `repo:<owner>/<name> is:issue is:open`
+Group repositories into batches (e.g., 5-10 repositories per batch) to avoid rate limits.
+For each batch:
+   - Construct a query string: `repo:owner/name repo:owner/name ... is:pr is:open`
+   - Call `github-mcp-server` tool `search_pull_requests` with the combined query.
+   - Construct a query string: `repo:owner/name repo:owner/name ... is:issue is:open`
+   - Call `github-mcp-server` tool `search_issues` with the combined query.
 
 3. Report Summary
 Synthesize a report listing:
-   - **Open Pull Requests**: Repo, Title, Author, Number.
-   - **Open Issues**: Repo, Title, Number.
+   - **Open Pull Requests**: Repo, Title, Author, Number, Link.
+   - **Open Issues**: Repo, Title, Number, Link.
    - Highlight any items assigned to `rolker` or tagged `help wanted`.
