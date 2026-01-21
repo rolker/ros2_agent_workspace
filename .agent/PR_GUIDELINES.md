@@ -23,5 +23,17 @@ Every PR must go through an automated review cycle:
         *   **Code Changes**: Commit fixes for valid issues.
         *   **Discussion**: Reply to comments if clarification is needed or if you disagree (politely).
     *   **Dismiss**: False positives can be dismissed with reasoning, but human reviewer comments MUST be addressed.
-4.  **Merge Handoff**:
     *   Once checks pass and reviews are approved, notify the user to merge (per `definition-of-done.md`).
+
+## Repository Locking & Branch Hygiene
+
+To ensure workspace stability and prevent lost work, we enforce a **"Branch as Lock"** policy:
+
+### 1. The Lock Mechanism
+*   **Unlocked**: A repository is "Unlocked" ONLY when it is on its default branch (`main` or `jazzy`) AND is clean (no uncommitted changes).
+*   **Locked**: If a repository is on any other branch or has uncommitted changes, it is considered **LOCKED** (Active Work in Progress).
+
+### 2. Workflow Rules
+*   **Do Not Disturb**: Agents MUST NOT switch branches or modify files in a locked repository unless explicitly instructed to continue the work associated with that specific branch.
+*   **Start Fresh**: Always run the `start-feature` workflow before beginning new work. This ensures you start from a clean, up-to-date default branch.
+*   **Clean Up**: Always run the `finish-feature` workflow immediately after submitting a PR. This returns the repository to the "Unlocked" state, ready for the next task.
