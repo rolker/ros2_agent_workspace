@@ -27,6 +27,9 @@ echo "## Root Repository"
 cd "$ROOT_DIR"
 if command -v git &> /dev/null; then
     # Check for modifications
+    if ! git fetch -q 2>/dev/null; then
+        echo "- **Note**: \`git fetch\` failed/skipped; status may not reflect latest remote state."
+    fi
     if [ -n "$(git status --porcelain)" ]; then
         echo "- **Status**: ⚠️ Modified"
         echo "- **Branch**: $(git branch --show-current)"
@@ -51,6 +54,16 @@ if ! command -v vcs &> /dev/null; then
     exit 1
 fi
 
+# Fetch expected repositories (including underlay) for tracking checks
+# Fetch expected repositories (including underlay) for tracking checks
+EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names)
+if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+    echo "## Workspaces"
+    echo "**Error**: Failed to list expected repositories. Tracking check disabled."
+    EXPECTED_REPOS=""
+    # Don't exit, just continue without tracking info
+fi
+
 for ws_dir in "$WORKSPACES_DIR"/*; do
     if [ -d "$ws_dir/src" ]; then
         ws_name=$(basename "$ws_dir" | sed 's/_ws//')
@@ -65,6 +78,15 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
         #  M file
         # ?? file
         
+        # Fetch updates
+        if ! vcs custom --git --args fetch -q >/dev/null 2>&1; then
+             # Just warn once per workspace or rely on VCS output if verbose?
+             # For status report, we suppress but maybe log if needed.
+             # We won't echo here to keep report clean, or minimal warning:
+             # echo "<!-- Warning: Fetch failed for some repos in $ws_name -->"
+             true
+        fi
+
         raw_output=$(vcs custom --git --args status --porcelain -b)
         
         clean_count=0
@@ -112,6 +134,14 @@ for ws_dir in "$WORKSPACES_DIR"/*; do
                         status_str="$status_str, 🔀 Non-Jazzy?"
                      else
                         status_str="🔀 Non-Jazzy?"
+                     fi
+                fi
+
+                if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
+                     if [ "$status_str" != "" ]; then
+                        status_str="$status_str, ❓ Untracked"
+                     else
+                        status_str="❓ Untracked"
                      fi
                 fi
                 

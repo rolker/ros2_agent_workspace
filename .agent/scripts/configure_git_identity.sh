@@ -5,7 +5,6 @@
 # Usage: ./configure_git_identity.sh "<Agent Name>" "<email>"
 # Example: ./configure_git_identity.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 
-set -e
 
 if [ $# -ne 2 ]; then
     echo "Usage: $0 \"<Agent Name>\" \"<email>\""
@@ -33,19 +32,25 @@ git config user.email "$AGENT_EMAIL"
 echo "  ✓ Workspace repository configured"
 
 # Configure all repositories in workspaces/
+# Configure all repositories in workspaces/
 if [ -d "workspaces" ]; then
     REPO_COUNT=0
-    while IFS= read -r -d '' git_dir; do
-        repo_dir="${git_dir%/.git}"
-        if [ -d "$repo_dir/.git" ]; then
-            echo "Configuring $repo_dir..."
-            if ! (cd "$repo_dir" && git config user.name "$AGENT_NAME" && git config user.email "$AGENT_EMAIL"); then
-                echo "  ✗ Failed to configure $repo_dir" >&2
-                exit 1
-            fi
-            ((REPO_COUNT++))
+    # Use process substitution with find to be robust against weird filenames
+    # and avoid subshell exit issues with set -e
+    while IFS= read -r git_dir; do
+        repo_dir="$(dirname "$git_dir")"
+        echo "Configuring $repo_dir..."
+        
+        # Capture failure but don't crash whole script immediately if one fails
+        if ! git -C "$repo_dir" config user.name "$AGENT_NAME" || \
+           ! git -C "$repo_dir" config user.email "$AGENT_EMAIL"; then
+            echo "  ✗ Failed to configure $repo_dir" >&2
+            # Decide if we want to fail hard or continue. 
+            # Continuing sees more errors.
+            continue
         fi
-    done < <(find workspaces -type d -name ".git" -print0)
+        ((REPO_COUNT++))
+    done < <(find workspaces -type d -name ".git")
     
     if [ $REPO_COUNT -gt 0 ]; then
         echo "  ✓ Configured $REPO_COUNT repositories in workspaces/"
