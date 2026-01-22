@@ -61,9 +61,14 @@ def validate_skill(skill_path):
     name = name.strip()
     if name:
         # Check naming convention (hyphen-case: lowercase with hyphens)
-        # Note: We relaxed the strict regex check here because some legacy/workspace skills 
-        # might use Title Case names. Ideally, new skills should use hyphen-case.
-        pass
+        hyphen_case_pattern = r'^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        
+        if not re.fullmatch(hyphen_case_pattern, name):
+            return False, (
+                f"Invalid 'name' in frontmatter: '{name}'. "
+                "Must be hyphen-case (lowercase letters, numbers, and hyphens only), "
+                "match the directory name, and not contain consecutive hyphens."
+            )
 
     return True, "Skill is valid!"
 
