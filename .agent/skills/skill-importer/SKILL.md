@@ -30,6 +30,11 @@ Assess the skill against these strict criteria:
 ## 3. Adaptation Planning
 Identify necessary tweaks to make it compatible with this workspace:
 -   **Frontmatter**: Ensure `SKILL.md` has valid YAML frontmatter (`name`, `description`).
+-   **Provenance**: Add a `source` field to the `metadata` block (or create one) pointing to the original URL.
+    ```yaml
+    metadata:
+      source: https://github.com/org/repo/tree/main/skills/some-skill
+    ```
 -   **Terminology**: If the skill references "Claude" explicitly in user-facing strings, consider changing to "Agent" or "Assistant".
 -   **Paths**: Ensure scripts use relative paths or configurable arguments, not hardcoded `/home/user` paths.
 
@@ -39,6 +44,6 @@ Identify necessary tweaks to make it compatible with this workspace:
 1.  **Import**: Write the files to `.agent/skills/<skill-name>/`.
 2.  **Verify**: Run the standard validator:
     ```bash
-    python3 .agent/skills/skill_creator/scripts/quick_validate.py .agent/skills/<skill-name>
+    python3 .agent/skills/skill-creator/scripts/quick_validate.py .agent/skills/<skill-name>
     ```
 3.  **Report**: Notify the user that the skill is ready.

@@ -4,7 +4,6 @@ Quick validation script for skills - minimal version
 """
 
 import sys
-import os
 import re
 import yaml
 from pathlib import Path
@@ -62,17 +61,9 @@ def validate_skill(skill_path):
     name = name.strip()
     if name:
         # Check naming convention (hyphen-case: lowercase with hyphens)
-        # Relaxed slightly to allow Title Case names in the 'name' field, 
-        # as existing workspace skills might use them (e.g. "ROS Documentation").
-        # Ideally 'name' is human readable, filename is hyphen-case.
-        # But for strict compliance with the original script, we'll keep checking, 
-        # OR we can assume 'name' in frontmatter is the ID.
-        # Looking at ros_documentation/SKILL.md: "name: ROS Documentation". 
-        # The original validator enforces hyphen-case for 'name'. 
-        # We should RELAX this check to allow spaces/Title Case as per workspace convention.
-        pass 
-        # if not re.match(r'^[a-z0-9-]+$', name):
-        #      return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
+        # Note: We relaxed the strict regex check here because some legacy/workspace skills 
+        # might use Title Case names. Ideally, new skills should use hyphen-case.
+        pass
 
     return True, "Skill is valid!"
 

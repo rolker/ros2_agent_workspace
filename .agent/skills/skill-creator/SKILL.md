@@ -22,7 +22,7 @@ Skill creation involves these steps:
 Run the initialization script from the workspace root:
 
 ```bash
-python3 .agent/skills/skill_creator/scripts/init_skill.py <skill-name>
+python3 .agent/skills/skill-creator/scripts/init_skill.py <skill-name>
 ```
 
 -   `<skill-name>`: Hyphen-case name (e.g., `git-helper`, `data-processing`).
@@ -40,5 +40,5 @@ The initialization script creates:
 Run the validation script to ensure the skill follows conventions:
 
 ```bash
-python3 .agent/skills/skill_creator/scripts/quick_validate.py .agent/skills/<skill-name>
+python3 .agent/skills/skill-creator/scripts/quick_validate.py .agent/skills/<skill-name>
 ```

@@ -15,7 +15,7 @@ import argparse
 from pathlib import Path
 
 SKILL_TEMPLATE = """---
-name: {skill_title}
+name: {skill_name}
 description: [TODO: Complete and informative explanation of what the skill does and when to use it.]
 ---
 
@@ -145,7 +145,7 @@ def init_skill(skill_name, path):
     print("\\nNext steps:")
     print("1. Edit SKILL.md to complete the TODO items and update the description")
     print("2. Customize or delete the example files in scripts/, references/, and assets/")
-    print(f"3. Run the validator: python .agent/skills/skill_creator/scripts/quick_validate.py {skill_dir}")
+    print(f"3. Run the validator: python .agent/skills/skill-creator/scripts/quick_validate.py {skill_dir}")
 
     return skill_dir
 
