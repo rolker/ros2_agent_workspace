@@ -1,6 +1,8 @@
 ---
 name: Skill Creator
 description: Use this skill to create new skills for the workspace.
+metadata:
+  source: https://github.com/anthropics/skills/tree/main/skills/skill-creator
 ---
 
 # Skill Creator Skill
