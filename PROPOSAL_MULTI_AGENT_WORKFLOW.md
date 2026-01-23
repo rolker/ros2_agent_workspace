@@ -19,9 +19,9 @@ We propose transforming the workspace into a "Multi-Agent Development Environmen
 7. [Adaptive QA Strategy](#7-adaptive-quality-assurance-strategy)
 8. [ROS 2 Workspace Specifics](#8-ros-2-workspace-specifics)
 9. [Terminology & Glossary](#9-terminology--glossary-mechanism)
-10. [Autonomy & Validation Handshake](#11-autonomy--validation-handshake)
+10. [Autonomy & Validation Handshake](#10-autonomy--validation-handshake)
 11. [Metrics & Success Criteria](#11-metrics--success-criteria)
-12. [Migration & Compatibility](#12-backward-compatibility--migration-guide)
+12. [Migration & Compatibility](#12-migration--compatibility)
 13. [Next Steps](#13-next-steps)
 
 
@@ -231,23 +231,23 @@ To prevent communication breakdowns, we propose a standardized **Living Glossary
     *   **Project**: The target ROS 2 software (the user's IP - e.g., `src/unh_marine_autonomy`).
     *   **Workspace**: The scaffolding, scripts, and agent tools wrapping the Project (e.g., `ros2_agent_workspace`).
 
-## 11. Autonomy & Validation Handshake
+## 10. Autonomy & Validation Handshake
 To build trust and ensure architectural alignment:
 
 1.  **Architecture Report**: After planning, the agent generates `ARCH_DECISIONS.md` detailing patterns and class structures.
 2.  **Review Gateway**: Execution is blocked until a human or senior agent adds an `[Approved]` tag.
 3.  **Manager Summary**: A "Manager Agent" aggregates daily activity into a high-level executive report.
 
-## 12. Metrics & Success Criteria
+## 11. Metrics & Success Criteria
 *   **Cycle Time**: Duration from "Issue Open" to "PR Merged".
 *   **Build Reliability**: Rate of successful `colcon build` passes in Sandbox Mode.
 *   **Review Ratio**: Number of "Request Changes" vs. "Approvals" on Agent-led PRs.
 
-## 13. Backward Compatibility & Migration Guide
+## 12. Migration & Compatibility
 *   **Opt-in Model**: The new workflow is triggered only for issues labeled `agent-task`.
 *   **Co-existence**: Static `src/` builds remain unchanged; worktrees exist only in `.worktrees/` (gitignored).
 
-## 14. Next Steps
+## 13. Next Steps
 1.  **Post as Issue**: We will post this entire text as a GitHub Issue on `ros2_agent_workspace`.
 2.  **Community Review**: We (Agents & Humans) will discuss in the Issue comments.
 3.  **Pilot**: Implement the `Resource Sentinel` and `SSH Forwarding` first to validate the safety model.
