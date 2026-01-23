@@ -4,10 +4,10 @@
 **Target**: Project11 / ROS 2 Agent Workspace
 
 ## 1. Executive Summary
-We propose transforming the workspace into a "Multi-Agent Development Environment" that supports:
-1.  **Parallel Work**: Multiple agents working on different tasks simultaneously.
-2.  **Phased Execution**: Explicit Planning, Implementation, and Review phases.
-3.  **Cross-Agent Collaboration**: Robust review loops between different AI models/frameworks.
+We propose a **Multi-Agent Development Environment** enabling:
+1.  **Parallel Execution**: Agents work on independent tasks simultaneously.
+2.  **Phased Development**: Explicit Planning, Implementation, and Verification stages.
+3.  **Cross-Agent Verification**: Dedicated review loops between diverse AI models.
 
 ## Table of Contents
 1. [Executive Summary](#1-executive-summary)
@@ -25,31 +25,28 @@ We propose transforming the workspace into a "Multi-Agent Development Environmen
 13. [Next Steps](#13-next-steps)
 
 
-## 2. Memory Architecture: "Source of Truth" vs. "Working Memory"
+## 2. Memory Architecture
 
-### The Problem
-Agents are ephemeral. They forget context when a session ends. We need a persistent state that works across different environments (VS Code, CLI, GitHub Codespaces).
+### Challenge
+Agents are ephemeral and lose context between sessions. We require persistence across VS Code, CLI, and Codespaces.
 
-### The Solution
-*   **Layer 1: The Hard Drive (GitHub Issues)**
-    *   **Role**: The absolute Source of Truth.
-    *   **Content**: High-level goals, requirements, decision records, and final status.
-    *   **Access**: All agents (Copilot, Gemini, etc.) have API access to read/write Issues.
-*   **Layer 2: The RAM (Local `task.md`)**
-    *   **Role**: Immediate, low-latency working memory.
-    *   **Content**: The granular checkbox list for the *current* session (e.g., "[ ] Fix typo in line 40").
+### Solution: Dual-Layer Memory
+*   **Layer 1: Long-Term (GitHub Issues)**
+    *   **Role**: Absolute Source of Truth (Goals, Decisions, Status).
+    *   **Access**: Read/Write for all agents.
+*   **Layer 2: Working Memory (Local `task.md`)**
+    *   **Role**: Low-latency, granular task tracking.
     *   **Lifecycle**:
         1. Agent picks up Issue #123.
-        2. Agent creates/updates `.worktrees/issue-123/task.md` based on Issue description.
-        3. Agent checks off items as it executes tool calls.
-        4. Before session end, Agent summarizes `task.md` progress into a GitHub Comment (saving state to Layer 1).
-    *   **IDE Integration**: In VS Code/Antigravity, `task.md` is pinned open. In CLI, it's just a text file.
+        2. Agent tracks detailed progress in `.worktrees/issue-123/task.md`.
+        3. Agent periodically summarizes `task.md` back to the GitHub Issue.
+    *   **UI**: Pinned in IDE; simple text file in CLI.
 
-### Conflict Resolution: Optimistic Locking
-To prevent race conditions when multiple agents update the same GitHub Issue:
-1.  **Timestamp Check**: Agents store the `updated_at` timestamp when reading an Issue.
-2.  **Pre-write Validation**: Before committing a summary, the agent re-fetches the Issue.
-3.  **Rebase/Merge**: If the timestamp has changed, the agent MUST merge its local `task.md` summary with the new remote comments before pushing.
+### Conflict Resolution (Optimistic Locking)
+To prevent race conditions:
+1.  **Read**: Store `updated_at` timestamp.
+2.  **Verify**: Re-check Issue before writing.
+3.  **Merge**: If changed, merge local `task.md` with remote before push.
 
 ### Architecture Diagram: Memory Flow
 ```mermaid
@@ -62,25 +59,22 @@ graph TD
 ```
 
 
-## 3. Parallelism: The "Isolation" Strategy
+## 3. Parallelism & Isolation
 
-### The Requirement
-"Having agents working in parallel is important." (User Feedback)
+### Challenge
+ROS 2 builds conflict when sharing the same workspace directory.
 
-### The Challenge
-ROS 2 workspaces use `colcon` to build layers. If Agent A and Agent B share the same `build/` directory, they will corrupt each other's compiles.
-
+### Strategy
 > [!IMPORTANT]
-> We combine **Worktrees** for code isolation with **Docker** for environment isolation. This allows multiple agents to work cleanly in parallel without stepping on each other's toes (e.g., conflicting builds).
+> We combine **Worktrees** (code isolation) with **Docker** (environment isolation) to enable interference-free parallel work.
 
 ### 3.1. Execution Modes
 1.  **Sandbox Mode (Default)**: Agent runs inside a Docker container. Host files are mounted as Volumes.
 2.  **Host Mode (Optional)**: Agent runs directly on the host (e.g., for local debugging). All commands MUST be confirmed by the human user.
 
-### 3.2. Secret Management: SSH Agent Forwarding
-To eliminate the need for writing sensitive keys into Docker images:
-*   **Mechanism**: Use SSH Agent Forwarding (`-v $SSH_AUTH_SOCK:/ssh-agent`).
-*   **Safety**: The container can use the host's credentials to `git push` without ever seeing the actual private key file.
+### 3.2. Security: SSH Forwarding
+*   **Mechanism**: Pass `-v $SSH_AUTH_SOCK:/ssh-agent` to container.
+*   **Benefit**: Containers push code using host credentials without storing private keys.
 
 ### 3.3. Isolation Diagram
 ```mermaid
@@ -98,26 +92,18 @@ sequenceDiagram
 ```
 
 
-1.  **Source Layer (Git)**:
-    *   Agents create specific worktrees: `.worktrees/task-123`.
-2.  **Runtime Layer (Docker)**:
-    *   Instead of running `colcon build` on the host, the Agent spins up a **Disposable Container**.
-    *   **Mounts**:
-        *   Read-Only: `~/workspace/workspaces/core_ws` (The Underlay).
-        *   Read-Write: `.worktrees/task-123` (The active task).
-    *   **Execution**: The agent runs build/test commands *inside* this container.
-3.  **Sandboxing Benefits**:
-    *   **Safety**: An agent cannot accidentally `rm -rf /` the host.
-    *   **Cleanliness**: No polluting of the host's `.bashrc` or weird python path issues.
-    *   **Consistency**: Every task starts from a known-good "Golden Image" of the OS.
+1.  **Source (Git)**: Agents create `.worktrees/task-123`.
+2.  **Runtime (Docker)**:
+    *   Agent spins up a **Disposable Container**.
+    *   **Mounts**: Read-Only Underlay (`~/ws/core_ws`), Read-Write Task Worktree.
+3.  **Benefits**:
+    *   **Safety**: Cannot delete host system files.
+    *   **Cleanliness**: No usage of host `.bashrc`.
+    *   **Consistency**: Fresh, known-good environment state.
 
-## 4. Ecosystem: The Cross-Agent Review Loop
+## 4. Ecosystem: Cross-Agent Review
 
-### The Requirement
-"Have different agents/models/frameworks check each other's work."
-
-### The Workflow
-#### 1. Agent-to-Agent Review
+### 4.1. Agent-to-Agent Review
 1.  **Submission**: Agent A (Implementer) pushes `feature/task-123` and opens a PR.
 2.  **Trigger**:
     *   **Manual**: User asks Agent B (Reviewer) to "Check PR #123".
@@ -134,7 +120,7 @@ sequenceDiagram
         *   `[ ] Address comment on line 42 (Memory leak)`
     *   Agent A fixes code, commits, and resolves the conversation.
 
-#### 2. Human-in-the-Loop
+### 4.2. Human-in-the-Loop
 Humans are not just observers; they are active participants.
 *   **Manual Override**: A human can always pause an agent, comment on a PR, or reject a plan.
 *   **Direct Debugging**: If an agent gets stuck, a human can attach to the agent's container (see Sec 6.4) to diagnose the issue directly.
@@ -155,7 +141,7 @@ We will expand the audit to the **Entire Workspace**, categorizing every file/fo
 
 ## 6. Gaps & Technical Challenges (To Be Solved)
 
-### 6.1. The Meta-Learning Loop (Retrospectives)
+### 6.1. Retrospectives (Meta-Learning)
 *   **Gap**: Agents fixing code is good, but agents fixing *rules* is better.
 *   **Solution**: A **"Retrospective" Workflow** runs when a Task is marked `Done`.
     *   It analyzes PR comments: "Did we violate a rule?"
@@ -165,9 +151,9 @@ We will expand the audit to the **Entire Workspace**, categorizing every file/fo
 *   **Gap**: Docker containers need git access.
 *   **Solution**: Use `ssh-agent` forwarding or strict Volume Mounts for keys. *Never* write secrets to the container filesystem.
 
-### 6.3. Resource Governance (The "OOM" Killer)
-*   **Gap**: 3 concurrent `colcon build` jobs can easily exhaust system RAM, causing the host machine to freeze or crash ("OOM Killer").
-*   **Solution**: A **"Resource Sentinel"** (e.g., using `flock` on a shared `.colcon.lock` file) ensures only 1 heavy build runs at a time. Other agents must wait their turn.
+### 6.3. Resource Governance
+*   **Gap**: Concurrent builds exhaust RAM (OOM).
+*   **Solution**: **Resource Sentinel** limits concurrent builds.
 
 
 ### 6.4. Human Debuggability
