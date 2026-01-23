@@ -40,7 +40,7 @@ ROS 2 workspaces use `colcon` to build layers. If Agent A and Agent B share the 
 ### The Proposed Solution: `git worktree` + Docker Sandboxing
 > "Can docker containers be used to accomplish something similar? What about a sandboxing strategy?"
 
-We can combine **Worktrees** (Source Isolation) with **Docker** (Runtime Isolation) for the ultimate "Antigravity Chamber".
+We combine **Worktrees** for code isolation with **Docker** for environment isolation. This allows multiple agents to work cleanly in parallel without stepping on each other's toes (e.g., conflicting builds).
 
 1.  **Source Layer (Git)**:
     *   Agents create specific worktrees: `.worktrees/task-123`.
@@ -52,7 +52,7 @@ We can combine **Worktrees** (Source Isolation) with **Docker** (Runtime Isolati
     *   **Execution**: The agent runs build/test commands *inside* this container.
 3.  **Sandboxing Benefits**:
     *   **Safety**: An agent cannot accidentally `rm -rf /` the host.
-    *   **Cleanliness**: No polling of the host's `.bashrc` or weird python path issues.
+    *   **Cleanliness**: No polluting of the host's `.bashrc` or weird python path issues.
     *   **Consistency**: Every task starts from a known-good "Golden Image" of the OS.
 
 ## 4. Ecosystem: The Cross-Agent Review Loop
@@ -61,6 +61,7 @@ We can combine **Worktrees** (Source Isolation) with **Docker** (Runtime Isolati
 "Have different agents/models/frameworks check each other's work."
 
 ### The Workflow
+#### 1. Agent-to-Agent Review
 1.  **Submission**: Agent A (Implementer) pushes `feature/task-123` and opens a PR.
 2.  **Trigger**:
     *   **Manual**: User asks Agent B (Reviewer) to "Check PR #123".
@@ -77,6 +78,11 @@ We can combine **Worktrees** (Source Isolation) with **Docker** (Runtime Isolati
         *   `[ ] Address comment on line 42 (Memory leak)`
     *   Agent A fixes code, commits, and resolves the conversation.
 
+#### 2. Human-in-the-Loop
+Humans are not just observers; they are active participants.
+*   **Manual Override**: A human can always pause an agent, comment on a PR, or reject a plan.
+*   **Direct Debugging**: If an agent gets stuck, a human can attach to the agent's container (see Sec 6.4) to diagnose the issue directly.
+
 ## 5. Cleanup & Simplification: Full Workspace Audit
 
 > "Can we do the same for other files and directories in the workspace?"
@@ -91,37 +97,37 @@ We will expand the audit to the **Entire Workspace**, categorizing every file/fo
 *   `ag_work/` (if exists) -> Temp files to clean?
 *   `.agent/rules/` -> Are these rules actually followed?
 
-## 7. Gaps & Technical Challenges (To Be Solved)
+## 6. Gaps & Technical Challenges (To Be Solved)
 
-### 7.1. The Meta-Learning Loop (Retrospectives)
+### 6.1. The Meta-Learning Loop (Retrospectives)
 *   **Gap**: Agents fixing code is good, but agents fixing *rules* is better.
 *   **Solution**: A **"Retrospective" Workflow** runs when a Task is marked `Done`.
     *   It analyzes PR comments: "Did we violate a rule?"
     *   It proposes updates to `CONTRIBUTING.md` or `.agent/rules/` to prevent recurrence.
 
-### 7.2. Secret Management
+### 6.2. Secret Management
 *   **Gap**: Docker containers need git access.
 *   **Solution**: Use `ssh-agent` forwarding or strict Volume Mounts for keys. *Never* write secrets to the container filesystem.
 
-### 7.3. Resource Governance (The "OOM" Killer)
-*   **Gap**: 3 concurrent `colcon build` jobs will freeze the machine.
-*   **Solution**: A **"Resource Sentinel"** (simple lock file) ensures only 1 heavy build runs at a time, queueing others.
+### 6.3. Resource Governance (The "OOM" Killer)
+*   **Gap**: 3 concurrent `colcon build` jobs can easily exhaust system RAM, causing the host machine to freeze or crash ("OOM Killer").
+*   **Solution**: A **"Resource Sentinel"** (e.g., a simple lock file or queue system) ensures only 1 heavy build runs at a time. Other agents must wait their turn.
 
-### 7.4. Human Debuggability
+### 6.4. Human Debuggability
 *   **Gap**: How to fix a broken agent container?
 *   **Solution**: Standardize a `make attach-task-123` command to drop a human shell instantly into the agent's environment.
 
-### 7.5. Dependency Drift
+### 6.5. Dependency Drift
 *   **Gap**: Agents `pip install` packages in Docker but forget `package.xml`.
 *   **Solution**: A CI check (or Pre-Commit hook) that fails if imported modules are missing from `package.xml`.
 
-## 8. Adaptive Quality Assurance Strategy
+## 7. Adaptive Quality Assurance Strategy
 
 > "Let's keep it flexible... depending on the task, the development method will vary."
 
 Instead of enforcing a rigid "One Size Fits All" TDD policy, we propose an **Adaptive Strategy**. The *Reviewer Agent* will determine the appropriate testing method based on the Task Type.
 
-### 8.1. The Menu of Methodologies
+### 7.1. The Menu of Methodologies
 
 #### Option A: Test-Driven Development (TDD)
 *   **Best For**: Pure logic libraries, algorithms, utilities (e.g., `calc_distance()`, `path_smoother`).
@@ -141,12 +147,34 @@ Instead of enforcing a rigid "One Size Fits All" TDD policy, we propose an **Ada
     2.  Implement the Node.
     3.  Verify purely that the node "Speaks the right language" (Topics/Types match).
 
-### 8.2. Enforcement
+#### Option D: Property-Based Testing
+*   **Best For**: Message serialization, complex coordinate transforms, robust parsing.
+*   **Workflow**: Define invariants (e.g., "quaternion magnitude is always 1") and fuzz-test inputs.
+
+### 7.2. Enforcement
 The **Reviewer Agent** does not enforce "Unit Tests" blindly. Instead, it asks: **"Did you verify this work in a way that matches its complexity?"**
 *   If you wrote a Math library, show me `gtest`.
 *   If you wrote a Wall Follower, show me a Rosbag or Sim Screenshot.
 
-## 9. Next Steps
+## 8. ROS 2 Workspace Specifics
+We must formalize the definition of "Project" vs "Workspace" to avoid agent confusion.
+
+1.  **Underlay/Overlay Structure**:
+    *   **Underlay**: Pre-built dependencies (e.g., `/opt/ros/jazzy` + common libs). Agents **READ** but **DO NOT MODIFY**.
+    *   **Project Overlay**: The active development layer (user's code). Agents **MODIFY** this.
+2.  **Multi-Distro Support**:
+    *   The workspace handles multiple ROS 2 distributions (e.g., Jazzy, Rolling) via branch-based or docker-based switching. Agents must query the active distro before generating code.
+
+## 9. Terminology & Glossary Mechanism
+To prevent communication breakdowns, we propose a standardized **Living Glossary**.
+
+*   **Mechanism**: A file `.agent/GLOSSARY.md` will exist in the workspace root.
+*   **Rule**: Agents MUST consult this glossary when encountering ambiguous terms.
+*   **Key Definitions (Initial Set)**:
+    *   **Project**: The target ROS 2 software (the user's IP - e.g., `src/unh_marine_autonomy`).
+    *   **Workspace**: The scaffolding, scripts, and agent tools wrapping the Project (e.g., `ros2_agent_workspace`).
+
+## 10. Next Steps
 1.  **Post as Issue**: We will post this entire text as a GitHub Issue on `ros2_agent_workspace`.
 2.  **Community Review**: We (Agents & Humans) will discuss in the Issue comments.
 3.  **Pilot**: Once the "Docker vs. Local" debate is settled in the Issue, we start Phase 2.
