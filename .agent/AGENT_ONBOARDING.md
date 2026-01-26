@@ -40,7 +40,7 @@ This configures git in:
 - The workspace repository (this repo)
 - All 19 repositories in `workspaces/*/src/`
 
-## 3. Create a Feature Branch (30 sec)
+## 4. Create a Feature Branch (30 sec)
 
 ```bash
 git checkout -b feature/TASK-<ID>-<description>
@@ -51,7 +51,7 @@ Example:
 git checkout -b feature/TASK-001-add-workflow-index
 ```
 
-## 4. Discover Available Workflows (Optional, as needed)
+## 5. Discover Available Workflows (Optional, as needed)
 
 When you need to perform a common task (build, test, status check, etc.):
 
@@ -60,7 +60,7 @@ When you need to perform a common task (build, test, status check, etc.):
 
 This prevents "task creep" where you manually implement something that already has a workflow.
 
-## 5. Review Other Key Resources
+## 6. Review Other Key Resources
 
 - **[`ROADMAP.md`](ROADMAP.md)** — What's currently being worked on
 - **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination

@@ -6,7 +6,7 @@ Execute tests across all workspace layers in the correct order.
 
 1.  **Run the Test Script**:
     ```bash
-    ./scripts/test.sh
+    ./.agent/scripts/test.sh
     ```
 
 2.  **Analyze Report**:

@@ -31,5 +31,6 @@
   "remoteUser": "ros",
   "runArgs": [
     "--userns=host"
-  ]
+  ],
+  "postCreateCommand": "./.agent/scripts/bootstrap.sh"
 }

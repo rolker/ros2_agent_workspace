@@ -12,14 +12,14 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 
 ## Prerequisites
 -   **GitHub MCP**: Must be configured and active.
--   **Helper Script**: `scripts/list_overlay_repos.py` must exist.
+-   **Helper Script**: `.agent/scripts/list_overlay_repos.py` must exist.
 
 ## Core Operations
 
 ### 1. Scan Issues
 **Trigger**: "Scan for new issues" or "Triage issues"
 **Procedure**:
-1.  Run `python3 scripts/list_overlay_repos.py` to get a JSON list of `{name, url, version}`.
+1.  Run `python3 .agent/scripts/list_overlay_repos.py` to get a JSON list of `{name, url, version}`.
 2.  For each repository:
     -   Parse the owner/repo from the URL.
     -   Use the GitHub MCP tool `search_issues` (or `list_issues`) to find **open** issues.
