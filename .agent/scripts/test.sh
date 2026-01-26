@@ -90,17 +90,16 @@ for layer in "${LAYERS[@]}"; do
         echo "| $layer | ⏭️ Skipped | No source |" >> "$REPORT_FILE"
     fi
 
-    # Append to CSV
-    echo "$TIMESTAMP,$layer,$LAYER_RESULT" >> "$HISTORY_FILE"
+    # Append to CSV (quote all fields)
+    echo "\"$TIMESTAMP\",\"$layer\",\"$LAYER_RESULT\"" >> "$HISTORY_FILE"
 
-    # Construct JSON Object for this layer (using python for safety if complex, but simple string here)
-    # Escape quotes in summary just in case
-    SAFE_SUMMARY=$(echo "$LAYER_SUMMARY" | sed 's/"/\\"/g')
-    JSON_LAYERS_ARRAY+=("{\"name\": \"$layer\", \"result\": \"$LAYER_RESULT\", \"summary\": \"$SAFE_SUMMARY\"}")
+    # Construct JSON Object for this layer using Python for safety
+    LAYER_JSON=$(python3 -c "import json, sys; print(json.dumps({'name': sys.argv[1], 'result': sys.argv[2], 'summary': sys.argv[3]}))" "$layer" "$LAYER_RESULT" "$LAYER_SUMMARY")
+    JSON_LAYERS_ARRAY+=("$LAYER_JSON")
 done
 
 # Build JSON Output
-JSON_STR="{ \"timestamp\": \"$TIMESTAMP\", \"overall_success\": $OVERALL_SUCCESS, \"layers\": ["
+JSON_STR="{ \"timestamp\": \"$TIMESTAMP\", \"overall_success\": $([ "$OVERALL_SUCCESS" = true ] && echo "true" || echo "false"), \"layers\": ["
 FIRST=true
 for item in "${JSON_LAYERS_ARRAY[@]}"; do
     if [ "$FIRST" = true ]; then FIRST=false; else JSON_STR+=","; fi

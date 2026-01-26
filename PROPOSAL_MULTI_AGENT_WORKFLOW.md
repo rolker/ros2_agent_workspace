@@ -245,7 +245,7 @@ The implementation of this proposal is underway.
 
 ### Phase 1: Testing & Reporting (Completed)
 We have established the foundational comprehensive testing and reporting scripts.
-*   **Targeted Verification**: `verify_change.sh` allows agents to run specific tests (unit/lint/sim) on single packages.
+*   **Targeted Verification**: `verify_change.sh` allows agents to run specific tests (unit/lint/all) on single packages.
 *   **Enhanced Reporting**: `test.sh` now generates structured JSON and CSV history.
 *   **Status Visibility**: `status_report.sh` integrates test results into the daily status report.
 

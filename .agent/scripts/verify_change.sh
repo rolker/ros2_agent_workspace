@@ -1,7 +1,7 @@
 #!/bin/bash
 # .agent/scripts/verify_change.sh
 # Verification tool for agents to run targeted tests (Unit, Lint, etc.)
-# Usage: ./verify_change.sh --package <package_name> [--type <unit|lint>]
+# Usage: ./verify_change.sh --package <package_name> [--type <unit|lint|all>]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")" # Go up to workspace root
@@ -66,16 +66,16 @@ fi
 # or colcon test builds if needed (it usually doesn't, test depends on build).
 # Ideally user should run ./scripts/build.sh first or agent does it.
 
-CMD="colcon test --packages-select $PKG --event-handlers console_direct+ --return-code-on-test-failure"
+CMD=(colcon test --packages-select "$PKG" --event-handlers console_direct+ --return-code-on-test-failure)
 
 if [ "$TYPE" == "unit" ]; then
-    CMD="$CMD --ctest-args -L unit"
+    CMD+=("--ctest-args" "-L" "unit")
 elif [ "$TYPE" == "lint" ]; then
-    CMD="$CMD --ctest-args -L lint copyright flake8 pep8 cpplint"
+    CMD+=("--ctest-args" "-L" "lint|copyright|flake8|pep8|cpplint")
 fi
 
-echo "Running: $CMD"
-$CMD
+echo "Running: ${CMD[*]}"
+"${CMD[@]}"
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then

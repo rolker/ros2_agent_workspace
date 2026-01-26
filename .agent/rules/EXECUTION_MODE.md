@@ -29,5 +29,5 @@
 
 ## 5. Anti-Patterns
 *   ❌ Committing broken code (always verify first!).
-*   ❌ changing the plan silently (if the plan changes, go back to Planning Mode).
+*   ❌ Changing the plan silently (if the plan changes, go back to Planning Mode).
 *   ❌ Leaving `task.md` stale.
