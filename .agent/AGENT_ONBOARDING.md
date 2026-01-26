@@ -40,18 +40,24 @@ This configures git in:
 - The workspace repository (this repo)
 - All 19 repositories in `workspaces/*/src/`
 
-## 4. Create a Feature Branch (30 sec)
+## 4. Ticket the Task (2 min)
+
+1.  **Check if a GitHub Issue exists** for your current objective.
+2.  If not, **ask the user**: *"Should I open an issue to track this?"*
+3.  Use the issue number in your branch name: `feature/ISSUE-<number>-<description>`.
+
+## 5. Create a Feature Branch (30 sec)
 
 ```bash
-git checkout -b feature/TASK-<ID>-<description>
+git checkout -b feature/ISSUE-<number>-<description>
 ```
 
 Example:
 ```bash
-git checkout -b feature/TASK-001-add-workflow-index
+git checkout -b feature/ISSUE-45-standardize-issues
 ```
 
-## 5. Discover Available Workflows (Optional, as needed)
+## 6. Discover Available Workflows (Optional, as needed)
 
 When you need to perform a common task (build, test, status check, etc.):
 
@@ -60,7 +66,7 @@ When you need to perform a common task (build, test, status check, etc.):
 
 This prevents "task creep" where you manually implement something that already has a workflow.
 
-## 6. Review Other Key Resources
+## 7. Review Other Key Resources
 
 - **[`ROADMAP.md`](ROADMAP.md)** — What's currently being worked on
 - **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination
@@ -74,7 +80,8 @@ Before starting work, verify:
 - [ ] Read `rules/common/git-hygiene.md`
 - [ ] Sourced environment: `source .agent/scripts/env.sh`
 - [ ] Ran `configure_git_identity.sh`
-- [ ] Created feature branch with `feature/TASK-*` naming
+- [ ] **Verified/Created GitHub Issue for task**
+- [ ] Created feature branch with `feature/ISSUE-*` naming
 - [ ] Checked `AGENT_INDEX.md` for existing workflows
 - [ ] Reviewed `ROADMAP.md` for ongoing tasks
 
