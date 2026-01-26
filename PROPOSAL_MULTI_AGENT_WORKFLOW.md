@@ -1,6 +1,6 @@
 # Proposal: Multi-Agent Workflow System (RFC)
 
-**Status**: Draft / Request for Comments
+**Status**: Draft / Implementing
 **Target**: Project11 / ROS 2 Agent Workspace
 
 ## 1. Executive Summary
@@ -238,3 +238,22 @@ To build trust and ensure architectural alignment:
 2.  **Community Review**: We (Agents & Humans) will discuss in the Issue comments.
 3.  **Pilot**: Implement the `Resource Sentinel` and `SSH Forwarding` first to validate the safety model.
 
+
+## 14. Current Implementation Status (January 2026)
+
+The implementation of this proposal is underway.
+
+### Phase 1: Testing & Reporting (Completed)
+We have established the foundational comprehensive testing and reporting scripts.
+*   **Targeted Verification**: `verify_change.sh` allows agents to run specific tests (unit/lint/sim) on single packages.
+*   **Enhanced Reporting**: `test.sh` now generates structured JSON and CSV history.
+*   **Status Visibility**: `status_report.sh` integrates test results into the daily status report.
+
+### Phase 2: Core Rules (Completed)
+The "Laws of Physics" for agents have been codified in `.agent/rules/`.
+*   [PLANNING_MODE.md](.agent/rules/PLANNING_MODE.md): Mandates the creation of `implementation_plan.md` and explicit user approval before coding.
+*   [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md): Mandates strict verification using `verify_change.sh` and documentation via `walkthrough.md`.
+
+### Phase 3: Advanced Coordination (Pending)
+*   **Worktree Management**: Scripts to create and manage git worktrees are next.
+*   **Docker Sandboxing**: Containerization of agent tasks is planned for the next sprint.

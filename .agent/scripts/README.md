@@ -241,6 +241,37 @@ Run tests on ROS 2 workspace layers.
 - ROS 2 Jazzy installed
 - Workspace built (see `build.sh`)
 
+**Outputs:**
+- `ai_workspace/test_report.md` (Human readable)
+- `ai_workspace/test_summary.json` (Machine readable)
+- `ai_workspace/test_history.csv` (Historical data)
+
+---
+
+### `verify_change.sh`
+
+Run targeted verification on a specific package.
+
+**Usage:**
+```bash
+./.agent/scripts/verify_change.sh --package <package_name> [--type <unit|lint|all>]
+```
+
+**Examples:**
+```bash
+./.agent/scripts/verify_change.sh --package unh_marine_autonomy --type lint
+./.agent/scripts/verify_change.sh --package marine_interfaces --type unit
+```
+
+**What it does:**
+1. Auto-detects the workspace layer containing the package
+2. Runs `colcon test` with specific filters (e.g. `-L unit`)
+3. Returns 0 on success, 1 on failure
+
+**When to use:**
+- Before committing changes to a specific package
+- When an agent is verifying a fix
+
 ---
 
 ### `validate_repos.py`

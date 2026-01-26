@@ -169,6 +169,10 @@ make test          # Run all tests
 make clean         # Clean build artifacts
 make status        # Show workspace status
 make lint          # Run linters
+
+### Helper Scripts
+- `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
+- `status_report.sh`: Comprehensive workspace status with test history.
 ```
 
 ### Pre-commit Hooks

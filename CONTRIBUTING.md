@@ -20,11 +20,17 @@ We are committed to providing a welcoming and inclusive environment. Please be r
    ./.agent/scripts/setup.sh core
    ```
 
+## Agent Rules
+> [!IMPORTANT]
+> Since we use AI Agents extensively, we have codified rules in `.agent/rules/`.
+> - **Planning**: See [PLANNING_MODE.md](.agent/rules/PLANNING_MODE.md) before starting complex tasks.
+> - **Execution**: See [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md) for coding and verification standards.
+
 ## Development Workflow
 
 ### Creating a Feature Branch
 
-Follow the git hygiene rules in `.agent/rules/git-hygiene.md`:
+Follow the git hygiene rules in `.agent/rules/git-hygiene.md` and [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md):
 
 - Features: `feature/TASK-<ID>-<description>` (e.g., `feature/TASK-001-multi-distro`)
 - Fixes: `fix/<description>`
@@ -41,6 +47,7 @@ git checkout -b feature/TASK-123-add-new-layer
 3. **Test your changes**:
    ```bash
    ./.agent/scripts/build.sh
+   ./.agent/scripts/verify_change.sh --package <modified_pkg> --type lint
    ./.agent/scripts/test.sh
    ```
 

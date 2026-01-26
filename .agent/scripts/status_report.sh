@@ -51,157 +51,145 @@ echo ""
 if ! command -v vcs &> /dev/null; then
     echo "## Workspaces"
     echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
-    exit 1
-fi
+    # We continue to show test results even if VCS fails
+else
+    # Fetch expected repositories (including underlay) for tracking checks
+    EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+        # echo "**Error**: Failed to list expected repositories. Tracking check disabled."
+        EXPECTED_REPOS=""
+    fi
 
-# Fetch expected repositories (including underlay) for tracking checks
-
-EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names)
-if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
-    echo "## Workspaces"
-    echo "**Error**: Failed to list expected repositories. Tracking check disabled."
-    EXPECTED_REPOS=""
-    # Don't exit, just continue without tracking info
-fi
-
-for ws_dir in "$WORKSPACES_DIR"/*; do
-    if [ -d "$ws_dir/src" ]; then
-        ws_name=$(basename "$ws_dir" | sed 's/_ws//')
-        # Header printed later with stats
-        
-        cd "$ws_dir/src"
-        
-        # Get list of all repos (directories with .git)
-        # We use vcs custom to efficiently check status
-        # Output format for status --porcelain -b:
-        # ## branch...origin/branch [ahead 1]
-        #  M file
-        # ?? file
-        
-        # Fetch updates
-        if ! vcs custom --git --args fetch -q >/dev/null 2>&1; then
-             # Just warn once per workspace or rely on VCS output if verbose?
-             # For status report, we suppress but maybe log if needed.
-             # We won't echo here to keep report clean, or minimal warning:
-             # echo "<!-- Warning: Fetch failed for some repos in $ws_name -->"
-             true
-        fi
-
-        raw_output=$(vcs custom --git --args status --porcelain -b)
-        
-        clean_count=0
-        modified_count=0
-        modified_repos=()
-        
-        # Process the output
-        current_repo=""
-        is_dirty=false
-        sync_status=""
-        branch=""
-        
-        # Function to finalize the current repo processing
-        process_repo() {
-            if [ "$current_repo" != "" ]; then
-                local status_str=""
-                if [ "$is_dirty" = true ]; then
-                    status_str="⚠️ Modified"
-                fi
-                
-                if [ "$sync_status" != "" ]; then
-                    if [ "$status_str" != "" ]; then
-                        status_str="$status_str, $sync_status"
+    for ws_dir in "$WORKSPACES_DIR"/*; do
+        if [ -d "$ws_dir/src" ]; then
+            ws_name=$(basename "$ws_dir" | sed 's/_ws//')
+            
+            cd "$ws_dir/src"
+            
+            # Fetch updates quietly
+            vcs custom --git --args fetch -q >/dev/null 2>&1
+            
+            raw_output=$(vcs custom --git --args status --porcelain -b)
+            
+            clean_count=0
+            modified_count=0
+            modified_repos=()
+            
+            # Process the output
+            current_repo=""
+            is_dirty=false
+            sync_status=""
+            branch=""
+            
+            process_repo() {
+                if [ "$current_repo" != "" ]; then
+                    local status_str=""
+                    if [ "$is_dirty" = true ]; then
+                        status_str="⚠️ Modified"
+                    fi
+                    
+                    if [ "$sync_status" != "" ]; then
+                        if [ "$status_str" != "" ]; then
+                            status_str="$status_str, $sync_status"
+                        else
+                            status_str="$sync_status"
+                        fi
+                    fi
+                    
+                    # Fetch expected branch from config
+                    if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
+                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo")
                     else
-                        status_str="$sync_status"
+                        expected_branch="unknown"
+                    fi
+                    
+                    if [ "$expected_branch" != "unknown" ]; then
+                         if [ "$branch" != "$expected_branch" ]; then
+                            warning="🔀 $branch (Want: $expected_branch)"
+                            status_str="${status_str:+$status_str, }$warning"
+                         fi
+                    elif [ "$branch" != "jazzy" ] && [ "$current_repo" != "ros2_agent_workspace" ]; then
+                         status_str="${status_str:+$status_str, }🔀 Non-Jazzy?"
+                    fi
+
+                    if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
+                         status_str="${status_str:+$status_str, }❓ Untracked"
+                    fi
+                    
+                    if [ "$status_str" != "" ]; then
+                        modified_repos+=("$current_repo|$status_str|$branch")
+                        ((modified_count++))
+                    else
+                        ((clean_count++))
                     fi
                 fi
-                
-                # Fetch expected branch from config
-                expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo")
-                
-                # Check for branch mismatch
-                if [ "$expected_branch" != "unknown" ]; then
-                     if [ "$branch" != "$expected_branch" ]; then
-                        warning="🔀 $branch (Want: $expected_branch)"
-                        if [ "$status_str" != "" ]; then
-                            status_str="$status_str, $warning"
-                        else
-                            status_str="$warning"
-                        fi
-                     fi
-                elif [ "$branch" != "jazzy" ] && [ "$current_repo" != "ros2_agent_workspace" ]; then
-                     # Fallback for repos not in config (assume Jazzy default)
-                     if [ "$status_str" != "" ]; then
-                        status_str="$status_str, 🔀 Non-Jazzy?"
-                     else
-                        status_str="🔀 Non-Jazzy?"
-                     fi
-                fi
+            }
 
-                if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
-                     if [ "$status_str" != "" ]; then
-                        status_str="$status_str, ❓ Untracked"
-                     else
-                        status_str="❓ Untracked"
+            while IFS= read -r line; do
+                if [[ "$line" =~ ^===\ \./(.*)\ \(git\)\ ===$ ]]; then
+                    process_repo
+                    current_repo="${BASH_REMATCH[1]}"
+                    is_dirty=false
+                    sync_status=""
+                    branch="unknown"
+                elif [[ "$line" =~ ^##\ ([^.]*)(\.\.\.([^\ ]*))?(\ \[(.*)\])? ]]; then
+                     branch="${BASH_REMATCH[1]}"
+                     if [ -n "${BASH_REMATCH[5]}" ]; then
+                         sync_status="${BASH_REMATCH[5]}"
+                         sync_status="${sync_status//ahead/🚀 Ahead}"
+                         sync_status="${sync_status//behind/⬇️ Behind}"
                      fi
+                elif [[ -n "$line" && "$line" != "" ]]; then
+                    is_dirty=true
                 fi
-                
-                if [ "$status_str" != "" ]; then
-                    modified_repos+=("$current_repo|$status_str|$branch")
-                    ((modified_count++))
-                else
-                    ((clean_count++))
-                fi
+            done <<< "$raw_output"
+            
+            process_repo
+            
+            total_count=$((clean_count + modified_count))
+            echo "## Workspace: **$ws_name** (Total: $total_count, Clean: $clean_count, Attention: $modified_count)"
+            
+            if [ $modified_count -gt 0 ]; then
+                 echo ""
+                 echo "### ⚠️ Attention Needed"
+                 print_header
+                 for repo_info in "${modified_repos[@]}"; do
+                     repo_name="${repo_info%%|*}"
+                     rest="${repo_info#*|}"
+                     repo_status="${rest%%|*}"
+                     repo_branch="${rest#*|}"
+                     print_row "$repo_name" "$repo_status" "$repo_branch"
+                 done
             fi
-        }
-
-        while IFS= read -r line; do
-            if [[ "$line" =~ ^===\ \./(.*)\ \(git\)\ ===$ ]]; then
-                # New repo block started, process previous one
-                process_repo
-                
-                current_repo="${BASH_REMATCH[1]}"
-                is_dirty=false
-                sync_status=""
-                branch="unknown"
-            elif [[ "$line" =~ ^##\ ([^.]*)(\.\.\.([^\ ]*))?(\ \[(.*)\])? ]]; then
-                 # Parse branch line: ## main...origin/main [ahead 1]
-                 branch="${BASH_REMATCH[1]}"
-                 # ${BASH_REMATCH[5]} captures "ahead 1" or "ahead 1, behind 2"
-                 if [ -n "${BASH_REMATCH[5]}" ]; then
-                     sync_status="${BASH_REMATCH[5]}"
-                     # Add emojis for better visibility
-                     sync_status="${sync_status//ahead/🚀 Ahead}"
-                     sync_status="${sync_status//behind/⬇️ Behind}"
-                 fi
-            elif [[ -n "$line" && "$line" != "" ]]; then
-                # Any other non-empty line means local changes (A, M, D, ??, etc.)
-                is_dirty=true
-            fi
-        done <<< "$raw_output"
-        
-        # Handle the last repo
-        process_repo
-        
-        
-        total_count=$((clean_count + modified_count))
-        
-        # Summary Header
-        echo "## Workspace: **$ws_name** (Total: $total_count, Clean: $clean_count, Attention: $modified_count)"
-        
-        if [ $modified_count -gt 0 ]; then
-             echo ""
-             echo "### ⚠️ Attention Needed"
-             print_header
-             for repo_info in "${modified_repos[@]}"; do
-                 # Split string "repo|status|branch"
-                 repo_name="${repo_info%%|*}"
-                 rest="${repo_info#*|}"
-                 repo_status="${rest%%|*}"
-                 repo_branch="${rest#*|}"
-                 
-                 print_row "$repo_name" "$repo_status" "$repo_branch"
-             done
+            echo ""
         fi
-        echo ""
-    fi
-done
+    done
+fi
+
+# 3. Test Status (New Section)
+SUMMARY_JSON="$ROOT_DIR/ai_workspace/test_summary.json"
+if [ -f "$SUMMARY_JSON" ]; then
+    echo "## Latest Test Status"
+    python3 -c "
+import json, sys
+try:
+    with open('$SUMMARY_JSON') as f:
+        data = json.load(f)
+    ts = data.get('timestamp', 'Unknown')
+    overall = '✅ Passed' if data.get('overall_success') else '❌ Failed'
+    print(f'**Date**: {ts}')
+    print(f'**Overall**: {overall}')
+    print('')
+    print('| Layer | Result | Summary |')
+    print('|---|---|---|')
+    for layer in data.get('layers', []):
+        r = layer.get('result')
+        res = '✅ Passed' if r == 'passed' else ('⏭️ Skipped' if r == 'skipped' else '❌ Failed')
+        summ = layer.get('summary', '')
+        name = layer.get('name')
+        print(f'| {name} | {res} | {summ} |')
+except Exception as e:
+    print(f'Error parsing test summary: {e}')
+"
+    echo ""
+fi

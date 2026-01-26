@@ -1,0 +1,87 @@
+#!/bin/bash
+# .agent/scripts/verify_change.sh
+# Verification tool for agents to run targeted tests (Unit, Lint, etc.)
+# Usage: ./verify_change.sh --package <package_name> [--type <unit|lint>]
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")" # Go up to workspace root
+
+PKG=""
+TYPE="all"
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --package) PKG="$2"; shift ;;
+        --type) TYPE="$2"; shift ;;
+        -h|--help)
+            echo "Usage: $0 --package <package_name> [--type <unit|lint|all>]"
+            echo "Runs colcon test for the specified package with optional type filtering."
+            exit 0
+            ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+if [ -z "$PKG" ]; then
+    echo "Error: --package argument is required."
+    echo "Usage: $0 --package <package_name> [--type <unit|lint|all>]"
+    exit 1
+fi
+
+echo "========================================"
+echo "Verifying Change: $PKG"
+echo "Type: $TYPE"
+echo "========================================"
+
+# Auto-detect workspace layer
+FOUND_WS=""
+if [ -d "$ROOT_DIR/workspaces" ]; then
+    for ws in "$ROOT_DIR/workspaces/"*; do
+        if [ -d "$ws/src" ]; then
+            # Simple check: is there a directory with the package name?
+            # Using find to handle nested structures
+            if [ -n "$(find "$ws/src" -name "$PKG" -type d -print -quit 2>/dev/null)" ]; then
+                FOUND_WS="$ws"
+                break
+            fi
+        fi
+    done
+fi
+
+if [ -n "$FOUND_WS" ]; then
+    echo "📂 Located package in: $FOUND_WS"
+    cd "$FOUND_WS" || exit 1
+    
+    # Source install if available to ensure environment is ready
+    if [ -f "install/setup.bash" ]; then
+        source "install/setup.bash"
+    fi
+else
+    echo "⚠️ Could not locate workspace for '$PKG'. Running from current directory: $(pwd)"
+    # Might fail if not in a valid colcon workspace
+fi
+
+# Not forcing build before test, assuming agent handles build separately 
+# or colcon test builds if needed (it usually doesn't, test depends on build).
+# Ideally user should run ./scripts/build.sh first or agent does it.
+
+CMD="colcon test --packages-select $PKG --event-handlers console_direct+ --return-code-on-test-failure"
+
+if [ "$TYPE" == "unit" ]; then
+    CMD="$CMD --ctest-args -L unit"
+elif [ "$TYPE" == "lint" ]; then
+    CMD="$CMD --ctest-args -L lint copyright flake8 pep8 cpplint"
+fi
+
+echo "Running: $CMD"
+$CMD
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✅ Verification Passed ($TYPE) for $PKG"
+else
+    echo "❌ Verification Failed ($TYPE) for $PKG"
+fi
+
+exit $EXIT_CODE
