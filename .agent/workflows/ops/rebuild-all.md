@@ -15,7 +15,7 @@ This workflow combines the cleanup of build artifacts and the sequential buildin
 
 2. **Run Build Script**: Execute the consolidated build script.
    ```bash
-   ./scripts/build.sh
+   ./.agent/scripts/build.sh
    ```
 
 ## Verification

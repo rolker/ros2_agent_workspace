@@ -62,7 +62,7 @@ fi
 # 3b. Install Python Dependencies (Required for message generation)
 echo "Installing Python dependencies..."
 sudo apt install -y python3-pip
-pip3 install --break-system-packages empy==3.3.4 catkin_pkg lark
+python3 -m pip install --user empy==3.3.4 catkin_pkg lark
 
 # 4. Initialize rosdep
 echo "Initializing rosdep..."
@@ -71,13 +71,17 @@ if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
 fi
 rosdep update
 
-rosdep update
-
 # 5. Codespace Configuration
 if [ "${CODESPACES}" = "true" ]; then
     echo "Detected GitHub Codespaces environment."
     echo "Converting SSH URLs to HTTPS in .repos files..."
-    find configs -name "*.repos" -print0 | xargs -0 sed -i 's|git@github.com:|https://github.com/|g'
+    while IFS= read -r -d '' repos_file; do
+        # Create a backup before in-place modification to avoid inconsistent state on failure
+        if ! sed -i.bak 's|git@github.com:|https://github.com/|g' "${repos_file}"; then
+            echo "Error: Failed to convert SSH URLs to HTTPS in '${repos_file}'." >&2
+            exit 1
+        fi
+    done < <(find configs -name "*.repos" -print0)
     echo "URL conversion complete."
 fi
 
