@@ -59,11 +59,26 @@ else
     echo "ros-jazzy-ros-base is already installed."
 fi
 
+# 3b. Install Python Dependencies (Required for message generation)
+echo "Installing Python dependencies..."
+sudo apt install -y python3-pip
+pip3 install --break-system-packages empy==3.3.4 catkin_pkg lark
+
 # 4. Initialize rosdep
 echo "Initializing rosdep..."
 if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
     sudo rosdep init
 fi
 rosdep update
+
+rosdep update
+
+# 5. Codespace Configuration
+if [ "${CODESPACES}" = "true" ]; then
+    echo "Detected GitHub Codespaces environment."
+    echo "Converting SSH URLs to HTTPS in .repos files..."
+    find configs -name "*.repos" -print0 | xargs -0 sed -i 's|git@github.com:|https://github.com/|g'
+    echo "URL conversion complete."
+fi
 
 echo "Bootstrap complete! You can now run './.agent/scripts/setup.sh <workspace_name>'."

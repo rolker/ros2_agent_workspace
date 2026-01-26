@@ -4,7 +4,7 @@ description: Check for open Pull Requests and Issues in overlay repositories usi
 
 1. Get List of Repositories
 ```bash
-python3 scripts/list_overlay_repos.py
+python3 .agent/scripts/list_overlay_repos.py
 ```
 
 2. Fetch GitHub Data

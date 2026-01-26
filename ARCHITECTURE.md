@@ -54,7 +54,7 @@ ros2_agent_workspace/
 ├── .agent/                    # Agent intelligence
 │   ├── workflows/            # Executable workflows (e.g., /build-all)
 │   ├── rules/                # Always-on guidelines for agents
-│   ├── scripts/              # Automation scripts (setup, build, test, etc.)
+│   ├── .agent/scripts/       # Automation scripts (setup, build, test, etc.)
 │   ├── templates/            # Templates for various tasks
 │   └── knowledge/            # Auto-generated knowledge links
 │
