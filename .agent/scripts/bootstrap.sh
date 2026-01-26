@@ -81,6 +81,8 @@ if [ "${CODESPACES}" = "true" ]; then
             echo "Error: Failed to convert SSH URLs to HTTPS in '${repos_file}'." >&2
             exit 1
         fi
+        # Remove backup file after successful conversion
+        rm -f "${repos_file}.bak"
     done < <(find configs -name "*.repos" -print0)
     echo "URL conversion complete."
 fi
