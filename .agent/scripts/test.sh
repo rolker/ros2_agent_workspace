@@ -57,6 +57,13 @@ for layer in "${LAYERS[@]}"; do
         echo "----------------------------------------"
         echo "Testing Layer: $layer"
         
+
+        # Safety Check: Never run in root
+        if [ "$WORKSPACE_DIR" == "$ROOT_DIR" ]; then
+             echo "❌ Error: Layer workspace path resolves to root directory. Skipping."
+             continue
+        fi
+
         cd "$WORKSPACE_DIR" || continue
         
         # Source existing install if available

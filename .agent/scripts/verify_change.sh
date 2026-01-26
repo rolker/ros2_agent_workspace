@@ -58,8 +58,16 @@ if [ -n "$FOUND_WS" ]; then
         source "install/setup.bash"
     fi
 else
-    echo "⚠️ Could not locate workspace for '$PKG'. Running from current directory: $(pwd)"
-    # Might fail if not in a valid colcon workspace
+    echo "❌ Error: Could not locate workspace for '$PKG'."
+    echo "Search locations checked:"
+    echo "  - $ROOT_DIR/workspaces/*/src"
+    exit 1
+fi
+
+# Paranoid check against running in root if logic matched root somehow
+if [ "$(pwd)" == "$ROOT_DIR" ]; then
+    echo "❌ Error: Attempted to run test in workspace root. This is forbidden."
+    exit 1
 fi
 
 # Not forcing build before test, assuming agent handles build separately 
