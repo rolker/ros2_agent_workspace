@@ -1,115 +1,122 @@
 #!/bin/bash
-# scripts/test.sh
-# Unified test script for ROS2 Agent Workspace
-#
-# Usage: ./scripts/test.sh
-#
-# This script will:
-# 1. Check for workspace locks (multi-agent coordination)
-# 2. Run tests on all workspace layers in order
-# 3. Generate a detailed test report in ai_workspace/test_report.md
-# 4. Continue testing other layers even if one fails (for full status)
-#
-# Exit codes:
-#   0 - All tests passed
-#   1 - Tests failed in one or more layers
+# .agent/scripts/test.sh
+# Unified test script for ROS2 Agent Workspace.
+# Adds JSON/CSV reporting for agents.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+# Go up two levels: .agent/scripts -> .agent -> root
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 REPORT_FILE="$ROOT_DIR/ai_workspace/test_report.md"
+HISTORY_FILE="$ROOT_DIR/ai_workspace/test_history.csv"
+SUMMARY_JSON="$ROOT_DIR/ai_workspace/test_summary.json"
 
-# Ensure ai_workspace exists
 mkdir -p "$ROOT_DIR/ai_workspace"
 LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
 
 # Check for Lock
 if [ -f "$LOCK_FILE" ]; then
-    echo "❌ Workspace is LOCKED."
-    echo "This script cannot run because another agent/task is active."
-    echo "Lock details:"
-    cat "$LOCK_FILE"
-    echo ""
-    echo "If you are sure this is a stale lock, run: ./scripts/unlock.sh"
+    echo "❌ Workspace is LOCKED by $(cat $LOCK_FILE)"
     exit 1
 fi
 
-# Header for the Report
+# Initialize Report and JSON parts
 echo "# Test Report - $(date)" > "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 echo "| Layer | Result | Summary |" >> "$REPORT_FILE"
 echo "|---|---|---|" >> "$REPORT_FILE"
 
-# Load Layer Definitions
-source "$SCRIPT_DIR/env.sh" > /dev/null
+# Init CSV header if new
+if [ ! -f "$HISTORY_FILE" ]; then
+    echo "timestamp,layer,result" > "$HISTORY_FILE"
+fi
+
+# Load Layers
+if [ -f "$SCRIPT_DIR/env.sh" ]; then
+    source "$SCRIPT_DIR/env.sh" > /dev/null
+else
+    # Fallback if env.sh missing
+    LAYERS=("core") 
+fi
 
 echo "========================================"
 echo "Starting Test Sequence"
 echo "========================================"
 
+OVERALL_SUCCESS=true
 TOTAL_FAILURES=0
 FAILED_LAYERS=""
+JSON_LAYERS_ARRAY=()
+TIMESTAMP="$(date -Iseconds)"
 
 for layer in "${LAYERS[@]}"; do
     WORKSPACE_DIR="$ROOT_DIR/workspaces/${layer}_ws"
+    LAYER_RESULT="skipped"
+    LAYER_SUMMARY="No source"
     
-    if [ ! -d "$WORKSPACE_DIR/src" ]; then
-        echo "Skipping layer $layer (no src directory)"
-        echo "| $layer | ⏭️ Skipped | No source |" >> "$REPORT_FILE"
-        continue
-    fi
-
-    echo "----------------------------------------"
-    echo "Testing Layer: $layer"
-    echo "----------------------------------------"
-
-    # Go to workspace
-    cd "$WORKSPACE_DIR" || exit 1
-
-    # Source environment to ensure tests can run (requires install/setup.bash)
-    if [ -f "install/setup.bash" ]; then
-        source "install/setup.bash"
-    else
-        echo "⚠️ Warning: No install/setup.bash found. Tests might fail if not built."
-    fi
-
-    # Run Colcon Test
-    # --event-handlers console_direct+ shows output in real-time
-    # --return-code-on-test-failure guarantees non-zero exit if tests fail
-    colcon test --event-handlers console_direct+ --return-code-on-test-failure
-    TEST_RC=$?
-
-    # Get Test Results Summary
-    # colcon test-result --all shows all cases
-    RESULT_SUMMARY=$(colcon test-result --verbose | grep -E "Total|Errors|Failures" | paste -sd " " -)
-    if [ -z "$RESULT_SUMMARY" ]; then
-        RESULT_SUMMARY="No tests found or ran."
-    fi
-
-    if [ $TEST_RC -eq 0 ]; then
-        echo "✅ Tests Passed for $layer"
-        echo "| $layer | ✅ Passed | $RESULT_SUMMARY |" >> "$REPORT_FILE"
-    else
-        echo "❌ Tests Failed for $layer"
-        echo "| $layer | ❌ Failed | $RESULT_SUMMARY |" >> "$REPORT_FILE"
-        TOTAL_FAILURES=$((TOTAL_FAILURES + 1))
-        FAILED_LAYERS="$FAILED_LAYERS $layer"
+    if [ -d "$WORKSPACE_DIR/src" ]; then
+        echo "----------------------------------------"
+        echo "Testing Layer: $layer"
         
-        # We generally continue testing other layers unless critical, 
-        # but for CI-like behavior we might want to stop. 
-        # Here we continue to gather full status.
+        cd "$WORKSPACE_DIR" || continue
+        
+        # Source existing install if available
+        if [ -f "install/setup.bash" ]; then
+            source "install/setup.bash"
+        fi
+
+        # Run Tests
+        colcon test --event-handlers console_direct+ --return-code-on-test-failure
+        TEST_RC=$?
+        
+        # Summary
+        RESULT_SUMMARY=$(colcon test-result --verbose | grep -E "Total|Errors|Failures" | paste -sd " " -)
+        [ -z "$RESULT_SUMMARY" ] && RESULT_SUMMARY="No tests run"
+
+        if [ $TEST_RC -eq 0 ]; then
+            echo "✅ Tests Passed for $layer"
+            LAYER_RESULT="passed"
+            echo "| $layer | ✅ Passed | $RESULT_SUMMARY |" >> "$REPORT_FILE"
+        else
+            echo "❌ Tests Failed for $layer"
+            LAYER_RESULT="failed"
+            echo "| $layer | ❌ Failed | $RESULT_SUMMARY |" >> "$REPORT_FILE"
+            OVERALL_SUCCESS=false
+            TOTAL_FAILURES=$((TOTAL_FAILURES + 1))
+            FAILED_LAYERS="$FAILED_LAYERS $layer"
+        fi
+        LAYER_SUMMARY="$RESULT_SUMMARY"
+    else
+        echo "Skipping $layer (no source)"
+        echo "| $layer | ⏭️ Skipped | No source |" >> "$REPORT_FILE"
     fi
 
+    # Append to CSV (quote all fields)
+    echo "\"$TIMESTAMP\",\"$layer\",\"$LAYER_RESULT\"" >> "$HISTORY_FILE"
+
+    # Construct JSON Object for this layer using Python for safety
+    LAYER_JSON=$(python3 -c "import json, sys; print(json.dumps({'name': sys.argv[1], 'result': sys.argv[2], 'summary': sys.argv[3]}))" "$layer" "$LAYER_RESULT" "$LAYER_SUMMARY")
+    JSON_LAYERS_ARRAY+=("$LAYER_JSON")
 done
+
+# Build JSON Output
+JSON_STR="{ \"timestamp\": \"$TIMESTAMP\", \"overall_success\": $([ "$OVERALL_SUCCESS" = true ] && echo "true" || echo "false"), \"layers\": ["
+FIRST=true
+for item in "${JSON_LAYERS_ARRAY[@]}"; do
+    if [ "$FIRST" = true ]; then FIRST=false; else JSON_STR+=","; fi
+    JSON_STR+="$item"
+done
+JSON_STR+="] }"
+
+echo "$JSON_STR" > "$SUMMARY_JSON"
 
 echo "========================================"
 echo "Test Summary"
-echo "========================================"
 cat "$REPORT_FILE"
 
 if [ $TOTAL_FAILURES -eq 0 ]; then
-    echo "All tests passed successfully."
+    echo "All tests passed."
     exit 0
 else
-    echo "Tests failed in layers: $FAILED_LAYERS"
+    echo "Tests failed in: $FAILED_LAYERS"
     exit 1
 fi
