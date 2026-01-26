@@ -20,7 +20,15 @@ These documents are **required reading** for every agent session:
   - Overview of agent responsibilities and constraints
   - Quick reference for what agents can/cannot do
 
-## 2. Configure Git Identity (1 min)
+## 2. Source the Environment (1 min)
+
+Ensure your shell has the correct ROS 2 environment paths:
+
+```bash
+source .agent/scripts/env.sh
+```
+
+## 3. Configure Git Identity (1 min)
 
 Before making ANY commits, configure your identity:
 
@@ -64,6 +72,7 @@ Before starting work, verify:
 
 - [ ] Read `AI_IDENTITY_STRATEGY.md`
 - [ ] Read `rules/common/git-hygiene.md`
+- [ ] Sourced environment: `source .agent/scripts/env.sh`
 - [ ] Ran `configure_git_identity.sh`
 - [ ] Created feature branch with `feature/TASK-*` naming
 - [ ] Checked `AGENT_INDEX.md` for existing workflows
