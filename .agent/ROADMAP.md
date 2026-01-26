@@ -12,6 +12,10 @@
     - **Context**: Split from TASK-002.
 
 ### 🤖 Agent Infrastructure
+- [TASK-011] **Standardize Issues as Source of Truth** (Status: In Progress)
+    - **Goal**: Enforce a rule that all agent tasks must be tracked by a GitHub Issue.
+    - **Source**: Issue #45.
+    - **Resolution**: Update Onboarding, Planning Mode, and create new rule file.
 - [TASK-001] **Multi-Distro Support** (Status: Planned)
     - **Goal**: Support multiple ROS 2 distributions (Jazzy, Kilted, Rolling) simultaneously.
 - [TASK-003] **Bootstrap Automation** (Status: Done)
