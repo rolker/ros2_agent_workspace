@@ -48,6 +48,7 @@ This configures git in:
 1.  **Check if a GitHub Issue exists** for your current objective.
 2.  If not, **ask the user**: *"Should I open an issue to track this?"*
 3.  Use the issue number in your branch name: `feature/ISSUE-<number>-<description>`.
+4.  **Note**: When you submit the PR, you MUST include `Closes #<issue-number>` in the description.
 
 ## 5. Create a Feature Branch (30 sec)
 
