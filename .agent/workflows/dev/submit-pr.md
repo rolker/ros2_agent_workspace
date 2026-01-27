@@ -28,12 +28,13 @@ Use this workflow when you are ready to submit your changes for review.
     -   **Option A: GitHub MCP (Preferred)**
         -   Use `github.create_pull_request`.
         -   Title: `feat: <description>`
-        -   Body: Description of changes + "Closes #<issue-id>" if applicable.
+        -   Body: Description of changes + "Closes #<issue-id>" (Mandatory).
     -   **Option B: `gh` CLI**
-        -   Run: `gh pr create --fill`
+        -   Run: `gh pr create --title "feat: <description>" --body "Closes #<issue-id> description of changes..."`
     -   **Option C: Manual**
         -   The `git push` command usually outputs a URL to create a PR.
         -   **Action**: Display that URL to the user.
+        -   **Requirement**: Remind user to add "Closes #<issue-id>" to the description.
 
 6.  **Request Review**
     -   If the repo is configured, comment `/copilot review` on the PR (if supported) or assign the relevant reviewers.
