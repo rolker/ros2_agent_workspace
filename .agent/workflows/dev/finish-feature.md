@@ -12,11 +12,14 @@ Use this workflow **IMMEDIATELY AFTER** submitting a Pull Request. This "unlocks
     -   Ensure the PR has been successfully created and pushed.
 
 2.  **Unlock (Return to Default)**
-    -   Determine default branch (usually `main` for root, `jazzy` for project repos).
-    -   `git checkout <default-branch>`
+    -   Run the auto-checkout script:
+        ```bash
+        ./.agent/scripts/checkout_default_branch.sh
+        ```
+    -   This script detects the default branch (main/jazzy), checks for uncommitted changes, switches, and pulls.
 
 3.  **Sync**
-    -   `git pull`
+    -   (Handled by the script above)
     -   Ensures local default branch is up-to-date.
 
 4.  **Optional Cleanup**

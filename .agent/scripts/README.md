@@ -215,6 +215,28 @@ Lock/unlock the workspace to prevent accidental modifications.
 
 ---
 
+### `checkout_default_branch.sh`
+
+Automatically detect and switch to the remote default branch (e.g. `main` or `jazzy`).
+ 
+ **Usage:**
+ ```bash
+ ./.agent/scripts/checkout_default_branch.sh
+ ```
+ 
+ **What it does:**
+ 1. Detects `origin/HEAD`
+ 2. Checks for uncommitted changes (Safeguard)
+ 3. Switches to default branch
+ 4. Pulls latest changes
+ 
+ **Safety:**
+ - Will **EXIT with error** if you have uncommitted changes. This prevents accidental loss of work or "hiding" work in stashes.
+ 
+ ---
+
+---
+
 ## Testing & Validation
 
 ### `test.sh`
