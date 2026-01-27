@@ -59,6 +59,14 @@ Register a GitHub App to act on behalf of the agent.
 *   **Limitations**:
     *   Significant complexity to set up and authenticate compared to a simple PAT.
 
+## GitHub Content Strategy (Mandatory)
+
+To address the limitations of the "Git Authorship Distinction" strategy (specifically PR attribution), we implement a **Content Signature** protocol.
+
+**Rule**: All AI agents must append a structured signature to the body of any GitHub Issue, Pull Request, or Comment they create via the API.
+
+Details: [**`.agent/rules/common/ai-signature.md`**](rules/common/ai-signature.md)
+
 ## Proposed Plan
 
 ### Phase 1: Establish Authorship (The "Signed-By" Strategy)
@@ -90,3 +98,4 @@ The user has configured the repository to require 0 reviews for merging.
 - [x] **Create Configuration Script**: `.agent/scripts/configure_git_identity.sh` to apply identity across all repos.
 - [x] **Update Documentation**: Document the "0-Review" policy decision and scope requirements.
 - [x] **Clarify Scope**: Identity applies to workspace repo AND all repos in `workspaces/`.
+- [x] **Enforce Content Signatures**: Agents must sign GitHub comments/PRs (see `rules/common/ai-signature.md`).
