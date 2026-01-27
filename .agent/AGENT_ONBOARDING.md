@@ -19,6 +19,9 @@ These documents are **required reading** for every agent session:
 - **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
   - **Signature Required**: Must append `**🤖 Authored-By**: `<Agent Name>`` to all GitHub Issues/PRs/Comments.
 
+- **[`rules/common/github-cli-best-practices.md`](rules/common/github-cli-best-practices.md)**
+  - **Protocol**: MUST use "File-First" approach (temp file + `--body-file`) for all multiline GitHub interactions (Issues/PRs).
+
 - **[`AGENTS.md`](../AGENTS.md)**
   - Overview of agent responsibilities and constraints
   - Quick reference for what agents can/cannot do
@@ -83,6 +86,7 @@ Before starting work, verify:
 - [ ] Read `AI_IDENTITY_STRATEGY.md`
 - [ ] Read `rules/common/git-hygiene.md`
 - [ ] Read `rules/common/ai-signature.md`
+- [ ] Read `rules/common/github-cli-best-practices.md`
 - [ ] Sourced environment: `source .agent/scripts/env.sh`
 - [ ] Ran `configure_git_identity.sh`
 - [ ] **Verified/Created GitHub Issue for task**
