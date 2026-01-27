@@ -77,7 +77,29 @@ def batch_repos(repos, batch_size):
         yield repos[i:i + batch_size]
 
 
-
+def build_repo_query(repo_specs, query_type):
+    """
+    Build a GitHub search query for multiple repositories.
+    
+    Args:
+        repo_specs: List of "owner/repo" strings
+        query_type: "pr" or "issue"
+        
+    Returns:
+        str: GitHub search query
+    """
+    if not repo_specs:
+        return ""
+    
+    # Build the query with repo filters
+    repo_filters = " OR ".join([f"repo:{spec}" for spec in repo_specs])
+    
+    if query_type == "pr":
+        return f"({repo_filters}) is:pr is:open"
+    elif query_type == "issue":
+        return f"({repo_filters}) is:issue is:open"
+    else:
+        return ""
 
 
 def fetch_github_prs(repo_specs, batch_size=10):
@@ -94,13 +116,13 @@ def fetch_github_prs(repo_specs, batch_size=10):
     all_prs = []
     
     for batch in batch_repos(repo_specs, batch_size):
-        # Use repeated -R flags for each repo in the batch
-        cmd = ["gh", "search", "prs"]
-        for repo in batch:
-            cmd.extend(["-R", repo])
-            
-        cmd.extend(["--state", "open", "--json", "repository,title,author,number,url,createdAt"])
+        query = build_repo_query(batch, "pr")
         
+        if not query:
+            continue
+        
+        # Use gh search prs with the constructed query
+        cmd = ["gh", "search", "prs", query, "--json", "repository,title,author,number,url,createdAt"]
         returncode, stdout, stderr = run_command(cmd)
         
         if returncode != 0:
@@ -130,13 +152,13 @@ def fetch_github_issues(repo_specs, batch_size=10):
     all_issues = []
     
     for batch in batch_repos(repo_specs, batch_size):
-        # Use repeated -R flags for each repo in the batch
-        cmd = ["gh", "search", "issues"]
-        for repo in batch:
-            cmd.extend(["-R", repo])
-            
-        cmd.extend(["--state", "open", "--json", "repository,title,number,url,labels,createdAt"])
+        query = build_repo_query(batch, "issue")
         
+        if not query:
+            continue
+        
+        # Use gh search issues with the constructed query
+        cmd = ["gh", "search", "issues", query, "--json", "repository,title,number,url,labels,createdAt"]
         returncode, stdout, stderr = run_command(cmd)
         
         if returncode != 0:
@@ -282,6 +304,10 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Validate batch size
+    if args.batch_size < 1:
+        parser.error("--batch-size must be at least 1")
     
     local_status = None
     remote_status = None
