@@ -72,7 +72,10 @@ def sync_repo(repo_path, repo_name, dry_run=False):
 
     # 1. Check for local modifications
     if is_dirty(repo_path, dry_run):
-        print(f"  ⚠️  Skipping: Uncommitted changes detected.")
+        if dry_run:
+            print(f"  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
+        else:
+            print(f"  ⚠️  Skipping: Uncommitted changes detected.")
         return
 
     branch = get_current_branch(repo_path, dry_run)
@@ -81,7 +84,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
         return
 
     # 2. Sync Logic
-    if branch in ['main', 'jazzy']:
+    if branch in ['main', 'jazzy', 'rolling']:
         print(f"  🚀 On default branch '{branch}'. Pulling updates...")
         success, output = run_git_cmd(repo_path, ["pull", "--rebase"], dry_run)
         if success:
@@ -98,15 +101,17 @@ def sync_repo(repo_path, repo_name, dry_run=False):
         print(f"  🌿 On feature branch '{branch}'. Fetching only...")
         success, output = run_git_cmd(repo_path, ["fetch"], dry_run)
         
-        # Check status relative to upstream
-        # Assuming upstream is 'origin'
         if success:
-            # Check if behind
-            s_success, s_msg = run_git_cmd(repo_path, ["status", "-sb"], dry_run)
-            if s_success and "behind" in s_msg:
-                print(f"     ⚠️  Branch is behind remote. Run 'git merge' or 'git rebase' manually.")
+            if dry_run:
+                print("     (Dry run successful)")
             else:
-                print("     ✅ Fetched.")
+                # Check status relative to upstream
+                # Assuming upstream is 'origin'
+                s_success, s_msg = run_git_cmd(repo_path, ["status", "-sb"], dry_run)
+                if s_success and "behind" in s_msg:
+                    print(f"     ⚠️  Branch is behind remote. Run 'git merge' or 'git rebase' manually.")
+                else:
+                    print("     ✅ Fetched.")
         else:
             print(f"     ❌ Fetch failed: {output}")
 
