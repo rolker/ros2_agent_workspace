@@ -13,7 +13,7 @@
 #
 # IMPORTANT: Must be sourced (not executed) to export variables to current shell:
 #   source .agent/scripts/set_git_identity_env.sh "..." "..."   ✓ Correct
-#   ./agent/scripts/set_git_identity_env.sh "..." "..."         ✗ Wrong (variables won't persist)
+#   ./.agent/scripts/set_git_identity_env.sh "..." "..."        ✗ Wrong (variables won't persist)
 
 # Check if script is being sourced (not executed)
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
@@ -62,7 +62,10 @@ echo "  GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME"
 echo "  GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL"
 echo ""
 echo "Verification:"
-echo "  Current session identity: $(git var GIT_AUTHOR_IDENT | cut -d'<' -f1 | xargs)<$(git var GIT_AUTHOR_IDENT | grep -oP '<\K[^>]+')"
+AUTHOR_IDENT=$(git var GIT_AUTHOR_IDENT)
+AUTHOR_NAME=$(echo "$AUTHOR_IDENT" | sed 's/ <.*//')
+AUTHOR_EMAIL=$(echo "$AUTHOR_IDENT" | sed 's/.*<\(.*\)>.*/\1/')
+echo "  Current session identity: $AUTHOR_NAME <$AUTHOR_EMAIL>"
 echo ""
 echo "ℹ️  This identity applies ONLY to this shell session."
 echo "ℹ️  The .git/config file remains unchanged."
