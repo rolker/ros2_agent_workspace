@@ -38,6 +38,7 @@ Here is the first paragraph.
 
 ---
 **🤖 Authored-By**: `Agent Name`
+**🧠 Model**: `Model Name`
 EOF
 
 # 3. Execute command
