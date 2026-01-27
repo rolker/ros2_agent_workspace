@@ -10,12 +10,17 @@ import os
 import sys
 import yaml
 import glob
+from pathlib import Path
 
 
 def get_workspace_root():
     """Get the absolute path to the workspace root directory."""
     # This file is in .agent/scripts/lib/, so go up 3 levels
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    lib_dir = Path(__file__).parent
+    scripts_dir = lib_dir.parent
+    agent_dir = scripts_dir.parent
+    workspace_root = agent_dir.parent
+    return str(workspace_root)
 
 
 def get_overlay_repos(include_underlay=False):

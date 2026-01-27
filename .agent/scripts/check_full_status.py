@@ -178,7 +178,7 @@ def get_remote_status(batch_size=10):
     repos = get_overlay_repos(include_underlay=False)
     
     # Extract GitHub owner/repo specs
-    repo_specs = set([ROOT_REPO])  # Always include root repo
+    repo_specs = {ROOT_REPO}  # Always include root repo
     
     for repo in repos:
         owner, repo_name = extract_github_owner_repo(repo.get("url", ""))

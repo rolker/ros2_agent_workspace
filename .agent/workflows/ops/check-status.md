@@ -18,7 +18,7 @@ This single command performs:
 
 **Options:**
 - `--no-local` - Skip local git status check
-- `--no-remote` - Skip remote GitHub status check  
+- `--no-remote` - Skip remote GitHub status check
 - `--batch-size N` - Number of repositories per GitHub query (default: 10)
 
 **Examples:**
