@@ -55,10 +55,8 @@ Implement a **draft PR workflow** where agents:
   - Accepts issue number
   - Fetches issue metadata from GitHub
   - Creates feature branch
-  - Generates plan from template
-  - Commits plan
-  - Pushes branch
-  - Creates draft PR with `gh pr create --draft`
+  - Generates plan file from template in `.agent/work-plans/`
+  - Prints manual next steps for committing, pushing, and creating a draft PR
 - [x] Create script: `.agent/scripts/update_issue_plan.sh`
   - Updates plan file
   - Commits with standardized message

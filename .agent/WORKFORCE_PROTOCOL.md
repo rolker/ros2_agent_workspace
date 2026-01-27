@@ -37,11 +37,6 @@ GitHub Issues are the **Source of Truth** for what is being worked on.
 *   **Before Starting**:
     *   Search for open issues or projects.
     *   **Do not** pick up an issue assigned to another user/agent unless explicitly instructed to "Join" or "Collaborate".
-*   **During Work**:
-    *   Assign the issue to yourself (if possible) or comment "Taking this".
-*   **Finishing**:
-    *   Reference the issue in your PR (e.g., "Closes #123").
-
 ## 2. Task Locking (GitHub Issues Authority)
 GitHub Issues are the **Source of Truth** for what is being worked on.
 
