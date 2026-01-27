@@ -7,7 +7,9 @@ description: Manage the workspace roadmap by adding tasks, updating status, and 
 
 Use this skill when asked to "add a task", "update the roadmap", "what are we working on?", or "prioritize X".
 
-**Note**: GitHub Issues are the **primary Source of Truth** for task tracking (see `.agent/WORKFORCE_PROTOCOL.md`). This skill manages the legacy **`.agent/ROADMAP.md`** file for backward compatibility and local task tracking. When possible, prefer using GitHub Issues directly.
+**Note**: This skill manages the legacy **`.agent/ROADMAP.md`** file for backward compatibility and local task tracking. However:
+- GitHub Issues are the **primary Source of Truth** for task tracking (see `.agent/WORKFORCE_PROTOCOL.md`)
+- When possible, prefer using GitHub Issues directly
 
 ## Core Operations
 

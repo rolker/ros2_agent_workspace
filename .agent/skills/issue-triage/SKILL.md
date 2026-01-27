@@ -25,7 +25,7 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 2.  For each repository:
     -   Parse the owner/repo from the URL.
     -   Use the GitHub MCP tool `search_issues` (or `list_issues`) to find **open** issues.
-    -   *Filter*: Check which issues are already being tracked (via GitHub Issues in this workspace or optionally in `.agent/ROADMAP.md`).
+    -   *Filter*: Check if the issue is already tracked in this workspace's GitHub Issues (search for the issue URL or number).
 3.  **Report**: Present a list of *new, untracked* issues to the User.
 
 ### 2. Triage (Interactive)
@@ -33,8 +33,8 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 **Procedure**:
 1.  Ask the User: "Which of these should be tracked in this workspace?"
 2.  For selected issues:
-    -   Recommend creating a GitHub Issue in this workspace to track the upstream issue.
-    -   Optionally use the **Project Management Skill** to add to `.agent/ROADMAP.md` for legacy tracking.
+    -   **Primary**: Create a GitHub Issue in this workspace to track the upstream issue.
+    -   **Optional**: Use the **Project Management Skill** to also add to `.agent/ROADMAP.md` if local file tracking is needed for offline or quick reference.
     -   Title format: `[Upstream] <Issue Title> (Link: <url>)`
 
 ## Example Output
