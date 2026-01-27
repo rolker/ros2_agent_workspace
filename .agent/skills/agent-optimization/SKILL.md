@@ -42,11 +42,11 @@ You must consider the Agent Workspace in the context of:
 ### 3. Synthesize & Innovate
 **Trigger**: "Suggest improvements" or "What new tech should we use?"
 **Procedure**:
-1.  Review `.agent/ROADMAP.md` to understand project goals.
+1.  Review GitHub Issues in this workspace to understand project goals and priorities.
 2.  Propose new:
     -   **Skills**: e.g., "An agent specializing in converting ROS 1 bags to ROS 2".
     -   **Workflows**: e.g., "A GitHub Action workflow for auto-documenting PRs".
     -   **Tools**: Integration of new vector databases or memory systems.
 
 ## Output Format
-When proposing changes, add them to **`.agent/ROADMAP.md`** under `## Backlog > ### System Improvements` (create the section if needed), using the Project Management ID format.
+When proposing changes, create a **GitHub Issue** with appropriate labels (e.g., `enhancement`, `system-improvement`). Optionally add to **`.agent/ROADMAP.md`** under `## Backlog > ### System Improvements` for backward compatibility.

@@ -5,6 +5,12 @@
 *   **Size**: Aim for PRs reviewable in < 15 minutes.
 *   **Focus**: Separate refactoring from feature work.
 
+## 🛑 SAFETY CHECK: NO DIRECT COMMITS TO MAIN
+**CRITICAL**: Before every commit, run \`git branch --show-current\`.
+*   If the output is \`main\` (or \`jazzy\`/\`rolling\`), **STOP**.
+*   You must create a feature branch: \`git checkout -b feature/<issue-number>-<description>\`.
+*   **Reason**: Direct commits to main bypass CI/CD and Code Review, breaking the "stable main" contract.
+
 ## Multi-Agent Concurrency Strategy
 To prevent conflicts when multiple agents/users work in the same repo:
 1.  **Sync First**: Always pull the latest `main` before branching.

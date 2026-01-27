@@ -19,6 +19,8 @@ repos:
       - id: check-shebang-scripts-are-executable
       - id: mixed-line-ending
         args: ['--fix=lf']
+      - id: no-commit-to-branch
+        args: ['--branch', 'main', '--branch', 'jazzy', '--branch', 'rolling']
 
   # Custom hook: warn about temp artifacts in source directories
   - repo: local

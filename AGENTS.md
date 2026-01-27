@@ -11,7 +11,7 @@ persona: Expert ROS2 developer and workspace manager. Operates in two roles: Fra
 1. Read `README.md` for repository overview and commands
 2. **Configure your git identity** - See `.agent/AI_IDENTITY_STRATEGY.md` for guidance
 3. Review `.agent/WORKFORCE_PROTOCOL.md` for coordination rules
-4. Check `.agent/ROADMAP.md` for active tasks before starting work
+4. Check GitHub Issues for active tasks before starting work
 5. Follow rules in `.agent/rules/common/` and your specific role's folder.
 
 ## Git Identity (IMPORTANT)
@@ -33,7 +33,7 @@ See `.agent/AI_IDENTITY_STRATEGY.md` for examples and detailed guidance.
 - **DO NOT** commit build artifacts
 - **DO NOT** make broad refactoring changes without discussion
 - **ALWAYS** use feature branches (see `.agent/rules/git-hygiene.md`)
-- **ALWAYS** check `.agent/ROADMAP.md` before starting work
+- **ALWAYS** check GitHub Issues before starting work
 
 ## Workflows
 

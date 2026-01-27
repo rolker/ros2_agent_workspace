@@ -107,7 +107,7 @@ Common scripts:
 
 ### First time in workspace?
 1. Run `/check-status` to see current state
-2. Check [`.agent/ROADMAP.md`](.agent/ROADMAP.md) for active tasks
+2. Check GitHub Issues for active tasks (or optionally [`.agent/ROADMAP.md`](.agent/ROADMAP.md) for legacy planning)
 3. Run `/build-all` if needed
 
 ### Before committing?
