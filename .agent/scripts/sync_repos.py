@@ -129,6 +129,7 @@ def main():
         candidate_path = root_dir / "workspaces" / ws_name / "src" / repo['name']
 
         repo_path = None
+        tried_paths = [str(candidate_path)]
 
         # First, try the conventional workspace layout.
         if candidate_path.exists():
@@ -140,12 +141,13 @@ def main():
                 explicit_path = Path(explicit_path)
                 if not explicit_path.is_absolute():
                     explicit_path = root_dir / explicit_path
+                tried_paths.append(str(explicit_path))
                 if explicit_path.exists():
                     repo_path = explicit_path
         
         if repo_path is None:
-            print(f"Skipping {repo['name']}: could not resolve repository path "
-                  f"(tried {candidate_path}{', and ' + str(explicit_path) if 'explicit_path' in locals() else ''}).")
+            paths_str = ", ".join(tried_paths)
+            print(f"Skipping {repo['name']}: could not resolve repository path (tried {paths_str}).")
             continue
 
         sync_repo(repo_path, repo['name'], args.dry_run)
