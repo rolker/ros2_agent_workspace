@@ -6,11 +6,13 @@
 ## 1. Analysis Phase
 *   **Read Context**: Use `view_file` on relevant docs (`README.md`, `ARCHITECTURE.md`) and source code.
 *   **Check Existing Issues**: Use `github-mcp-server` to search for related issues/PRs.
+*   **Prerequisite**: Ensure a GitHub Issue exists. If not, ask the user to create one (or ask for permission to create it).
 *   **Understand Requirements**: If ambiguous, ask clarifying questions using `notify_user`.
 
 ## 2. Artifact Creation
 *   **Create/Update `task.md`**: Break down the high-level goal into checklist items.
 *   **Create `implementation_plan.md`**:
+    *   **Header**: Start with `Ref: Issue #<number>`.
     *   **Goal Description**: What are we doing?
     *   **User Review Required**: Breaking changes? Risks?
     *   **Proposed Changes**: List files to modify/create.
