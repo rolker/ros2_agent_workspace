@@ -212,12 +212,12 @@ Lock/unlock the workspace to prevent accidental modifications.
 **When to use:**
 - `lock.sh`: Before long operations or to pause work
 - `unlock.sh`: When resuming work or if locked unexpectedly
- 
- ---
- 
- ### `checkout_default_branch.sh`
- 
- Automatically detect and switch to the remote default branch (e.g. `main` or `jazzy`).
+
+---
+
+### `checkout_default_branch.sh`
+
+Automatically detect and switch to the remote default branch (e.g. `main` or `jazzy`).
  
  **Usage:**
  ```bash

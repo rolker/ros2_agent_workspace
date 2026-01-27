@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Script: .agent/scripts/checkout_default_branch.sh
 # Purpose: Automatically detect and switch to the remote default branch.
@@ -32,9 +33,9 @@ fi
 
 echo -e "✅ Default branch detected: ${GREEN}${DEFAULT_BRANCH}${NC}"
 
-# 2. Check for Uncommitted Changes
-if ! git diff-index --quiet HEAD --; then
-    echo -e "${RED}❌ Uncommitted chances detected.${NC}"
+# 2. Check for Uncommitted Changes (including untracked files)
+if [ -n "$(git status --porcelain)" ]; then
+    echo -e "${RED}❌ Uncommitted changes detected.${NC}"
     echo "   Please commit or stash your changes before switching branches."
     echo "   Aborting auto-checkout."
     exit 1
@@ -44,8 +45,12 @@ fi
 echo "🔄 Switching to ${DEFAULT_BRANCH}..."
 if git checkout "${DEFAULT_BRANCH}"; then
     echo "📥 Pulling latest changes..."
-    git pull
-    echo -e "${GREEN}✅ Successfully checked out and updated ${DEFAULT_BRANCH}.${NC}"
+    if git pull; then
+        echo -e "${GREEN}✅ Successfully checked out and updated ${DEFAULT_BRANCH}.${NC}"
+    else
+        echo -e "${RED}❌ Failed to pull latest changes for ${DEFAULT_BRANCH}.${NC}"
+        exit 1
+    fi
 else
     echo -e "${RED}❌ Failed to checkout ${DEFAULT_BRANCH}.${NC}"
     exit 1
