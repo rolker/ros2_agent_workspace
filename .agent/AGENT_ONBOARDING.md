@@ -68,9 +68,10 @@ This prevents "task creep" where you manually implement something that already h
 
 ## 7. Review Other Key Resources
 
-- **[`ROADMAP.md`](ROADMAP.md)** — What's currently being worked on
-- **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination
+- **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination and GitHub Issues workflow
+- **GitHub Issues** — Check open issues to see what's currently being worked on
 - **[`README.md`](../README.md)** — Repository structure and usage
+- **[`ROADMAP.md`](ROADMAP.md)** (Optional) — Legacy planning document; GitHub Issues are now the Source of Truth
 
 ## Quick Checklist for Your Session
 
@@ -83,7 +84,7 @@ Before starting work, verify:
 - [ ] **Verified/Created GitHub Issue for task**
 - [ ] Created feature branch with `feature/ISSUE-*` naming
 - [ ] Checked `AGENT_INDEX.md` for existing workflows
-- [ ] Reviewed `ROADMAP.md` for ongoing tasks
+- [ ] Reviewed GitHub Issues for ongoing tasks
 
 ## Why This Matters
 
