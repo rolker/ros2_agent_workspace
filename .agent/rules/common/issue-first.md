@@ -18,7 +18,7 @@ Agents should not begin coding until a GitHub Issue number is assigned and known
 1.  **Check First**: Before starting any task, search for an existing issue.
 2.  **Ask**: If no issue exists, ask the user: *"Should I open an issue to track this?"*
 3.  **Link**: The `implementation_plan.md` (if used) must link to the Issue.
-4.  **Branch**: Feature branches must follow `feature/ISSUE-<number>-<description>`.
+4.  **Branch**: Feature branches must follow `feature/ISSUE-<number>-<description>`. This Issue-based naming supersedes any older `feature/TASK-<ID>-<description>` examples; if you also have a separate TASK ID, include it in the description segment (for example: `feature/ISSUE-42-TASK-1234-add-logging`).
 
 ## Why?
 - **Tracking**: Ensures all work is visible on the roadmap.
