@@ -18,7 +18,7 @@ These documents are **required reading** for every agent session:
   - Always stash/commit uncommitted changes before finishing
 
 - **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
-  - **Signature Required**: Must append `**🤖 Authored-By**: `<Agent Name>`` and `**🧠 Model**: `<Model Name>`` to all GitHub Issues/PRs/Comments.
+  - **Signature Required**: Must append AI signature with **🤖 Authored-By** (agent name) and **🧠 Model** (model name) to all GitHub Issues/PRs/Comments.
 
 - **[`rules/common/github-cli-best-practices.md`](rules/common/github-cli-best-practices.md)**
   - **Protocol**: MUST use "File-First" approach (temp file + `--body-file`) for all multiline GitHub interactions (Issues/PRs).
