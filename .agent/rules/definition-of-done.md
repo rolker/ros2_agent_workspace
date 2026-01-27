@@ -4,7 +4,7 @@ trigger: always_on
 
 # Definition of Done (DoD)
 
-**Rule**: An agent MUST NOT consider a task "Done" (or mark it as `[x]` in `task.md` or `Status: Done` in `ROADMAP.md`) until the full lifecycle is complete.
+**Rule**: An agent MUST NOT consider a task "Done" (or mark it as closed in GitHub Issues or complete in tracking documents) until the full lifecycle is complete.
 
 ## The DoD Lifecycle
 A task is only **Done** when:
