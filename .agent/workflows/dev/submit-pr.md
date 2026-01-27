@@ -25,6 +25,7 @@ Use this workflow when you are ready to submit your changes for review.
     -   Push to origin: `git push -u origin HEAD`
 
 5.  **Create Pull Request**
+    -   **MANDATORY**: Append the AI Signature (see `.agent/rules/common/ai-signature.md`) to the PR body for all methods.
     -   **Option A: GitHub MCP (Preferred)**
         -   Use `github.create_pull_request`.
         -   Title: `feat: <description>`
@@ -34,7 +35,7 @@ Use this workflow when you are ready to submit your changes for review.
     -   **Option C: Manual**
         -   The `git push` command usually outputs a URL to create a PR.
         -   **Action**: Display that URL to the user.
-        -   **Requirement**: Remind user to add "Closes #<issue-id>" to the description.
+        -   **Requirement**: Remind user to add "Closes #<issue-id>" and the AI Signature to the description.
 
 6.  **Request Review**
     -   If the repo is configured, comment `/copilot review` on the PR (if supported) or assign the relevant reviewers.

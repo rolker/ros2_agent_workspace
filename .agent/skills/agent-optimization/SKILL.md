@@ -49,4 +49,8 @@ You must consider the Agent Workspace in the context of:
     -   **Tools**: Integration of new vector databases or memory systems.
 
 ## Output Format
-When proposing changes, create a **GitHub Issue** with appropriate labels (e.g., `enhancement`, `system-improvement`). Optionally add to **`.agent/ROADMAP.md`** under `## Backlog > ### System Improvements` for backward compatibility.
+When proposing changes, create a **GitHub Issue** with appropriate labels (e.g., `enhancement`, `system-improvement`). 
+
+**MANDATORY**: Append the AI Signature (see `.agent/rules/common/ai-signature.md`) at the very end of the issue body, separated from the main content by a horizontal rule (`---`). 
+
+Optionally add to **`.agent/ROADMAP.md`** under `## Backlog > ### System Improvements` for backward compatibility.
