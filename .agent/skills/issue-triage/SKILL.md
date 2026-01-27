@@ -42,4 +42,4 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 1.  `Crash on startup when no camera connected` (#42)
 2.  `Add graceful shutdown` (#45)
 
-Do you want to create GitHub Issues in this workspace to track these? (I will automatically append my AI signature to any issues created)."
+Do you want to create GitHub Issues in this workspace to track these? (I will automatically append my AI Signature to any issues created)."
