@@ -18,13 +18,16 @@ gh issue create --title "My Issue" --body "Line 1\nLine 2"
 ALWAYS write the content to a temporary file first, then use `--body-file`.
 
 **Steps**:
-1.  Create a temporary markdown file in `.agent/scratchpad/`.
-2.  Write your full, formatted content to that file.
+1.  Ensure the scratchpad directory exists: `mkdir -p .agent/scratchpad/`
+2.  Write your full, formatted content to a temporary file.
 3.  Pass that file path to the `gh` command.
 
 ```bash
 # GOOD
-# 1. Prepare content
+# 1. Ensure directory exists
+mkdir -p .agent/scratchpad/
+
+# 2. Prepare content
 cat <<EOF > .agent/scratchpad/issue_body.md
 # My Issue Title
 
@@ -34,10 +37,10 @@ Here is the first paragraph.
 - List item 2
 
 ---
-**🤖 Authored-By**: \`Agent Name\`
+**🤖 Authored-By**: `Agent Name`
 EOF
 
-# 2. Execute command
+# 3. Execute command
 gh issue create --title "My Issue" --body-file .agent/scratchpad/issue_body.md
 ```
 
