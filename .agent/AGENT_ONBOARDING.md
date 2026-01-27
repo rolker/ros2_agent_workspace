@@ -17,7 +17,7 @@ These documents are **required reading** for every agent session:
   - Always stash/commit uncommitted changes before finishing
 
 - **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
-  - **Signature Required**: Must append `**🤖 Authored-By**: <Agent Name>` to all GitHub Issues/PRs/Comments.
+  - **Signature Required**: Must append `**🤖 Authored-By**: `<Agent Name>`` to all GitHub Issues/PRs/Comments.
 
 - **[`AGENTS.md`](../AGENTS.md)**
   - Overview of agent responsibilities and constraints
