@@ -16,6 +16,9 @@ These documents are **required reading** for every agent session:
   - Branch naming: `feature/TASK-<ID>-<description>` or `fix/<description>`
   - Always stash/commit uncommitted changes before finishing
 
+- **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
+  - **Signature Required**: Must append `**🤖 Authored-By**: `<Agent Name>`` to all GitHub Issues/PRs/Comments.
+
 - **[`AGENTS.md`](../AGENTS.md)**
   - Overview of agent responsibilities and constraints
   - Quick reference for what agents can/cannot do
@@ -79,6 +82,7 @@ Before starting work, verify:
 
 - [ ] Read `AI_IDENTITY_STRATEGY.md`
 - [ ] Read `rules/common/git-hygiene.md`
+- [ ] Read `rules/common/ai-signature.md`
 - [ ] Sourced environment: `source .agent/scripts/env.sh`
 - [ ] Ran `configure_git_identity.sh`
 - [ ] **Verified/Created GitHub Issue for task**
