@@ -62,6 +62,54 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ## Status & Reporting
 
+### `check_full_status.py` ⭐ Recommended
+
+**One-command comprehensive status check** combining local git status and remote GitHub status.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/check_full_status.py
+```
+
+**Options:**
+```bash
+python3 ./.agent/scripts/check_full_status.py --no-local    # Skip local check
+python3 ./.agent/scripts/check_full_status.py --no-remote   # Skip remote check
+python3 ./.agent/scripts/check_full_status.py --batch-size 5  # Custom batch size
+```
+
+**What it does:**
+1. Runs local git status check (via `status_report.sh`)
+2. Discovers all workspace repositories from `.repos` files
+3. Fetches open PRs and Issues from GitHub (batched queries)
+4. Generates consolidated Markdown report
+
+**Output includes:**
+- Root repository status
+- All workspace repositories status
+- Open Pull Requests table
+- Open Issues table
+- Latest test results (if available)
+
+**Benefits:**
+- ✅ Single command (was 5 separate commands)
+- ✅ One user approval (was 3-5)
+- ✅ Automatic batching for GitHub queries
+- ✅ Server-side filtering for efficiency
+
+**Dependencies:**
+- `python3`
+- `vcstool` (for local status)
+- `gh` CLI authenticated (`gh auth login`)
+
+**When to use:**
+- Daily morning status check
+- Before starting work
+- After being away from workspace
+- To check PR/Issue backlog
+
+---
+
 ### `status_report.sh`
 
 Generate a comprehensive workspace status report.
@@ -425,16 +473,74 @@ List all repositories in overlay workspace layers.
 **Usage:**
 ```bash
 python3 ./.agent/scripts/list_overlay_repos.py
+python3 ./.agent/scripts/list_overlay_repos.py --format names
+python3 ./.agent/scripts/list_overlay_repos.py --include-underlay
 ```
 
 **Outputs:**
-- Formatted list of all cloned repositories
-- Directory structure
-- Repository status
+- JSON array of repository information (default)
+- Repository names only (with `--format names`)
+- Includes underlay repos (with `--include-underlay`)
+
+**Note:** Now uses the shared `lib/workspace.py` module for consistency.
+
+---
+
+### `get_repo_info.py`
+
+Get version/branch information for a specific repository.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/get_repo_info.py <repo_name>
+```
+
+**Example:**
+```bash
+python3 ./.agent/scripts/get_repo_info.py project11
+# Output: jazzy
+```
+
+**Note:** Now uses the shared `lib/workspace.py` module for consistency.
+
+---
+
+### `lib/workspace.py` (Library Module)
+
+Shared library module providing common workspace management functions.
+
+**Functions:**
+- `get_workspace_root()` - Get absolute path to workspace root
+- `get_overlay_repos(include_underlay=False)` - Get list of all repositories from .repos files
+- `find_repo_version(target_repo)` - Find version/branch for a specific repository
+- `extract_github_owner_repo(url)` - Extract owner and repo name from GitHub URL
+
+**Usage:**
+```python
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
+from workspace import get_overlay_repos, extract_github_owner_repo
+
+repos = get_overlay_repos()
+for repo in repos:
+    owner, name = extract_github_owner_repo(repo['url'])
+    print(f"{owner}/{name}")
+```
+
+**When to use:**
+- Creating new scripts that need to discover repositories
+- Avoiding code duplication
+- Ensuring consistent repository parsing logic
 
 ---
 
 ## Common Workflows
+
+### Daily status check
+```bash
+python3 ./.agent/scripts/check_full_status.py  # Quick morning report
+```
 
 ### Initialize workspace (first time)
 ```bash
