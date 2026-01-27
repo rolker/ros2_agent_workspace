@@ -24,3 +24,4 @@ ai_workspace/
 !.agent/knowledge/ros2_cli_best_practices.md
 !.agent/knowledge/ros2_development_patterns.md
 .env
+__pycache__/
