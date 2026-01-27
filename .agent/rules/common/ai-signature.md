@@ -16,6 +16,7 @@ The signature must be placed at the very end of the content body, separated by a
 
 ---
 **🤖 Authored-By**: `<Agent Name>`
+**🧠 Model**: `<Model Name>`
 ```
 
 ### Examples
@@ -26,6 +27,7 @@ This PR updates the dependency list.
 
 ---
 **🤖 Authored-By**: `Antigravity Agent`
+**🧠 Model**: `Gemini 2.0 Flash`
 ```
 
 **For Copilot CLI:**
@@ -34,4 +36,5 @@ I have fixed the bug in the navigation stack.
 
 ---
 **🤖 Authored-By**: `Copilot CLI Agent`
+**🧠 Model**: `GPT-4o`
 ```

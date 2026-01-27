@@ -33,7 +33,7 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 **Procedure**:
 1.  Ask the User: "Which of these should be tracked in this workspace?"
 2.  For selected issues:
-    -   **Primary**: Create a GitHub Issue in this workspace to track the upstream issue.
+    -   **Primary**: Create a GitHub Issue in this workspace to track the upstream issue. **MANDATORY**: Append the AI Signature (see `.agent/rules/common/ai-signature.md`) to the issue body.
     -   **Optional**: Use the **Project Management Skill** to also add to `.agent/ROADMAP.md` if local file tracking is needed for offline or quick reference.
     -   Title format: `[Upstream] <Issue Title> (Link: <url>)`
 
@@ -42,4 +42,4 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 1.  `Crash on startup when no camera connected` (#42)
 2.  `Add graceful shutdown` (#45)
 
-Do you want to create GitHub Issues in this workspace to track these?"
+Do you want to create GitHub Issues in this workspace to track these? (I will automatically append my AI Signature to any issues created)."
