@@ -11,7 +11,7 @@ Before starting any work, review these files in order:
 3. **`.agent/rules/git-hygiene.md`** - Git workflow requirements
 4. **`.agent/rules/build-location.md`** - Where to run builds
 5. **`.agent/rules/clean-root.md`** - Keep workspace root clean
-6. **`.agent/ROADMAP.md`** - Active tasks and backlog
+6. **GitHub Issues** - Check open issues for active tasks and backlog
 
 ## Workflows
 
