@@ -1,4 +1,4 @@
-# GitHub Copilot CLI Instructions
+# Gemini CLI Instructions
 
 **🚀 Quick Start**: See [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
 
@@ -17,7 +17,7 @@ All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core 
 
 ---
 
-## Copilot CLI-Specific Notes
+## Gemini CLI-Specific Notes
 
 ### Quick Command Reference
 
@@ -32,16 +32,9 @@ Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS
 /submit-pr         # Create pull request
 ```
 
-### GitHub Integration
+### Google Cloud Integration
 
-Copilot CLI has native GitHub access. Use it for faster operations:
-
-```bash
-gh pr list                          # List open PRs
-gh issue list --assignee @me        # Your assigned issues
-gh pr view 123                      # View PR details
-gh issue view 46                    # View issue details
-```
+If Gemini CLI has access to Google Cloud services, you may be able to use additional capabilities. Check your environment for available integrations.
 
 ### ROS2 Knowledge
 
@@ -60,7 +53,10 @@ If this is your first session in this workspace:
 source .agent/scripts/env.sh
 
 # 2. Configure git identity (ephemeral, session-only)
-source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
+
+# Or use the shorthand:
+source .agent/scripts/set_git_identity_env.sh --agent gemini
 
 # 3. Check workspace status
 .agent/scripts/status_report.sh
@@ -72,13 +68,28 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 ## Role Assignment
 
-By default, Copilot CLI acts as **ROS Developer**:
+By default, Gemini CLI acts as **ROS Developer**:
 - ✅ Create/modify ROS packages
 - ✅ Write/update tests
 - ✅ Update package documentation
 - ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
 
 See [`.agent/PERMISSIONS.md`](../.agent/PERMISSIONS.md) for full role definitions.
+
+---
+
+## GitHub Integration
+
+If you have GitHub CLI (`gh`) installed, use it for faster GitHub operations:
+
+```bash
+gh pr list                          # List open PRs
+gh issue list --assignee @me        # Your assigned issues
+gh pr view 123                      # View PR details
+gh issue view 46                    # View issue details
+```
+
+Otherwise, the workspace falls back to web API calls (slower but still functional).
 
 ---
 

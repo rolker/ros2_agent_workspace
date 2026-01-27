@@ -23,8 +23,34 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 ## Agent Rules
 > [!IMPORTANT]
 > Since we use AI Agents extensively, we have codified rules in `.agent/rules/`.
-> - **Planning**: See [PLANNING_MODE.md](.agent/rules/PLANNING_MODE.md) before starting complex tasks.
-> - **Execution**: See [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md) for coding and verification standards.
+
+### For AI CLI Agents (Copilot CLI, Gemini CLI)
+- **Quick Start**: See [`.agent/AI_CLI_QUICKSTART.md`](.agent/AI_CLI_QUICKSTART.md) for 5-minute setup
+- **Universal Rules**: [`.agent/AI_RULES.md`](.agent/AI_RULES.md) - Single source of truth for all agents
+- **Command Reference**: [`.agent/CLI_COMMANDS.md`](.agent/CLI_COMMANDS.md) - Workflow discovery
+
+### For All Agents
+- **Planning**: See [PLANNING_MODE.md](.agent/rules/PLANNING_MODE.md) before starting complex tasks.
+- **Execution**: See [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md) for coding and verification standards.
+
+### Documentation Maintenance
+
+**Important**: The agent documentation follows a layered structure to avoid duplication:
+
+1. **`.agent/AI_RULES.md`** - Universal rules for ALL agents (single source of truth)
+2. **`.agent/AI_CLI_QUICKSTART.md`** - Fast path for CLI agents
+3. **`.agent/CLI_COMMANDS.md`** - Command mapping and discovery
+4. **Framework-specific overlays**:
+   - `.github/copilot-instructions.md` - Copilot CLI references
+   - `.agent/instructions/gemini-cli.instructions.md` - Gemini CLI references
+   - `.agent/AGENT_ONBOARDING.md` - Specialized/container agents
+
+**When updating agent documentation**:
+- ✅ Update `AI_RULES.md` for universal changes (applies to all agents)
+- ✅ Update framework-specific files only for platform-specific features
+- ❌ Don't duplicate universal rules across files - link to `AI_RULES.md` instead
+
+**Documentation Owner**: Framework Engineering Team
 
 ## Development Workflow
 

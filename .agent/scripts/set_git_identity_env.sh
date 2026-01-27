@@ -4,9 +4,13 @@
 #
 # USAGE FOR HOST-BASED AGENTS (Copilot CLI, Gemini CLI):
 #   source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
+#   source .agent/scripts/set_git_identity_env.sh --agent <framework>
+#   source .agent/scripts/set_git_identity_env.sh --detect
 #
-# Example:
+# Examples:
 #   source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+#   source .agent/scripts/set_git_identity_env.sh --agent copilot
+#   source .agent/scripts/set_git_identity_env.sh --detect
 #
 # This sets identity ONLY for the current shell session without modifying .git/config.
 # The user's .git/config remains unchanged, allowing them to commit as themselves afterward.
@@ -15,33 +19,117 @@
 #   source .agent/scripts/set_git_identity_env.sh "..." "..."   ✓ Correct
 #   ./.agent/scripts/set_git_identity_env.sh "..." "..."        ✗ Wrong (variables won't persist)
 
+# Framework identity lookup table (same as configure_git_identity.sh)
+declare -A FRAMEWORK_NAMES=(
+    ["copilot"]="Copilot CLI Agent"
+    ["copilot-cli"]="Copilot CLI Agent"
+    ["gemini"]="Gemini CLI Agent"
+    ["gemini-cli"]="Gemini CLI Agent"
+    ["antigravity"]="Antigravity Agent"
+)
+
+declare -A FRAMEWORK_EMAILS=(
+    ["copilot"]="roland+copilot-cli@ccom.unh.edu"
+    ["copilot-cli"]="roland+copilot-cli@ccom.unh.edu"
+    ["gemini"]="roland+gemini-cli@ccom.unh.edu"
+    ["gemini-cli"]="roland+gemini-cli@ccom.unh.edu"
+    ["antigravity"]="roland+antigravity@ccom.unh.edu"
+)
+
 # Check if script is being sourced (not executed)
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     echo "❌ ERROR: This script must be sourced, not executed directly."
     echo ""
     echo "Correct usage:"
     echo "  source $0 \"<Agent Name>\" \"<email>\""
+    echo "  source $0 --agent <framework>"
+    echo "  source $0 --detect"
     echo ""
-    echo "Example:"
+    echo "Examples:"
     echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\""
-    echo "  source $0 \"Gemini CLI Agent\" \"roland+gemini-cli@ccom.unh.edu\""
+    echo "  source $0 --agent copilot"
+    echo "  source $0 --detect"
     exit 1
 fi
 
-if [ $# -ne 2 ]; then
-    echo "Usage: source $0 \"<Agent Name>\" \"<email>\""
+show_usage() {
+    echo "Usage: source $0 [OPTIONS] [\"<Agent Name>\" \"<email>\"]"
     echo ""
-    echo "Example:"
+    echo "Options:"
+    echo "  --agent <framework>    Use predefined identity for framework"
+    echo "                         Supported: copilot, gemini, antigravity"
+    echo "  --detect              Auto-detect framework from environment"
+    echo ""
+    echo "Examples:"
     echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\""
-    echo "  source $0 \"Gemini CLI Agent\" \"roland+gemini-cli@ccom.unh.edu\""
+    echo "  source $0 --agent copilot"
+    echo "  source $0 --detect"
     echo ""
     echo "This sets git identity ONLY for the current shell session using environment variables."
     echo "It does NOT modify .git/config, so the user's identity remains unchanged."
+}
+
+# Auto-detect framework
+detect_framework() {
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$SCRIPT_DIR/detect_cli_env.sh" ]; then
+        source "$SCRIPT_DIR/detect_cli_env.sh"
+        echo "$AGENT_FRAMEWORK"
+    else
+        echo "unknown"
+    fi
+}
+
+# Parse arguments
+if [ $# -eq 0 ]; then
+    show_usage
     return 1
 fi
 
-AGENT_NAME="$1"
-AGENT_EMAIL="$2"
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    show_usage
+    return 0
+fi
+
+if [ "$1" == "--agent" ]; then
+    if [ $# -ne 2 ]; then
+        echo "Error: --agent requires framework name"
+        show_usage
+        return 1
+    fi
+    
+    FRAMEWORK="${2,,}"  # Convert to lowercase
+    AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK]}"
+    AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK]}"
+    
+    if [ -z "$AGENT_NAME" ]; then
+        echo "Error: Unknown framework '$2'"
+        echo "Supported frameworks: ${!FRAMEWORK_NAMES[@]}"
+        return 1
+    fi
+    
+elif [ "$1" == "--detect" ]; then
+    DETECTED=$(detect_framework)
+    
+    if [ "$DETECTED" == "unknown" ]; then
+        echo "Error: Could not auto-detect framework"
+        echo "Please use --agent <framework> or provide name/email manually"
+        return 1
+    fi
+    
+    AGENT_NAME="${FRAMEWORK_NAMES[$DETECTED]}"
+    AGENT_EMAIL="${FRAMEWORK_EMAILS[$DETECTED]}"
+    echo "Detected framework: $DETECTED"
+    
+elif [ $# -eq 2 ]; then
+    # Manual name and email
+    AGENT_NAME="$1"
+    AGENT_EMAIL="$2"
+else
+    echo "Error: Invalid arguments"
+    show_usage
+    return 1
+fi
 
 echo "Setting ephemeral git identity for: $AGENT_NAME <$AGENT_EMAIL>"
 echo ""

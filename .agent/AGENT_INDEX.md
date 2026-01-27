@@ -2,7 +2,28 @@
 
 Machine-readable registry of all available workflows. Use this to discover what tasks are already automated.
 
+> **🚀 CLI Agents**: See [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md) for fast onboarding and [CLI_COMMANDS.md](CLI_COMMANDS.md) for detailed command reference.
+
 > **Quick Reference**: For most common tasks, run `/check-status`, `/build-all`, or `/clean`
+
+---
+
+## Quick Start
+
+### For CLI Agents (Copilot CLI, Gemini CLI)
+
+**First time here?**
+1. [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md) - 5-minute setup guide
+2. [CLI_COMMANDS.md](CLI_COMMANDS.md) - Complete command mapping and examples
+3. [AI_RULES.md](AI_RULES.md) - Universal agent rules and workflow
+
+**Framework-specific guides**:
+- [Copilot CLI](../.github/copilot-instructions.md)
+- [Gemini CLI](instructions/gemini-cli.instructions.md)
+
+### For Specialized Agents (Antigravity, Custom Platforms)
+
+See [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md) for detailed onboarding.
 
 ---
 
@@ -14,9 +35,10 @@ Maintenance and operational tasks.
 
 | Command | Description |
 |---------|-------------|
-| `/check-status` | Comprehensive workspace status check (Local + GitHub) |
+| `/check-status` | Comprehensive workspace status check (Local + GitHub) - **CLI-aware**, uses GitHub API if available |
 | `/check-local-status` | Check the local git status of the workspace |
 | `/check-github-status` | Check for open Pull Requests and Issues in overlay repositories |
+| `/setup-environment` | **NEW** - One-command setup for CLI agents (env + identity + status) |
 
 ### Build & Compile
 

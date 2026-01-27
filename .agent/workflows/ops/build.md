@@ -2,6 +2,18 @@
 
 To build the workspaces, use the standard `colcon` workflow.
 
+## Prerequisites
+
+Before building, ensure ROS environment is sourced:
+
+```bash
+# Check if ROS commands available
+if ! command -v colcon &> /dev/null; then
+    echo "⚠️  ROS environment not sourced. Sourcing now..."
+    source .agent/scripts/env.sh
+fi
+```
+
 ## Steps
 
 1. **Determine Workspace**: Identify if you are building `underlay_ws`, a specific overlay (e.g., `core_ws`), or all of them.

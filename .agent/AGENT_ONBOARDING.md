@@ -1,8 +1,16 @@
 # Agent Onboarding Checklist
 
+> **🚀 CLI Agents (Copilot CLI, Gemini CLI)**: Skip this detailed guide and use [**AI_CLI_QUICKSTART.md**](AI_CLI_QUICKSTART.md) instead for a faster 5-minute setup.
+
+This document provides detailed onboarding for specialized agent platforms (Antigravity, custom agents, or container-based agents). CLI users should follow the streamlined quick start guide linked above.
+
+---
+
 Before starting ANY task in this workspace, complete these steps in order:
 
 ## 1. Read Critical Documentation (5 min)
+
+**Core universal rules** are now consolidated in [**AI_RULES.md**](AI_RULES.md).
 
 These documents are **required reading** for every agent session:
 
