@@ -2,16 +2,16 @@
 
 **Goal**: Enable multiple AI agents to work accurately and safely within the same workspace without stepping on each other's toes.
 
-## 1. Task Locking (The `ROADMAP.md` Authority)
-The `.agent/ROADMAP.md` is the **Source of Truth** for what is being worked on.
+## 1. Task Locking (GitHub Issues Authority)
+GitHub Issues are the **Source of Truth** for what is being worked on.
 
 *   **Before Starting**:
-    *   Check `.agent/ROADMAP.md` for items marked `(Status: Active)` or `(Status: In Progress)`.
-    *   **Do not** pick up a task effectively "owned" by another active agent session unless explicitly instructed to "Join" or "Collaborate".
+    *   Search for open issues or projects.
+    *   **Do not** pick up an issue assigned to another user/agent unless explicitly instructed to "Join" or "Collaborate".
 *   **During Work**:
-    *   Update your specific item to `(Status: Active)`.
+    *   Assign the issue to yourself (if possible) or comment "Taking this".
 *   **Finishing**:
-    *   Update item to `(Status: Done)`.
+    *   Reference the issue in your PR (e.g., "Closes #123").
 
 ## 2. The "Clean Handover" Standard
 Every agent invocation is a "shift". When your shift ends (you call `notify_user` or terminate), the workspace must be in a clean state.

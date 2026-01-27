@@ -1,10 +1,8 @@
-# Workspace Roadmap
+# Workspace Roadmap [DEPRECATED]
 
-## Active Tasks
+**⚠️ DEPRECATION NOTICE**: This file is no longer the Source of Truth. Please refer to **GitHub Issues** for active tasks and planning.
 
-
-
-## Backlog
+## Historical Data (For Reference Only)
 
 ### 🔥 High Priority
 - [TASK-010] **CAMP Architecture Refactor** (Status: Planned)
