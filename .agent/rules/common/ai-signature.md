@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # AI Agent Signature Protocol
 
 **Rule**: All AI agents must append a structured signature to the body of any GitHub Issue, Pull Request, or Comment they create via the API.
