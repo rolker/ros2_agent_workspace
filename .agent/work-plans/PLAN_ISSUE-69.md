@@ -4,7 +4,7 @@
 **Title**: Make sure it's easy to discover that an agent started work on an issue  
 **Assignee**: Copilot CLI Agent  
 **Started**: 2026-01-27  
-**Status**: 🚧 In Progress
+**Status**: 🚀 Ready for Review
 
 ---
 
@@ -24,7 +24,7 @@ The issue suggests committing plans to `.agent/scratchpad/` and creating draft P
 Implement a **draft PR workflow** where agents:
 
 1. **On issue start**:
-   - Create feature branch `feature/ISSUE-{number}-{slug}`
+   - Create feature branch `feature/ISSUE-<number>-<description>`
    - Generate structured plan in `.agent/work-plans/PLAN_ISSUE-{number}.md` (git-tracked)
    - Commit and push the plan
    - Create **draft PR** linking to the issue
@@ -42,7 +42,7 @@ Implement a **draft PR workflow** where agents:
 - Visible in PR diff/commits
 - Not cluttered (one file per issue in dedicated directory)
 - Enables review of approach before code
-- Survives branch deletion (in git history)
+- Remains visible in the PR history and in git as long as the branch/PR/commit stays referenced (e.g., if merged or tagged)
 
 **Alternative considered**: `.agent/scratchpad/` (git-ignored) - rejected because plans wouldn't be visible in PR without extra tooling.
 
@@ -50,8 +50,8 @@ Implement a **draft PR workflow** where agents:
 
 ### Phase 1: Core Infrastructure ✅
 - [x] Create `.agent/work-plans/` directory
-- [ ] Create plan template: `.agent/templates/ISSUE_PLAN.md`
-- [ ] Create script: `.agent/scripts/start_issue_work.sh`
+- [x] Create plan template: `.agent/templates/ISSUE_PLAN.md`
+- [x] Create script: `.agent/scripts/start_issue_work.sh`
   - Accepts issue number
   - Fetches issue metadata from GitHub
   - Creates feature branch
@@ -59,27 +59,26 @@ Implement a **draft PR workflow** where agents:
   - Commits plan
   - Pushes branch
   - Creates draft PR with `gh pr create --draft`
-- [ ] Create script: `.agent/scripts/update_issue_plan.sh`
+- [x] Create script: `.agent/scripts/update_issue_plan.sh`
   - Updates plan file
   - Commits with standardized message
   - Pushes update
 
-### Phase 2: Workflow Integration
-- [ ] Update `.agent/workflows/dev/start-feature.md`
+### Phase 2: Workflow Integration ✅
+- [x] Update `.agent/workflows/dev/start-feature.md`
   - Add section on starting work from an issue
   - Document when to use `start_issue_work.sh`
-- [ ] Update `.agent/workflows/dev/submit-pr.md`
+- [x] Update `.agent/workflows/dev/submit-pr.md`
   - Add step to convert draft → ready for review
   - Include plan update verification
-- [ ] Update `.agent/WORKFORCE_PROTOCOL.md`
+- [x] Update `.agent/WORKFORCE_PROTOCOL.md`
   - Add "Work Visibility Protocol" section
   - Document draft PR convention
   - Explain plan handover mechanism
 
-### Phase 3: Documentation & Guidance
-- [ ] Update `.agent/AI_RULES.md`
-  - Add requirement to create plans for non-trivial issues
-  - Link to helper scripts
+### Phase 3: Documentation & Guidance ✅
+- [x] Add `.agent/work-plans/README.md` explaining the directory
+- [x] Update `.agent/AI_RULES.md` - Added to WORKFORCE_PROTOCOL instead
 - [ ] Update `.agent/AI_CLI_QUICKSTART.md` (if applicable)
   - Add example of starting work on an issue
 - [ ] Consider creating `.agent/skills/work-tracking/SKILL.md`
@@ -87,17 +86,18 @@ Implement a **draft PR workflow** where agents:
   - Examples of good plans
   - Handover procedures
 
-### Phase 4: Testing & Validation
+### Phase 4: Testing & Validation ✅
 - [x] Use workflow on Issue #69 itself (dogfooding)
+- [x] Verify draft PR visibility on GitHub UI
+- [x] Confirm plan updates are visible in PR commits
+- [x] Address PR review feedback
 - [ ] Test with a second issue to verify repeatability
-- [ ] Verify draft PR visibility on GitHub UI
-- [ ] Confirm plan updates are visible in PR commits
 - [ ] Test handover scenario (if possible)
 
-### Phase 5: Cleanup & Polish
-- [ ] Add `.agent/work-plans/README.md` explaining the directory
-- [ ] Update `.gitignore` if needed (ensure work-plans is NOT ignored)
-- [ ] Add AI signature to PR body when creating draft
+### Phase 5: Cleanup & Polish 🚧
+- [x] Add `.agent/work-plans/README.md` explaining the directory
+- [x] Update `.gitignore` if needed (work-plans is tracked - no change needed)
+- [x] Add AI signature to PR body when creating draft
 - [ ] Document edge cases (multi-repo issues, plan conflicts)
 
 ## Design Decisions
