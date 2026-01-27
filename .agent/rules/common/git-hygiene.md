@@ -8,10 +8,12 @@ To prevent conflicts and "messy" workspaces when multiple agents are active:
 
 1.  **Branch Isolation**:
     *   **NEVER** commit directly to `main`, `master`, or `jazzy`.
+    *   **Repository Protection**: The `main` branch is protected by repository rules - direct pushes will be rejected.
     *   **ALWAYS** create a new branch for your task:
         *   Features: `feature/TASK-<ID>-<description>` (e.g., `feature/TASK-001-multi-distro`)
         *   Fixes: `fix/<description>`
-    *   *exception*: If you are just updating documentation or non-code artifacts, you may use your discretion, but a branch is still preferred.
+    *   **All changes via Pull Requests**: After pushing your feature branch, create a PR to merge into `main`.
+    *   *exception*: If you are just updating documentation or non-code artifacts, you may use your discretion, but a branch + PR is still preferred.
 
 ## Development Workflows
 

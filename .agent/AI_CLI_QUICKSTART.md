@@ -131,10 +131,35 @@ Before starting work, see what's currently happening:
    Closes #46"
    ```
 
-5. **Push and create PR** when ready:
+5. **Push and create PR (REQUIRED)**:
+   
+   ⚠️ **IMPORTANT**: The `main` branch is **protected by repository rules**. Direct pushes are blocked. All changes must go through pull requests.
+   
+   ```bash
+   # Push to your feature branch
+   git push -u origin feature/TASK-46-cli-integration
+   
+   # Create pull request
+   gh pr create --title "Implement CLI integration" \
+     --body "Closes #46
+   
+   - Added quickstart guide  
+   - Updated workflows for CLI detection
+   - Enhanced identity automation
+   
+   **🤖 Authored-By**: Copilot CLI Agent"
    ```
+   
+   **Or use the workflow**:
+   ```bash
    /submit-pr
    ```
+   
+   **Without gh CLI**:
+   - Push your branch: `git push -u origin feature/TASK-46-cli-integration`
+   - Visit: https://github.com/rolker/ros2_agent_workspace/pulls
+   - Click "New pull request"
+   - Add AI signature to PR description: `**🤖 Authored-By**: <Your Agent Name>`
 
 ### Option B: Use Existing Workflows
 

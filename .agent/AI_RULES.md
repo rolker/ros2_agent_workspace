@@ -113,10 +113,17 @@ Once environment is set up and status is clean:
 ### Git Hygiene
 
 - **Never commit directly to `main`** - Always use feature branches
+- **All changes via Pull Requests** - The `main` branch is protected; direct pushes are blocked
 - **Branch naming**: `feature/TASK-<ID>-<description>` or `fix/<description>`
 - **Atomic commits**: One logical change per commit
 - **Stash or commit** uncommitted changes before finishing
 - **Clean handover**: Leave workspace in clean state when session ends
+
+**Critical**: After committing to your feature branch, you **must** create a pull request:
+```bash
+git push -u origin feature/my-task
+gh pr create --title "..." --body "Closes #123\n\n**🤖 Authored-By**: <Your Agent>"
+```
 
 **Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md)
 
