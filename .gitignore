@@ -15,7 +15,8 @@ COLCON_IGNORE
 ai_workspace/
 
 # Agent Scratchpad (Temporary files and artifacts)
-.agent/scratchpad/
+.agent/scratchpad/*
+!.agent/scratchpad/README.md
 
 # Generated Knowledge (Keep README and permanent knowledge files)
 .agent/knowledge/*
