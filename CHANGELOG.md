@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI CLI Integration** (Issue #46):
+  - `.agent/AI_RULES.md` - Universal agent rules (single source of truth)
+  - `.agent/AI_CLI_QUICKSTART.md` - 5-minute setup guide for CLI agents
+  - `.agent/CLI_COMMANDS.md` - Workflow discovery and command mapping
+  - `.agent/instructions/gemini-cli.instructions.md` - Gemini CLI support
+  - `.agent/workflows/ops/setup-environment.md` - One-command environment setup
+  - Enhanced `.agent/scripts/configure_git_identity.sh` with `--agent` and `--detect` flags
+  - New `.agent/scripts/detect_cli_env.sh` for framework auto-detection
+  - Enhanced `.agent/scripts/set_git_identity_env.sh` with framework presets
+  - Basic test suite for framework detection
+- **GitHub API Integration** (Issue #46):
+  - Enhanced `/check-status` workflow with CLI-aware GitHub API usage
+  - Caching for GitHub data to avoid rate limits
+  - Fallback to web API when CLI tools unavailable
+- **Documentation Consolidation** (Issue #46):
+  - Single source of truth for universal agent rules (`.agent/AI_RULES.md`)
+  - Framework-specific overlay pattern (Copilot CLI, Gemini CLI)
+  - Updated README.md with CLI-specific quick start section
+  - Updated AGENT_INDEX.md with CLI agent navigation
+  - Updated CONTRIBUTING.md with documentation maintenance guidelines
 - **Temporary File Management** (Issue #44):
   - `.agent/scratchpad/` directory for persistent temporary artifacts
   - Custom pre-commit hook `check-source-artifacts.py` to warn about temp files in source directories

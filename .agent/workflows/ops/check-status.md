@@ -4,102 +4,292 @@ description: Comprehensive workspace status check (Local + GitHub)
 
 # Workspace Status Check
 
-## Quick Start (Unified Script)
+This workflow provides a comprehensive status report combining local git state, build status, and GitHub activity. It automatically detects if you're using a CLI framework with GitHub API access and uses faster native tools when available.
 
-Run the unified status check script that combines local and remote checks:
+## Prerequisites
+
+**Required:**
+- `git` - Version control
+- `bash` - Shell scripting
+
+**Optional (enhanced features):**
+- `gh` - GitHub CLI (faster GitHub operations)
+- `jq` - JSON parsing (for advanced GitHub status formatting)
+- `vcstool` - Multi-repo operations (`pip install vcstool`)
+
+Without optional tools, the workflow falls back to basic functionality.
+
+## Quick Usage
 
 ```bash
-python3 .agent/scripts/check_full_status.py
+# Run the status report script
+.agent/scripts/status_report.sh
+
+# Or use this workflow step-by-step (see below)
 ```
 
-This single command performs:
-1. **Local Git Status** - Checks all workspace repositories for modifications
-2. **Remote GitHub Status** - Fetches open PRs and Issues
+## Workflow Steps
 
-**Options:**
-- `--no-local` - Skip local git status check
-- `--no-remote` - Skip remote GitHub status check
-- `--batch-size N` - Number of repositories per GitHub query (default: 10)
+### 1. Detect Environment
 
-**Examples:**
+Check if running under a CLI framework with enhanced capabilities:
+
 ```bash
-# Full status check (local + remote)
-python3 .agent/scripts/check_full_status.py
-
-# Only local status
-python3 .agent/scripts/check_full_status.py --no-remote
-
-# Only remote status
-python3 .agent/scripts/check_full_status.py --no-local
-
-# Custom batch size for GitHub queries
-python3 .agent/scripts/check_full_status.py --batch-size 5
+source .agent/scripts/detect_cli_env.sh
+echo "Framework: $AGENT_FRAMEWORK"
 ```
 
-## Legacy Workflow (Manual Steps)
+**Supported frameworks**:
+- `copilot-cli` - Has GitHub API access via `gh` CLI
+- `gemini-cli` - May have Google Cloud integrations
+- `antigravity` - Standard shell-based checks
+- `unknown` - Fallback to standard tools
 
-The following steps are still available if you need to run checks separately:
+### 2. Local Git Status
 
-1. **Local Git Status**
-   - Run the `/check-local-status` workflow.
-
-2. **Remote GitHub Status**
-   - Run the `/check-github-status` workflow.
-
-3. **Morning Report**
-   - Combine the findings into a summary "Morning Report".
-   - **Format**:
-     - **Date**: Today's Date
-     - **Workspace State**: (Clean/Dirty)
-     - **Action Items**:
-       - Unmerged PRs waiting for review.
-       - New Issues needing triage.
-       - Local changes needing commit.
-
-## Output Format
-
-The unified script generates a consolidated Markdown report with:
-
-### Local Status Section
-- Root repository status (clean/modified, branch)
-- Workspace repositories summary (total, clean, attention needed)
-- Modified repositories table with status indicators:
-  - ⚠️ Modified - Local changes
-  - 🚀 Ahead - Commits ahead of remote
-  - ⬇️ Behind - Commits behind remote
-  - 🔀 Branch mismatch - Not on expected branch
-  - ❓ Untracked - Not in .repos files
-- Latest test status (if available)
-
-### Remote Status Section
-- Open Pull Requests table (repository, title, author, PR #)
-- Open Issues table (repository, title, labels, issue #)
-
-## Benefits of Unified Script
-
-| Metric | Legacy | Unified |
-|--------|--------|---------|
-| **User Approvals** | 3-5 | **1** |
-| **Agent Turns** | ~10 | **2** |
-| **Commands** | 5 separate | **1** |
-| **Reliability** | Manual coordination | **High** |
-
-## Technical Details
-
-### Repository Discovery
-The script uses `.agent/scripts/lib/workspace.py` to:
-- Scan all `.repos` files in `configs/` directory
-- Extract GitHub owner/repo information from URLs
-- Always include the root repository `rolker/ros2_agent_workspace`
-
-### GitHub Query Batching
-- Queries are batched to avoid command-line length limits
-- Default batch size: 10 repositories per query
-- Uses server-side filtering (`repo:owner/name` syntax) for efficiency
-- Avoids fetching unrelated repositories
-
-### Authentication
-Requires GitHub CLI authentication:
+**Option A: Use status_report.sh (Recommended)**
 ```bash
-gh auth login
+.agent/scripts/status_report.sh
 ```
+
+**Option B: Manual checks**
+```bash
+# Workspace repository status
+git status
+
+# All repositories in workspaces/
+vcs status workspaces/*/src 2>/dev/null || echo "No workspaces cloned yet"
+
+# Check for uncommitted changes
+if [ -n "$(git status --porcelain)" ]; then
+    echo "⚠️  Uncommitted changes detected"
+    git status --short
+fi
+```
+
+### 3. Build Status
+
+Check if workspaces have been built:
+
+```bash
+for ws in workspaces/*_ws; do
+    if [ -d "$ws/install" ]; then
+        echo "✅ $(basename $ws): Built"
+    else
+        echo "❌ $(basename $ws): Not built"
+    fi
+done
+```
+
+### 4. GitHub Status
+
+**Option A: CLI framework with GitHub API access (FAST)**
+
+If `AGENT_FRAMEWORK=copilot-cli` or `gh` CLI is available:
+
+```bash
+if command -v gh &> /dev/null; then
+    echo "=== Open Pull Requests ==="
+    gh pr list --limit 20
+    
+    echo ""
+    echo "=== Assigned Issues ==="
+    gh issue list --assignee @me --limit 10
+    
+    echo ""
+    echo "=== Recent Issues ==="
+    gh issue list --limit 10 --state open
+    
+    # Cache results to avoid rate limiting
+    gh pr list --json number,title,updatedAt --limit 20 > .agent/scratchpad/pr_cache.json 2>/dev/null || true
+    gh issue list --json number,title,labels,assignees --limit 20 > .agent/scratchpad/issue_cache.json 2>/dev/null || true
+else
+    echo "GitHub CLI (gh) not available, skipping GitHub status"
+    echo "Install with: https://cli.github.com/"
+fi
+```
+
+**Option B: Fallback to web API (SLOWER)**
+
+If GitHub CLI not available, use curl:
+
+```bash
+echo "=== GitHub Status (via API) ==="
+curl -s "https://api.github.com/repos/rolker/ros2_agent_workspace/pulls?state=open" | \
+    grep -E '"title"|"number"' | \
+    head -20
+
+curl -s "https://api.github.com/repos/rolker/ros2_agent_workspace/issues?state=open" | \
+    grep -E '"title"|"number"' | \
+    head -20
+```
+
+### 5. Generate Status Report
+
+Combine findings into a structured report:
+
+```bash
+cat << EOF
+================================================================================
+WORKSPACE STATUS REPORT
+Date: $(date +"%Y-%m-%d %H:%M:%S")
+Framework: ${AGENT_FRAMEWORK:-unknown}
+================================================================================
+
+LOCAL STATUS:
+$(git status --short)
+
+BUILD STATUS:
+$(for ws in workspaces/*_ws; do
+    if [ -d "$ws/install" ]; then
+        echo "  ✅ $(basename $ws)"
+    else
+        echo "  ❌ $(basename $ws) (not built)"
+    fi
+done)
+
+GITHUB STATUS:
+$(if command -v gh &> /dev/null; then
+    if command -v jq &> /dev/null; then
+        echo "Open PRs: $(gh pr list --json number | jq '. | length')"
+        echo "Open Issues: $(gh issue list --json number | jq '. | length')"
+        echo "Assigned to me: $(gh issue list --assignee @me --json number | jq '. | length')"
+    else
+        # Fallback without jq
+        echo "Open PRs: $(gh pr list --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+        echo "Open Issues: $(gh issue list --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+        echo "Assigned to me: $(gh issue list --assignee @me --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+    fi
+else
+    echo "(GitHub CLI not available - install 'gh' for detailed status)"
+fi)
+
+ACTION ITEMS:
+$(if [ -n "$(git status --porcelain)" ]; then
+    echo "  ⚠️  Uncommitted changes - review and commit"
+fi)
+$(if command -v gh &> /dev/null; then
+    if command -v jq &> /dev/null; then
+        PR_COUNT=$(gh pr list --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    else
+        # Fallback without jq
+        PR_COUNT=$(gh pr list --json number 2>/dev/null | grep -c '"number"' 2>/dev/null || echo "0")
+    fi
+    if [ "$PR_COUNT" -gt 0 ]; then
+        echo "  📋 $PR_COUNT open PR(s) - review or merge"
+    fi
+    
+    if command -v jq &> /dev/null; then
+        ISSUE_COUNT=$(gh issue list --assignee @me --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    else
+        # Fallback without jq
+        ISSUE_COUNT=$(gh issue list --assignee @me --json number 2>/dev/null | grep -c '"number"' 2>/dev/null || echo "0")
+    fi
+    if [ "$ISSUE_COUNT" -gt 0 ]; then
+        echo "  🎯 $ISSUE_COUNT issue(s) assigned to you"
+    fi
+fi)
+
+================================================================================
+EOF
+```
+
+## Framework-Specific Optimizations
+
+### GitHub Copilot CLI
+
+Uses `gh` CLI for fast GitHub operations:
+- ✅ Native PR/issue listing
+- ✅ JSON output for programmatic parsing
+- ✅ Respects GitHub API rate limits
+- ✅ Cached results in `.agent/scratchpad/`
+
+### Gemini CLI
+
+Standard git/vcs checks with optional Google Cloud integrations.
+
+### Fallback (Unknown Framework)
+
+- Uses `git` and `vcs` commands
+- Web API calls for GitHub data (slower, rate-limited)
+- No caching
+
+## Caching Strategy
+
+To avoid GitHub API rate limits:
+
+```bash
+# Create cache directory if needed
+mkdir -p .agent/scratchpad
+
+# Cache PR data (valid for 5 minutes)
+CACHE_FILE=".agent/scratchpad/pr_cache.json"
+CACHE_AGE=$(($(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)))
+
+if [ $CACHE_AGE -gt 300 ]; then
+    # Cache older than 5 minutes, refresh
+    gh pr list --json number,title,updatedAt --limit 20 > "$CACHE_FILE" 2>/dev/null
+fi
+
+# Use cached data
+if command -v jq &> /dev/null; then
+    jq -r '.[] | "\(.number): \(.title)"' "$CACHE_FILE"
+else
+    # Fallback without jq - use grep/sed
+    grep -o '"number":[0-9]*\|"title":"[^"]*"' "$CACHE_FILE" | \
+        paste -d' ' - - | \
+        sed 's/"number"://; s/"title":"/ /; s/"$//'
+fi
+```
+
+## Troubleshooting
+
+### "gh: command not found"
+
+Install GitHub CLI:
+```bash
+# Ubuntu/Debian
+sudo apt install gh
+
+# Or see: https://cli.github.com/
+```
+
+### "API rate limit exceeded"
+
+Use cached results or wait:
+```bash
+# Check rate limit status
+gh api rate_limit
+
+# Use cached data
+cat .agent/scratchpad/pr_cache.json | jq
+```
+
+### "vcs: command not found"
+
+Install vcstool:
+```bash
+pip install vcstool
+```
+
+### "jq: command not found"
+
+The workflow includes fallback parsing for JSON when `jq` is not available. For better formatting, install `jq`:
+```bash
+# Ubuntu/Debian
+sudo apt install jq
+
+# macOS
+brew install jq
+```
+
+## Related Workflows
+
+- `/check-local-status` - Fast git-only status check
+- `/check-github-status` - GitHub PRs and issues only
+- `/build-all` - Build all workspaces after status check
+
+---
+
+**Last Updated**: 2026-01-27  
+**Maintained By**: Framework Engineering Team

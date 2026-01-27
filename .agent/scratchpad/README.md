@@ -34,3 +34,4 @@ gh issue create --title "My Issue" --body-file .agent/scratchpad/issue_body.md
 
 ## Alternative: `/tmp`
 For truly ephemeral files (cleaned up within the same command), use `/tmp` instead.
+

@@ -6,6 +6,17 @@ description: Adding a new repository to a workspace layer
 
 This workflow guides you through adding a new Git repository to an existing or new workspace layer defined in `configs/`.
 
+## Prerequisites
+
+Ensure ROS environment is sourced:
+
+```bash
+if ! command -v vcs &> /dev/null || ! command -v rosdep &> /dev/null; then
+    echo "⚠️  ROS tools not available. Sourcing environment..."
+    source .agent/scripts/env.sh
+fi
+```
+
 ## Steps
 
 1. **Identify the Layer**: Choose which `.repos` file in `configs/` to update (e.g., `configs/core.repos` or `configs/underlay.repos`). Create a new one if necessary.

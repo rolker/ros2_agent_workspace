@@ -12,9 +12,33 @@ The core configuration (`configs/core.repos`) includes repositories for:
 
 ## Quick Start
 
+### For AI CLI Agents (Copilot CLI, Gemini CLI)
+
+**⚡ Fast Path**: See [`.agent/AI_CLI_QUICKSTART.md`](.agent/AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
+
+**3-Step Setup**:
+```bash
+# 1. Source ROS environment
+source .agent/scripts/env.sh
+
+# 2. Configure git identity (for Copilot CLI)
+source .agent/scripts/set_git_identity_env.sh --agent copilot
+
+# 3. Check workspace status
+.agent/scripts/status_report.sh
+```
+
+**Common Workflows**: See [`.agent/CLI_COMMANDS.md`](.agent/CLI_COMMANDS.md) for command reference.
+
+### For Human Users
+
 **New to this workspace?** See [QUICKSTART.md](QUICKSTART.md) for a step-by-step setup guide.
 
 **Experienced users?** Jump to [Usage](#usage) below.
+
+### For Specialized Agents (Antigravity, Custom Platforms)
+
+See [`.agent/AGENT_ONBOARDING.md`](.agent/AGENT_ONBOARDING.md) for detailed onboarding.
 
 ## Sandboxed Development (Recommended)
 
@@ -25,6 +49,13 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 
 ## Documentation
 
+### For AI Agents
+- ⚡ [AI CLI Quick Start](.agent/AI_CLI_QUICKSTART.md) - 5-minute setup for CLI agents
+- 📋 [AI Rules](.agent/AI_RULES.md) - Universal agent workflow and rules
+- 🔧 [CLI Commands](.agent/CLI_COMMANDS.md) - Workflow discovery and mapping
+- 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Detailed onboarding for specialized agents
+
+### For All Users
 - 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes
 - 🏗️ [Architecture Guide](ARCHITECTURE.md) - Understanding the layered workspace system
 - 🤝 [Contributing Guide](CONTRIBUTING.md) - Development workflow and best practices
