@@ -62,6 +62,54 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ## Status & Reporting
 
+### `check_full_status.py` ⭐ Recommended
+
+**One-command comprehensive status check** combining local git status and remote GitHub status.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/check_full_status.py
+```
+
+**Options:**
+```bash
+python3 ./.agent/scripts/check_full_status.py --no-local    # Skip local check
+python3 ./.agent/scripts/check_full_status.py --no-remote   # Skip remote check
+python3 ./.agent/scripts/check_full_status.py --batch-size 5  # Custom batch size
+```
+
+**What it does:**
+1. Runs local git status check (via `status_report.sh`)
+2. Discovers all workspace repositories from `.repos` files
+3. Fetches open PRs and Issues from GitHub (batched queries)
+4. Generates consolidated Markdown report
+
+**Output includes:**
+- Root repository status
+- All workspace repositories status
+- Open Pull Requests table
+- Open Issues table
+- Latest test results (if available)
+
+**Benefits:**
+- ✅ Single command (was 5 separate commands)
+- ✅ One user approval (was 3-5)
+- ✅ Automatic batching for GitHub queries
+- ✅ Server-side filtering for efficiency
+
+**Dependencies:**
+- `python3`
+- `vcstool` (for local status)
+- `gh` CLI authenticated (`gh auth login`)
+
+**When to use:**
+- Daily morning status check
+- Before starting work
+- After being away from workspace
+- To check PR/Issue backlog
+
+---
+
 ### `status_report.sh`
 
 Generate a comprehensive workspace status report.
@@ -163,9 +211,42 @@ source ./.agent/scripts/env.sh
 
 ## Git & Configuration
 
-### `configure_git_identity.sh`
+### `set_git_identity_env.sh` (Ephemeral - Recommended for Host-Based Agents)
 
-Configure git identity for agent commits across all repositories.
+Set git identity using environment variables (session-only, doesn't modify `.git/config`).
+
+**Usage:**
+```bash
+source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>"
+```
+
+**Examples:**
+```bash
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
+```
+
+**What it does:**
+1. Exports `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`
+2. These environment variables take precedence over `.git/config`
+3. Identity applies ONLY to current shell session
+
+**Why use this:**
+- ✅ Does NOT modify `.git/config` (user's identity remains intact)
+- ✅ Perfect for host-based agents (Copilot CLI, Gemini CLI) that share workspace with user
+- ✅ When session ends, user can commit as themselves without reverting config
+- ✅ No disruption to shared workspace workflow
+
+**Important:** 
+- Must be **sourced** (not executed) to affect current shell
+- Identity disappears when shell session ends
+- Ideal for Copilot CLI, Gemini CLI, and other host-based agents
+
+---
+
+### `configure_git_identity.sh` (Persistent - For Containerized Agents)
+
+Configure git identity persistently across all repositories by modifying `.git/config`.
 
 **Usage:**
 ```bash
@@ -174,20 +255,35 @@ Configure git identity for agent commits across all repositories.
 
 **Example:**
 ```bash
-./.agent/scripts/configure_git_identity.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+./.agent/scripts/configure_git_identity.sh "Antigravity Agent" "roland+antigravity@ccom.unh.edu"
 ```
 
 **What it does:**
 1. Configures git in workspace repository
-2. Configures git in all 19+ repositories under `workspaces/*/src/`
+2. Configures git in all repositories under `workspaces/*/src/`
 3. Sets git user.name and user.email in each `.git/config`
 
-**Why it matters:**
-- Distinguishes agent commits from human commits
-- Satisfies audit trail requirements
-- Prevents "ghost commits" from appearing user-authored
+**Why use this:**
+- ✅ Persists across all shell sessions
+- ✅ Ideal for containerized agents (Antigravity) or dedicated agent-only checkouts
+- ✅ Automatically configures all repositories in one command
 
-**Important:** Must be run BEFORE making any commits in a session.
+**Trade-offs:**
+- ⚠️ Modifies `.git/config` persistently
+- ⚠️ Not suitable for shared workspaces (disrupts user workflow)
+
+**Important:** 
+- Best for isolated environments (containers, dedicated checkouts)
+- User must manually revert `.git/config` if sharing workspace
+
+**Decision Tree:**
+```
+Are you in a container or isolated environment?
+├─ YES → Use this script (configure_git_identity.sh)
+└─ NO → Do you share this checkout with the user?
+         ├─ YES → Use set_git_identity_env.sh instead
+         └─ NO → Use this script (configure_git_identity.sh)
+```
 
 **Dependencies:**
 - git
@@ -377,16 +473,74 @@ List all repositories in overlay workspace layers.
 **Usage:**
 ```bash
 python3 ./.agent/scripts/list_overlay_repos.py
+python3 ./.agent/scripts/list_overlay_repos.py --format names
+python3 ./.agent/scripts/list_overlay_repos.py --include-underlay
 ```
 
 **Outputs:**
-- Formatted list of all cloned repositories
-- Directory structure
-- Repository status
+- JSON array of repository information (default)
+- Repository names only (with `--format names`)
+- Includes underlay repos (with `--include-underlay`)
+
+**Note:** Now uses the shared `lib/workspace.py` module for consistency.
+
+---
+
+### `get_repo_info.py`
+
+Get version/branch information for a specific repository.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/get_repo_info.py <repo_name>
+```
+
+**Example:**
+```bash
+python3 ./.agent/scripts/get_repo_info.py project11
+# Output: jazzy
+```
+
+**Note:** Now uses the shared `lib/workspace.py` module for consistency.
+
+---
+
+### `lib/workspace.py` (Library Module)
+
+Shared library module providing common workspace management functions.
+
+**Functions:**
+- `get_workspace_root()` - Get absolute path to workspace root
+- `get_overlay_repos(include_underlay=False)` - Get list of all repositories from .repos files
+- `find_repo_version(target_repo)` - Find version/branch for a specific repository
+- `extract_github_owner_repo(url)` - Extract owner and repo name from GitHub URL
+
+**Usage:**
+```python
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
+from workspace import get_overlay_repos, extract_github_owner_repo
+
+repos = get_overlay_repos()
+for repo in repos:
+    owner, name = extract_github_owner_repo(repo['url'])
+    print(f"{owner}/{name}")
+```
+
+**When to use:**
+- Creating new scripts that need to discover repositories
+- Avoiding code duplication
+- Ensuring consistent repository parsing logic
 
 ---
 
 ## Common Workflows
+
+### Daily status check
+```bash
+python3 ./.agent/scripts/check_full_status.py  # Quick morning report
+```
 
 ### Initialize workspace (first time)
 ```bash

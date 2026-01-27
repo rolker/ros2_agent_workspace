@@ -18,14 +18,19 @@ persona: Expert ROS2 developer and workspace manager. Operates in two roles: Fra
 
 Before making any commits, you must configure your git identity to distinguish your commits from human commits:
 
-1. **Determine your identity** based on your agent platform (e.g., "Copilot CLI Agent", "Antigravity Agent")
+1. **Determine your identity** based on your agent platform (e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent")
 2. **Ask the user** if uncertain about the appropriate name/email format
-3. **Run the configuration script**:
-   ```bash
-   ./.agent/scripts/configure_git_identity.sh "<Your Agent Name>" "<email>"
-   ```
+3. **Choose the appropriate configuration method**:
+   - **Host-based agents (Copilot CLI, Gemini CLI)** sharing workspace with user:
+     ```bash
+     source .agent/scripts/set_git_identity_env.sh "<Your Agent Name>" "<email>"
+     ```
+   - **Containerized agents (Antigravity)** or dedicated checkouts:
+     ```bash
+     ./.agent/scripts/configure_git_identity.sh "<Your Agent Name>" "<email>"
+     ```
 
-See `.agent/AI_IDENTITY_STRATEGY.md` for examples and detailed guidance.
+See `.agent/AI_IDENTITY_STRATEGY.md` for the decision tree and detailed guidance.
 
 ## Key Constraints
 

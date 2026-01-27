@@ -9,7 +9,8 @@ These documents are **required reading** for every agent session:
 - **[`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md)** ⚠️ **READ FIRST**
   - Explains how to identify yourself in git commits
   - Shows identity format: `<Platform> Agent` / `roland+<platform>@ccom.unh.edu`
-  - Current agent: `Copilot CLI Agent` / `roland+copilot-cli@ccom.unh.edu`
+  - Documents ephemeral vs. persistent identity configuration methods
+  - Includes decision tree for choosing the right approach
 
 - **[`rules/common/git-hygiene.md`](rules/common/git-hygiene.md)**
   - **Never commit to `main`** — always use feature branches
@@ -36,21 +37,42 @@ source .agent/scripts/env.sh
 
 ## 3. Configure Git Identity (1 min)
 
-Before making ANY commits, configure your identity:
+Before making ANY commits, configure your identity using the appropriate method:
+
+### Host-Based Agents (Copilot CLI, Gemini CLI)
+
+If you're running directly on the host and sharing the working copy with the user:
 
 ```bash
-./.agent/scripts/configure_git_identity.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 
-This configures git in:
-- The workspace repository (this repo)
-- All 19 repositories in `workspaces/*/src/`
+**Why this method?**
+- ✅ Session-only (doesn't modify `.git/config`)
+- ✅ User's identity remains intact for their own commits
+- ✅ Perfect for shared workspaces
+
+### Containerized Agents (Antigravity)
+
+If you're running in a container or isolated environment:
+
+```bash
+./.agent/scripts/configure_git_identity.sh "Antigravity Agent" "roland+antigravity@ccom.unh.edu"
+```
+
+**Why this method?**
+- ✅ Persists across sessions
+- ✅ Configures workspace repo + all repos in `workspaces/*/src/`
+- ✅ Isolated environment means no conflict with user
+
+**Not sure which to use?** See the decision tree in [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md).
 
 ## 4. Ticket the Task (2 min)
 
 1.  **Check if a GitHub Issue exists** for your current objective.
 2.  If not, **ask the user**: *"Should I open an issue to track this?"*
 3.  Use the issue number in your branch name: `feature/ISSUE-<number>-<description>`.
+4.  **Note**: When you submit the PR, you MUST include `Closes #<issue-number>` in the description.
 
 ## 5. Create a Feature Branch (30 sec)
 
@@ -88,7 +110,7 @@ Before starting work, verify:
 - [ ] Read `rules/common/ai-signature.md`
 - [ ] Read `rules/common/github-cli-best-practices.md`
 - [ ] Sourced environment: `source .agent/scripts/env.sh`
-- [ ] Ran `configure_git_identity.sh`
+- [ ] Configured git identity (ephemeral or persistent, based on your environment)
 - [ ] **Verified/Created GitHub Issue for task**
 - [ ] Created feature branch with `feature/ISSUE-*` naming
 - [ ] Checked `AGENT_INDEX.md` for existing workflows
@@ -99,6 +121,7 @@ Before starting work, verify:
 Following this checklist prevents:
 - ❌ Accidentally committing to main
 - ❌ Using the wrong git identity (confusing commit history)
+- ❌ Disrupting user workflow with persistent config in shared workspaces
 - ❌ Asking the user questions already answered in docs
 - ❌ Implementing workflows that already exist
 - ❌ Duplicating work from other agents

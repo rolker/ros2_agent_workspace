@@ -11,6 +11,11 @@
 *   You must create a feature branch: \`git checkout -b feature/<issue-number>-<description>\`.
 *   **Reason**: Direct commits to main bypass CI/CD and Code Review, breaking the "stable main" contract.
 
+## Issue Linking (Mandatory)
+Every Pull Request MUST explicitly link to the issue it resolves using GitHub's keyword syntax.
+*   **Requirement**: Include `Closes #<issue-number>` (or `Fixes #...`) in the PR description body.
+*   **Why**: This ensures the issue is automatically closed when the PR is merged, keeping the backlog clean and status accurate.
+
 ## Multi-Agent Concurrency Strategy
 To prevent conflicts when multiple agents/users work in the same repo:
 1.  **Sync First**: Always pull the latest `main` before branching.

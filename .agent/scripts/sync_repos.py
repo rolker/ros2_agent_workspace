@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+"""
+Sync Workspace Repositories
+
+This script safely synchronizes workspace repositories by pulling updates on
+default branches (main/jazzy) and fetching on feature branches. It respects
+dirty working directories and detached HEAD states.
+
+Usage:
+    python3 sync_repos.py [--dry-run]
+
+Options:
+    --dry-run    Simulate actions without executing
+"""
+
 import sys
 import subprocess
 import argparse
@@ -33,14 +47,17 @@ def run_git_cmd(repo_path, cmd_args, dry_run=False):
     except subprocess.CalledProcessError as e:
         return False, e.stderr.strip()
 
-def is_dirty(repo_path):
+def is_dirty(repo_path, dry_run=False):
     """Check if repo has uncommitted changes."""
-    success, output = run_git_cmd(repo_path, ["status", "--porcelain"])
+    # Dirty check is a read-only operation, always execute regardless of dry_run
+    # but we need to call run_git_cmd without dry_run flag to actually execute
+    success, output = run_git_cmd(repo_path, ["status", "--porcelain"], dry_run=False)
     return success and bool(output)
 
-def get_current_branch(repo_path):
+def get_current_branch(repo_path, dry_run=False):
     """Get the current checked out branch."""
-    success, output = run_git_cmd(repo_path, ["branch", "--show-current"])
+    # Getting branch is a read-only operation, always execute regardless of dry_run
+    success, output = run_git_cmd(repo_path, ["branch", "--show-current"], dry_run=False)
     if success:
         return output
     return None
@@ -54,14 +71,14 @@ def sync_repo(repo_path, repo_name, dry_run=False):
         return
 
     # 1. Check for local modifications
-    if is_dirty(repo_path):
+    if is_dirty(repo_path, dry_run):
         if dry_run:
             print(f"  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
             print(f"  ⚠️  Skipping: Uncommitted changes detected.")
         return
 
-    branch = get_current_branch(repo_path)
+    branch = get_current_branch(repo_path, dry_run)
     if not branch:
         print(f"  ❌ Skipping: Detached HEAD or invalid git state.")
         return
@@ -100,7 +117,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Safely sync workspace repositories.")
-    parser.add_argument("--dry-run", action="store_true", help=" Simulate actions without executing.")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate actions without executing.")
     args = parser.parse_args()
 
     root_dir = SCRIPT_DIR.parent.parent
@@ -114,7 +131,30 @@ def main():
     for repo in repos:
         # Determine workspace directory from source file (e.g. core.repos -> core_ws)
         ws_name = repo['source_file'].replace('.repos', '_ws')
-        repo_path = root_dir / "workspaces" / ws_name / "src" / repo['name']
+        candidate_path = root_dir / "workspaces" / ws_name / "src" / repo['name']
+
+        repo_path = None
+        tried_paths = [str(candidate_path)]
+
+        # First, try the conventional workspace layout.
+        if candidate_path.exists():
+            repo_path = candidate_path
+        else:
+            # Fall back to an explicit path if provided by list_overlay_repos.
+            explicit_path = repo.get("path")
+            if explicit_path:
+                explicit_path = Path(explicit_path)
+                if not explicit_path.is_absolute():
+                    explicit_path = root_dir / explicit_path
+                tried_paths.append(str(explicit_path))
+                if explicit_path.exists():
+                    repo_path = explicit_path
+        
+        if repo_path is None:
+            paths_str = ", ".join(tried_paths)
+            print(f"Skipping {repo['name']}: could not resolve repository path (tried {paths_str}).")
+            continue
+
         sync_repo(repo_path, repo['name'], args.dry_run)
         
     print("\n✅ Sync complete.")
