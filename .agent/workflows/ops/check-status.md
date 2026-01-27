@@ -6,6 +6,19 @@ description: Comprehensive workspace status check (Local + GitHub)
 
 This workflow provides a comprehensive status report combining local git state, build status, and GitHub activity. It automatically detects if you're using a CLI framework with GitHub API access and uses faster native tools when available.
 
+## Prerequisites
+
+**Required:**
+- `git` - Version control
+- `bash` - Shell scripting
+
+**Optional (enhanced features):**
+- `gh` - GitHub CLI (faster GitHub operations)
+- `jq` - JSON parsing (for advanced GitHub status formatting)
+- `vcstool` - Multi-repo operations (`pip install vcstool`)
+
+Without optional tools, the workflow falls back to basic functionality.
+
 ## Quick Usage
 
 ```bash
@@ -137,9 +150,16 @@ done)
 
 GITHUB STATUS:
 $(if command -v gh &> /dev/null; then
-    echo "Open PRs: $(gh pr list --json number | jq '. | length')"
-    echo "Open Issues: $(gh issue list --json number | jq '. | length')"
-    echo "Assigned to me: $(gh issue list --assignee @me --json number | jq '. | length')"
+    if command -v jq &> /dev/null; then
+        echo "Open PRs: $(gh pr list --json number | jq '. | length')"
+        echo "Open Issues: $(gh issue list --json number | jq '. | length')"
+        echo "Assigned to me: $(gh issue list --assignee @me --json number | jq '. | length')"
+    else
+        # Fallback without jq
+        echo "Open PRs: $(gh pr list --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+        echo "Open Issues: $(gh issue list --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+        echo "Assigned to me: $(gh issue list --assignee @me --json number 2>/dev/null | grep -c '"number"' || echo "0")"
+    fi
 else
     echo "(GitHub CLI not available - install 'gh' for detailed status)"
 fi)
@@ -149,12 +169,22 @@ $(if [ -n "$(git status --porcelain)" ]; then
     echo "  ⚠️  Uncommitted changes - review and commit"
 fi)
 $(if command -v gh &> /dev/null; then
-    PR_COUNT=$(gh pr list --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    if command -v jq &> /dev/null; then
+        PR_COUNT=$(gh pr list --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    else
+        # Fallback without jq
+        PR_COUNT=$(gh pr list --json number 2>/dev/null | grep -c '"number"' 2>/dev/null || echo "0")
+    fi
     if [ "$PR_COUNT" -gt 0 ]; then
         echo "  📋 $PR_COUNT open PR(s) - review or merge"
     fi
     
-    ISSUE_COUNT=$(gh issue list --assignee @me --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    if command -v jq &> /dev/null; then
+        ISSUE_COUNT=$(gh issue list --assignee @me --json number 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+    else
+        # Fallback without jq
+        ISSUE_COUNT=$(gh issue list --assignee @me --json number 2>/dev/null | grep -c '"number"' 2>/dev/null || echo "0")
+    fi
     if [ "$ISSUE_COUNT" -gt 0 ]; then
         echo "  🎯 $ISSUE_COUNT issue(s) assigned to you"
     fi
@@ -202,7 +232,14 @@ if [ $CACHE_AGE -gt 300 ]; then
 fi
 
 # Use cached data
-jq -r '.[] | "\(.number): \(.title)"' "$CACHE_FILE"
+if command -v jq &> /dev/null; then
+    jq -r '.[] | "\(.number): \(.title)"' "$CACHE_FILE"
+else
+    # Fallback without jq - use grep/sed
+    grep -o '"number":[0-9]*\|"title":"[^"]*"' "$CACHE_FILE" | \
+        paste -d' ' - - | \
+        sed 's/"number"://; s/"title":"/ /; s/"$//'
+fi
 ```
 
 ## Troubleshooting
@@ -233,6 +270,17 @@ cat .agent/scratchpad/pr_cache.json | jq
 Install vcstool:
 ```bash
 pip install vcstool
+```
+
+### "jq: command not found"
+
+The workflow includes fallback parsing for JSON when `jq` is not available. For better formatting, install `jq`:
+```bash
+# Ubuntu/Debian
+sudo apt install jq
+
+# macOS
+brew install jq
 ```
 
 ## Related Workflows

@@ -1,6 +1,6 @@
 # Gemini CLI Instructions
 
-**🚀 Quick Start**: See [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
+**🚀 Quick Start**: See [`../AI_CLI_QUICKSTART.md`](../AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
 
 ---
 
@@ -8,7 +8,7 @@
 
 All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core workflow and rules documented in:
 
-👉 **[`.agent/AI_RULES.md`](../.agent/AI_RULES.md)** - Single source of truth for:
+👉 **[`../AI_RULES.md`](../AI_RULES.md)** - Single source of truth for:
 - Essential documentation to read
 - Standard 4-step workflow (source env → configure identity → check status → start work)
 - Core rules (git hygiene, AI signatures, clean workspace, issue-first)
@@ -21,7 +21,7 @@ All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core 
 
 ### Quick Command Reference
 
-Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS.md):
+Common workflows are mapped in [`../CLI_COMMANDS.md`](../CLI_COMMANDS.md):
 
 ```bash
 /check-status      # Full workspace status
@@ -39,8 +39,8 @@ If Gemini CLI has access to Google Cloud services, you may be able to use additi
 ### ROS2 Knowledge
 
 For ROS2 development patterns and CLI usage:
-- **[`.agent/knowledge/ros2_development_patterns.md`](../.agent/knowledge/ros2_development_patterns.md)** - Package structure, colcon, vcstool
-- **[`.agent/knowledge/ros2_cli_best_practices.md`](../.agent/knowledge/ros2_cli_best_practices.md)** - Runtime ROS commands
+- **[`../knowledge/ros2_development_patterns.md`](../knowledge/ros2_development_patterns.md)** - Package structure, colcon, vcstool
+- **[`../knowledge/ros2_cli_best_practices.md`](../knowledge/ros2_cli_best_practices.md)** - Runtime ROS commands
 
 ---
 
@@ -62,7 +62,7 @@ source .agent/scripts/set_git_identity_env.sh --agent gemini
 .agent/scripts/status_report.sh
 ```
 
-**📚 Full details**: [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md)
+**📚 Full details**: [`../AI_CLI_QUICKSTART.md`](../AI_CLI_QUICKSTART.md)
 
 ---
 
@@ -74,7 +74,7 @@ By default, Gemini CLI acts as **ROS Developer**:
 - ✅ Update package documentation
 - ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
 
-See [`.agent/PERMISSIONS.md`](../.agent/PERMISSIONS.md) for full role definitions.
+See [`../PERMISSIONS.md`](../PERMISSIONS.md) for full role definitions.
 
 ---
 
@@ -94,11 +94,11 @@ Otherwise, the workspace falls back to web API calls (slower but still functiona
 ---
 
 **Next Steps**:
-- Read [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md) for fast onboarding
-- Reference [`.agent/AI_RULES.md`](../.agent/AI_RULES.md) for complete workflow
-- Use [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS.md) to discover workflows
+- Read [`../AI_CLI_QUICKSTART.md`](../AI_CLI_QUICKSTART.md) for fast onboarding
+- Reference [`../AI_RULES.md`](../AI_RULES.md) for complete workflow
+- Use [`../CLI_COMMANDS.md`](../CLI_COMMANDS.md) to discover workflows
 
 ---
 
 **Last Updated**: 2026-01-27  
-**Related**: [AI_RULES.md](../.agent/AI_RULES.md), [AI_CLI_QUICKSTART.md](../.agent/AI_CLI_QUICKSTART.md), [CLI_COMMANDS.md](../.agent/CLI_COMMANDS.md)
+**Related**: [AI_RULES.md](../AI_RULES.md), [AI_CLI_QUICKSTART.md](../AI_CLI_QUICKSTART.md), [CLI_COMMANDS.md](../CLI_COMMANDS.md)

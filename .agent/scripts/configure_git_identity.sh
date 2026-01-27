@@ -12,29 +12,31 @@
 #   ./configure_git_identity.sh --agent copilot
 #   ./configure_git_identity.sh --detect
 
-# Framework identity lookup table
-declare -A FRAMEWORK_NAMES=(
-    ["copilot"]="Copilot CLI Agent"
-    ["copilot-cli"]="Copilot CLI Agent"
-    ["gemini"]="Gemini CLI Agent"
-    ["gemini-cli"]="Gemini CLI Agent"
-    ["antigravity"]="Antigravity Agent"
-)
+# Load framework identity lookup table from shared configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FRAMEWORK_CONFIG="${SCRIPT_DIR}/framework_config.sh"
 
-declare -A FRAMEWORK_EMAILS=(
-    ["copilot"]="roland+copilot-cli@ccom.unh.edu"
-    ["copilot-cli"]="roland+copilot-cli@ccom.unh.edu"
-    ["gemini"]="roland+gemini-cli@ccom.unh.edu"
-    ["gemini-cli"]="roland+gemini-cli@ccom.unh.edu"
-    ["antigravity"]="roland+antigravity@ccom.unh.edu"
-)
+if [ -f "${FRAMEWORK_CONFIG}" ]; then
+    # shellcheck source=/dev/null
+    source "${FRAMEWORK_CONFIG}"
+else
+    echo "❌ ERROR: Framework configuration not found at ${FRAMEWORK_CONFIG}."
+    echo "This script expects FRAMEWORK_NAMES and FRAMEWORK_EMAILS to be defined in a shared config."
+    exit 1
+fi
+
+# Add aliases for backward compatibility
+FRAMEWORK_NAMES["copilot-cli"]="${FRAMEWORK_NAMES[copilot]}"
+FRAMEWORK_EMAILS["copilot-cli"]="${FRAMEWORK_EMAILS[copilot]}"
+FRAMEWORK_NAMES["gemini-cli"]="${FRAMEWORK_NAMES[gemini]}"
+FRAMEWORK_EMAILS["gemini-cli"]="${FRAMEWORK_EMAILS[gemini]}"
 
 show_usage() {
     echo "Usage: $0 [OPTIONS] [\"<Agent Name>\" \"<email>\"]"
     echo ""
     echo "Options:"
     echo "  --agent <framework>    Use predefined identity for framework"
-    echo "                         Supported: copilot, gemini, antigravity"
+    echo "                         Supported: copilot, gemini, antigravity, claude"
     echo "  --detect              Auto-detect framework from environment"
     echo ""
     echo "Examples:"

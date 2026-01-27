@@ -252,7 +252,7 @@ Solution: Follow Step 2 above (Configure Git Identity)
 
 For platform-specific features and optimizations:
 
-- **GitHub Copilot CLI**: [`.agent/instructions/copilot-cli.instructions.md`](.agent/instructions/copilot-cli.instructions.md) or [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
+- **GitHub Copilot CLI**: [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
 - **Gemini CLI**: [`.agent/instructions/gemini-cli.instructions.md`](.agent/instructions/gemini-cli.instructions.md)
 - **Antigravity**: Use this document (no special instructions)
 
