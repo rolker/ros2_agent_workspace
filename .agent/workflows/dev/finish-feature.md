@@ -16,7 +16,7 @@ Use this workflow **IMMEDIATELY AFTER** submitting a Pull Request. This "unlocks
         ```bash
         ./.agent/scripts/checkout_default_branch.sh
         ```
-    -   This script detects the default branch (main/jazzy), checks for uncommitted changes, swtiches, and pulls.
+    -   This script detects the default branch (main/jazzy), checks for uncommitted changes, switches, and pulls.
 
 3.  **Sync**
     -   (Handled by the script above)
