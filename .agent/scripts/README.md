@@ -163,9 +163,42 @@ source ./.agent/scripts/env.sh
 
 ## Git & Configuration
 
-### `configure_git_identity.sh`
+### `set_git_identity_env.sh` (Ephemeral - Recommended for Host-Based Agents)
 
-Configure git identity for agent commits across all repositories.
+Set git identity using environment variables (session-only, doesn't modify `.git/config`).
+
+**Usage:**
+```bash
+source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>"
+```
+
+**Examples:**
+```bash
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
+```
+
+**What it does:**
+1. Exports `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`
+2. These environment variables take precedence over `.git/config`
+3. Identity applies ONLY to current shell session
+
+**Why use this:**
+- ✅ Does NOT modify `.git/config` (user's identity remains intact)
+- ✅ Perfect for host-based agents (Copilot CLI, Gemini CLI) that share workspace with user
+- ✅ When session ends, user can commit as themselves without reverting config
+- ✅ No disruption to shared workspace workflow
+
+**Important:** 
+- Must be **sourced** (not executed) to affect current shell
+- Identity disappears when shell session ends
+- Ideal for Copilot CLI, Gemini CLI, and other host-based agents
+
+---
+
+### `configure_git_identity.sh` (Persistent - For Containerized Agents)
+
+Configure git identity persistently across all repositories by modifying `.git/config`.
 
 **Usage:**
 ```bash
@@ -174,20 +207,35 @@ Configure git identity for agent commits across all repositories.
 
 **Example:**
 ```bash
-./.agent/scripts/configure_git_identity.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+./.agent/scripts/configure_git_identity.sh "Antigravity Agent" "roland+antigravity@ccom.unh.edu"
 ```
 
 **What it does:**
 1. Configures git in workspace repository
-2. Configures git in all 19+ repositories under `workspaces/*/src/`
+2. Configures git in all repositories under `workspaces/*/src/`
 3. Sets git user.name and user.email in each `.git/config`
 
-**Why it matters:**
-- Distinguishes agent commits from human commits
-- Satisfies audit trail requirements
-- Prevents "ghost commits" from appearing user-authored
+**Why use this:**
+- ✅ Persists across all shell sessions
+- ✅ Ideal for containerized agents (Antigravity) or dedicated agent-only checkouts
+- ✅ Automatically configures all repositories in one command
 
-**Important:** Must be run BEFORE making any commits in a session.
+**Trade-offs:**
+- ⚠️ Modifies `.git/config` persistently
+- ⚠️ Not suitable for shared workspaces (disrupts user workflow)
+
+**Important:** 
+- Best for isolated environments (containers, dedicated checkouts)
+- User must manually revert `.git/config` if sharing workspace
+
+**Decision Tree:**
+```
+Are you in a container or isolated environment?
+├─ YES → Use this script (configure_git_identity.sh)
+└─ NO → Do you share this checkout with the user?
+         ├─ YES → Use set_git_identity_env.sh instead
+         └─ NO → Use this script (configure_git_identity.sh)
+```
 
 **Dependencies:**
 - git

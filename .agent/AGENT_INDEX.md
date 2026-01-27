@@ -77,7 +77,8 @@ Common scripts:
 - `./.agent/scripts/setup.sh <layer>` — Initialize a workspace layer
 - `./.agent/scripts/status_report.sh` — Generate workspace status report
 - `./.agent/scripts/env.sh` — Source the ROS2 environment
-- `./.agent/scripts/configure_git_identity.sh` — Set git identity for commits
+- `source ./.agent/scripts/set_git_identity_env.sh` — Set ephemeral git identity (host-based agents)
+- `./.agent/scripts/configure_git_identity.sh` — Set persistent git identity (containerized agents)
 
 ---
 
