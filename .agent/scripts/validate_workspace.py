@@ -70,6 +70,12 @@ def get_all_repos_config():
                     continue
                     
                 for repo_name, repo_info in data['repositories'].items():
+                    # Validate repo_info is a dictionary
+                    if not isinstance(repo_info, dict):
+                        print(f"Warning: Invalid repo entry '{repo_name}' in {repos_file.name}", 
+                              file=sys.stderr)
+                        continue
+                        
                     if repo_name in repos_config:
                         print(f"Warning: Duplicate repo '{repo_name}' in {repos_file.name}", 
                               file=sys.stderr)
@@ -223,7 +229,18 @@ def validate_workspace(verbose=False):
         
         # Check if branch matches expected version
         # Note: version can be a branch, tag, or commit SHA
-        if actual_branch and actual_branch != expected_version:
+        # Handle detached HEAD state (actual_branch is None)
+        if actual_branch is None:
+            # Detached HEAD - report as mismatch unless expected
+            if expected_version.lower() not in ['head', 'detached']:
+                version_mismatches.append({
+                    'name': repo_name,
+                    'type': 'detached_head',
+                    'expected': expected_version,
+                    'actual': 'DETACHED HEAD',
+                    'path': actual['path']
+                })
+        elif actual_branch != expected_version:
             version_mismatches.append({
                 'name': repo_name,
                 'type': 'version_mismatch',
@@ -276,6 +293,10 @@ def validate_workspace(verbose=False):
             if mismatch['type'] == 'workspace_mismatch':
                 print(f"   - {mismatch['name']}: wrong workspace")
                 print(f"     Expected: {mismatch['expected']}")
+                print(f"     Actual: {mismatch['actual']}")
+            elif mismatch['type'] == 'detached_head':
+                print(f"   - {mismatch['name']}: in detached HEAD state")
+                print(f"     Expected branch: {mismatch['expected']}")
                 print(f"     Actual: {mismatch['actual']}")
             else:  # version_mismatch
                 print(f"   - {mismatch['name']}: wrong branch/version")
@@ -358,7 +379,7 @@ def fix_workspace(missing_repos, verbose=False):
             if verbose:
                 print(f"  Running: {' '.join(cmd)} < {repos_file}")
             
-            with open(repos_file, 'r') as f:
+            with open(repos_file, 'r', encoding='utf-8') as f:
                 result = subprocess.run(
                     cmd,
                     stdin=f,

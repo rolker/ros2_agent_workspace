@@ -184,7 +184,7 @@ fi
 echo ""
 
 # Check 7: Git Status
-echo "6. Checking Git Repository..."
+echo "7. Checking Git Repository..."
 cd "$ROOT_DIR"
 if git rev-parse --git-dir > /dev/null 2>&1; then
     check_pass "Git repository initialized"
