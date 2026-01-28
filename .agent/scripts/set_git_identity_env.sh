@@ -19,8 +19,8 @@
 # Also exports AGENT_MODEL for use in AI signatures.
 #
 # IMPORTANT: Must be sourced (not executed) to export variables to current shell:
-#   source .agent/scripts/set_git_identity_env.sh "..." "..."   ✓ Correct
-#   ./.agent/scripts/set_git_identity_env.sh "..." "..."        ✗ Wrong (variables won't persist)
+#   source .agent/scripts/set_git_identity_env.sh "..." "..." ["..."]   ✓ Correct
+#   ./.agent/scripts/set_git_identity_env.sh "..." "..."                ✗ Wrong (variables won't persist)
 
 # Load framework identity lookup table from shared configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
