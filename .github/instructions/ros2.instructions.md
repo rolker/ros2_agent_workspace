@@ -20,7 +20,7 @@ These files contain comprehensive ROS2 development patterns and conventions for 
 
 **Adding a repository to a layer:**
 ```bash
-# Edit configs/core.repos
+# Edit the .repos file in the key repository's config/repos/ directory
 # Add entry under repositories:
 repositories:
   my_new_package:
@@ -33,7 +33,8 @@ repositories:
 ```bash
 cd workspaces/core_ws
 colcon build --symlink-install --packages-select my_package
-source install/setup.bash
+# Source using the env script to get proper underlay and overlays
+source ../../.agent/scripts/env.sh
 ```
 
 **Running tests for a package:**

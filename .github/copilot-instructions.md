@@ -22,7 +22,7 @@ All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core 
 ### Environment & Versions
 
 This workspace uses:
-- **ROS 2**: Jazzy (or Humble fallback)
+- **ROS 2**: Jazzy, Kilted, and Rolling (multi-distro support)
 - **Build System**: colcon
 - **VCS Tool**: vcstool
 - **Python**: 3.10+
@@ -131,7 +131,7 @@ By default, Copilot CLI acts as **ROS Developer**:
 - ✅ Create/modify ROS packages in `workspaces/*/src/` (when working on assigned tasks)
 - ✅ Write/update tests
 - ✅ Update package documentation
-- ✅ Modify config files in `configs/*.repos`
+- ✅ Modify config files in the key repository's `config/repos/*.repos`
 - ✅ Update build configurations (CMakeLists.txt, package.xml, setup.py)
 
 **Forbidden:**
