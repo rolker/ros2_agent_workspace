@@ -13,43 +13,34 @@ def main():
     """Check for updates in default branch and provide recommendations."""
     # Get repository root
     try:
-        repo_root = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"], text=True
-            )
-            .strip()
-        )
+        repo_root = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], text=True
+        ).strip()
     except subprocess.CalledProcessError:
         # Not in a git repository, skip
         return 0
 
     # Path to the check script
     check_script = Path(repo_root) / ".agent" / "scripts" / "check_branch_updates.sh"
-    
+
     if not check_script.exists():
         # Script not found, skip silently
         return 0
 
     # Run the check script (non-strict mode - informational only)
+    # The script will display output directly to the user
+    # We always return 0 to avoid blocking the commit in pre-commit context
     try:
-        result = subprocess.run(
+        subprocess.run(
             [str(check_script)],
-            capture_output=False,
+            capture_output=False,  # Let output go directly to console
             text=True,
+            check=False,  # Don't raise exception on non-zero exit
         )
-        
-        # Exit code 0: up-to-date or on default branch
-        # Exit code 1: updates available (informational)
-        # Exit code 2: error
-        
-        # We don't block commits in pre-commit hook, just inform
-        # Users can run with --strict if they want to enforce
+        # Always return 0 to avoid blocking commits
+        # The script provides informational output only
         return 0
-        
-    except subprocess.CalledProcessError as e:
-        # If check script fails, don't block the commit
-        print(f"⚠️  Warning: Branch update check failed: {e}")
-        return 0
+
     except FileNotFoundError:
         # Script not executable or not found
         return 0

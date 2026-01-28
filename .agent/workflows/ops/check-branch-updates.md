@@ -49,8 +49,8 @@ To prevent commits when your branch is behind:
 ```
 
 **Exit codes:**
-- `0` - Branch is up-to-date or on default branch
-- `1` - Branch needs updates
+- `0` - Branch is up-to-date, on default branch, or informational check completed
+- `1` - Updates required (strict mode only)
 - `2` - Error occurred
 
 ## Understanding the Output

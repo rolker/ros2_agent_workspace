@@ -37,8 +37,9 @@ This directory contains custom pre-commit hooks for the ROS2 Agent Workspace.
 **When it runs**: Before every commit (via pre-commit framework)
 
 **Exit codes**:
-- `0` - Branch is up-to-date or informational message shown
-- Script is non-blocking by default (always returns 0 in pre-commit context)
+- `0` - Always (pre-commit hook wrapper is non-blocking; informational only)
+
+The underlying script (`.agent/scripts/check_branch_updates.sh`) provides the actual check and recommendations, but the pre-commit hook wrapper always returns 0 to avoid blocking commits. Use the script directly with `--strict` mode if you want to enforce branch updates.
 
 **Configuration**: See `.pre-commit-config.yaml`
 

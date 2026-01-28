@@ -357,8 +357,8 @@ Check if the default branch has new commits and provide merge/rebase recommendat
 - When coordinating with team updates
 
 **Exit codes:**
-- `0` - Branch is up-to-date or on default branch
-- `1` - Updates available (informational mode) or updates required (strict mode)
+- `0` - Branch is up-to-date, on default branch, or informational check completed
+- `1` - Updates required (strict mode only)
 - `2` - Error occurred
 
 **Examples:**
@@ -386,9 +386,7 @@ $ ./.agent/scripts/check_branch_updates.sh
 - `.agent/workflows/ops/check-branch-updates.md` - Detailed usage guide
 - `.agent/hooks/check-branch-updates.py` - Pre-commit hook implementation
 
- ---
-
- ---
+---
 
 ## Testing & Validation
 

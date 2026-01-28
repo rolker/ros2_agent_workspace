@@ -5,7 +5,7 @@
 #
 # Exit codes:
 #   0 - No updates needed or on default branch
-#   1 - Updates available (informational when not strict)
+#   1 - Script should never exit 1 in informational mode (reserved for strict mode)
 #   2 - Error occurred
 
 set -e
@@ -153,4 +153,6 @@ if [ "$STRICT_MODE" == "true" ]; then
 fi
 
 echo -e "${YELLOW}ℹ️  Informational: You may want to update your branch${NC}"
-exit 1
+echo ""
+# In informational mode, we don't block the commit
+exit 0
