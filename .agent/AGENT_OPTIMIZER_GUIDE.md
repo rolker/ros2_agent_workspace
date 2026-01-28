@@ -15,7 +15,7 @@ This document establishes the "North Star" metrics and principles for this works
 **"If it isn't verified, it doesn't exist."**
 
 *   **The Standard**: All packages must pass `ament_lint`, `gtest` (if applicable), and build without warnings.
-*   **Verification**: No code is "done" until verified by `verify_change.sh` or `test.sh`.
+*   **Verification**: No code is "done" until verified by `./.agent/scripts/verify_change.sh` or `./.agent/scripts/test.sh`.
 *   **Documentation**: Code must be self-documenting (standard ROS 2 Doxygen/Sphinx) *and* have clear high-level `README.md` files.
 *   **Constraint**: Never lower logical quality to satisfy valid syntax. A compiling node that crashes is worse than a compile error.
 
@@ -30,7 +30,7 @@ This document establishes the "North Star" metrics and principles for this works
 **"Many hands, one mind, zero collisions."**
 
 *   **Identity**: Every commit and comment must be attributable to a specific agent identity (e.g., "Antigravity Agent").
-*   **Isolation**: Work is done in `feature/` branches or isolated `worktrees`. The `main` branch is sacred and read-only.
+*   **Isolation**: Work is done in `feature/` branches or isolated `worktrees`. The default branch (main/jazzy/rolling) is sacred and read-only.
 *   **Handover**: The "Clean Campsite" rule. Agents must leave the workspace in a known, clean state (`git status` clean) when their session ends.
 *   **Coordination**: Use Draft PRs and `work-plans/` to signal intent before writing code.
 
@@ -46,7 +46,7 @@ This document establishes the "North Star" metrics and principles for this works
 ### V. Industry Alignment
 **"Don't reinvent the wheel; just make it roll smoother."**
 
-*   **Standards**: Use standard ROS 2 tools (`colcon`, `rostest`, `ros2 launch`) rather than custom wrappers that obscure the underlying mechanics.
+*   **Standards**: Use standard ROS 2 tools (`colcon`, `colcon test`/`ctest`, `launch_testing`, `ros2 launch`) rather than custom wrappers that obscure the underlying mechanics.
 *   **Conventions**: Follow REP-standards (e.g., REP-2004 for package layout).
 *   **Ecosystem**: Embrace standard Linux/Git workflows. If a tool exists (e.g., `gh` CLI), use it instead of writing a custom API client.
 
