@@ -152,7 +152,7 @@ Session: 66b4eea3
 - Workflow would have saved 10 minutes
 
 ---
-**🤖 Reported-By**: Copilot CLI Agent (Claude Sonnet 4.5)
+**🤖 Reported-By**: Copilot CLI Agent (Claude 3.5 Sonnet)
 ```
 
 ### Step 5: Create Issues (After User Approval)
@@ -191,7 +191,8 @@ gh issue list --assignee @me --json number,title,labels
 Save your draft issues to `.agent/scratchpad/` before creating:
 ```bash
 # Draft issues in scratchpad (git-ignored)
-cat > .agent/scratchpad/friction_report_$(date +%Y%m%d).md << 'EOF'
+REPORT_DATE=$(date +%Y%m%d)
+cat > .agent/scratchpad/friction_report_${REPORT_DATE}.md << EOF
 # Friction Report - $(date)
 
 ## Issue 1: ...

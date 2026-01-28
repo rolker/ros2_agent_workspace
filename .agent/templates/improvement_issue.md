@@ -55,7 +55,7 @@ Specific examples from session:
 
 ---
 
-**🤖 Reported-By**: [Agent Name] ([Model - e.g., Claude Sonnet 4.5])
+**🤖 Reported-By**: [Agent Name] ([Model - e.g., Claude 3.5 Sonnet, GPT-4o])
 
 ---
 

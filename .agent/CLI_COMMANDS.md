@@ -423,7 +423,7 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 # 2. Check for existing issues
 gh issue list --repo rolker/ros2_agent_workspace --state open --limit 50
-gh issue list --search "documentation" --state open
+gh issue list --repo rolker/ros2_agent_workspace --search "documentation" --state open
 
 # 3. Draft issues using template
 cat .agent/templates/improvement_issue.md
