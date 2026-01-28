@@ -171,7 +171,7 @@ Build ROS 2 workspace layers with colcon.
 **What it does:**
 1. Sources the ROS 2 environment
 2. Runs `colcon build --symlink-install` on each layer
-3. Generates build report in `ai_workspace/build_report.md`
+3. Generates build report in `.agent/scratchpad/build_report.md`
 
 **Dependencies:**
 - ROS 2 Jazzy installed
@@ -180,7 +180,7 @@ Build ROS 2 workspace layers with colcon.
 
 **Outputs:**
 - Build artifacts in each `workspaces/<layer>_ws/build/`
-- `ai_workspace/build_report.md` with build summary
+- `.agent/scratchpad/build_report.md` with build summary
 
 ---
 
@@ -415,9 +415,9 @@ Run tests on ROS 2 workspace layers.
 - Workspace built (see `build.sh`)
 
 **Outputs:**
-- `ai_workspace/test_report.md` (Human readable)
-- `ai_workspace/test_summary.json` (Machine readable)
-- `ai_workspace/test_history.csv` (Historical data)
+- `.agent/scratchpad/test_report.md` (Human readable)
+- `.agent/scratchpad/test_summary.json` (Machine readable)
+- `.agent/scratchpad/test_history.csv` (Historical data)
 
 ---
 

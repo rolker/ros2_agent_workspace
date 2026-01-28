@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 
 if [ ! -f "$LOCK_FILE" ]; then
     echo "⚠️ Workspace is NOT locked."

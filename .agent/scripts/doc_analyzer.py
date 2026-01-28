@@ -10,7 +10,7 @@ from datetime import datetime
 # Explicitly listing workspaces based on previous context, but could be dynamic
 BASE_DIR = Path(__file__).resolve().parent
 WORKSPACES_ROOT = BASE_DIR.parent / 'workspaces'
-REPORT_FILE = BASE_DIR.parent / 'ai_workspace' / 'documentation_quality_report.md'
+REPORT_FILE = BASE_DIR.parent / 'scratchpad' / 'documentation_quality_report.md'
 
 # Scoring Weights
 WEIGHT_README_EXISTS = 40

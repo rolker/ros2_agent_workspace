@@ -9,5 +9,5 @@ description: Analyze the documentation quality of ROS2 packages in the workspace
 
 2. Open the generated report
    ```bash
-   code ai_workspace/documentation_quality_report.md
+   code .agent/scratchpad/documentation_quality_report.md
    ```
