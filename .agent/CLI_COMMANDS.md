@@ -266,7 +266,7 @@ rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
 git status --porcelain  # Verify clean
 git checkout main
 git pull
-git checkout -b feature/TASK-46-cli-integration
+git checkout -b feature/ISSUE-46-cli-integration
 ```
 
 **When to use**:
@@ -311,7 +311,7 @@ git checkout -b feature/TASK-46-cli-integration
 
 **Example**:
 ```bash
-git push -u origin feature/TASK-46-cli-integration
+git push -u origin feature/ISSUE-46-cli-integration
 gh pr create --title "Add CLI integration support" --body "Closes #46
 
 **🤖 Authored-By**: Copilot CLI Agent"

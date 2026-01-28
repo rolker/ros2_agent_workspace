@@ -169,7 +169,7 @@ Before starting work, see what's currently happening:
 
 2. **Create a feature branch**:
    ```bash
-   git checkout -b feature/TASK-46-cli-integration
+   git checkout -b feature/ISSUE-46-cli-integration
    ```
 
 3. **Work on your task** (write code, run tests, etc.)
@@ -191,7 +191,7 @@ Before starting work, see what's currently happening:
    
    ```bash
    # Push to your feature branch
-   git push -u origin feature/TASK-46-cli-integration
+   git push -u origin feature/ISSUE-46-cli-integration
    
    # Create pull request with correct signature
    # Note: Variables must be in double quotes to expand properly
@@ -213,7 +213,7 @@ Before starting work, see what's currently happening:
    ```
    
    **Without gh CLI (manual web UI)**:
-   - Push your branch: `git push -u origin feature/TASK-46-cli-integration`
+   - Push your branch: `git push -u origin feature/ISSUE-46-cli-integration`
    - Visit: https://github.com/rolker/ros2_agent_workspace/pulls
    - Click "New pull request"
    - Add AI signature to PR description. Since environment variables are not available in the web UI, look up your identity:
@@ -262,7 +262,7 @@ ros2 run <package_name> <node_name>
 ### Git Hygiene 🔴 CRITICAL
 
 - ❌ **NEVER commit to `main`** - Always use feature branches
-- ✅ Branch naming: `feature/TASK-<ID>-description` or `fix/description`
+- ✅ Branch naming: `feature/ISSUE-<ID>-description` or `fix/description`
 - ✅ Atomic commits (one logical change per commit)
 - ✅ Always stash or commit before finishing your session
 

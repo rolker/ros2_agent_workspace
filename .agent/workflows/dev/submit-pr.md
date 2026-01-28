@@ -52,8 +52,8 @@ If you started with `.agent/scripts/start_issue_work.sh` and created a draft PR:
 
 1.  **Branching**
     -   Ensure you are on the latest `main`.
-    -   Create a new branch: `git checkout -b feature/<task-id>-<short-description>`
-    -   *Example*: `git checkout -b feature/TASK-001-multi-distro-support`
+    -   Create a new branch: `git checkout -b feature/<issue-id>-<short-description>`
+    -   *Example*: `git checkout -b feature/ISSUE-001-multi-distro-support`
 
 2.  **Check for Updates** (Recommended)
     -   Before committing, ensure your branch is current:

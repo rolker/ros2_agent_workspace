@@ -22,7 +22,7 @@ These documents are **required reading** for every agent session:
 
 - **[`rules/common/git-hygiene.md`](rules/common/git-hygiene.md)**
   - **Never commit to `main`** — always use feature branches
-  - Branch naming: `feature/TASK-<ID>-<description>` or `fix/<description>`
+  - Branch naming: `feature/ISSUE-<ID>-<description>` or `fix/<description>`
   - Always stash/commit uncommitted changes before finishing
 
 - **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
