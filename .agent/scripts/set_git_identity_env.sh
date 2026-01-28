@@ -1,6 +1,7 @@
 #!/bin/bash
 # .agent/scripts/set_git_identity_env.sh
 # Sets ephemeral git identity using environment variables (session-only, doesn't modify .git/config)
+# Also exports agent model identity for signatures
 #
 # USAGE FOR HOST-BASED AGENTS (Copilot CLI, Gemini CLI):
 #   source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
@@ -14,6 +15,7 @@
 #
 # This sets identity ONLY for the current shell session without modifying .git/config.
 # The user's .git/config remains unchanged, allowing them to commit as themselves afterward.
+# Also exports AGENT_MODEL for use in AI signatures.
 #
 # IMPORTANT: Must be sourced (not executed) to export variables to current shell:
 #   source .agent/scripts/set_git_identity_env.sh "..." "..."   ✓ Correct
@@ -69,6 +71,7 @@ show_usage() {
     echo ""
     echo "This sets git identity ONLY for the current shell session using environment variables."
     echo "It does NOT modify .git/config, so the user's identity remains unchanged."
+    echo "Also exports AGENT_NAME, AGENT_EMAIL, AGENT_MODEL, and AGENT_FRAMEWORK for use in signatures."
 }
 
 # Auto-detect framework
@@ -103,6 +106,8 @@ if [ "$1" == "--agent" ]; then
     FRAMEWORK="${2,,}"  # Convert to lowercase
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK]}"
+    AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK]}"
+    AGENT_FRAMEWORK="$FRAMEWORK"
     
     if [ -z "$AGENT_NAME" ]; then
         echo "Error: Unknown framework '$2'"
@@ -119,14 +124,22 @@ elif [ "$1" == "--detect" ]; then
         return 1
     fi
     
-    AGENT_NAME="${FRAMEWORK_NAMES[$DETECTED]}"
-    AGENT_EMAIL="${FRAMEWORK_EMAILS[$DETECTED]}"
+    # Normalize framework name for lookup
+    FRAMEWORK_KEY="${DETECTED//-cli/}"
+    FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"
+    
+    AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"
+    AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK_KEY]}"
+    AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK_KEY]}"
+    AGENT_FRAMEWORK="$DETECTED"
     echo "Detected framework: $DETECTED"
     
 elif [ $# -eq 2 ]; then
     # Manual name and email
     AGENT_NAME="$1"
     AGENT_EMAIL="$2"
+    AGENT_MODEL="Unknown Model"
+    AGENT_FRAMEWORK="custom"
 else
     echo "Error: Invalid arguments"
     show_usage
@@ -134,6 +147,7 @@ else
 fi
 
 echo "Setting ephemeral git identity for: $AGENT_NAME <$AGENT_EMAIL>"
+echo "Model: $AGENT_MODEL"
 echo ""
 
 # Export Git environment variables for this session
@@ -143,6 +157,12 @@ export GIT_AUTHOR_EMAIL="$AGENT_EMAIL"
 export GIT_COMMITTER_NAME="$AGENT_NAME"
 export GIT_COMMITTER_EMAIL="$AGENT_EMAIL"
 
+# Export agent identity for use in signatures
+export AGENT_NAME
+export AGENT_EMAIL
+export AGENT_MODEL
+export AGENT_FRAMEWORK
+
 echo "✅ Ephemeral git identity configured for this session!"
 echo ""
 echo "Environment variables set:"
@@ -150,6 +170,8 @@ echo "  GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME"
 echo "  GIT_AUTHOR_EMAIL=$GIT_AUTHOR_EMAIL"
 echo "  GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME"
 echo "  GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL"
+echo "  AGENT_MODEL=$AGENT_MODEL"
+echo "  AGENT_FRAMEWORK=$AGENT_FRAMEWORK"
 echo ""
 echo "Verification:"
 AUTHOR_IDENT=$(git var GIT_AUTHOR_IDENT)
@@ -160,3 +182,4 @@ echo ""
 echo "ℹ️  This identity applies ONLY to this shell session."
 echo "ℹ️  The .git/config file remains unchanged."
 echo "ℹ️  When the session ends, the user's original identity is restored."
+echo "ℹ️  Use \$AGENT_NAME and \$AGENT_MODEL in GitHub signatures."

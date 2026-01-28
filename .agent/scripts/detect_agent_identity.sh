@@ -1,0 +1,180 @@
+#!/bin/bash
+# .agent/scripts/detect_agent_identity.sh
+# Detects full agent identity (framework, name, email, and model)
+# and writes to .agent/.identity file
+#
+# Usage:
+#   .agent/scripts/detect_agent_identity.sh [--write] [--export]
+#
+# Options:
+#   --write    Write detected identity to .agent/.identity
+#   --export   Export identity as environment variables
+#   (no args)  Display detected identity only
+#
+# Exports (with --export):
+#   AGENT_NAME - Full agent name (e.g., "Copilot CLI Agent")
+#   AGENT_EMAIL - Agent email address
+#   AGENT_MODEL - Detected or default model name
+#   AGENT_FRAMEWORK - Framework identifier (copilot, gemini, etc.)
+
+# Don't exit on error for sourced scripts
+# set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_ROOT="$(dirname "$SCRIPT_DIR")"
+IDENTITY_FILE="$AGENT_ROOT/.identity"
+
+# Load framework configuration
+if [ -f "$SCRIPT_DIR/framework_config.sh" ]; then
+    source "$SCRIPT_DIR/framework_config.sh"
+else
+    echo "❌ ERROR: Framework configuration not found at $SCRIPT_DIR/framework_config.sh"
+    exit 1
+fi
+
+# Detect framework using existing detection script
+if [ -f "$SCRIPT_DIR/detect_cli_env.sh" ]; then
+    source "$SCRIPT_DIR/detect_cli_env.sh"
+else
+    echo "⚠️  WARNING: Framework detection script not found"
+    AGENT_FRAMEWORK="unknown"
+fi
+
+# Get framework details
+if [ "$AGENT_FRAMEWORK" != "unknown" ]; then
+    # Normalize framework name (remove -cli suffix for lookup)
+    FRAMEWORK_KEY="${AGENT_FRAMEWORK//-cli/}"
+    FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"  # lowercase
+    
+    AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"
+    AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK_KEY]}"
+    AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK_KEY]}"
+    
+    # If lookups failed, use defaults
+    if [ -z "$AGENT_NAME" ]; then
+        AGENT_NAME="AI Agent"
+    fi
+    if [ -z "$AGENT_EMAIL" ]; then
+        AGENT_EMAIL="roland+ai-agent@ccom.unh.edu"
+    fi
+    if [ -z "$AGENT_MODEL" ]; then
+        AGENT_MODEL="Unknown Model"
+    fi
+else
+    # Unknown framework - use defaults
+    AGENT_NAME="AI Agent"
+    AGENT_EMAIL="roland+ai-agent@ccom.unh.edu"
+    AGENT_MODEL="Unknown Model"
+    AGENT_FRAMEWORK="unknown"
+fi
+
+# Try to detect actual model from environment or APIs
+# This is framework-specific and may not always be available
+detect_actual_model() {
+    local detected_model=""
+    
+    case "$AGENT_FRAMEWORK" in
+        copilot*|copilot-cli)
+            # GitHub Copilot doesn't expose model info easily
+            # Use default from config
+            detected_model="${FRAMEWORK_MODELS[copilot]}"
+            ;;
+        gemini*|gemini-cli)
+            # Gemini CLI might have model info in env or config
+            # Check common environment variables
+            if [ -n "$GEMINI_MODEL" ]; then
+                detected_model="$GEMINI_MODEL"
+            else
+                detected_model="${FRAMEWORK_MODELS[gemini]}"
+            fi
+            ;;
+        antigravity)
+            # Antigravity might have model info
+            if [ -n "$ANTIGRAVITY_MODEL" ]; then
+                detected_model="$ANTIGRAVITY_MODEL"
+            else
+                detected_model="${FRAMEWORK_MODELS[antigravity]}"
+            fi
+            ;;
+        claude*|claude-cli)
+            # Claude CLI model detection
+            if [ -n "$CLAUDE_MODEL" ]; then
+                detected_model="$CLAUDE_MODEL"
+            else
+                detected_model="${FRAMEWORK_MODELS[claude]}"
+            fi
+            ;;
+        *)
+            # For unknown frameworks, check generic environment variable
+            if [ -n "$AI_MODEL_NAME" ]; then
+                detected_model="$AI_MODEL_NAME"
+            fi
+            ;;
+    esac
+    
+    echo "$detected_model"
+}
+
+# Attempt to detect actual model
+DETECTED_MODEL=$(detect_actual_model)
+if [ -n "$DETECTED_MODEL" ]; then
+    AGENT_MODEL="$DETECTED_MODEL"
+fi
+
+# Parse command line options
+WRITE_FILE=false
+EXPORT_VARS=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --write)
+            WRITE_FILE=true
+            ;;
+        --export)
+            EXPORT_VARS=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--write] [--export]"
+            echo ""
+            echo "Options:"
+            echo "  --write    Write detected identity to .agent/.identity"
+            echo "  --export   Export identity as environment variables"
+            echo "  (no args)  Display detected identity only"
+            exit 0
+            ;;
+    esac
+done
+
+# Display detected identity
+echo "Detected Agent Identity:"
+echo "  Framework:  $AGENT_FRAMEWORK"
+echo "  Name:       $AGENT_NAME"
+echo "  Email:      $AGENT_EMAIL"
+echo "  Model:      $AGENT_MODEL"
+echo ""
+
+# Write to file if requested
+if [ "$WRITE_FILE" = true ]; then
+    cat > "$IDENTITY_FILE" << EOF
+# Agent Identity Configuration
+# Auto-generated by detect_agent_identity.sh on $(date)
+# This file serves as the source of truth for agent runtime identity.
+
+AGENT_NAME="$AGENT_NAME"
+AGENT_EMAIL="$AGENT_EMAIL"
+AGENT_MODEL="$AGENT_MODEL"
+AGENT_FRAMEWORK="$AGENT_FRAMEWORK"
+EOF
+    echo "✅ Identity written to: $IDENTITY_FILE"
+    echo ""
+fi
+
+# Export variables if requested
+if [ "$EXPORT_VARS" = true ]; then
+    export AGENT_NAME
+    export AGENT_EMAIL
+    export AGENT_MODEL
+    export AGENT_FRAMEWORK
+    echo "✅ Identity exported to environment variables"
+    echo ""
+fi
