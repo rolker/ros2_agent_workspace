@@ -122,7 +122,7 @@ Once environment is set up and status is clean:
 **Critical**: After committing to your feature branch, you **must** create a pull request:
 ```bash
 git push -u origin feature/my-task
-gh pr create --title "..." --body "Closes #123\n\n**🤖 Authored-By**: <Your Agent>"
+gh pr create --title "..." --body "Closes #123\n\n**🤖 Authored-By**: \`<Your Agent>\`\n**🧠 Model**: \`<Model Name>\`"
 ```
 
 **Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md)
@@ -132,13 +132,26 @@ gh pr create --title "..." --body "Closes #123\n\n**🤖 Authored-By**: <Your Ag
 All GitHub Issues, PRs, and Comments **must** include:
 
 ```markdown
-**🤖 Authored-By**: <Your Agent Name>
+**🤖 Authored-By**: `<Your Agent Name>`
+**🧠 Model**: `<Model Name>`
 ```
 
 Examples:
-- `**🤖 Authored-By**: Copilot CLI Agent`
-- `**🤖 Authored-By**: Gemini CLI Agent`
-- `**🤖 Authored-By**: Antigravity Agent`
+- Copilot CLI Agent:
+  ```markdown
+  **🤖 Authored-By**: `Copilot CLI Agent`
+  **🧠 Model**: `GPT-4o`
+  ```
+- Gemini CLI Agent:
+  ```markdown
+  **🤖 Authored-By**: `Gemini CLI Agent`
+  **🧠 Model**: `Gemini 2.0 Flash`
+  ```
+- Antigravity Agent:
+  ```markdown
+  **🤖 Authored-By**: `Antigravity Agent`
+  **🧠 Model**: `Claude 3.5 Sonnet`
+  ```
 
 **Reference**: [rules/common/ai-signature.md](rules/common/ai-signature.md)
 
