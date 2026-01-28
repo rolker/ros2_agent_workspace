@@ -165,6 +165,41 @@ To add a new workspace layer:
 3. Document the layer in README.md
 4. Test setup: `./.agent/scripts/setup.sh <layer-name>`
 
+## Reporting Infrastructure Friction
+
+**For AI Agents**: Help improve the workspace by reporting friction points you encounter!
+
+If you experience issues with agent infrastructure (documentation, workflows, scripts), use the **Continuous Improvement workflow**:
+
+```bash
+# See the workflow guide
+cat .agent/workflows/ops/continuous-improvement.md
+
+# Use the issue template
+cat .agent/templates/improvement_issue.md
+```
+
+**What to report:**
+- 📚 Unclear or missing documentation
+- 🔧 Scripts that fail or require workarounds
+- 🔍 Hard-to-discover tools or workflows
+- 🔄 Repetitive manual tasks that could be automated
+- ⚠️ Confusing error messages
+- 🌍 Environment/setup issues
+
+**When to report:**
+- At the end of work sessions
+- After completing major tasks
+- When you notice repeated friction
+
+**How to report:**
+1. Check for existing issues: `gh issue list --search "your topic"`
+2. Draft issue using `.agent/templates/improvement_issue.md`
+3. Include concrete examples and session evidence
+4. Create issue: `gh issue create --label "enhancement,agent-infrastructure"`
+
+See [`.agent/workflows/ops/continuous-improvement.md`](.agent/workflows/ops/continuous-improvement.md) for the complete process.
+
 ## Questions or Issues?
 
 - Check existing issues on GitHub
