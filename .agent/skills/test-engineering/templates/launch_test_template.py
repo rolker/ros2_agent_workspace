@@ -9,8 +9,6 @@ Replace placeholders with actual node names, topics, and test logic.
 import unittest
 import pytest
 
-import launch
-import launch_ros
 import launch_testing
 import launch_testing.actions
 import launch_testing.markers
@@ -245,7 +243,7 @@ class TestNodeCommunication(unittest.TestCase):
         self.assertTrue(future.done(), 'Service call timed out')
         
         # Verify response
-        response = future.result()
+        future.result()
         # self.assertTrue(response.success)
         # self.assertEqual(response.message, 'expected_message')
         

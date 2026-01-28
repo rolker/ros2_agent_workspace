@@ -87,9 +87,11 @@ Verified mktemp approach:
 
 These items were identified but not implemented (out of scope):
 
-1. **Complete ai_workspace/ migration** - Several scripts still use the old location
-2. **Automated testing** - Create tests to simulate concurrent agent operations
-3. **Lock file enhancement** - Add agent identity to workspace locks
+1. **Automated testing** - Create tests to simulate concurrent agent operations
+2. **Lock file enhancement** - Add agent identity to workspace locks to show which agent holds the lock
+3. **Troubleshooting guide** - Create comprehensive troubleshooting documentation for collision scenarios
+
+Note: The migration from `ai_workspace/` to `.agent/scratchpad/` has been completed in this PR.
 
 ## Recommendations
 
@@ -99,9 +101,9 @@ These items were identified but not implemented (out of scope):
 3. **Use descriptive prefixes**: Makes cleanup easier later
 
 ### For Future Improvements
-1. Complete migration from `ai_workspace/` to `.agent/scratchpad/`
-2. Add automated tests for concurrent scenarios
-3. Consider wrapper scripts that automatically use mktemp
+1. Add automated tests for concurrent scenarios
+2. Consider wrapper scripts that automatically use mktemp
+3. Enhance lock file to show which agent holds it
 
 ## Files Changed
 

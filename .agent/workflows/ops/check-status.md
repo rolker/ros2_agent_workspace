@@ -101,7 +101,9 @@ if command -v gh &> /dev/null; then
     gh issue list --limit 10 --state open
     
     # Cache results to avoid rate limiting
-    # Use simple predictable filenames (one per agent session)
+    # Note: Using $$ (process ID) instead of mktemp for cache files
+    # because these should persist across multiple invocations within
+    # the same shell session, allowing age-based cache refresh logic
     PR_CACHE=".agent/scratchpad/pr_cache_$$.json"
     ISSUE_CACHE=".agent/scratchpad/issue_cache_$$.json"
     
@@ -223,7 +225,9 @@ Standard git/vcs checks with optional Google Cloud integrations.
 To avoid GitHub API rate limits:
 
 ```bash
-# Use PID-based cache file (unique per process)
+# Use PID-based cache file (unique per process, persistent for session)
+# Note: We use $$ instead of mktemp because cache files should persist
+# across multiple invocations to enable age-based refresh logic
 CACHE_FILE=".agent/scratchpad/pr_cache_$$.json"
 
 # Check cache age (valid for 5 minutes)

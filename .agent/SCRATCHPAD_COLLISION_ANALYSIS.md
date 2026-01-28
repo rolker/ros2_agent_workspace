@@ -92,13 +92,13 @@ T3: Agent B tries to read .agent/scratchpad/analysis.md (file gone!)
 
 ## Additional Issues Not Originally Considered
 
-### 1. Migration Inconsistency
-Many scripts still use `ai_workspace/` instead of `.agent/scratchpad/`:
-- `.agent/scripts/build.sh` → writes to `ai_workspace/build_report.md`
-- `.agent/scripts/test.sh` → writes to `ai_workspace/test_report.md`
-- `.agent/scripts/lock.sh` → uses `ai_workspace/workspace.lock`
+### 1. Migration Status (COMPLETED)
+All relevant scripts have been migrated from `ai_workspace/` to `.agent/scratchpad/`:
+- `.agent/scripts/build.sh` → writes to `.agent/scratchpad/build_report.md`
+- `.agent/scripts/test.sh` → writes to `.agent/scratchpad/test_report.md`
+- `.agent/scripts/lock.sh` → uses `.agent/scratchpad/workspace.lock`
 
-**Impact**: Documentation says use `.agent/scratchpad/`, but scripts use old location.
+**Impact**: Documentation and scripts are now aligned on using `.agent/scratchpad/` as the standard location.
 
 ### 2. No File Existence Checks
 No examples show checking if a file exists before creating it:
@@ -125,11 +125,11 @@ All agents write to the same flat directory. No subdirectories per:
 - Session ID (e.g., `.agent/scratchpad/session-abc123/`)
 - Task/Issue (e.g., `.agent/scratchpad/issue-46/`)
 
-### 5. Lock File Placement
-The workspace lock is in `ai_workspace/workspace.lock`:
+### 5. Lock File Placement (COMPLETED)
+The workspace lock has been migrated to `.agent/scratchpad/workspace.lock`:
 - ✅ Good: Prevents concurrent builds/tests
-- ❌ Issue: Uses deprecated `ai_workspace/` location
-- ❌ Issue: Lock is binary (locked/unlocked), doesn't identify which agent holds it
+- ✅ Migrated: Now uses `.agent/scratchpad/` location
+- Note: Lock is binary (locked/unlocked), could be enhanced to identify which agent holds it
 
 ## Recommended Mitigations
 
@@ -241,10 +241,10 @@ find .agent/scratchpad/ -type f -mmin +60 -delete
 - [x] Add warning in scratchpad README about name collisions
 - [x] Update all skills and workflows to use `mktemp`
 
-### Phase 2: Migration (Short Term)
-- [ ] Update all scripts to use `.agent/scratchpad/` instead of `ai_workspace/`
-- [ ] Move lock file to `.agent/scratchpad/workspace.lock`
-- [ ] Test all scripts after migration
+### Phase 2: Migration (COMPLETED)
+- [x] Update all scripts to use `.agent/scratchpad/` instead of `ai_workspace/`
+- [x] Move lock file to `.agent/scratchpad/workspace.lock`
+- [x] Test all scripts after migration
 
 ### Phase 3: Documentation (Ongoing)
 - [x] Create collision analysis document
