@@ -194,7 +194,7 @@ Before starting work, see what's currently happening:
    git push -u origin feature/TASK-46-cli-integration
    
    # Create pull request with correct signature
-   # Use your actual AGENT_NAME and AGENT_MODEL (set during identity configuration)
+   # Note: Variables must be in double quotes to expand properly
    gh pr create --title "Implement CLI integration" \
      --body "Closes #46
 
@@ -203,8 +203,8 @@ Before starting work, see what's currently happening:
    - Enhanced identity automation
    
    ---
-   **🤖 Authored-By**: \`$AGENT_NAME\`
-   **🧠 Model**: \`$AGENT_MODEL\`"
+   **🤖 Authored-By**: \`${AGENT_NAME}\`
+   **🧠 Model**: \`${AGENT_MODEL}\`"
    ```
    
    **Or use the workflow**:
@@ -212,11 +212,16 @@ Before starting work, see what's currently happening:
    /submit-pr
    ```
    
-   **Without gh CLI**:
+   **Without gh CLI (manual web UI)**:
    - Push your branch: `git push -u origin feature/TASK-46-cli-integration`
    - Visit: https://github.com/rolker/ros2_agent_workspace/pulls
    - Click "New pull request"
-   - Add AI signature to PR description using your environment variables: `**🤖 Authored-By**: $AGENT_NAME` and `**🧠 Model**: $AGENT_MODEL`
+   - Add AI signature to PR description. Since environment variables are not available in the web UI, look up your identity:
+     ```bash
+     echo "Name: $AGENT_NAME"
+     echo "Model: $AGENT_MODEL"
+     ```
+   - Then manually type: `**🤖 Authored-By**: <your name>` and `**🧠 Model**: <your model>`
 
 ### Option B: Use Existing Workflows
 

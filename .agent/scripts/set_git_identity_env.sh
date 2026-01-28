@@ -124,8 +124,8 @@ elif [ "$1" == "--detect" ]; then
         return 1
     fi
     
-    # Normalize framework name for lookup
-    FRAMEWORK_KEY="${DETECTED//-cli/}"
+    # Normalize framework name for lookup (remove -cli suffix from end only)
+    FRAMEWORK_KEY="${DETECTED%-cli}"
     FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"
     
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"

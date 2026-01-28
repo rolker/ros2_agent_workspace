@@ -42,8 +42,8 @@ fi
 
 # Get framework details
 if [ "$AGENT_FRAMEWORK" != "unknown" ]; then
-    # Normalize framework name (remove -cli suffix for lookup)
-    FRAMEWORK_KEY="${AGENT_FRAMEWORK//-cli/}"
+    # Normalize framework name (remove -cli suffix from end only)
+    FRAMEWORK_KEY="${AGENT_FRAMEWORK%-cli}"
     FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"  # lowercase
     
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"

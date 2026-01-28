@@ -59,15 +59,21 @@ echo ""
 
 # Test 5: set_git_identity_env.sh works with --agent flag
 echo "Test 5: Setting identity with --agent flag..."
+EXIT_CODE=0
 (
     source "$SCRIPT_DIR/set_git_identity_env.sh" --agent copilot
     if [ "$AGENT_NAME" = "Copilot CLI Agent" ] && [ "$AGENT_MODEL" = "GPT-4o" ]; then
         echo "✅ Identity set successfully with --agent flag"
+        exit 0
     else
         echo "❌ Identity setting with --agent flag failed"
         exit 1
     fi
-)
+) || EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    exit $EXIT_CODE
+fi
 echo ""
 
 # Test 6: Documentation files exist and reference introspection
@@ -97,11 +103,13 @@ fi
 if [ "$DOCS_OK" = true ]; then
     echo "✅ Documentation is consistent"
 else
-    echo "⚠️  Some documentation issues found"
+    echo "⚠️  Some documentation issues found (non-critical)"
+    # Note: We don't fail the test for documentation warnings
+    # as the core functionality still works
 fi
 echo ""
 
-echo "=== All Tests Passed! ==="
+echo "=== All Core Tests Passed! ==="
 echo ""
 echo "The agent identity introspection system is working correctly."
 echo "Agents can now:"
