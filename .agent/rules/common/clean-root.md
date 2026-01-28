@@ -20,15 +20,33 @@ Use this for all persistent temporary files created during agent sessions:
 - Test results and coverage reports
 - Session-specific metadata
 
-**Example**:
-```bash
-# ✅ CORRECT
-output_file=".agent/scratchpad/build_report_$(date +%s).json"
-analysis_result=".agent/scratchpad/analysis.md"
+**⚠️ Multi-Agent Safety**: When multiple agents work concurrently, you MUST use unique filenames to prevent collisions.
 
-# ❌ INCORRECT
-output_file="./ai_workspace/report.json"      # Old location
-temp_file="workspaces/core_ws/temp_analysis" # Never in source dirs!
+**Recommended: Use Helper Functions**:
+```bash
+source .agent/scripts/lib/scratchpad_helpers.sh
+
+# ✅ CORRECT - Collision-safe with helper functions
+output_file=$(scratchpad_file "build_report" ".json")
+analysis_result=$(scratchpad_file "analysis" ".md")
+
+# Use the files
+echo "data" > "$output_file"
+echo "analysis" > "$analysis_result"
+
+# Clean up when done
+rm "$output_file" "$analysis_result"
+```
+
+**Alternative: Manual Timestamp-Based Naming**:
+```bash
+# ✅ CORRECT - Collision-safe with timestamps
+output_file=".agent/scratchpad/build_report_$(date +%s%N).json"
+analysis_result=".agent/scratchpad/analysis_$(date +%s%N).md"
+
+# ❌ INCORRECT - Static filenames cause collisions!
+output_file=".agent/scratchpad/report.json"  # Multiple agents will overwrite each other
+temp_file="workspaces/core_ws/temp_analysis"  # Never in source dirs!
 ```
 
 ### When to Use System `/tmp`
@@ -68,8 +86,13 @@ echo "debug info" > debug_output.txt
 
 **✅ Correct Pattern (New)**:
 ```bash
-# Agent creates file in scratchpad
-echo "debug info" > .agent/scratchpad/debug_output_$(date +%s).txt
+source .agent/scripts/lib/scratchpad_helpers.sh
+
+# Agent creates file in scratchpad with unique name
+debug_file=$(scratchpad_file "debug_output" ".txt")
+echo "debug info" > "$debug_file"
 # File is ignored by git; never accidentally committed
 # Can be manually reviewed later if needed
+# Clean up when done
+rm "$debug_file"
 ```
