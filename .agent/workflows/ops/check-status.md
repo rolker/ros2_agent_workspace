@@ -101,8 +101,14 @@ if command -v gh &> /dev/null; then
     gh issue list --limit 10 --state open
     
     # Cache results to avoid rate limiting
-    gh pr list --json number,title,updatedAt --limit 20 > .agent/scratchpad/pr_cache.json 2>/dev/null || true
-    gh issue list --json number,title,labels,assignees --limit 20 > .agent/scratchpad/issue_cache.json 2>/dev/null || true
+    # Note: Using $$ (process ID) instead of mktemp for cache files
+    # because these should persist across multiple invocations within
+    # the same shell session, allowing age-based cache refresh logic
+    PR_CACHE=".agent/scratchpad/pr_cache_$$.json"
+    ISSUE_CACHE=".agent/scratchpad/issue_cache_$$.json"
+    
+    gh pr list --json number,title,updatedAt --limit 20 > "$PR_CACHE" 2>/dev/null || true
+    gh issue list --json number,title,labels,assignees --limit 20 > "$ISSUE_CACHE" 2>/dev/null || true
 else
     echo "GitHub CLI (gh) not available, skipping GitHub status"
     echo "Install with: https://cli.github.com/"
@@ -219,11 +225,12 @@ Standard git/vcs checks with optional Google Cloud integrations.
 To avoid GitHub API rate limits:
 
 ```bash
-# Create cache directory if needed
-mkdir -p .agent/scratchpad
+# Use PID-based cache file (unique per process, persistent for session)
+# Note: We use $$ instead of mktemp because cache files should persist
+# across multiple invocations to enable age-based refresh logic
+CACHE_FILE=".agent/scratchpad/pr_cache_$$.json"
 
-# Cache PR data (valid for 5 minutes)
-CACHE_FILE=".agent/scratchpad/pr_cache.json"
+# Check cache age (valid for 5 minutes)
 CACHE_AGE=$(($(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)))
 
 if [ $CACHE_AGE -gt 300 ]; then
@@ -240,6 +247,8 @@ else
         paste -d' ' - - | \
         sed 's/"number"://; s/"title":"/ /; s/"$//'
 fi
+
+# Note: Cache file persists for reuse - don't delete it here
 ```
 
 ## Troubleshooting
@@ -261,8 +270,8 @@ Use cached results or wait:
 # Check rate limit status
 gh api rate_limit
 
-# Use cached data
-cat .agent/scratchpad/pr_cache.json | jq
+# If you have a cached file, use it
+# (Note: with helper functions, cache files have unique names)
 ```
 
 ### "vcs: command not found"

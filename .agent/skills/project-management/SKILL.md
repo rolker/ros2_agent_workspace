@@ -19,8 +19,9 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Create a GitHub Issue using `gh issue create`:
     ```bash
-    # Create issue body in scratchpad (to preserve formatting)
-    cat > .agent/scratchpad/issue_body.md << 'EOF'
+    # Create issue body in scratchpad with unique name (to preserve formatting)
+    BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
+    cat > "$BODY_FILE" << 'EOF'
     ### Description
     [Task description]
     
@@ -33,7 +34,10 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     EOF
     
     # Create the issue
-    gh issue create --title "[Task Title]" --label "enhancement" --body-file .agent/scratchpad/issue_body.md
+    gh issue create --title "[Task Title]" --label "enhancement" --body-file "$BODY_FILE"
+    
+    # Clean up
+    rm "$BODY_FILE"
     ```
 2.  **AI Signature Required**: Always append the AI signature to issue body (see `.agent/rules/common/ai-signature.md`)
 3.  Optional: Sync ROADMAP.md from GitHub (see "Sync ROADMAP" operation below)
@@ -79,8 +83,12 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Query all open and recently closed issues:
     ```bash
-    gh issue list --state open --json number,title,assignees,labels,state --limit 100 > .agent/scratchpad/issues_open.json
-    gh issue list --state closed --json number,title,closedAt,labels --limit 20 > .agent/scratchpad/issues_closed.json
+    # Create unique cache files
+    ISSUES_OPEN=$(mktemp .agent/scratchpad/issues_open.XXXXXX.json)
+    ISSUES_CLOSED=$(mktemp .agent/scratchpad/issues_closed.XXXXXX.json)
+    
+    gh issue list --state open --json number,title,assignees,labels,state --limit 100 > "$ISSUES_OPEN"
+    gh issue list --state closed --json number,title,closedAt,labels --limit 20 > "$ISSUES_CLOSED"
     ```
 2.  Generate ROADMAP.md from JSON data:
     - Parse JSON to extract issue details
@@ -90,21 +98,26 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     - List recently closed issues as "Completed"
     - Add timestamp in ISO 8601 format (e.g., `2026-01-28T12:00:00Z`)
 3.  Prepend deprecation notice to generated file
-4.  **Note**: This is currently a manual process. A future automation script could be added to `.agent/scripts/sync_roadmap.sh` to standardize the JSON parsing and formatting.
-5.  **Never manually edit ROADMAP.md** - it should always be generated from GitHub data
+4.  Clean up temporary JSON files:
+    ```bash
+    rm "$ISSUES_OPEN" "$ISSUES_CLOSED"
+    ```
+5.  **Note**: This is currently a manual process. A future automation script could be added to `.agent/scripts/sync_roadmap.sh` to standardize the JSON parsing and formatting.
+6.  **Never manually edit ROADMAP.md** - it should always be generated from GitHub data
 
 ## Best Practices
 
 ### GitHub CLI Usage
 - **Always use `--body-file`** for multi-line content (see `.agent/rules/common/github-cli-best-practices.md`)
 - **Include AI Signature** in all issues/PRs/comments (see `.agent/rules/common/ai-signature.md`)
-- **Use scratchpad** for temporary files: `.agent/scratchpad/issue_body.md`
+- **Use unique filenames** with `mktemp` to prevent name collisions
 
 ### Issue Creation Examples
 
 **Feature Request**:
 ```bash
-cat > .agent/scratchpad/issue_body.md << 'EOF'
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
+cat > "$BODY_FILE" << 'EOF'
 ### Description
 Add support for multi-sensor fusion in the navigation stack.
 
@@ -122,12 +135,15 @@ EOF
 
 gh issue create --title "[Feature] Multi-sensor fusion support" \
   --label "enhancement,high-priority" \
-  --body-file .agent/scratchpad/issue_body.md
+  --body-file "$BODY_FILE"
+
+rm "$BODY_FILE"
 ```
 
 **Bug Report**:
 ```bash
-cat > .agent/scratchpad/issue_body.md << 'EOF'
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
+cat > "$BODY_FILE" << 'EOF'
 ### Description
 Navigation node crashes when receiving malformed sensor data.
 
@@ -145,7 +161,9 @@ EOF
 
 gh issue create --title "[Bug] Navigation crash on malformed data" \
   --label "bug,high-priority" \
-  --body-file .agent/scratchpad/issue_body.md
+  --body-file "$BODY_FILE"
+
+rm "$BODY_FILE"
 ```
 
 ### Task Workflow

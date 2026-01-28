@@ -20,14 +20,31 @@ Use this for all persistent temporary files created during agent sessions:
 - Test results and coverage reports
 - Session-specific metadata
 
-**Example**:
-```bash
-# ✅ CORRECT
-output_file=".agent/scratchpad/build_report_$(date +%s).json"
-analysis_result=".agent/scratchpad/analysis.md"
+**⚠️ Multi-Agent Safety**: When multiple agents work concurrently, you MUST use unique filenames to prevent collisions.
 
-# ❌ INCORRECT
-temp_file="workspaces/core_ws/temp_analysis" # Never in source dirs!
+**Recommended: Use mktemp**:
+```bash
+# ✅ CORRECT - Collision-safe with mktemp
+output_file=$(mktemp .agent/scratchpad/build_report.XXXXXX.json)
+analysis_result=$(mktemp .agent/scratchpad/analysis.XXXXXX.md)
+
+# Use the files
+echo "data" > "$output_file"
+echo "analysis" > "$analysis_result"
+
+# Clean up when done
+rm "$output_file" "$analysis_result"
+```
+
+**Alternative: Timestamp-Based Naming**:
+```bash
+# ✅ ACCEPTABLE - Collision-safe with timestamps
+output_file=".agent/scratchpad/build_report_$(date +%s%N).json"
+analysis_result=".agent/scratchpad/analysis_$(date +%s%N).md"
+
+# ❌ INCORRECT - Static filenames cause collisions!
+output_file=".agent/scratchpad/report.json"  # Multiple agents will overwrite each other
+temp_file="workspaces/core_ws/temp_analysis"  # Never in source dirs!
 ```
 
 ### When to Use System `/tmp`
@@ -67,8 +84,11 @@ echo "debug info" > debug_output.txt
 
 **✅ Correct Pattern (New)**:
 ```bash
-# Agent creates file in scratchpad
-echo "debug info" > .agent/scratchpad/debug_output_$(date +%s).txt
+# Agent creates file in scratchpad with unique name using mktemp
+debug_file=$(mktemp .agent/scratchpad/debug_output.XXXXXX.txt)
+echo "debug info" > "$debug_file"
 # File is ignored by git; never accidentally committed
 # Can be manually reviewed later if needed
+# Clean up when done
+rm "$debug_file"
 ```
