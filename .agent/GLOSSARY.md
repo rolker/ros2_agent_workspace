@@ -4,6 +4,9 @@
 
 **Rule**: Agents MUST consult this glossary when encountering ambiguous terms in instructions, issues, or code.
 
+## Quick Links
+[Core Concepts](#core-concepts) | [ROS 2 Architecture](#ros-2-workspace-architecture) | [Workflow Terms](#agent-workflow-terms) | [Git & Roles](#git--version-control) | [Examples](#ambiguity-resolution-examples)
+
 ---
 
 ## Core Concepts
@@ -44,11 +47,11 @@ The **scaffolding, tooling, and infrastructure** that wraps and supports Project
 
 ### Overlay
 **Plural**: There are **ONE OR MORE** overlays - active development layers built on top of the underlay.
-- **Count**: This workspace has 5 overlay layers (core_ws, sensors_ws, platforms_ws, simulation_ws, ui_ws)
+- **Count**: This workspace has 5 overlay layers (core_ws, platforms_ws, sensors_ws, simulation_ws, ui_ws)
 - **Purpose**: Contains project code under development
 - **Agent Rule**: MODIFY when working on assigned tasks
 - **Chaining**: Overlays can stack - each overlay sources the previous one
-- **Example Chain**: underlay → core_ws → sensors_ws → platforms_ws → simulation_ws → ui_ws
+- **Example Chain**: underlay → core_ws → platforms_ws → sensors_ws → simulation_ws → ui_ws
 
 ### Workspace Layer
 A thematic grouping of related packages within the multi-workspace structure.
@@ -65,9 +68,9 @@ A thematic grouping of related packages within the multi-workspace structure.
     ↓
 workspaces/core_ws/install (overlay 1)
     ↓
-workspaces/sensors_ws/install (overlay 2)
+workspaces/platforms_ws/install (overlay 2)
     ↓
-workspaces/platforms_ws/install (overlay 3)
+workspaces/sensors_ws/install (overlay 3)
     ↓
 workspaces/simulation_ws/install (overlay 4)
     ↓
@@ -91,23 +94,13 @@ A markdown file documenting the approach and progress for an issue.
 
 ### Draft PR Workflow
 The process of making work-in-progress visible via a draft Pull Request.
-1. Create feature branch
-2. Create work plan
-3. Commit and push plan
-4. Open draft PR immediately
-5. Update plan as work progresses
-6. Mark PR ready when complete
+- **Details**: See [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md)
+- **Quick Summary**: Create feature branch → work plan → draft PR → implement → mark ready
 
-### Planning Mode
-A workflow phase where agents analyze requirements and create implementation plans.
-- **Trigger**: User message prefixed with `[[PLAN]]`
-- **Output**: Structured plan in session workspace or work plan
-- **Rule**: Must get user approval before starting implementation
-
-### Execution Mode
-A workflow phase where agents implement code and verify changes.
-- **Requirements**: Must run `verify_change.sh` and create `walkthrough.md`
-- **Documentation**: See `.agent/rules/EXECUTION_MODE.md`
+### Planning Mode / Execution Mode
+Agent workflow phases for structured development.
+- **Planning**: Analyze requirements, create implementation plan (see `.agent/rules/PLANNING_MODE.md`)
+- **Execution**: Implement code, run verification (see `.agent/rules/EXECUTION_MODE.md`)
 
 ---
 
@@ -115,38 +108,25 @@ A workflow phase where agents implement code and verify changes.
 
 ### Feature Branch
 A branch for developing a specific feature or fix.
-- **Naming**: `feature/ISSUE-<number>-<description>` or `feature/<description>`
+- **Details**: See `.agent/rules/common/git-hygiene.md`
+- **Naming**: `feature/ISSUE-<number>-<description>`
 - **Rule**: Never commit directly to `main`
 
 ### Worktree (Planned)
-A git feature allowing multiple working directories from the same repository.
-- **Purpose**: Enable parallel agent work without conflicts
-- **Location**: `.worktrees/task-<number>/` (when implemented)
-- **Status**: Not yet implemented (Phase 3)
+Git feature for multiple working directories from one repository.
+- **Status**: Phase 3 (see [PROPOSAL_MULTI_AGENT_WORKFLOW.md](../PROPOSAL_MULTI_AGENT_WORKFLOW.md))
 
 ---
 
-## Agent Roles & Modes
+## Agent Roles & Permissions
+
+See [PERMISSIONS.md](PERMISSIONS.md) for complete role definitions.
 
 ### Framework Engineer
-Role with permissions to modify workspace infrastructure.
-- **Can modify**: `.agent/` scripts, workflows, build system, CI/CD
-- **Cannot modify**: Project code without explicit assignment
+Modifies workspace infrastructure (`.agent/`, workflows, build system).
 
 ### ROS Developer
-Default role for agents working on ROS 2 packages.
-- **Can modify**: ROS packages in `workspaces/*/src/` (when assigned)
-- **Cannot modify**: `.agent/` infrastructure, other agents' tasks
-
-### Sandbox Mode (Planned)
-Execution mode where agent runs inside a Docker container.
-- **Purpose**: Isolation, safety, clean environment
-- **Status**: Not yet implemented (Phase 3)
-
-### Host Mode
-Execution mode where agent runs directly on the host system.
-- **Current**: Default mode (sandbox not yet implemented)
-- **Rule**: All commands should be confirmed by user
+Modifies ROS 2 packages in `workspaces/*/src/` (when assigned tasks).
 
 ---
 
@@ -160,36 +140,30 @@ The authoritative reference for information.
 
 ### Verification
 The process of validating that changes work correctly.
-- **Tool**: `verify_change.sh <package_name> <test_type>`
-- **Test Types**: `unit`, `lint`, `all`
+- **Tool**: `./.agent/scripts/verify_change.sh --package <name> --type <unit|lint|all>`
 - **Rule**: Required before marking PR ready
 
 ### Definition of Done
-Criteria that must be met before a task is considered complete.
-- **Location**: `.agent/rules/definition-of-done.md`
-- **Includes**: Tests pass, code linted, documentation updated, PR approved
+Criteria for task completion. See `.agent/rules/definition-of-done.md`.
 
 ---
 
 ## Configuration & Setup
 
 ### .repos File
-A YAML file defining git repositories to clone with vcstool.
-- **Format**: vcstool repository specification
-- **Location**: `configs/repos/*.repos` (in key repositories)
+YAML file defining git repositories to clone with vcstool.
+- **Location**: `configs/<layer>.repos` or `<key_repo>/config/repos/<layer>.repos`
 - **Purpose**: Declarative dependency management
 
 ### Bootstrap
-The initial setup process for a fresh workspace.
-- **Script**: `scripts/bootstrap.sh` or `make bootstrap`
-- **Actions**: Clone repos (vcstool), install dependencies (rosdep), build workspace
+Initial environment setup for a fresh workspace.
+- **Script**: `./.agent/scripts/bootstrap.sh` or `make bootstrap`
+- **Actions**: Install ROS 2/dev tools, configure `rosdep`
+- **Follow-up**: Clone repos (`./setup.sh`), build workspaces (`./build.sh`)
 
 ### Colcon
-The ROS 2 build tool.
-- **Common Commands**: 
-  - `colcon build --symlink-install`
-  - `colcon test --packages-select <pkg>`
-  - `colcon test-result --verbose`
+ROS 2 build tool. See `.agent/knowledge/ros2_development_patterns.md` for details.
+- **Quick Reference**: `colcon build --symlink-install`, `colcon test --packages-select <pkg>`
 
 ---
 
@@ -207,7 +181,7 @@ The ROS 2 build tool.
 **"Run tests"** → Clarify:
 - All workspace tests? → `make test`
 - Specific package tests? → `colcon test --packages-select <pkg>`
-- Verification script? → `verify_change.sh <pkg> <type>`
+- Verification script? → `./.agent/scripts/verify_change.sh --package <pkg> --type <unit|lint|all>`
 
 ---
 
@@ -220,8 +194,6 @@ The ROS 2 build tool.
 ❌ **"The code"** → Clarify: Agent infrastructure code or project ROS 2 packages?
 
 ❌ **"Setup"** → Clarify: Bootstrap a fresh workspace, source the environment, or configure git identity?
-
----
 
 ---
 
