@@ -135,46 +135,41 @@ The workspace lock is in `ai_workspace/workspace.lock`:
 
 ### Priority 1: Enforce Unique Naming (CRITICAL)
 
-**A. Provide Helper Function**
-Create `.agent/scripts/lib/scratchpad_helpers.sh`:
+**Solution: Use `mktemp` Utility**
+
+The standard POSIX `mktemp` utility is the simplest and most reliable solution:
+
 ```bash
-#!/bin/bash
-# Generate unique filename in scratchpad
-
-scratchpad_file() {
-    local base_name="$1"
-    local extension="${2:-.txt}"
-    local agent_id="${AGENT_ID:-unknown}"
-    local timestamp=$(date +%s%N)  # nanoseconds for better uniqueness
-    
-    echo ".agent/scratchpad/${agent_id}_${base_name}_${timestamp}${extension}"
-}
-
-# Usage:
-# BODY_FILE=$(scratchpad_file "issue_body" ".md")
-# cat > "$BODY_FILE" << EOF
-# ...
-# EOF
-# gh issue create --body-file "$BODY_FILE"
-```
-
-**B. Update Documentation Examples**
-Replace all static filename examples with unique naming:
-```bash
-# BEFORE (bad)
-cat > .agent/scratchpad/issue_body.md << 'EOF'
-
-# AFTER (good) - Using nanoseconds (Linux/macOS) or seconds+random (fallback)
-BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N 2>/dev/null || echo "$(date +%s)${RANDOM}${RANDOM}").md"
+# mktemp creates unique files atomically with built-in race condition protection
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ...
 EOF
 gh issue create --body-file "$BODY_FILE"
-# Cleanup after use
 rm "$BODY_FILE"
 ```
 
-**Note**: The helper functions in `scratchpad_helpers.sh` automatically handle the fallback from nanoseconds to seconds+random when `date +%s%N` is not available. On systems without nanosecond support, the random number and PID components provide sufficient entropy to prevent collisions.
+**Advantages**:
+- Standard utility available on all POSIX systems
+- Atomic file creation (no race conditions)
+- Built-in uniqueness guarantees
+- No custom code to maintain
+- No dependencies on environment variables
+
+**Update Documentation Examples**:
+Replace all static filename examples with `mktemp`:
+```bash
+# BEFORE (bad)
+cat > .agent/scratchpad/issue_body.md << 'EOF'
+
+# AFTER (good) - Using mktemp
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
+cat > "$BODY_FILE" << 'EOF'
+...
+EOF
+gh issue create --body-file "$BODY_FILE"
+rm "$BODY_FILE"
+```
 
 ### Priority 2: Complete Migration to .agent/scratchpad/
 
@@ -192,62 +187,29 @@ rm "$BODY_FILE"
 - `.agent/scripts/health_check.sh`
 - `.agent/scripts/status_report.sh`
 
-### Priority 3: Add Namespace Isolation (MEDIUM)
+### Priority 3: Add Namespace Isolation (OPTIONAL)
 
-**Option A: Agent-Specific Subdirectories**
+With `mktemp`, namespace isolation is less critical since each file is already unique. However, for organizational purposes, you can still use subdirectories:
+
+**Option: Use mktemp with subdirectories**
 ```bash
-mkdir -p .agent/scratchpad/${AGENT_ID}/
-cat > .agent/scratchpad/${AGENT_ID}/issue_body.md << 'EOF'
-...
-EOF
-```
-
-**Option B: Session-Specific Subdirectories**
-```bash
-SESSION_ID=${SESSION_ID:-$(date +%s)}
-mkdir -p .agent/scratchpad/session-${SESSION_ID}/
-cat > .agent/scratchpad/session-${SESSION_ID}/issue_body.md << 'EOF'
-...
-EOF
-```
-
-**Option C: Task-Specific Subdirectories**
-```bash
-ISSUE_NUM=46
-mkdir -p .agent/scratchpad/issue-${ISSUE_NUM}/
-cat > .agent/scratchpad/issue-${ISSUE_NUM}/analysis.md << 'EOF'
-...
-EOF
-```
-
-**Recommended**: Combination of Agent ID + Timestamp for most cases.
-
-### Priority 4: Add File Existence Checks (LOW)
-
-For truly critical operations, add checks:
-```bash
-BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N).md"
-
-# Paranoid check (unlikely to be needed with timestamps)
-if [ -f "$BODY_FILE" ]; then
-    echo "⚠️  Warning: File collision detected, retrying..."
-    sleep 0.1
-    BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N).md"
-fi
-
+mkdir -p .agent/scratchpad/temp
+BODY_FILE=$(mktemp .agent/scratchpad/temp/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ...
 EOF
 ```
 
+### Priority 4: File Existence Checks (NOT NEEDED)
+
+With `mktemp`, file existence checks are unnecessary because `mktemp` handles this atomically and will never create a duplicate file.
+
 ### Priority 5: Improve Lock File System (MEDIUM)
 
-**Enhanced Lock File**:
+**Enhanced Lock File** (optional future improvement):
 ```bash
-# .agent/scripts/lib/lock_helpers.sh
 acquire_lock() {
     local lock_file=".agent/scratchpad/workspace.lock"
-    local agent_id="${AGENT_ID:-unknown}"
     local timestamp=$(date -Iseconds)
     
     if [ -f "$lock_file" ]; then
@@ -255,82 +217,61 @@ acquire_lock() {
         return 1
     fi
     
-    echo "Agent: $agent_id" > "$lock_file"
-    echo "Time: $timestamp" >> "$lock_file"
+    echo "Time: $timestamp" > "$lock_file"
     echo "PID: $$" >> "$lock_file"
     return 0
 }
-
-release_lock() {
-    local lock_file=".agent/scratchpad/workspace.lock"
-    rm -f "$lock_file"
-}
 ```
 
-### Priority 6: Add Cleanup Helpers (LOW)
+### Priority 6: Cleanup Helpers (OPTIONAL)
 
-**Session Cleanup Script**:
+Simple cleanup by file age:
 ```bash
-# .agent/scripts/cleanup_scratchpad.sh
-#!/bin/bash
-# Clean up this agent's files from scratchpad
+# Clean up files older than 1 day
+find .agent/scratchpad/ -type f -mtime +1 -delete
 
-AGENT_ID="${AGENT_ID:-unknown}"
-SESSION_ID="${SESSION_ID}"
-
-if [ -n "$SESSION_ID" ]; then
-    # Clean up by session
-    rm -rf ".agent/scratchpad/session-${SESSION_ID}/"
-elif [ "$AGENT_ID" != "unknown" ]; then
-    # Clean up by agent (careful!)
-    echo "⚠️  Cleaning up files for agent: $AGENT_ID"
-    find .agent/scratchpad/ -name "${AGENT_ID}_*" -delete
-else
-    echo "❌ Cannot clean up: No AGENT_ID or SESSION_ID set"
-    exit 1
-fi
+# Clean up files older than 1 hour
+find .agent/scratchpad/ -type f -mmin +60 -delete
 ```
 
 ## Implementation Roadmap
 
-### Phase 1: Quick Wins (Immediate)
-- [ ] Create helper function for unique filenames
-- [ ] Update documentation examples to use timestamps
-- [ ] Add warning in scratchpad README about name collisions
+### Phase 1: Documentation Updates (Immediate)
+- [x] Update documentation examples to use `mktemp`
+- [x] Add warning in scratchpad README about name collisions
+- [x] Update all skills and workflows to use `mktemp`
 
 ### Phase 2: Migration (Short Term)
 - [ ] Update all scripts to use `.agent/scratchpad/` instead of `ai_workspace/`
 - [ ] Move lock file to `.agent/scratchpad/workspace.lock`
 - [ ] Test all scripts after migration
 
-### Phase 3: Enhancements (Medium Term)
-- [ ] Implement namespace isolation (agent subdirectories)
-- [ ] Create cleanup helper scripts
-- [ ] Enhance lock file with agent identity
-
-### Phase 4: Documentation (Ongoing)
-- [ ] Update all documentation with best practices
-- [ ] Add examples showing safe concurrent usage
+### Phase 3: Documentation (Ongoing)
+- [x] Create collision analysis document
+- [x] Add examples showing safe concurrent usage
 - [ ] Create troubleshooting guide for collision scenarios
 
 ## Testing Plan
 
 ### Manual Tests
-1. **Concurrent Issue Creation**: Two agents create issues simultaneously
+1. **Concurrent Issue Creation**: Two agents create issues simultaneously using `mktemp`
 2. **Concurrent Status Checks**: Two agents run status reports simultaneously
-3. **Cleanup During Active Work**: One agent cleans up while another works
-4. **Timestamp Uniqueness**: Verify nanosecond timestamps prevent collisions
+3. **mktemp Uniqueness**: Verify mktemp creates unique files even when called rapidly
 
 ### Automated Tests (Future)
 - Script to simulate concurrent agent operations
-- Verify file uniqueness across parallel operations
-- Test lock file acquisition/release under contention
+- Verify file uniqueness across parallel operations with mktemp
 
 ## Conclusion
 
-The scratchpad is a good concept but needs hardening for true multi-agent scenarios. The most critical fix is **enforcing unique filenames** through helper functions and updated documentation. The migration from `ai_workspace/` should also be completed to avoid confusion.
+The scratchpad is a good concept but needed hardening for true multi-agent scenarios. The solution is to use the standard **`mktemp` utility** instead of custom helper functions. This provides:
 
-With these mitigations, the scratchpad can safely support multiple concurrent agents.
+- ✅ Atomic file creation (no race conditions)
+- ✅ Built-in uniqueness guarantees
+- ✅ Standard POSIX utility (no custom code)
+- ✅ Simple and well-understood
+
+With `mktemp`, the scratchpad can safely support unlimited concurrent agents.
 
 ---
 **Analyzed by**: Copilot CLI Agent  

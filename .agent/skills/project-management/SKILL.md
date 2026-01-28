@@ -19,12 +19,8 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Create a GitHub Issue using `gh issue create`:
     ```bash
-    # Set agent identity and source helper functions
-    export AGENT_ID="${AGENT_ID:-copilot_cli}"
-    source .agent/scripts/lib/scratchpad_helpers.sh
-    
     # Create issue body in scratchpad with unique name (to preserve formatting)
-    BODY_FILE=$(scratchpad_file "issue_body" ".md")
+    BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
     cat > "$BODY_FILE" << 'EOF'
     ### Description
     [Task description]
@@ -87,12 +83,9 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Query all open and recently closed issues:
     ```bash
-    export AGENT_ID="${AGENT_ID:-copilot_cli}"
-    source .agent/scripts/lib/scratchpad_helpers.sh
-    
     # Create unique cache files
-    ISSUES_OPEN=$(scratchpad_file "issues_open" ".json")
-    ISSUES_CLOSED=$(scratchpad_file "issues_closed" ".json")
+    ISSUES_OPEN=$(mktemp .agent/scratchpad/issues_open.XXXXXX.json)
+    ISSUES_CLOSED=$(mktemp .agent/scratchpad/issues_closed.XXXXXX.json)
     
     gh issue list --state open --json number,title,assignees,labels,state --limit 100 > "$ISSUES_OPEN"
     gh issue list --state closed --json number,title,closedAt,labels --limit 20 > "$ISSUES_CLOSED"
@@ -117,17 +110,13 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 ### GitHub CLI Usage
 - **Always use `--body-file`** for multi-line content (see `.agent/rules/common/github-cli-best-practices.md`)
 - **Include AI Signature** in all issues/PRs/comments (see `.agent/rules/common/ai-signature.md`)
-- **Use unique filenames** for scratchpad files (see `.agent/scratchpad/EXAMPLES.md`)
-- **Use scratchpad helper functions** to prevent name collisions (source `.agent/scripts/lib/scratchpad_helpers.sh`)
+- **Use unique filenames** with `mktemp` to prevent name collisions
 
 ### Issue Creation Examples
 
 **Feature Request**:
 ```bash
-export AGENT_ID="${AGENT_ID:-copilot_cli}"
-source .agent/scripts/lib/scratchpad_helpers.sh
-
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ### Description
 Add support for multi-sensor fusion in the navigation stack.
@@ -153,10 +142,7 @@ rm "$BODY_FILE"
 
 **Bug Report**:
 ```bash
-export AGENT_ID="${AGENT_ID:-copilot_cli}"
-source .agent/scripts/lib/scratchpad_helpers.sh
-
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ### Description
 Navigation node crashes when receiving malformed sensor data.

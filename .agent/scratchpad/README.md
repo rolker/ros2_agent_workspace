@@ -7,8 +7,7 @@ This directory is for **persistent temporary artifacts** created during agent se
 **When multiple agents work concurrently, file name collisions WILL occur unless you follow these rules:**
 
 1. **NEVER use static filenames** (e.g., `issue_body.md`, `analysis.txt`)
-2. **ALWAYS use unique names** with timestamps, agent ID, and PID
-3. **USE the helper functions** from `.agent/scripts/lib/scratchpad_helpers.sh`
+2. **ALWAYS use `mktemp`** to create unique temporary files
 
 **Bad (collision-prone)**:
 ```bash
@@ -19,8 +18,8 @@ EOF
 
 **Good (collision-safe)**:
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+# mktemp creates unique files atomically
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ...
 EOF
@@ -28,8 +27,7 @@ gh issue create --body-file "$BODY_FILE"
 rm "$BODY_FILE"  # Clean up after use
 ```
 
-See `.agent/SCRATCHPAD_COLLISION_ANALYSIS.md` for detailed analysis of collision scenarios.  
-See `.agent/SCRATCHPAD_EXAMPLES.md` for comprehensive usage examples.
+See `.agent/SCRATCHPAD_COLLISION_ANALYSIS.md` for detailed analysis of collision scenarios.
 
 ## Purpose
 Use this location for:
@@ -46,29 +44,10 @@ Use this location for:
 
 ## Usage Examples
 
-### Recommended: Using Helper Functions (Collision-Safe)
+### Recommended: Using mktemp (Collision-Safe)
 ```bash
-# Source the helper library
-source .agent/scripts/lib/scratchpad_helpers.sh
-
 # Create a unique file for GitHub CLI
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
-cat <<EOF > "$BODY_FILE"
-# My Issue Title
-Content here...
-EOF
-
-# Use it with gh
-gh issue create --title "My Issue" --body-file "$BODY_FILE"
-
-# Clean up after use
-rm "$BODY_FILE"
-```
-
-### Alternative: Manual Timestamp-Based Naming
-```bash
-# Use nanosecond timestamp for uniqueness
-BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N).md"
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat <<EOF > "$BODY_FILE"
 # My Issue Title
 Content here...
@@ -92,30 +71,18 @@ EOF
 
 ## Cleanup
 
-### Using Helper Functions
-```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-
-# Clean up all files created by this agent
-scratchpad_cleanup
-
-# Clean up files older than 1 hour
-scratchpad_cleanup 3600
-
-# List files created by this agent
-scratchpad_list_mine
-```
-
 ### Manual Cleanup
 - **Session-Level**: Clean up files when your session ends (unless needed for review)
 - **Cross-Session**: Don't assume files are temporary across sessions
-- Only delete files you created (check AGENT_ID prefix)
 - Manually remove old files as needed
 
 **Example**:
 ```bash
-# Clean up only your files (if you set AGENT_ID)
-rm .agent/scratchpad/${AGENT_ID}_* 2>/dev/null || true
+# Clean up your specific temporary files by pattern
+rm .agent/scratchpad/issue_body.* 2>/dev/null || true
+
+# Or clean up old files (older than 1 day)
+find .agent/scratchpad -type f -mtime +1 -delete
 ```
 
 ## Alternative: `/tmp`

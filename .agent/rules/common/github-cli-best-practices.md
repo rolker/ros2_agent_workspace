@@ -19,38 +19,15 @@ ALWAYS write the content to a temporary file first, then use `--body-file`.
 
 **Steps**:
 1.  Ensure the scratchpad directory exists: `mkdir -p .agent/scratchpad/`
-2.  Create a **unique filename** to prevent collisions with other concurrent agents
+2.  Create a **unique filename** using `mktemp` to prevent collisions with other concurrent agents
 3.  Write your full, formatted content to that unique file.
 4.  Pass that file path to the `gh` command.
 5.  Clean up the file after use.
 
 ```bash
-# GOOD - Using helper functions (recommended)
-source .agent/scripts/lib/scratchpad_helpers.sh
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
-
-cat <<EOF > "$BODY_FILE"
-# My Issue Title
-
-Here is the first paragraph.
-
-- List item 1
-- List item 2
-
----
-**🤖 Authored-By**: `Agent Name`
-**🧠 Model**: `Model Name`
-EOF
-
-gh issue create --title "My Issue" --body-file "$BODY_FILE"
-rm "$BODY_FILE"  # Clean up after use
-```
-
-**Alternative - Manual timestamp-based naming**:
-```bash
-# GOOD - Manual unique naming
+# GOOD - Using mktemp (recommended)
 mkdir -p .agent/scratchpad/
-BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N).md"
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 
 cat <<EOF > "$BODY_FILE"
 # My Issue Title

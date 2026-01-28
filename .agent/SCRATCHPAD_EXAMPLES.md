@@ -1,29 +1,38 @@
-# Scratchpad Helper Functions - Usage Examples
+# Scratchpad Usage Examples with mktemp
 
-This document provides practical examples for using the scratchpad helper functions to prevent file name collisions in multi-agent scenarios.
+This document provides practical examples for using `mktemp` with the scratchpad directory to prevent file name collisions in multi-agent scenarios.
 
-## Setup
+## Why mktemp?
 
-First, source the helper library and set your AGENT_ID:
+`mktemp` is the standard POSIX utility for creating unique temporary files:
+- ✅ Atomic file creation (no race conditions)
+- ✅ Built-in uniqueness guarantees
+- ✅ Available on all POSIX systems
+- ✅ Simple and well-understood
+- ✅ No dependencies on environment variables
+
+## Basic Usage
 
 ```bash
-# Source the library
-source .agent/scripts/lib/scratchpad_helpers.sh
+# Create a unique temporary file
+TEMP_FILE=$(mktemp .agent/scratchpad/myfile.XXXXXX.txt)
 
-# Set your agent identity (recommended)
-export AGENT_ID="copilot_cli"  # or "antigravity", "gemini_cli", etc.
+# Use the file
+echo "content" > "$TEMP_FILE"
+
+# Clean up when done
+rm "$TEMP_FILE"
 ```
+
+The `XXXXXX` will be replaced with a unique random string.
 
 ## Example 1: GitHub CLI Issue Creation
 
 **Scenario**: Create a GitHub issue with markdown body content.
 
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
 # Create unique file for issue body
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 
 # Write content
 cat > "$BODY_FILE" << 'EOF'
@@ -53,11 +62,8 @@ rm "$BODY_FILE"
 **Scenario**: Generate an analysis report that may be reviewed later.
 
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
 # Create unique analysis file
-ANALYSIS_FILE=$(scratchpad_file "code_analysis" ".md")
+ANALYSIS_FILE=$(mktemp .agent/scratchpad/code_analysis.XXXXXX.md)
 
 # Generate analysis
 echo "# Code Analysis Report" > "$ANALYSIS_FILE"
@@ -68,20 +74,17 @@ grep -r "TODO" src/ >> "$ANALYSIS_FILE"
 # Show to user
 cat "$ANALYSIS_FILE"
 
-# Don't delete - may be needed for review
+# Keep for review (don't delete immediately)
 echo "Analysis saved to: $ANALYSIS_FILE"
 ```
 
 ## Example 3: Build Report with Timestamp
 
-**Scenario**: Generate build report with timestamp-based naming for historical tracking.
+**Scenario**: Generate build report that persists for review.
 
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
 # Create timestamped build report
-BUILD_REPORT=$(scratchpad_file "build_report" ".json")
+BUILD_REPORT=$(mktemp .agent/scratchpad/build_report.XXXXXX.json)
 
 # Generate report
 cat > "$BUILD_REPORT" << EOF
@@ -95,58 +98,13 @@ EOF
 echo "Build report: $BUILD_REPORT"
 ```
 
-## Example 4: Using Agent Subdirectories
-
-**Scenario**: Use namespaced files for better organization.
-
-```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
-# Create file in agent-specific subdirectory
-# This creates .agent/scratchpad/copilot_cli/analysis_<timestamp>.md
-REPORT=$(scratchpad_file_namespaced "analysis" ".md")
-
-echo "# My Analysis" > "$REPORT"
-echo "Report location: $REPORT"
-
-# List all my files
-scratchpad_list_mine
-```
-
-## Example 5: Session Cleanup
-
-**Scenario**: Clean up files at the end of a session.
-
-```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
-# Create some temporary files
-FILE1=$(scratchpad_file "temp1" ".txt")
-FILE2=$(scratchpad_file "temp2" ".txt")
-echo "data" > "$FILE1"
-echo "data" > "$FILE2"
-
-# ... do work ...
-
-# Clean up all files created by this agent
-scratchpad_cleanup
-
-# Or clean up only files older than 1 hour (3600 seconds)
-# scratchpad_cleanup 3600
-```
-
-## Example 6: Cached GitHub Data
+## Example 4: Cached GitHub Data
 
 **Scenario**: Cache GitHub API responses to avoid rate limiting.
 
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
-export AGENT_ID="copilot_cli"
-
 # Create unique cache file
-CACHE_FILE=$(scratchpad_file "pr_cache" ".json")
+CACHE_FILE=$(mktemp .agent/scratchpad/pr_cache.XXXXXX.json)
 
 # Fetch and cache
 gh pr list --json number,title,state --limit 20 > "$CACHE_FILE"
@@ -158,16 +116,13 @@ jq '.[] | select(.state == "OPEN")' "$CACHE_FILE"
 rm "$CACHE_FILE"
 ```
 
-## Example 7: Multiple Agents Working Concurrently
+## Example 5: Multiple Agents Working Concurrently
 
 **Scenario**: Two agents create issues at the same time without collision.
 
 **Agent A (Copilot CLI)**:
 ```bash
-export AGENT_ID="copilot_cli"
-source .agent/scripts/lib/scratchpad_helpers.sh
-
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 Issue from Agent A
 EOF
@@ -177,10 +132,7 @@ rm "$BODY_FILE"
 
 **Agent B (Antigravity) - Running simultaneously**:
 ```bash
-export AGENT_ID="antigravity"
-source .agent/scripts/lib/scratchpad_helpers.sh
-
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 Issue from Agent B
 EOF
@@ -188,24 +140,52 @@ gh issue create --title "Agent B Issue" --body-file "$BODY_FILE"
 rm "$BODY_FILE"
 ```
 
-**Result**: Both agents create their files without collision because filenames include:
-- Agent ID (`copilot_cli` vs `antigravity`)
-- Nanosecond timestamp
-- Process ID
+**Result**: Both agents create their files without collision because `mktemp` generates unique filenames atomically.
 
 Example filenames:
-- `.agent/scratchpad/copilot_cli_issue_body_1769567549030881398_4464.md`
-- `.agent/scratchpad/antigravity_issue_body_1769567549030920889_5123.md`
+- `.agent/scratchpad/issue_body.a1b2c3.md`
+- `.agent/scratchpad/issue_body.x7y8z9.md`
+
+## Example 6: Using Subdirectories for Organization
+
+**Scenario**: Organize temporary files in subdirectories.
+
+```bash
+# Ensure subdirectory exists
+mkdir -p .agent/scratchpad/temp
+
+# Create file in subdirectory
+TEMP_FILE=$(mktemp .agent/scratchpad/temp/analysis.XXXXXX.md)
+
+# Use the file
+echo "Analysis data" > "$TEMP_FILE"
+
+# Clean up
+rm "$TEMP_FILE"
+```
+
+## Example 7: Bulk Cleanup
+
+**Scenario**: Clean up old temporary files.
+
+```bash
+# Clean up files older than 1 day
+find .agent/scratchpad/ -type f -mtime +1 -delete
+
+# Clean up files older than 1 hour
+find .agent/scratchpad/ -type f -mmin +60 -delete
+
+# Clean up by pattern (be careful!)
+rm .agent/scratchpad/issue_body.* 2>/dev/null || true
+```
 
 ## Best Practices
 
-1. **Always set AGENT_ID** before using helper functions
-2. **Clean up files** you create unless they're needed for review
-3. **Use scratchpad_file()** for simple cases
-4. **Use scratchpad_file_namespaced()** when you have many related files
-5. **Delete files immediately** after one-time use (like GitHub CLI body files)
-6. **Keep files with timestamps** for reports that may be reviewed later
-7. **Use scratchpad_cleanup()** at the end of your session
+1. **Always use mktemp** for temporary files in scratchpad
+2. **Clean up files immediately** after one-time use (like GitHub CLI body files)
+3. **Keep files with meaningful names** for reports that may be reviewed later
+4. **Use descriptive prefixes** in the template (e.g., `issue_body.XXXXXX.md` not `temp.XXXXXX.md`)
+5. **Include file extension** after the XXXXXX for clarity
 
 ## What NOT to Do
 
@@ -215,22 +195,10 @@ Example filenames:
 cat > .agent/scratchpad/issue_body.md << 'EOF'
 ```
 
-❌ **Don't forget to source the library**:
-```bash
-# BAD - Function not defined
-BODY_FILE=$(scratchpad_file "issue" ".md")  # Error: command not found
-```
-
-❌ **Don't skip AGENT_ID**:
-```bash
-# BAD - Files will be named "unknown_..."
-scratchpad_file "test" ".txt"  # Works but less organized
-```
-
-❌ **Don't leave temporary files**:
+❌ **Don't forget to clean up one-time files**:
 ```bash
 # BAD - Creates clutter
-BODY_FILE=$(scratchpad_file "issue_body" ".md")
+BODY_FILE=$(mktemp .agent/scratchpad/issue_body.XXXXXX.md)
 cat > "$BODY_FILE" << 'EOF'
 ...
 EOF
@@ -238,53 +206,35 @@ gh issue create --body-file "$BODY_FILE"
 # Missing: rm "$BODY_FILE"
 ```
 
+❌ **Don't use /tmp for persistent files**:
+```bash
+# BAD - /tmp may be cleared automatically
+REPORT=$(mktemp /tmp/analysis.XXXXXX.md)
+# This file might disappear on reboot
+```
+
 ## Troubleshooting
 
-**Q: The helper functions aren't working**
-```bash
-# Make sure you sourced the library
-source .agent/scripts/lib/scratchpad_helpers.sh
+**Q: mktemp command not found**
 
-# Check if function exists
-type scratchpad_file
+`mktemp` is standard on Linux and macOS. If it's not available, you're on a very unusual system.
+
+**Q: Can I use mktemp without a template?**
+
+Yes, but it will create files in /tmp:
+```bash
+TEMP_FILE=$(mktemp)  # Creates /tmp/tmp.XXXXXXXXXX
 ```
 
-**Q: Files aren't getting unique names**
+For scratchpad, always provide a template path.
+
+**Q: How do I ensure the scratchpad directory exists?**
+
 ```bash
-# Check your system supports nanoseconds
-date +%s%N  # Should show nanoseconds (19 digits)
-
-# If not, it falls back to seconds + PID which is still unique
-```
-
-**Q: How do I find files created by a specific agent?**
-```bash
-# List files matching agent ID pattern
-ls -lh .agent/scratchpad/copilot_cli_*
-
-# Or use the helper
-export AGENT_ID="copilot_cli"
-source .agent/scripts/lib/scratchpad_helpers.sh
-scratchpad_list_mine
-```
-
-**Q: Can I use these functions in Python or other languages?**
-
-The functions are Bash-specific, but you can implement the same pattern:
-```python
-import os
-import time
-
-def scratchpad_file(base_name, extension=".txt"):
-    agent_id = os.environ.get("AGENT_ID", "unknown")
-    timestamp = int(time.time() * 1_000_000_000)  # nanoseconds
-    pid = os.getpid()
-    return f".agent/scratchpad/{agent_id}_{base_name}_{timestamp}_{pid}{extension}"
-
-# Usage
-body_file = scratchpad_file("issue_body", ".md")
+mkdir -p .agent/scratchpad
+TEMP_FILE=$(mktemp .agent/scratchpad/file.XXXXXX.md)
 ```
 
 ---
 **Last Updated**: 2026-01-28  
-**Related**: `.agent/scratchpad/README.md`, `.agent/scratchpad/collision_analysis.md`
+**Related**: `.agent/scratchpad/README.md`, `.agent/SCRATCHPAD_COLLISION_ANALYSIS.md`
