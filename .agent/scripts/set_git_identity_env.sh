@@ -4,11 +4,12 @@
 # Also exports agent model identity for signatures
 #
 # USAGE FOR HOST-BASED AGENTS (Copilot CLI, Gemini CLI):
-#   source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
+#   source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>" ["<model>"]
 #   source .agent/scripts/set_git_identity_env.sh --agent <framework>
 #   source .agent/scripts/set_git_identity_env.sh --detect
 #
 # Examples:
+#   source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "Claude Sonnet 4.5"
 #   source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 #   source .agent/scripts/set_git_identity_env.sh --agent copilot
 #   source .agent/scripts/set_git_identity_env.sh --detect
@@ -18,8 +19,8 @@
 # Also exports AGENT_MODEL for use in AI signatures.
 #
 # IMPORTANT: Must be sourced (not executed) to export variables to current shell:
-#   source .agent/scripts/set_git_identity_env.sh "..." "..."   ✓ Correct
-#   ./.agent/scripts/set_git_identity_env.sh "..." "..."        ✗ Wrong (variables won't persist)
+#   source .agent/scripts/set_git_identity_env.sh "..." "..." ["..."]   ✓ Correct
+#   ./.agent/scripts/set_git_identity_env.sh "..." "..."                ✗ Wrong (variables won't persist)
 
 # Load framework identity lookup table from shared configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,11 +46,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     echo "❌ ERROR: This script must be sourced, not executed directly."
     echo ""
     echo "Correct usage:"
-    echo "  source $0 \"<Agent Name>\" \"<email>\""
+    echo "  source $0 \"<Agent Name>\" \"<email>\" [\"<model>\"]"
     echo "  source $0 --agent <framework>"
     echo "  source $0 --detect"
     echo ""
     echo "Examples:"
+    echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\" \"Claude Sonnet 4.5\""
     echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\""
     echo "  source $0 --agent copilot"
     echo "  source $0 --detect"
@@ -57,7 +59,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 fi
 
 show_usage() {
-    echo "Usage: source $0 [OPTIONS] [\"<Agent Name>\" \"<email>\"]"
+    echo "Usage: source $0 [OPTIONS] [\"<Agent Name>\" \"<email>\" [\"<model>\"]]"
     echo ""
     echo "Options:"
     echo "  --agent <framework>    Use predefined identity for framework"
@@ -65,6 +67,7 @@ show_usage() {
     echo "  --detect              Auto-detect framework from environment"
     echo ""
     echo "Examples:"
+    echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\" \"Claude Sonnet 4.5\""
     echo "  source $0 \"Copilot CLI Agent\" \"roland+copilot-cli@ccom.unh.edu\""
     echo "  source $0 --agent copilot"
     echo "  source $0 --detect"
@@ -135,10 +138,16 @@ elif [ "$1" == "--detect" ]; then
     echo "Detected framework: $DETECTED"
     
 elif [ $# -eq 2 ]; then
-    # Manual name and email
+    # Manual name and email (without model)
     AGENT_NAME="$1"
     AGENT_EMAIL="$2"
     AGENT_MODEL="Unknown Model"
+    AGENT_FRAMEWORK="custom"
+elif [ $# -eq 3 ]; then
+    # Manual name, email, and model
+    AGENT_NAME="$1"
+    AGENT_EMAIL="$2"
+    AGENT_MODEL="$3"
     AGENT_FRAMEWORK="custom"
 else
     echo "Error: Invalid arguments"

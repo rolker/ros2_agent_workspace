@@ -103,6 +103,42 @@ else
 fi
 echo ""
 
+# Test 5c: Manual 2-parameter usage (backward compatibility)
+echo "Test 5c: Manual 2-parameter usage (backward compatibility)..."
+# Clear any existing variables
+unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
+# Source with 2 parameters
+source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" > /dev/null 2>&1
+if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Unknown Model" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
+    echo "✅ 2-parameter usage works correctly (model = 'Unknown Model')"
+else
+    echo "❌ 2-parameter usage failed"
+    echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
+    echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
+    echo "   AGENT_MODEL=$AGENT_MODEL (expected: Unknown Model)"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    exit 1
+fi
+echo ""
+
+# Test 5d: Manual 3-parameter usage (new feature)
+echo "Test 5d: Manual 3-parameter usage with model (new feature)..."
+# Clear any existing variables
+unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
+# Source with 3 parameters
+source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" "Test Model 1.0" > /dev/null 2>&1
+if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Test Model 1.0" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
+    echo "✅ 3-parameter usage works correctly (model specified)"
+else
+    echo "❌ 3-parameter usage failed"
+    echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
+    echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
+    echo "   AGENT_MODEL=$AGENT_MODEL (expected: Test Model 1.0)"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    exit 1
+fi
+echo ""
+
 # Test 6: Documentation files exist and reference introspection
 echo "Test 6: Documentation consistency..."
 DOCS_OK=true
