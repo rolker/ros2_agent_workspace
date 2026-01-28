@@ -28,7 +28,8 @@ gh issue create --body-file "$BODY_FILE"
 rm "$BODY_FILE"  # Clean up after use
 ```
 
-See `.agent/scratchpad/collision_analysis.md` for detailed analysis of collision scenarios.
+See `.agent/SCRATCHPAD_COLLISION_ANALYSIS.md` for detailed analysis of collision scenarios.  
+See `.agent/SCRATCHPAD_EXAMPLES.md` for comprehensive usage examples.
 
 ## Purpose
 Use this location for:
