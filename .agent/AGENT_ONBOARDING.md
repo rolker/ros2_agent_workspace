@@ -31,9 +31,7 @@ These documents are **required reading** for every agent session:
 - **[`rules/common/github-cli-best-practices.md`](rules/common/github-cli-best-practices.md)**
   - **Protocol**: MUST use "File-First" approach (temp file + `--body-file`) for all multiline GitHub interactions (Issues/PRs).
 
-- **[`AGENTS.md`](../AGENTS.md)**
-  - Overview of agent responsibilities and constraints
-  - Quick reference for what agents can/cannot do
+
 
 ## 2. Source the Environment (1 min)
 
