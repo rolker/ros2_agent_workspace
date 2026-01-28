@@ -243,7 +243,7 @@ class TestNodeCommunication(unittest.TestCase):
         self.assertTrue(future.done(), 'Service call timed out')
         
         # Verify response
-        future.result()
+        response = future.result()
         # self.assertTrue(response.success)
         # self.assertEqual(response.message, 'expected_message')
         
