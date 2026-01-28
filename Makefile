@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check
+.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check validate
 
 # Default target
 help:
@@ -15,6 +15,7 @@ help:
 	@echo "  test          - Run tests on all layers"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  status        - Show workspace status report"
+	@echo "  validate      - Validate workspace matches .repos configuration"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  format        - Format Python code with black"
@@ -67,6 +68,9 @@ clean:
 
 status:
 	@./.agent/scripts/status_report.sh
+
+validate:
+	@python3 ./.agent/scripts/validate_workspace.py
 
 lock:
 	@./.agent/scripts/lock.sh "Manual lock via Makefile"
