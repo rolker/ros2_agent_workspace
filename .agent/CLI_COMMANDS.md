@@ -27,6 +27,7 @@ This document maps:
 | `/start-feature` | Development | Create feature branch from clean state | Beginning new task |
 | `/finish-feature` | Development | Finalize feature (tests, docs, clean commits) | Task complete, ready for review |
 | `/submit-pr` | Development | Create GitHub pull request | Ready to merge |
+| `/create-issue` | Development | Create GitHub issue with label validation | Creating new issues programmatically |
 | `/setup-environment` | Setup | One-command initial setup | First time in workspace |
 | `/continuous-improvement` | Improvement | Identify and report infrastructure friction | End of session, after major tasks |
 | `/create-worktree` | Worktree | Create isolated worktree for an issue | Parallel work, multi-agent coordination |
@@ -327,6 +328,66 @@ gh pr create --title "Add CLI integration support" --body "Closes #46
 - ✅ After `/finish-feature`
 - ✅ Task complete and tested
 - ❌ Work in progress (use draft PR instead)
+
+---
+
+### `/create-issue`
+
+**Script**: `.agent/scripts/gh_create_issue.sh`
+
+**What it does**:
+- Creates GitHub issues with automatic label validation
+- Validates labels against `.agent/github_metadata.json` before submission
+- Prevents failures from invalid/non-existent labels
+- Provides helpful error messages with valid label suggestions
+- Supports all standard `gh issue create` options
+
+**Example**:
+```bash
+# Create issue with validated labels
+.agent/scripts/gh_create_issue.sh \
+  --title "Fix navigation bug" \
+  --body "Description of the bug" \
+  --label "bug" \
+  --label "enhancement"
+
+# Create with body from file
+.agent/scripts/gh_create_issue.sh \
+  --title "Add feature" \
+  --body-file /tmp/description.md \
+  --label "enhancement"
+
+# Interactive mode (no validation)
+.agent/scripts/gh_create_issue.sh
+```
+
+**Valid labels** (see `.agent/github_metadata.json`):
+- `bug` - Something isn't working
+- `documentation` - Improvements or additions to documentation
+- `duplicate` - This issue or pull request already exists
+- `enhancement` - New feature or request
+- `good first issue` - Good for newcomers
+- `help wanted` - Extra attention is needed
+- `invalid` - This doesn't seem right
+- `question` - Further information is requested
+- `wontfix` - This will not be worked on
+
+**Adding new labels**:
+1. Create label in GitHub: `gh label create "my-label" --description "Description" --color "hex-color"`
+2. Update `.agent/github_metadata.json` labels array
+3. Commit both changes together
+
+**CLI-native alternative**:
+```bash
+# Direct gh CLI (no validation)
+gh issue create --title "Title" --body "Body" --label "bug"
+```
+
+**When to use**:
+- ✅ Creating issues programmatically with labels
+- ✅ Avoiding trial-and-error with label names
+- ✅ Batch issue creation with consistent labels
+- ❌ Interactive issue creation (use `gh issue create` directly)
 
 ---
 
