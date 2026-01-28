@@ -275,9 +275,10 @@ self.get_logger().info(f'Received message: {msg.data}')
 - Use `rclpy.spin_once()` to process callbacks
 
 **Race Conditions**:
-- Use `time.sleep()` strategically (but sparingly)
-- Add synchronization barriers
-- Use event-based waiting instead of polling
+- Use event-based waiting mechanisms (e.g., `rclpy.spin_until_future_complete()`, `wait_for_service()`)
+- Add synchronization barriers using ROS mechanisms
+- Implement custom condition-based waiting loops instead of polling
+- Avoid `time.sleep()` as it leads to flaky tests
 
 **Message Not Received**:
 - Verify QoS settings match between publisher/subscriber
