@@ -14,6 +14,7 @@ This document maps:
 | Command | Category | What It Does | When To Use |
 |---------|----------|--------------|-------------|
 | `/check-status` | Status | Full workspace status (git, builds, GitHub) | Start of session, before/after major changes |
+| `/validate-workspace` | Status | Validate workspace matches .repos configuration | After setup, troubleshooting, health check |
 | `/check-local-status` | Status | Quick git status only | Fast check, no GitHub API needed |
 | `/check-github-status` | Status | GitHub PRs and issues only | Looking for tasks, checking PR status |
 | `/check-branch-updates` | Status | Check if default branch has new commits | Before committing, before PR, during long work |
@@ -68,6 +69,38 @@ vcs status layers/main/core_ws/src
 - ✅ Before committing/pushing
 - ✅ When debugging "why isn't this working?"
 - ❌ Don't use in tight loops (slow, hits GitHub API)
+
+---
+
+### `/validate-workspace`
+
+**Script**: `.agent/scripts/validate_workspace.py`  
+**Makefile**: `make validate`
+
+**What it does**:
+- Compares configured repos in .repos files against actual workspace directories
+- Reports missing repos (should be cloned)
+- Reports extra repos (orphaned, not in config)
+- Reports version/branch mismatches
+
+**Example**:
+```bash
+# Validate workspace
+make validate
+
+# Verbose output with details
+python3 .agent/scripts/validate_workspace.py --verbose
+
+# Auto-fix by importing missing repos
+python3 .agent/scripts/validate_workspace.py --fix
+```
+
+**When to use**:
+- ✅ After setup to verify all repos are cloned
+- ✅ When troubleshooting build failures
+- ✅ Before starting work to ensure complete workspace
+- ✅ As part of health check routine
+- ❌ Don't use in tight development loops (only validates, doesn't build)
 
 ---
 

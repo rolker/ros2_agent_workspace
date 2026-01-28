@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check sync
+.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check sync validate
 
 # Default target
 help:
@@ -77,6 +77,9 @@ unlock:
 
 sync:
 	@python3 ./.agent/scripts/sync_repos.py
+
+validate:
+	@python3 ./.agent/scripts/validate_workspace.py
 
 format:
 	@echo "Formatting Python code with black..."
