@@ -18,9 +18,12 @@ The **target ROS 2 software** being developed - the user's intellectual property
 - **Agent Permissions**: ROS Developers can modify when assigned tasks
 
 ### Project-Specific Terms
-Some terminology is specific to the active project. For project-specific glossaries:
-- **Pattern**: Check `workspaces/core_ws/src/<key_repo>/config/GLOSSARY.md` (if exists)
-- **Example**: `workspaces/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`
+Some terminology is specific to the active project.
+
+**For Project-Specific Glossaries:**
+- **Canonical Location (in project repo)**: `config/GLOSSARY.md` inside the **project/key repository itself** (e.g., in the `unh_marine_autonomy` repo)
+- **Workspace Path (after cloning)**: `workspaces/core_ws/src/<key_repo>/config/GLOSSARY.md` (e.g., `workspaces/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`)
+- **Git Note**: `workspaces/*/src/` is gitignored in this workspace repository; commit the project glossary to the **project/key repository**, not to this workspace repo
 - **Rule**: Project glossary takes precedence over workspace glossary for conflicting terms
 
 ### Workspace
@@ -40,7 +43,7 @@ The **scaffolding, tooling, and infrastructure** that wraps and supports Project
 
 ### Underlay
 **Singular**: There is **ONE** underlay - the pre-built dependency foundation.
-- **Examples**: `/opt/ros/jazzy`, optionally extended with `underlay_ws/install/`
+- **Examples**: `/opt/ros/jazzy`, optionally extended with `workspaces/underlay_ws/install/`
 - **Purpose**: Provides stable, known-good dependencies for all overlays
 - **Agent Rule**: READ only, DO NOT MODIFY
 - **Sourcing**: `source /opt/ros/jazzy/setup.bash` (or via `env.sh`)
@@ -89,7 +92,7 @@ A GitHub Issue representing a task, bug, or feature request.
 ### Work Plan
 A markdown file documenting the approach and progress for an issue.
 - **Location**: `.agent/work-plans/PLAN_ISSUE-<number>.md`
-- **Created by**: `start_issue_work.sh`
+- **Created by**: `.agent/scripts/start_issue_work.sh`
 - **Purpose**: Enable handover between agents, show progress, document decisions
 
 ### Draft PR Workflow
@@ -108,8 +111,8 @@ Agent workflow phases for structured development.
 
 ### Feature Branch
 A branch for developing a specific feature or fix.
-- **Details**: See `.agent/rules/common/git-hygiene.md`
-- **Naming**: `feature/ISSUE-<number>-<description>`
+- **Details**: See `.agent/rules/common/git-hygiene.md` and `.agent/rules/common/issue-first.md` (branch naming precedence)
+- **Naming**: `feature/ISSUE-<number>-<description>` (Issue-based naming supersedes older `TASK-` patterns)
 - **Rule**: Never commit directly to `main`
 
 ### Worktree (Planned)
@@ -135,7 +138,7 @@ Modifies ROS 2 packages in `workspaces/*/src/` (when assigned tasks).
 ### Source of Truth
 The authoritative reference for information.
 - **For Tasks**: GitHub Issues
-- **For Code**: `main` branch in git
+- **For Code**: Default branch in git (e.g., `main` in the workspace repo; may differ per project repo)
 - **For Status**: `status_report.sh` output
 
 ### Verification
