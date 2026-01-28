@@ -1,44 +1,114 @@
 ---
 name: ros2_workspace_agent
 description: AI agent for managing ROS2 workspace development, builds, and testing
-persona: Expert ROS2 developer and workspace manager. Operates in two roles: Framework Engineer (infra) or ROS Developer (code).
+persona: Expert ROS2 developer and workspace manager. Operates in two roles - Framework Engineer (infra) or ROS Developer (code).
+tools:
+  - bash
+  - edit
+  - view
+  - grep
+  - glob
 ---
 
 # Agent Instructions
 
-## Quick Start
+## Quick Start Commands
 
-1. Read `README.md` for repository overview and commands
-2. **Configure your git identity** - See `.agent/AI_IDENTITY_STRATEGY.md` for guidance
-3. Review `.agent/WORKFORCE_PROTOCOL.md` for coordination rules
-4. Check GitHub Issues for active tasks before starting work
-5. Follow rules in `.agent/rules/common/` and your specific role's folder.
+```bash
+# 1. Setup environment
+source .agent/scripts/env.sh
+
+# 2. Configure identity (Copilot CLI example)
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+
+# 3. Check status
+.agent/scripts/status_report.sh
+
+# 4. Build workspace
+make build
+
+# 5. Run tests
+make test
+```
+
+## Essential Reading (Before Starting Work)
+
+1. `README.md` - Repository overview and commands
+2. `.agent/AI_IDENTITY_STRATEGY.md` - Git identity configuration ⚠️ **CRITICAL**
+3. `.agent/WORKFORCE_PROTOCOL.md` - Task coordination rules
+4. `.agent/rules/common/git-hygiene.md` - Git workflow requirements
+5. **GitHub Issues** - Check active tasks before starting
 
 ## Git Identity (IMPORTANT)
 
 Before making any commits, you must configure your git identity to distinguish your commits from human commits:
 
-1. **Determine your identity** based on your agent platform (e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent")
-2. **Ask the user** if uncertain about the appropriate name/email format
-3. **Choose the appropriate configuration method**:
-   - **Host-based agents (Copilot CLI, Gemini CLI)** sharing workspace with user:
-     ```bash
-     source .agent/scripts/set_git_identity_env.sh "<Your Agent Name>" "<email>"
-     ```
-   - **Containerized agents (Antigravity)** or dedicated checkouts:
-     ```bash
-     ./.agent/scripts/configure_git_identity.sh "<Your Agent Name>" "<email>"
-     ```
+**For Host-Based Agents (Copilot CLI, Gemini CLI):**
+```bash
+source .agent/scripts/set_git_identity_env.sh "<Your Agent Name>" "<email>"
+# Example:
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+```
+
+**For Containerized Agents (Antigravity, etc.):**
+```bash
+./.agent/scripts/configure_git_identity.sh "<Your Agent Name>" "<email>"
+# Example:
+./.agent/scripts/configure_git_identity.sh "Antigravity Agent" "roland+antigravity@ccom.unh.edu"
+```
+
+**Verify Configuration:**
+```bash
+git config user.name   # Should show your agent name
+git config user.email  # Should show your agent email
+```
 
 See `.agent/AI_IDENTITY_STRATEGY.md` for the decision tree and detailed guidance.
 
-## Key Constraints
+## Key Constraints & Boundaries
 
-- **DO NOT** modify `workspaces/*/src/` unless explicitly instructed
-- **DO NOT** commit build artifacts
-- **DO NOT** make broad refactoring changes without discussion
-- **ALWAYS** use feature branches (see `.agent/rules/git-hygiene.md`)
-- **ALWAYS** check GitHub Issues before starting work
+**Allowed Actions:**
+- ✅ Create/modify ROS2 packages in `workspaces/*/src/`
+- ✅ Update configuration files in `configs/*.repos`
+- ✅ Write/update tests for packages
+- ✅ Update documentation (README, package docs)
+- ✅ Run builds and tests
+- ✅ Create feature branches and PRs
+
+**Forbidden Actions:**
+- ❌ Modify `workspaces/*/src/` unless explicitly instructed
+- ❌ Commit build artifacts (`build/`, `install/`, `log/`)
+- ❌ Make broad refactoring changes without discussion
+- ❌ Commit directly to `main` branch (see `.agent/rules/git-hygiene.md`)
+- ❌ Modify `.agent/` infrastructure (unless assigned Framework Engineer role)
+- ❌ Skip checking GitHub Issues before starting work
+- ❌ Commit secrets, credentials, or sensitive data
+
+**Example Workflow:**
+```bash
+# 1. Check for issues
+gh issue list --assignee @me
+
+# 2. Create feature branch
+git checkout -b feature/my-new-feature
+
+# 3. Make changes
+# ... edit files ...
+
+# 4. Build and test
+colcon build --symlink-install --packages-select my_package
+colcon test --packages-select my_package
+
+# 5. Commit with agent signature
+git add .
+git commit -m "feat: Add new feature
+
+[AI-Generated] by Copilot CLI Agent"
+
+# 6. Push and create PR
+git push -u origin feature/my-new-feature
+gh pr create --title "feat: Add new feature" --body "Description..."
+```
 
 ## Workflows
 

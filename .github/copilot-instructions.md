@@ -19,6 +19,14 @@ All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core 
 
 ## Copilot CLI-Specific Notes
 
+### Environment & Versions
+
+This workspace uses:
+- **ROS 2**: Jazzy (or Humble fallback)
+- **Build System**: colcon
+- **VCS Tool**: vcstool
+- **Python**: 3.10+
+
 ### Quick Command Reference
 
 Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS.md):
@@ -30,6 +38,39 @@ Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS
 /test-all          # Run all tests
 /start-feature     # Create feature branch
 /submit-pr         # Create pull request
+```
+
+### Build & Test Commands
+
+**Build workspace layers:**
+```bash
+# Build all layers in order
+make build
+
+# Build specific workspace
+cd workspaces/core_ws && colcon build --symlink-install
+
+# Build with output
+colcon build --symlink-install --event-handlers console_direct+
+```
+
+**Run tests:**
+```bash
+# All tests
+make test
+
+# Specific package tests
+colcon test --packages-select <package_name>
+colcon test-result --verbose
+```
+
+**Lint & Validate:**
+```bash
+# Pre-commit checks
+pre-commit run --all-files
+
+# Validate configs
+python3 .agent/scripts/validate_repos.py
 ```
 
 ### GitHub Integration
@@ -68,15 +109,52 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 **📚 Full details**: [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md)
 
+**Expected Output After Setup:**
+```bash
+$ source .agent/scripts/env.sh
+[ROS 2 Jazzy sourced]
+
+$ .agent/scripts/status_report.sh
+✓ ROS 2 environment: Jazzy
+✓ Workspace layers: core_ws (3 packages)
+✓ Git branch: main
+✓ No uncommitted changes
+```
+
 ---
 
-## Role Assignment
+## Role Assignment & Boundaries
 
 By default, Copilot CLI acts as **ROS Developer**:
-- ✅ Create/modify ROS packages
+
+**Allowed:**
+- ✅ Create/modify ROS packages in `workspaces/*/src/`
 - ✅ Write/update tests
 - ✅ Update package documentation
+- ✅ Modify config files in `configs/*.repos`
+- ✅ Update build configurations (CMakeLists.txt, package.xml, setup.py)
+
+**Forbidden:**
 - ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
+- ❌ Commit build artifacts (`build/`, `install/`, `log/`)
+- ❌ Commit directly to `main` branch (always use feature branches)
+- ❌ Modify `.github/workflows/` without review
+- ❌ Commit secrets or credentials
+
+**Code Examples:**
+
+Creating a new ROS2 Python package:
+```bash
+cd workspaces/core_ws/src
+ros2 pkg create --build-type ament_python my_package \
+  --dependencies rclpy std_msgs
+```
+
+Adding a dependency to package.xml:
+```xml
+<depend>geometry_msgs</depend>
+<depend>tf2_ros</depend>
+```
 
 See [`.agent/PERMISSIONS.md`](../.agent/PERMISSIONS.md) for full role definitions.
 
