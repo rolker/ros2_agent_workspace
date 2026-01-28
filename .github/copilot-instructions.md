@@ -128,13 +128,15 @@ $ .agent/scripts/status_report.sh
 By default, Copilot CLI acts as **ROS Developer**:
 
 **Allowed:**
-- ✅ Create/modify ROS packages in `workspaces/*/src/`
+- ✅ Create/modify ROS packages in `workspaces/*/src/` (when working on assigned tasks)
 - ✅ Write/update tests
 - ✅ Update package documentation
 - ✅ Modify config files in `configs/*.repos`
 - ✅ Update build configurations (CMakeLists.txt, package.xml, setup.py)
 
 **Forbidden:**
+- ❌ Delete or restructure `workspaces/*/src/` without explicit instruction
+- ❌ Modify packages you weren't assigned to work on
 - ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
 - ❌ Commit build artifacts (`build/`, `install/`, `log/`)
 - ❌ Commit directly to `main` branch (always use feature branches)
@@ -150,8 +152,9 @@ ros2 pkg create --build-type ament_python my_package \
   --dependencies rclpy std_msgs
 ```
 
-Adding a dependency to package.xml:
+Adding additional dependencies to existing package.xml:
 ```xml
+<!-- Beyond those specified in ros2 pkg create -->
 <depend>geometry_msgs</depend>
 <depend>tf2_ros</depend>
 ```

@@ -68,7 +68,7 @@ See `.agent/AI_IDENTITY_STRATEGY.md` for the decision tree and detailed guidance
 ## Key Constraints & Boundaries
 
 **Allowed Actions:**
-- ✅ Create/modify ROS2 packages in `workspaces/*/src/`
+- ✅ Create/modify ROS2 packages in `workspaces/*/src/` (when working on assigned tasks)
 - ✅ Update configuration files in `configs/*.repos`
 - ✅ Write/update tests for packages
 - ✅ Update documentation (README, package docs)
@@ -76,7 +76,8 @@ See `.agent/AI_IDENTITY_STRATEGY.md` for the decision tree and detailed guidance
 - ✅ Create feature branches and PRs
 
 **Forbidden Actions:**
-- ❌ Modify `workspaces/*/src/` unless explicitly instructed
+- ❌ Delete or restructure `workspaces/*/src/` without explicit instruction
+- ❌ Modify packages you weren't assigned to work on
 - ❌ Commit build artifacts (`build/`, `install/`, `log/`)
 - ❌ Make broad refactoring changes without discussion
 - ❌ Commit directly to `main` branch (see `.agent/rules/git-hygiene.md`)
@@ -101,9 +102,7 @@ colcon test --packages-select my_package
 
 # 5. Commit with agent signature
 git add .
-git commit -m "feat: Add new feature
-
-[AI-Generated] by Copilot CLI Agent"
+git commit -m "feat: Add new feature" -m "[AI-Generated] by Copilot CLI Agent"
 
 # 6. Push and create PR
 git push -u origin feature/my-new-feature
