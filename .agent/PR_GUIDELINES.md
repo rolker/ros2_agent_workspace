@@ -19,9 +19,9 @@ Every Pull Request MUST explicitly link to the issue it resolves using GitHub's 
 ## Multi-Agent Concurrency Strategy
 To prevent conflicts when multiple agents/users work in the same repo:
 1.  **Sync First**: Always pull the latest `main` before branching.
-2.  **Unique Branch Names**: MUST include a unique identifier (e.g., Task ID).
-    *   Format: `feature/<task-id>-<description>`
-    *   Example: `feature/TASK-123-update-nav-config`
+2.  **Unique Branch Names**: MUST include a unique identifier (e.g., Issue ID).
+    *   Format: `feature/<issue-id>-<description>`
+    *   Example: `feature/ISSUE-123-update-nav-config`
 
 ## Automated Review Workflow
 Every PR must go through an automated review cycle:

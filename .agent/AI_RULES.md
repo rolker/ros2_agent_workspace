@@ -114,7 +114,7 @@ Once environment is set up and status is clean:
 
 - **Never commit directly to `main`** - Always use feature branches
 - **All changes via Pull Requests** - The `main` branch is protected; direct pushes are blocked
-- **Branch naming**: `feature/TASK-<ID>-<description>` or `fix/<description>`
+- **Branch naming**: `feature/ISSUE-<ID>-<description>` or `fix/<description>`
 - **Atomic commits**: One logical change per commit
 - **Stash or commit** uncommitted changes before finishing
 - **Clean handover**: Leave workspace in clean state when session ends
