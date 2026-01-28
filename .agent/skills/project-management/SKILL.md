@@ -1,6 +1,6 @@
 ---
 name: Project Management
-description: Manage project tasks using GitHub Issues as Source of Truth. Sync local ROADMAP.md from GitHub for offline reference.
+description: Manage project tasks using GitHub Issues as Source of Truth. Sync local `.agent/scratchpad/ROADMAP.md` for offline reference.
 ---
 
 # Project Management Skill
@@ -9,8 +9,8 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 
 **⚠️ IMPORTANT**: Per `.agent/WORKFORCE_PROTOCOL.md`:
 - **GitHub Issues are the Source of Truth** for all task tracking
-- `.agent/ROADMAP.md` is a **read-only local snapshot** synced FROM GitHub Issues
-- Never manually edit ROADMAP.md - always work with GitHub Issues directly
+- `.agent/scratchpad/ROADMAP.md` is a **read-only local snapshot** synced FROM GitHub Issues
+- Never manually edit roadmap files - always work with GitHub Issues directly
 
 ## Primary Operations (GitHub Issues)
 
@@ -40,7 +40,7 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     rm "$BODY_FILE"
     ```
 2.  **AI Signature Required**: Always append the AI signature to issue body (see `.agent/rules/common/ai-signature.md`)
-3.  Optional: Sync ROADMAP.md from GitHub (see "Sync ROADMAP" operation below)
+3.  Optional: Sync ROADMAP to scratchpad (see "Sync ROADMAP" operation below)
 
 ### 2. Update Task Status
 **Trigger**: "Mark [task] as In Progress" or "Close [task]"
@@ -54,7 +54,7 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     - **Assign to self**: `gh issue edit <number> --add-assignee @me`
     - **Add labels**: `gh issue edit <number> --add-label "in-progress"`
     - **Close issue**: `gh issue close <number> --comment "Completed: [summary]"`
-3.  Optional: Sync ROADMAP.md from GitHub (see "Sync ROADMAP" operation below)
+3.  Optional: Sync ROADMAP to scratchpad (see "Sync ROADMAP" operation below)
 
 ### 3. Review Current Status
 **Trigger**: "What is the status?" or "Review the roadmap"
@@ -97,6 +97,7 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     - Group unassigned open issues as "Backlog"
     - List recently closed issues as "Completed"
     - Add timestamp in ISO 8601 format (e.g., `2026-01-28T12:00:00Z`)
+    - **Save to**: `.agent/scratchpad/ROADMAP.md` (Do not commit to repo)
 3.  Prepend deprecation notice to generated file
 4.  Clean up temporary JSON files:
     ```bash
@@ -230,13 +231,13 @@ Do not edit manually. Refer to **GitHub Issues** for the active task list.
 ## Migration Notes
 
 **For Legacy ROADMAP.md Entries**:
-1. Review existing task entries in ROADMAP.md (may use `[TASK-XXX]` format or other patterns)
+1. Review existing task entries in old ROADMAP.md (if exists)
 2. For each active task, create a corresponding GitHub Issue
 3. Reference the original identifier in the issue body:
    - If using TASK-ID format: "Migration from ROADMAP.md TASK-XXX"
    - If no ID present: Include the original task title and description
    - If using custom format: Note the original format in the issue
-4. After migration, regenerate ROADMAP.md from GitHub Issues using the sync procedure
+4. After migration, regenerate ROADMAP to scratchpad using the sync procedure
 5. Verify all tasks are accounted for by comparing counts
 6. Archive the original ROADMAP.md content if needed for historical reference
 

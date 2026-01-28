@@ -110,7 +110,7 @@ sequenceDiagram
     *   **Automated**: GitHub Action triggers a "Review Agent" (via webhook or scheduled job).
 3.  **Review Execution**:
     *   Agent B reads the *diff* (using `mcp_github` or `git diff main...feature/task-123`).
-    *   Agent B validates against `CONTRIBUTING.md` and `AGENTS.md` rules.
+    *   Agent B validates against `AI_RULES.md` and `AGENT_ONBOARDING.md`.
 4.  **Feedback Delivery**:
     *   Agent B uses `mcp_github` to post **Inline Comments** on the PR.
     *   *Why?* Because this is the universal "Review Interface" that users and other agents already understand.

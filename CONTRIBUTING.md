@@ -43,14 +43,12 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 4. **Framework-specific overlays**:
    - `.github/copilot-instructions.md` - Copilot CLI repository-wide instructions
    - `.github/instructions/*.instructions.md` - Path-specific instructions with YAML frontmatter
-   - `AGENTS.md` - Agent configuration with persona and tools (YAML frontmatter required)
    - `.agent/instructions/gemini-cli.instructions.md` - Gemini CLI references
    - `.agent/AGENT_ONBOARDING.md` - Specialized/container agents
 
 **GitHub Copilot Instruction Structure** (follows [best practices](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)):
 - **Repository-wide**: `.github/copilot-instructions.md` - applies to all files
 - **Path-specific**: `.github/instructions/*.instructions.md` - use `applies_to:` glob patterns in YAML frontmatter
-- **Agent config**: `AGENTS.md` - requires `name`, `description`, `persona` fields in YAML frontmatter
 
 **When updating agent documentation**:
 - ✅ Update `AI_RULES.md` for universal changes (applies to all agents)

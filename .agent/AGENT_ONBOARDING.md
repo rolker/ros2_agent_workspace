@@ -31,9 +31,7 @@ These documents are **required reading** for every agent session:
 - **[`rules/common/github-cli-best-practices.md`](rules/common/github-cli-best-practices.md)**
   - **Protocol**: MUST use "File-First" approach (temp file + `--body-file`) for all multiline GitHub interactions (Issues/PRs).
 
-- **[`AGENTS.md`](../AGENTS.md)**
-  - Overview of agent responsibilities and constraints
-  - Quick reference for what agents can/cannot do
+
 
 ## 2. Source the Environment (1 min)
 
@@ -125,7 +123,7 @@ This prevents "task creep" where you manually implement something that already h
 - **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination and GitHub Issues workflow
 - **GitHub Issues** — Check open issues to see what's currently being worked on
 - **[`README.md`](../README.md)** — Repository structure and usage
-- **[`ROADMAP.md`](ROADMAP.md)** (Optional) — Read-only snapshot of GitHub Issues for offline reference
+- **[`.agent/scratchpad/ROADMAP.md`](.agent/scratchpad/ROADMAP.md)** (If exists) — Read-only snapshot of GitHub Issues for offline reference
 
 ## Quick Checklist for Your Session
 

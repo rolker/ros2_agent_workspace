@@ -34,7 +34,7 @@ This skill operates on **Overlay Repositories** only (excluding the `underlay.re
 1.  Ask the User: "Which of these should be tracked in this workspace?"
 2.  For selected issues:
     -   **Primary**: Create a GitHub Issue in this workspace to track the upstream issue. **MANDATORY**: Append the AI Signature (see `.agent/rules/common/ai-signature.md`) to the issue body.
-    -   **Optional**: After creating issues, sync `.agent/ROADMAP.md` from GitHub Issues using the **Project Management Skill** for offline reference.
+    -   **Optional**: After creating issues, sync roadmap to `.agent/scratchpad/` using the **Project Management Skill** for offline reference.
     -   Title format: `[Upstream] <Issue Title> (Link: <url>)`
 
 ## Example Output
