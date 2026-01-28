@@ -103,6 +103,31 @@ Before starting work, see what's currently happening:
 
 ---
 
+## 🛑 CRITICAL: Issue-First Policy
+
+> **⚠️ STOP - Read This Before Touching Any Code ⚠️**
+> 
+> **NO CODE WITHOUT A TICKET**
+> 
+> Before making ANY code changes:
+> 1. **Check GitHub Issues** for an existing issue tracking this work
+> 2. **Create an issue** if one doesn't exist (or ask the user to create one)
+> 3. **Reference the issue** in your branch name: `feature/ISSUE-<number>-description`
+> 4. **Link the issue** in all commits and PRs: "Closes #123"
+> 
+> **Why this matters**:
+> - ✅ Ensures all work is tracked and visible
+> - ✅ Provides context for "why" changes were made
+> - ✅ Prevents duplicate work across agent sessions
+> 
+> **Exceptions** (rare):
+> - Trivial typo fixes in documentation
+> - Urgent hotfixes (but create an issue retrospectively)
+> 
+> **📚 Full details**: [rules/common/issue-first.md](rules/common/issue-first.md)
+
+---
+
 ## ✅ You're Ready! Now What?
 
 ### Option A: Start a New Task
@@ -147,7 +172,9 @@ Before starting work, see what's currently happening:
    - Updated workflows for CLI detection
    - Enhanced identity automation
    
-   **🤖 Authored-By**: Copilot CLI Agent"
+   ---
+   **🤖 Authored-By**: \`Copilot CLI Agent\`
+   **🧠 Model**: \`GPT-4o\`"
    ```
    
    **Or use the workflow**:
@@ -211,10 +238,12 @@ ros2 run <package_name> <node_name>
 All GitHub content (Issues, PRs, Comments) **must** end with:
 
 ```markdown
-**🤖 Authored-By**: Copilot CLI Agent
+---
+**🤖 Authored-By**: `Copilot CLI Agent`
+**🧠 Model**: `GPT-4o`
 ```
 
-(Replace with your framework name)
+(Replace with your framework name and model)
 
 **Why**: Distinguishes AI-generated content from human-generated content.
 
