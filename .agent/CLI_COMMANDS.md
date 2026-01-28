@@ -16,6 +16,7 @@ This document maps:
 | `/check-status` | Status | Full workspace status (git, builds, GitHub) | Start of session, before/after major changes |
 | `/check-local-status` | Status | Quick git status only | Fast check, no GitHub API needed |
 | `/check-github-status` | Status | GitHub PRs and issues only | Looking for tasks, checking PR status |
+| `/check-branch-updates` | Status | Check if default branch has new commits | Before committing, before PR, during long work |
 | `/build` | Build | Build specific workspace or package | Working on single package |
 | `/build-all` | Build | Build all workspaces (underlay + overlays) | After vcstool import, major changes |
 | `/rebuild-all` | Build | Clean + build all workspaces | Dependency issues, fresh start |
@@ -107,6 +108,45 @@ gh issue list --label "good first issue"
 - ✅ Looking for tasks to work on
 - ✅ Checking PR review status
 - ✅ Coordinating with other agents
+
+---
+
+### `/check-branch-updates`
+
+**File**: `.agent/workflows/ops/check-branch-updates.md`  
+**Script**: `.agent/scripts/check_branch_updates.sh`
+
+**What it does**:
+- Fetches latest commits from default branch
+- Compares your feature branch against it
+- Shows commits behind/ahead counts
+- Provides merge or rebase recommendations
+- Displays recent commits you're missing
+
+**Example**:
+```bash
+.agent/scripts/check_branch_updates.sh
+```
+
+**CLI-native alternative**:
+```bash
+# Manual check
+git fetch origin main
+git log HEAD..origin/main  # See what's new
+git log --oneline --left-right HEAD...origin/main  # Divergence check
+```
+
+**When to use**:
+- ✅ Before committing changes
+- ✅ Before creating a PR
+- ✅ After returning to old feature branch
+- ✅ During long-running development
+- ❌ On default branch (automatically skips)
+
+**Strict mode** (blocks if behind):
+```bash
+.agent/scripts/check_branch_updates.sh --strict
+```
 
 ---
 

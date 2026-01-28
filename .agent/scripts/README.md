@@ -171,7 +171,7 @@ Build ROS 2 workspace layers with colcon.
 **What it does:**
 1. Sources the ROS 2 environment
 2. Runs `colcon build --symlink-install` on each layer
-3. Generates build report in `ai_workspace/build_report.md`
+3. Generates build report in `.agent/scratchpad/build_report.md`
 
 **Dependencies:**
 - ROS 2 Jazzy installed
@@ -180,7 +180,7 @@ Build ROS 2 workspace layers with colcon.
 
 **Outputs:**
 - Build artifacts in each `workspaces/<layer>_ws/build/`
-- `ai_workspace/build_report.md` with build summary
+- `.agent/scratchpad/build_report.md` with build summary
 
 ---
 
@@ -331,6 +331,61 @@ Automatically detect and switch to the remote default branch (e.g. `main` or `ja
  
  ---
 
+### `check_branch_updates.sh`
+
+Check if the default branch has new commits and provide merge/rebase recommendations.
+
+**Usage:**
+```bash
+./.agent/scripts/check_branch_updates.sh          # Informational check
+./.agent/scripts/check_branch_updates.sh --strict # Block if behind
+```
+
+**What it does:**
+1. Fetches latest commits from default branch (e.g., `main`)
+2. Compares your feature branch against it
+3. Shows how many commits you're behind/ahead
+4. Detects if branches have diverged
+5. Provides specific recommendations (merge vs rebase)
+6. Displays recent commits you're missing
+
+**When to use:**
+- Before committing changes
+- Before creating a pull request
+- After returning to an old feature branch
+- During long-running development work
+- When coordinating with team updates
+
+**Exit codes:**
+- `0` - Branch is up-to-date, on default branch, or informational check completed
+- `1` - Updates required (strict mode only)
+- `2` - Error occurred
+
+**Examples:**
+
+```bash
+# Check status (non-blocking)
+$ ./.agent/scripts/check_branch_updates.sh
+⚠️  Default branch has new commits!
+  Current branch:  feature/my-feature
+  Default branch:  main
+  Commits behind:  3
+  Commits ahead:   2
+
+📋 Recommendations:
+  1️⃣  MERGE: git merge origin/main
+  2️⃣  REBASE: git rebase origin/main
+```
+
+**Integration:**
+- Runs automatically via pre-commit hook (when `pre-commit install` is configured)
+- Integrated into `/submit-pr` workflow
+- Recommended before `/finish-feature`
+
+**See also:**
+- `.agent/workflows/ops/check-branch-updates.md` - Detailed usage guide
+- `.agent/hooks/check-branch-updates.py` - Pre-commit hook implementation
+
 ---
 
 ## Testing & Validation
@@ -360,9 +415,9 @@ Run tests on ROS 2 workspace layers.
 - Workspace built (see `build.sh`)
 
 **Outputs:**
-- `ai_workspace/test_report.md` (Human readable)
-- `ai_workspace/test_summary.json` (Machine readable)
-- `ai_workspace/test_history.csv` (Historical data)
+- `.agent/scratchpad/test_report.md` (Human readable)
+- `.agent/scratchpad/test_summary.json` (Machine readable)
+- `.agent/scratchpad/test_history.csv` (Historical data)
 
 ---
 

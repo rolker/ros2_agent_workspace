@@ -22,7 +22,7 @@ repos:
       - id: no-commit-to-branch
         args: ['--branch', 'main', '--branch', 'jazzy', '--branch', 'rolling']
 
-  # Custom hook: warn about temp artifacts in source directories
+  # Custom hooks
   - repo: local
     hooks:
       - id: check-source-artifacts
@@ -30,7 +30,15 @@ repos:
         entry: python3 .agent/hooks/check-source-artifacts.py
         language: system
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
+        always_run: true
+
+      - id: check-branch-updates
+        name: Check for updates in default branch
+        entry: python3 .agent/hooks/check-branch-updates.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
         always_run: true
 
   - repo: https://github.com/shellcheck-py/shellcheck-py

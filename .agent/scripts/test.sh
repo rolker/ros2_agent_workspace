@@ -6,12 +6,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Go up two levels: .agent/scripts -> .agent -> root
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-REPORT_FILE="$ROOT_DIR/ai_workspace/test_report.md"
-HISTORY_FILE="$ROOT_DIR/ai_workspace/test_history.csv"
-SUMMARY_JSON="$ROOT_DIR/ai_workspace/test_summary.json"
+REPORT_FILE="$ROOT_DIR/.agent/scratchpad/test_report.md"
+HISTORY_FILE="$ROOT_DIR/.agent/scratchpad/test_history.csv"
+SUMMARY_JSON="$ROOT_DIR/.agent/scratchpad/test_summary.json"
 
-mkdir -p "$ROOT_DIR/ai_workspace"
-LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+mkdir -p "$ROOT_DIR/.agent/scratchpad"
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 
 # Check for Lock
 if [ -f "$LOCK_FILE" ]; then

@@ -150,7 +150,7 @@ Ensure ROS 2 Jazzy is installed:
 ```
 
 #### Build Failures
-1. Check the build report: `cat ai_workspace/build_report.md`
+1. Check the build report: `cat .agent/scratchpad/build_report.md`
 2. Try building a single layer:
    ```bash
    cd workspaces/core_ws

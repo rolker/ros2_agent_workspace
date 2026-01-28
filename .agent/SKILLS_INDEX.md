@@ -9,6 +9,7 @@ This index lists the available skills in the `.agent/skills/` directory.
 | **Project Management** | [.agent/skills/project-management/SKILL.md](.agent/skills/project-management/SKILL.md) | Manage project tasks using GitHub Issues as Source of Truth. Sync local ROADMAP.md from GitHub for offline reference. |
 | **ROS Code Documentation** | [.agent/skills/ros-code-documentation/SKILL.md](.agent/skills/ros-code-documentation/SKILL.md) | Generate developer API documentation. |
 | **ROS Documentation** | [.agent/skills/ros-documentation/SKILL.md](.agent/skills/ros-documentation/SKILL.md) | Document ROS 2 packages using standard format. |
+| **Test Engineering** | [.agent/skills/test-engineering/SKILL.md](.agent/skills/test-engineering/SKILL.md) | Develop, scaffold, and debug ROS 2 tests including GTest, PyTest, and launch_testing. |
 | **Doc Co-authoring** | [.agent/skills/doc-coauthoring/SKILL.md](.agent/skills/doc-coauthoring/SKILL.md) | Workflow for co-authoring documentation. |
 | **Skill Creator** | [.agent/skills/skill-creator/SKILL.md](.agent/skills/skill-creator/SKILL.md) | Create new skills for the workspace. |
 | **Skill Importer** | [.agent/skills/skill-importer/SKILL.md](.agent/skills/skill-importer/SKILL.md) | Import external skills. |

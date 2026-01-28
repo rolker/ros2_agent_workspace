@@ -12,7 +12,6 @@ COLCON_IGNORE
 
 # IDE settings
 .vscode/
-ai_workspace/
 
 # Agent Scratchpad (Temporary files and artifacts)
 .agent/scratchpad/*
@@ -30,3 +29,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# CodeQL generated files
+_codeql_detected_source_root

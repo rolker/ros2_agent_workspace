@@ -21,6 +21,14 @@ If you started with `.agent/scripts/start_issue_work.sh` and created a draft PR:
     git push
     ```
 
+2.  **Check for Updates** (Recommended)
+    -   Ensure your branch is up-to-date with the default branch:
+        ```bash
+        .agent/scripts/check_branch_updates.sh
+        ```
+    -   If updates are needed, merge or rebase as recommended
+    -   Re-run tests after updating
+
 3.  **Validate Your Changes**
     -   Run local quality checks: `make lint` or `pre-commit run --all-files`
     -   **Requirement**: You MUST fix any errors before proceeding.
@@ -47,7 +55,14 @@ If you started with `.agent/scripts/start_issue_work.sh` and created a draft PR:
     -   Create a new branch: `git checkout -b feature/<task-id>-<short-description>`
     -   *Example*: `git checkout -b feature/TASK-001-multi-distro-support`
 
-2.  **Validate**
+2.  **Check for Updates** (Recommended)
+    -   Before committing, ensure your branch is current:
+        ```bash
+        .agent/scripts/check_branch_updates.sh
+        ```
+    -   This runs automatically with pre-commit hooks
+
+3.  **Validate**
     -   Run local quality checks: `make lint` or `pre-commit run --all-files`
     -   **Requirement**: You MUST fix any errors before proceeding.
 

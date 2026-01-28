@@ -167,7 +167,7 @@ else
 fi
 
 # 3. Test Status (New Section)
-SUMMARY_JSON="$ROOT_DIR/ai_workspace/test_summary.json"
+SUMMARY_JSON="$ROOT_DIR/.agent/scratchpad/test_summary.json"
 if [ -f "$SUMMARY_JSON" ]; then
     echo "## Latest Test Status"
     python3 -c "

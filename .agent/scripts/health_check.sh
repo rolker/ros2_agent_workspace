@@ -224,7 +224,7 @@ echo ""
 
 # Check 8: Lock Status
 echo "8. Checking Workspace Lock..."
-LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 if [ -f "$LOCK_FILE" ]; then
     check_warn "Workspace is LOCKED:"
     cat "$LOCK_FILE"

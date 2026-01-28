@@ -7,7 +7,7 @@
 # This script will:
 # 1. Check for workspace locks (multi-agent coordination)
 # 2. Build all workspace layers in dependency order
-# 3. Generate a detailed build report in ai_workspace/build_report.md
+# 3. Generate a detailed build report in .agent/scratchpad/build_report.md
 # 4. Source each layer after successful build for cascading overlays
 #
 # The build order follows the layer hierarchy defined in scripts/env.sh:
@@ -23,11 +23,11 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-REPORT_FILE="$ROOT_DIR/ai_workspace/build_report.md"
+REPORT_FILE="$ROOT_DIR/.agent/scratchpad/build_report.md"
 
-# Ensure ai_workspace exists
-mkdir -p "$ROOT_DIR/ai_workspace"
-LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+# Ensure .agent/scratchpad exists
+mkdir -p "$ROOT_DIR/.agent/scratchpad"
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 
 # Check for Lock
 if [ -f "$LOCK_FILE" ]; then
