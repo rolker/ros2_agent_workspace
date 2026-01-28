@@ -24,7 +24,8 @@ scratchpad_file() {
     local base_name="$1"
     local extension="${2:-.txt}"
     local agent_id="${AGENT_ID:-unknown}"
-    local timestamp=$(date +%s%N 2>/dev/null || date +%s)  # nanoseconds if available, else seconds
+    # Use nanoseconds if available, otherwise use seconds + random number for entropy
+    local timestamp=$(date +%s%N 2>/dev/null || echo "$(date +%s)${RANDOM}${RANDOM}")
     local pid=$$
     
     # Include PID for additional uniqueness
@@ -71,16 +72,16 @@ scratchpad_cleanup() {
     
     if [ "$age_in_seconds" -gt 0 ]; then
         echo "🧹 Cleaning up scratchpad files for agent '$agent_id' older than $age_in_seconds seconds..."
-        find .agent/scratchpad -name "${agent_id}_*" -type f -mmin "+$(($age_in_seconds / 60))" -delete 2>/dev/null || true
+        find .agent/scratchpad -maxdepth 1 -name "${agent_id}_*" -type f -mmin +$(($age_in_seconds / 60)) -delete 2>/dev/null || true
         # Also clean up agent-specific directory if it exists
         if [ -d ".agent/scratchpad/${agent_id}" ]; then
-            find ".agent/scratchpad/${agent_id}" -type f -mmin "+$(($age_in_seconds / 60))" -delete 2>/dev/null || true
+            find ".agent/scratchpad/${agent_id}" -type f -mmin +$(($age_in_seconds / 60)) -delete 2>/dev/null || true
             # Remove directory if empty
             rmdir ".agent/scratchpad/${agent_id}" 2>/dev/null || true
         fi
     else
         echo "🧹 Cleaning up all scratchpad files for agent '$agent_id'..."
-        rm -f .agent/scratchpad/${agent_id}_* 2>/dev/null || true
+        find .agent/scratchpad -maxdepth 1 -name "${agent_id}_*" -type f -delete 2>/dev/null || true
         # Also clean up agent-specific directory if it exists
         if [ -d ".agent/scratchpad/${agent_id}" ]; then
             rm -rf ".agent/scratchpad/${agent_id}"
@@ -93,7 +94,7 @@ scratchpad_list_mine() {
     local agent_id="${AGENT_ID:-unknown}"
     
     echo "Files in scratchpad for agent '$agent_id':"
-    ls -lh .agent/scratchpad/${agent_id}_* 2>/dev/null || echo "  (none)"
+    find .agent/scratchpad -maxdepth 1 -name "${agent_id}_*" -type f -exec ls -lh {} + 2>/dev/null || echo "  (none)"
     
     if [ -d ".agent/scratchpad/${agent_id}" ]; then
         echo ""
@@ -102,13 +103,14 @@ scratchpad_list_mine() {
     fi
 }
 
-# Create a temporary file that will be automatically cleaned up
-# This is useful for short-lived files within a single script
+# Create a temporary file within a session
+# This is just an alias for scratchpad_file - files must be manually deleted
 # Args:
 #   $1: base_name
 #   $2: extension (optional)
 # Returns: Full path to temporary file
-# Note: File must be manually deleted, but will be cleaned up by scratchpad_cleanup
+# Note: Despite the name "temp", files must be MANUALLY deleted
+#       They will persist until you delete them or call scratchpad_cleanup
 scratchpad_temp() {
     scratchpad_file "$@"
 }

@@ -164,8 +164,8 @@ Replace all static filename examples with unique naming:
 # BEFORE (bad)
 cat > .agent/scratchpad/issue_body.md << 'EOF'
 
-# AFTER (good)
-BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N).md"
+# AFTER (good) - Using nanoseconds (Linux/macOS) or seconds+random (fallback)
+BODY_FILE=".agent/scratchpad/issue_body_$(date +%s%N 2>/dev/null || echo "$(date +%s)${RANDOM}${RANDOM}").md"
 cat > "$BODY_FILE" << 'EOF'
 ...
 EOF
@@ -173,6 +173,8 @@ gh issue create --body-file "$BODY_FILE"
 # Cleanup after use
 rm "$BODY_FILE"
 ```
+
+**Note**: The helper functions in `scratchpad_helpers.sh` automatically handle the fallback from nanoseconds to seconds+random when `date +%s%N` is not available. On systems without nanosecond support, the random number and PID components provide sufficient entropy to prevent collisions.
 
 ### Priority 2: Complete Migration to .agent/scratchpad/
 

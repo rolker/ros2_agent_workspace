@@ -19,9 +19,9 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Create a GitHub Issue using `gh issue create`:
     ```bash
-    # Source helper functions
-    source .agent/scripts/lib/scratchpad_helpers.sh
+    # Set agent identity and source helper functions
     export AGENT_ID="${AGENT_ID:-copilot_cli}"
+    source .agent/scripts/lib/scratchpad_helpers.sh
     
     # Create issue body in scratchpad with unique name (to preserve formatting)
     BODY_FILE=$(scratchpad_file "issue_body" ".md")
@@ -87,8 +87,8 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 **Procedure**:
 1.  Query all open and recently closed issues:
     ```bash
-    source .agent/scripts/lib/scratchpad_helpers.sh
     export AGENT_ID="${AGENT_ID:-copilot_cli}"
+    source .agent/scripts/lib/scratchpad_helpers.sh
     
     # Create unique cache files
     ISSUES_OPEN=$(scratchpad_file "issues_open" ".json")
@@ -124,8 +124,8 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
 
 **Feature Request**:
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
 export AGENT_ID="${AGENT_ID:-copilot_cli}"
+source .agent/scripts/lib/scratchpad_helpers.sh
 
 BODY_FILE=$(scratchpad_file "issue_body" ".md")
 cat > "$BODY_FILE" << 'EOF'
@@ -153,8 +153,8 @@ rm "$BODY_FILE"
 
 **Bug Report**:
 ```bash
-source .agent/scripts/lib/scratchpad_helpers.sh
 export AGENT_ID="${AGENT_ID:-copilot_cli}"
+source .agent/scripts/lib/scratchpad_helpers.sh
 
 BODY_FILE=$(scratchpad_file "issue_body" ".md")
 cat > "$BODY_FILE" << 'EOF'

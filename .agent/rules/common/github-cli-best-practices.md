@@ -38,8 +38,8 @@ Here is the first paragraph.
 - List item 2
 
 ---
-**🤖 Authored-By**: \`Agent Name\`
-**🧠 Model**: \`Model Name\`
+**🤖 Authored-By**: `Agent Name`
+**🧠 Model**: `Model Name`
 EOF
 
 gh issue create --title "My Issue" --body-file "$BODY_FILE"
@@ -61,8 +61,8 @@ Here is the first paragraph.
 - List item 2
 
 ---
-**🤖 Authored-By**: \`Agent Name\`
-**🧠 Model**: \`Model Name\`
+**🤖 Authored-By**: `Agent Name`
+**🧠 Model**: `Model Name`
 EOF
 
 gh issue create --title "My Issue" --body-file "$BODY_FILE"

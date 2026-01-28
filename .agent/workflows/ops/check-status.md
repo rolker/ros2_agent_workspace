@@ -101,11 +101,13 @@ if command -v gh &> /dev/null; then
     gh issue list --limit 10 --state open
     
     # Cache results to avoid rate limiting
-    # Use unique filenames to prevent collisions with other agents
+    # Use agent-specific predictable filenames for functional caching
     source .agent/scripts/lib/scratchpad_helpers.sh
     AGENT_ID="${AGENT_ID:-copilot_cli}"
-    PR_CACHE=$(scratchpad_file "pr_cache" ".json")
-    ISSUE_CACHE=$(scratchpad_file "issue_cache" ".json")
+    
+    # Predictable cache names allow age checking
+    PR_CACHE=".agent/scratchpad/${AGENT_ID}_pr_cache.json"
+    ISSUE_CACHE=".agent/scratchpad/${AGENT_ID}_issue_cache.json"
     
     gh pr list --json number,title,updatedAt --limit 20 > "$PR_CACHE" 2>/dev/null || true
     gh issue list --json number,title,labels,assignees --limit 20 > "$ISSUE_CACHE" 2>/dev/null || true
@@ -229,10 +231,10 @@ To avoid GitHub API rate limits:
 source .agent/scripts/lib/scratchpad_helpers.sh
 export AGENT_ID="${AGENT_ID:-copilot_cli}"
 
-# Create unique cache file
-CACHE_FILE=$(scratchpad_file "pr_cache" ".json")
+# Use agent-specific predictable cache name (allows checking age)
+CACHE_FILE=".agent/scratchpad/${AGENT_ID}_pr_cache.json"
 
-# Cache PR data (valid for 5 minutes)
+# Check cache age (valid for 5 minutes)
 CACHE_AGE=$(($(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)))
 
 if [ $CACHE_AGE -gt 300 ]; then
@@ -250,8 +252,7 @@ else
         sed 's/"number"://; s/"title":"/ /; s/"$//'
 fi
 
-# Clean up old cache
-rm "$CACHE_FILE"
+# Note: Cache file persists for reuse - don't delete it here
 ```
 
 ## Troubleshooting
