@@ -36,12 +36,7 @@ When working on a GitHub issue, use the **work visibility workflow** to make you
     ```bash
     gh pr create --draft \
       --title "feat: <description>" \
-      --body "See .agent/work-plans/PLAN_ISSUE-<number>.md
-
-    Closes #<number>
-
-    ---
-    **🤖 Authored-By**: \`Your Agent Name\`"
+      --body $'See .agent/work-plans/PLAN_ISSUE-<number>.md\n\nCloses #<number>\n\n---\n**🤖 Authored-By**: `Your Agent Name`'
     ```
 
 **Benefits**: 

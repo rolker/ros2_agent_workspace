@@ -59,8 +59,8 @@ Implement a **draft PR workflow** where agents:
   - Prints manual next steps for committing, pushing, and creating a draft PR
 - [x] Create script: `.agent/scripts/update_issue_plan.sh`
   - Updates plan file
-  - Commits with standardized message
-  - Pushes update
+  - Commits with standardized message (handles conventional commit prefixes)
+  - Prints instructions for running `git push` (does not push automatically)
 
 ### Phase 2: Workflow Integration ✅
 - [x] Update `.agent/workflows/dev/start-feature.md`

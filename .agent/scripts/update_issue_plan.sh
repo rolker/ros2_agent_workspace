@@ -13,6 +13,10 @@ if [ -z "$ISSUE_NUMBER" ]; then
     exit 1
 fi
 
+# Get repository root and change to it
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
 PLAN_FILE=".agent/work-plans/PLAN_ISSUE-${ISSUE_NUMBER}.md"
 
 if [ ! -f "$PLAN_FILE" ]; then
@@ -21,19 +25,29 @@ if [ ! -f "$PLAN_FILE" ]; then
     exit 1
 fi
 
-# Check if plan was modified
-if ! git diff --quiet "$PLAN_FILE"; then
+# Check if plan file has any changes (including untracked)
+if [[ -n "$(git status --porcelain -- "$PLAN_FILE")" ]]; then
     echo "📝 Changes detected in $PLAN_FILE"
     
     # Show diff summary
     echo ""
     echo "Changes:"
-    git diff --stat "$PLAN_FILE"
+    # Staged changes (if any)
+    git diff --stat --cached -- "$PLAN_FILE" 2>/dev/null || true
+    # Unstaged changes (if any)
+    git diff --stat -- "$PLAN_FILE" 2>/dev/null || true
     echo ""
+    
+    # Normalize commit message: only prepend 'docs:' if no conventional prefix is present
+    if [[ "$COMMIT_MSG" =~ ^[A-Za-z]+(\([^)]*\))?:[[:space:]] ]]; then
+        NORMALIZED_COMMIT_MSG="$COMMIT_MSG"
+    else
+        NORMALIZED_COMMIT_MSG="docs: $COMMIT_MSG"
+    fi
     
     # Commit the update
     git add "$PLAN_FILE"
-    git commit -m "docs: $COMMIT_MSG"
+    git commit -m "$NORMALIZED_COMMIT_MSG"
     
     echo "✅ Plan updated and committed!"
     echo ""
