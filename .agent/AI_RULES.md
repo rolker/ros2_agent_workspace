@@ -118,6 +118,16 @@ Once environment is set up and status is clean:
 - **Atomic commits**: One logical change per commit
 - **Stash or commit** uncommitted changes before finishing
 - **Clean handover**: Leave workspace in clean state when session ends
+- **Stay updated**: Check for updates in default branch before committing (automatic via pre-commit hook)
+
+**Branch Update Check**: Before committing, the pre-commit hook automatically checks if your feature branch is behind the default branch and provides recommendations:
+```bash
+# Manual check anytime
+.agent/scripts/check_branch_updates.sh
+
+# Strict mode (blocks if behind)
+.agent/scripts/check_branch_updates.sh --strict
+```
 
 **Critical**: After committing to your feature branch, you **must** create a pull request:
 ```bash
@@ -125,7 +135,7 @@ git push -u origin feature/my-task
 gh pr create --title "..." --body "Closes #123\n\n**🤖 Authored-By**: <Your Agent>"
 ```
 
-**Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md)
+**Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md), [workflows/ops/check-branch-updates.md](workflows/ops/check-branch-updates.md)
 
 ### AI Signature
 
