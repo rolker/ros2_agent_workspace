@@ -105,7 +105,7 @@ This prevents "task creep" where you manually implement something that already h
 - **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination and GitHub Issues workflow
 - **GitHub Issues** — Check open issues to see what's currently being worked on
 - **[`README.md`](../README.md)** — Repository structure and usage
-- **[`ROADMAP.md`](ROADMAP.md)** (Optional) — Read-only snapshot of GitHub Issues for offline reference
+- **[`ROADMAP.md`](.agent/scratchpad/ROADMAP.md)** (Optional) — Read-only snapshot of GitHub Issues for offline reference (if generated)
 
 ## Quick Checklist for Your Session
 

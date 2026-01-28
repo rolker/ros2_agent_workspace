@@ -1,6 +1,6 @@
 ---
 name: Project Management
-description: Manage project tasks using GitHub Issues as Source of Truth. Sync local ROADMAP to scratchpad for offline reference.
+description: Manage project tasks using GitHub Issues as Source of Truth. Sync local `.agent/scratchpad/ROADMAP.md` for offline reference.
 ---
 
 # Project Management Skill

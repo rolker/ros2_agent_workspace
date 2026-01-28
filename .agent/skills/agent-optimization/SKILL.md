@@ -53,4 +53,4 @@ When proposing changes, create a **GitHub Issue** with appropriate labels (e.g.,
 
 **MANDATORY**: Append the AI Signature (see `.agent/rules/common/ai-signature.md`) at the very end of the issue body, separated from the main content by a horizontal rule (`---`). 
 
-After creating the issue, optionally sync **`.agent/ROADMAP.md`** from GitHub Issues using the **Project Management Skill**.
+After creating the issue, optionally sync **roadmap** to `.agent/scratchpad/` using the **Project Management Skill**.
