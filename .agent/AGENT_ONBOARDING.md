@@ -43,20 +43,25 @@ source .agent/scripts/env.sh
 
 ## 3. Configure Git Identity (1 min)
 
-Before making ANY commits, configure your identity using the appropriate method:
+Before making ANY commits, configure your complete identity (name, email, AND model) using the appropriate method:
 
 ### Host-Based Agents (Copilot CLI, Gemini CLI)
 
 If you're running directly on the host and sharing the working copy with the user:
 
 ```bash
-source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+# Auto-detect (recommended)
+source .agent/scripts/set_git_identity_env.sh --detect
+
+# Or specify framework explicitly
+source .agent/scripts/set_git_identity_env.sh --agent copilot
 ```
 
 **Why this method?**
 - ✅ Session-only (doesn't modify `.git/config`)
 - ✅ User's identity remains intact for their own commits
 - ✅ Perfect for shared workspaces
+- ✅ Exports `AGENT_MODEL` for use in GitHub signatures
 
 ### Containerized Agents (Antigravity)
 
@@ -72,6 +77,19 @@ If you're running in a container or isolated environment:
 - ✅ Isolated environment means no conflict with user
 
 **Not sure which to use?** See the decision tree in [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md).
+
+### Verify Your Identity
+
+After configuration, verify that your identity (including model) is set correctly:
+
+```bash
+echo "Agent: $AGENT_NAME"
+echo "Email: $AGENT_EMAIL"
+echo "Model: $AGENT_MODEL"
+echo "Framework: $AGENT_FRAMEWORK"
+```
+
+Use these environment variables in your GitHub signatures.
 
 ## 4. Ticket the Task (2 min)
 

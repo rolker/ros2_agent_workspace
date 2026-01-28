@@ -17,6 +17,11 @@ COLCON_IGNORE
 .agent/scratchpad/*
 !.agent/scratchpad/README.md
 
+# Agent Identity (Runtime-generated, not template)
+# The .agent/.identity.template is the checked-in template
+# The .agent/.identity file is generated at runtime and should not be committed
+.agent/.identity
+
 # Generated Knowledge (Keep README and permanent knowledge files)
 .agent/knowledge/*
 !.agent/knowledge/README.md
@@ -29,3 +34,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# CodeQL generated files
+_codeql_detected_source_root

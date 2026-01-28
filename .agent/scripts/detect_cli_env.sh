@@ -17,6 +17,17 @@ export AGENT_FRAMEWORK_VERSION=""
 # Detection logic (order matters - more specific checks first)
 
 # GitHub Copilot CLI detection
+# Check for environment variables first (more reliable in CI/container environments)
+if [ -n "$COPILOT_API_URL" ] || [ -n "$COPILOT_AGENT_CALLBACK_URL" ]; then
+    export AGENT_FRAMEWORK="copilot-cli"
+    # Try to get version from runtime env
+    if [ -n "$COPILOT_AGENT_RUNTIME_VERSION" ]; then
+        export AGENT_FRAMEWORK_VERSION="$COPILOT_AGENT_RUNTIME_VERSION"
+    fi
+    return 0
+fi
+
+# Fallback: Check for gh copilot command
 if command -v gh &> /dev/null; then
     if gh copilot --version &> /dev/null 2>&1; then
         export AGENT_FRAMEWORK="copilot-cli"

@@ -54,7 +54,34 @@ If commands not found, see [Troubleshooting](#troubleshooting) below.
 
 ### Step 2: Configure Git Identity (1 minute)
 
-**CRITICAL**: You must set your git identity to distinguish your commits from human commits.
+**CRITICAL**: You must set your git identity (name, email, AND model) to distinguish your commits from human commits.
+
+#### Recommended: Auto-Detect
+
+```bash
+# Automatically detect your framework and configure identity
+source .agent/scripts/set_git_identity_env.sh --detect
+```
+
+This will:
+- ✅ Detect which AI framework you're using (Copilot, Gemini, etc.)
+- ✅ Set your git name and email
+- ✅ Export your model name for GitHub signatures
+- ✅ Be session-only (doesn't modify `.git/config`)
+
+#### Alternative: Manual Configuration
+
+If auto-detection doesn't work, specify your framework:
+
+```bash
+# For Copilot CLI:
+source .agent/scripts/set_git_identity_env.sh --agent copilot
+
+# For Gemini CLI:
+source .agent/scripts/set_git_identity_env.sh --agent gemini
+```
+
+Or configure manually:
 
 ```bash
 # For Copilot CLI:
@@ -69,14 +96,16 @@ source .agent/scripts/set_git_identity_env.sh "<Your Framework> Agent" "roland+<
 
 **Verify it worked**:
 ```bash
-git config user.name   # Should show: "<Your Framework> Agent"
-git config user.email  # Should show: "roland+<framework>@ccom.unh.edu"
+git config user.name        # Should show: "<Your Framework> Agent"
+git config user.email       # Should show: "roland+<framework>@ccom.unh.edu"
+echo $AGENT_MODEL           # Should show your model (e.g., "GPT-4o")
 ```
 
 **Why this method?**
 - Ephemeral (session-only, doesn't modify `.git/config`)
 - Keeps user's identity intact for their commits
 - Safe for shared workspaces
+- Sets `$AGENT_MODEL` for use in GitHub signatures
 
 **📚 More details**: [AI_IDENTITY_STRATEGY.md](AI_IDENTITY_STRATEGY.md)
 
@@ -164,17 +193,18 @@ Before starting work, see what's currently happening:
    # Push to your feature branch
    git push -u origin feature/TASK-46-cli-integration
    
-   # Create pull request
+   # Create pull request with correct signature
+   # Note: Variables must be in double quotes to expand properly
    gh pr create --title "Implement CLI integration" \
      --body "Closes #46
-   
+
    - Added quickstart guide  
    - Updated workflows for CLI detection
    - Enhanced identity automation
    
    ---
-   **🤖 Authored-By**: \`Copilot CLI Agent\`
-   **🧠 Model**: \`GPT-4o\`"
+   **🤖 Authored-By**: \`${AGENT_NAME}\`
+   **🧠 Model**: \`${AGENT_MODEL}\`"
    ```
    
    **Or use the workflow**:
@@ -182,11 +212,16 @@ Before starting work, see what's currently happening:
    /submit-pr
    ```
    
-   **Without gh CLI**:
+   **Without gh CLI (manual web UI)**:
    - Push your branch: `git push -u origin feature/TASK-46-cli-integration`
    - Visit: https://github.com/rolker/ros2_agent_workspace/pulls
    - Click "New pull request"
-   - Add AI signature to PR description: `**🤖 Authored-By**: <Your Agent Name>`
+   - Add AI signature to PR description. Since environment variables are not available in the web UI, look up your identity:
+     ```bash
+     echo "Name: $AGENT_NAME"
+     echo "Model: $AGENT_MODEL"
+     ```
+   - Then manually type: `**🤖 Authored-By**: <your name>` and `**🧠 Model**: <your model>`
 
 ### Option B: Use Existing Workflows
 

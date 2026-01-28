@@ -41,13 +41,21 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 2. **`.agent/AI_CLI_QUICKSTART.md`** - Fast path for CLI agents
 3. **`.agent/CLI_COMMANDS.md`** - Command mapping and discovery
 4. **Framework-specific overlays**:
-   - `.github/copilot-instructions.md` - Copilot CLI references
+   - `.github/copilot-instructions.md` - Copilot CLI repository-wide instructions
+   - `.github/instructions/*.instructions.md` - Path-specific instructions with YAML frontmatter
    - `.agent/instructions/gemini-cli.instructions.md` - Gemini CLI references
    - `.agent/AGENT_ONBOARDING.md` - Specialized/container agents
+
+**GitHub Copilot Instruction Structure** (follows [best practices](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)):
+- **Repository-wide**: `.github/copilot-instructions.md` - applies to all files
+- **Path-specific**: `.github/instructions/*.instructions.md` - use `applies_to:` glob patterns in YAML frontmatter
 
 **When updating agent documentation**:
 - ✅ Update `AI_RULES.md` for universal changes (applies to all agents)
 - ✅ Update framework-specific files only for platform-specific features
+- ✅ Include concrete code examples (not just descriptions)
+- ✅ Include build/test commands and version information
+- ✅ Verify YAML frontmatter is valid
 - ❌ Don't duplicate universal rules across files - link to `AI_RULES.md` instead
 
 **Documentation Owner**: Framework Engineering Team

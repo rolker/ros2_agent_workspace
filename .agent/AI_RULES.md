@@ -148,24 +148,38 @@ All GitHub Issues, PRs, and Comments **must** include:
 ```markdown
 ---
 **🤖 Authored-By**: `<Your Agent Name>`
-**🧠 Model**: `<Model Name>`
+**🧠 Model**: `<Your Actual Model Name>`
 ```
 
-Examples:
-- Copilot CLI Agent:
+**⚠️ CRITICAL**: Use your **actual runtime identity**, not example values.
+
+**How to get your identity:**
+1. **Check environment variables** (recommended) set during initialization:
+   - `$AGENT_NAME` - Your agent name
+   - `$AGENT_MODEL` - Your model name
+2. **Read from `.agent/.identity` file** (if it exists): `[ -f .agent/.identity ] && source .agent/.identity`
+3. **Auto-detect**: Run `.agent/scripts/detect_agent_identity.sh --export`
+4. **Fallback**: Use "AI Agent" / "Unknown Model" if detection fails
+
+**Note**: Environment variables are preferred as they're always current. The `.agent/.identity` file is runtime-generated (git-ignored) and may become stale if configuration changes during a session.
+
+**DO NOT copy example model names** (e.g., "GPT-4o", "Gemini 2.0 Flash") from documentation.
+
+Examples (with correct introspection):
+- If you're Copilot CLI running GPT-4o:
   ```markdown
   **🤖 Authored-By**: `Copilot CLI Agent`
   **🧠 Model**: `GPT-4o`
   ```
-- Gemini CLI Agent:
+- If you're Gemini CLI running Gemini 2.0 Flash:
   ```markdown
   **🤖 Authored-By**: `Gemini CLI Agent`
   **🧠 Model**: `Gemini 2.0 Flash`
   ```
-- Antigravity Agent:
+- If identity cannot be determined:
   ```markdown
-  **🤖 Authored-By**: `Antigravity Agent`
-  **🧠 Model**: `Gemini 2.0 Flash`
+  **🤖 Authored-By**: `AI Agent`
+  **🧠 Model**: `Unknown Model`
   ```
 
 **Reference**: [rules/common/ai-signature.md](rules/common/ai-signature.md)

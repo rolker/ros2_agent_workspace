@@ -7,19 +7,46 @@ Currently, AI agents operate using the user's personal GitHub credentials (PAT).
 
 ## Agent Identity Configuration
 
-**Important**: Each AI agent must identify itself appropriately in git commits. Do not use the repository owner's identity for agent-generated commits.
+**Important**: Each AI agent must identify itself appropriately in both git commits AND GitHub signatures (Issues/PRs/Comments).
+
+### Full Identity Components
+
+Each agent has a complete identity consisting of:
+1. **Framework Name** - e.g., "Copilot CLI Agent", "Gemini CLI Agent"
+2. **Email Address** - e.g., "roland+copilot-cli@ccom.unh.edu"
+3. **Model Name** - e.g., "GPT-4o", "Gemini 2.0 Flash", "Claude 3.5 Sonnet"
+4. **Framework ID** - e.g., "copilot", "gemini", "antigravity"
+
+### Identity Source of Truth
+
+Agent identity is determined from these sources (in order of preference):
+
+1. **Environment variables** (most reliable) - `AGENT_NAME`, `AGENT_EMAIL`, `AGENT_MODEL`, `AGENT_FRAMEWORK`
+   - Set by `set_git_identity_env.sh` when you configure your session
+   - Always current for the active shell session
+   - **Recommended method** for all identity needs
+
+2. **Auto-detection** - Runtime detection via `.agent/scripts/detect_agent_identity.sh`
+   - Automatically detects framework and model from environment
+   - Can export variables or write to file
+
+3. **`.agent/.identity` file** (if it exists) - Runtime-generated configuration file
+   - Contains all identity components
+   - **Note**: This is a git-ignored runtime file that may become stale if model/config changes during session
+   - Template is at `.agent/.identity.template`
 
 **How to determine your identity:**
-1. **Identify yourself** based on your actual agent platform/name
-2. **Ask the user** if you're uncertain about the appropriate name/email format
-3. **Choose the appropriate configuration method** (see below)
-4. **Configure git** with your identity before making any commits
+1. **Use environment variables** (recommended) - Set by `set_git_identity_env.sh --detect`
+2. **Read from** `.agent/.identity` file if it exists (check with `[ -f .agent/.identity ]`)
+3. **Ask the user** if auto-detection fails
+4. **Use fallback** values if necessary: "AI Agent" / "Unknown Model"
+5. **Configure git** with your identity before making any commits
 
 **Example identities:**
-- Antigravity Agent: `Antigravity Agent` / `roland+antigravity@ccom.unh.edu`
-- GitHub Copilot CLI: `Copilot CLI Agent` / `roland+copilot-cli@ccom.unh.edu`
-- Gemini CLI: `Gemini CLI Agent` / `roland+gemini-cli@ccom.unh.edu`
-- Other agents: Follow the pattern `<Platform> Agent` / `roland+<platform>@ccom.unh.edu`
+- Antigravity Agent: `Antigravity Agent` / `roland+antigravity@ccom.unh.edu` / `Gemini 2.5 Pro`
+- GitHub Copilot CLI: `Copilot CLI Agent` / `roland+copilot-cli@ccom.unh.edu` / `GPT-4o`
+- Gemini CLI: `Gemini CLI Agent` / `roland+gemini-cli@ccom.unh.edu` / `Gemini 2.0 Flash`
+- Other agents: Follow the pattern `<Platform> Agent` / `roland+<platform>@ccom.unh.edu` / `<Model Name>`
 
 ### Configuration Methods: Ephemeral vs. Persistent
 
@@ -29,6 +56,13 @@ Currently, AI agents operate using the user's personal GitHub credentials (PAT).
 
 **Method**: Source the environment variable script:
 ```bash
+# Auto-detect (recommended)
+source .agent/scripts/set_git_identity_env.sh --detect
+
+# Or specify framework
+source .agent/scripts/set_git_identity_env.sh --agent copilot
+
+# Or manual (not recommended)
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 
@@ -37,8 +71,9 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 - ✅ Identity applies only to current shell session
 - ✅ User can commit as themselves after agent session ends
 - ✅ Perfect for shared workspaces
+- ✅ Exports `AGENT_MODEL` for use in GitHub signatures
 
-**How it works**: Sets `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` environment variables which take precedence over `.git/config`.
+**How it works**: Sets `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` environment variables which take precedence over `.git/config`. Also exports `AGENT_NAME`, `AGENT_EMAIL`, `AGENT_MODEL`, `AGENT_FRAMEWORK` for use in GitHub API signatures.
 
 #### When to Use Persistent Identity (Containerized Agents)
 
@@ -124,6 +159,39 @@ To address the limitations of the "Git Authorship Distinction" strategy (specifi
 
 **Rule**: All AI agents must append a structured signature to the body of any GitHub Issue, Pull Request, or Comment they create via the API.
 
+The signature must include both:
+1. **Agent Name** (`🤖 Authored-By`) - Who created the content
+2. **Model Name** (`🧠 Model`) - Which AI model was used
+
+### Model Identity Introspection
+
+**Critical**: Agents must use their **actual runtime model name**, not copy example values.
+
+**How to determine your model:**
+1. **Use environment variables** (recommended) - Check `$AGENT_MODEL` set by `set_git_identity_env.sh`
+2. **Read from `.agent/.identity` file** (if exists) - Check file exists first: `[ -f .agent/.identity ] && source .agent/.identity`
+3. **Auto-detect** - Run `.agent/scripts/detect_agent_identity.sh --export`
+4. **Fallback** - Use "Unknown Model" if detection fails
+
+**Note on `.agent/.identity` file**: This is a runtime-generated file (git-ignored) that may become stale if the model changes during a session. Environment variables set by `set_git_identity_env.sh` are always current for the active shell and are the preferred method.
+
+**DO NOT**:
+- ❌ Copy example model names from documentation (e.g., "GPT-4o", "Gemini 2.0 Flash")
+- ❌ Guess or assume your model name
+- ❌ Hardcode model names based on examples
+
+**Correct approach**:
+```bash
+# Use environment variables (preferred - always current)
+echo "Model: $AGENT_MODEL"
+
+# Or read from file if it exists (may be stale)
+if [ -f .agent/.identity ]; then
+    source .agent/.identity
+    echo "Model: $AGENT_MODEL"
+fi
+```
+
 Details: [**`.agent/rules/common/ai-signature.md`**](rules/common/ai-signature.md)
 
 ## Proposed Plan
@@ -133,17 +201,24 @@ Details: [**`.agent/rules/common/ai-signature.md`**](rules/common/ai-signature.m
 We distinguish the **content** author from the **setup** author.
 
 **Agent Responsibilities:**
-1.  **Determine your identity** when first starting work in this workspace:
-    - Use your actual agent platform name (e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent")
-    - Use email format: `roland+<platform>@ccom.unh.edu`
-    - **Ask the user** if uncertain about the appropriate format
+1.  **Determine your complete identity** when first starting work in this workspace:
+    - **Framework name**: e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent"
+    - **Email format**: `roland+<platform>@ccom.unh.edu`
+    - **Model name**: Your actual runtime model (e.g., "GPT-4o", "Gemini 2.5 Pro")
+    - **Auto-detect** using: `source .agent/scripts/set_git_identity_env.sh --detect`
+    - **Or read from**: `.agent/.identity` file
+    - **Ask the user** if auto-detection fails
 2.  **Choose the appropriate configuration method**:
     - **Host-based agents (Copilot CLI, Gemini CLI)**: Use ephemeral identity (environment variables)
     - **Containerized agents (Antigravity)**: Use persistent identity (.git/config)
     - See "Configuration Methods: Ephemeral vs. Persistent" section above for details
 3.  **Configure git identity** before making any commits:
-    - **Ephemeral**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<Email>"`
+    - **Ephemeral**: `source .agent/scripts/set_git_identity_env.sh --detect` (or `--agent <framework>`)
     - **Persistent**: `./.agent/scripts/configure_git_identity.sh "<Name>" "<Email>"`
+4.  **Use correct model name in signatures**:
+    - After configuration, `$AGENT_MODEL` environment variable will be set
+    - Use this in all GitHub signatures (Issues/PRs/Comments)
+    - Never copy example model names from documentation
 
 ### Phase 2: Establish Independence (The "Machine User")
 **Status: SKIPPED**

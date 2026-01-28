@@ -1,0 +1,35 @@
+# Agent Identity Configuration Template
+# ============================================================================
+# This is a TEMPLATE file with placeholder values.
+# DO NOT modify this template in the repository.
+#
+# Runtime behavior:
+# -----------------
+# 1. The identity detection script (.agent/scripts/detect_agent_identity.sh)
+#    will create a runtime copy of this file with actual values when run with
+#    --write flag.
+# 2. The runtime-generated file (.agent/.identity) is git-ignored to prevent
+#    committing agent-specific or session-specific values.
+# 3. Agents should use environment variables set by set_git_identity_env.sh
+#    rather than relying solely on this file.
+#
+# Default/placeholder values:
+# ---------------------------
+# These values are used as fallbacks when auto-detection fails.
+
+# Human-friendly name for the agent
+# Override at runtime with actual agent name (e.g., "Copilot CLI Agent")
+AGENT_NAME="AI Agent"
+
+# Contact or logical email identity
+# Override at runtime to match executing agent's identity
+AGENT_EMAIL="roland+ai-agent@ccom.unh.edu"
+
+# Model identifier - PLACEHOLDER ONLY
+# Override at runtime with actual model (e.g., "GPT-4o", "Gemini 2.0 Flash")
+# DO NOT copy example model names from documentation
+AGENT_MODEL="Unknown Model"
+
+# Framework identifier
+# Override at runtime (e.g., "copilot-cli", "gemini-cli", "antigravity")
+AGENT_FRAMEWORK="unknown"
