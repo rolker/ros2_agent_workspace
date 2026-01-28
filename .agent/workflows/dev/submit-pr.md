@@ -6,7 +6,41 @@ description: Create a feature branch, push changes, and open a Pull Request.
 
 Use this workflow when you are ready to submit your changes for review.
 
-## Steps
+## For Work Started with a Plan (Draft PR)
+
+If you started with `.agent/scripts/start_issue_work.sh` and created a draft PR:
+
+1.  **Verify Plan is Updated**
+    -   Ensure `.agent/work-plans/PLAN_ISSUE-<number>.md` reflects final state
+    -   Check off completed tasks
+    -   Update status to "✅ Complete" or "🚀 Ready for Review"
+    
+2.  **Commit Final Plan Update** (if needed)
+    ```bash
+    .agent/scripts/update_issue_plan.sh <issue_number> "Final plan update"
+    git push
+    ```
+
+3.  **Validate Your Changes**
+    -   Run local quality checks: `make lint` or `pre-commit run --all-files`
+    -   **Requirement**: You MUST fix any errors before proceeding.
+
+4.  **Mark PR as Ready for Review**
+    ```bash
+    gh pr ready
+    ```
+    This converts the draft PR to ready-for-review status.
+
+5.  **Request Review** (if needed)
+    -   Comment `/copilot review` on the PR (if supported)
+    -   Or assign reviewers manually
+
+6.  **Return to Default Branch** (Unlock)
+    ```bash
+    ./.agent/scripts/checkout_default_branch.sh
+    ```
+
+## For New Work (No Draft PR Yet)
 
 1.  **Branching**
     -   Ensure you are on the latest `main`.
@@ -29,9 +63,10 @@ Use this workflow when you are ready to submit your changes for review.
     -   **Option A: GitHub MCP (Preferred)**
         -   Use `github.create_pull_request`.
         -   Title: `feat: <description>`
-        -   Body: Description of changes + "Closes #<issue-id>" (Mandatory).
+        -   Body: Description of changes + "Closes #<issue-id>" (Mandatory if related to issue) + AI Signature.
     -   **Option B: `gh` CLI**
         -   Run: `gh pr create --title "feat: <description>" --body "Closes #<issue-id> description of changes..."`
+        -   Ensure AI Signature is included in body.
     -   **Option C: Manual**
         -   The `git push` command usually outputs a URL to create a PR.
         -   **Action**: Display that URL to the user.
@@ -46,3 +81,9 @@ Use this workflow when you are ready to submit your changes for review.
         ```bash
         ./.agent/scripts/checkout_default_branch.sh
         ```
+
+## See Also
+
+- `.agent/work-plans/README.md` - Work visibility workflow
+- `.agent/workflows/dev/start-feature.md` - Starting work on issues
+- `.agent/rules/common/ai-signature.md` - AI signature requirement
