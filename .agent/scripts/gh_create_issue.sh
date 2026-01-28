@@ -49,6 +49,9 @@ fi
 # Parse command line arguments to extract labels
 LABELS=()
 
+# Preserve original arguments for passing to gh
+ORIGINAL_ARGS=("$@")
+
 # Single pass to extract labels
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -74,21 +77,21 @@ done
 # If no labels specified or metadata file doesn't exist, just pass through to gh
 if [ ${#LABELS[@]} -eq 0 ]; then
     echo "ℹ️  No labels specified, passing through to 'gh issue create'"
-    exec gh issue create "$@"
+    exec gh issue create "${ORIGINAL_ARGS[@]}"
 fi
 
 if [ ! -f "$METADATA_FILE" ]; then
     echo "⚠️  Warning: $METADATA_FILE not found"
     echo "   Skipping label validation. Labels will be validated by GitHub."
     echo "   To enable validation, create the metadata file with valid labels."
-    exec gh issue create "$@"
+    exec gh issue create "${ORIGINAL_ARGS[@]}"
 fi
 
 # Load valid labels from metadata
 VALID_LABELS=$(jq -r '.labels[]' "$METADATA_FILE" 2>/dev/null) || {
     echo "⚠️  Warning: Failed to parse $METADATA_FILE"
     echo "   Skipping label validation."
-    exec gh issue create "$@"
+    exec gh issue create "${ORIGINAL_ARGS[@]}"
 }
 
 # Validate each label
@@ -116,4 +119,4 @@ fi
 
 # All labels valid, proceed with gh issue create
 echo "✅ All labels valid, creating issue..."
-exec gh issue create "$@"
+exec gh issue create "${ORIGINAL_ARGS[@]}"
