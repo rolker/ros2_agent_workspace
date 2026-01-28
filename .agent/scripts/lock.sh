@@ -3,10 +3,10 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-LOCK_FILE="$ROOT_DIR/ai_workspace/workspace.lock"
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 
-# Ensure ai_workspace exists
-mkdir -p "$ROOT_DIR/ai_workspace"
+# Ensure .agent/scratchpad exists
+mkdir -p "$ROOT_DIR/.agent/scratchpad"
 
 if [ -f "$LOCK_FILE" ]; then
     echo "❌ Workspace is already LOCKED."

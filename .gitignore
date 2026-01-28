@@ -12,7 +12,6 @@ COLCON_IGNORE
 
 # IDE settings
 .vscode/
-ai_workspace/
 
 # Agent Scratchpad (Temporary files and artifacts)
 .agent/scratchpad/*

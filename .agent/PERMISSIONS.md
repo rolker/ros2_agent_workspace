@@ -28,4 +28,4 @@ This document defines the permissions and responsibilities for different Agent R
 **Role**: Execute standard operations (build, clean, test).
 **Scope**:
 - Read-only access to most files.
-- Write access to `ai_workspace/` (logs, reports).
+- Write access to `.agent/scratchpad/` (logs, reports).

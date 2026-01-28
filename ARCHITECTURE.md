@@ -78,11 +78,11 @@ ros2_agent_workspace/
 │       ├── install/          # Install space
 │       └── log/              # Build/test logs
 │
-└── ai_workspace/              # Agent working directory (gitignored)
-    ├── build_report.md       # Latest build status
-    ├── test_report.md        # Latest test results
-    ├── workspace.lock        # Multi-agent coordination lock
-    └── *.md                  # Other generated reports
+└── .agent/scratchpad/         # Agent working directory (gitignored)
+    ├── build_report.md        # Latest build status
+    ├── test_report.md         # Latest test results
+    ├── workspace.lock         # Multi-agent coordination lock
+    └── *.md                   # Other generated reports
 ```
 
 ## Workflow System
@@ -122,7 +122,7 @@ Each workspace uses `colcon` as the build tool with:
 
 ### Build Reports
 
-The `build.sh` script generates a markdown report (`ai_workspace/build_report.md`) showing:
+The `build.sh` script generates a markdown report (`.agent/scratchpad/build_report.md`) showing:
 - Number of packages per layer
 - Success/failure status
 - Warnings and errors
@@ -154,7 +154,7 @@ This allows agents to quickly access relevant documentation without traversing a
 
 The workspace supports a locking mechanism (`.agent/scripts/lock.sh`, `.agent/scripts/unlock.sh`) to prevent conflicts when multiple agents or processes might work simultaneously:
 
-- Creates `ai_workspace/workspace.lock` with:
+- Creates `.agent/scratchpad/workspace.lock` with:
   - User/Agent ID
   - Reason for lock
   - Timestamp

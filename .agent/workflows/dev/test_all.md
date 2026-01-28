@@ -10,7 +10,7 @@ Execute tests across all workspace layers in the correct order.
     ```
 
 2.  **Analyze Report**:
-    - The script outputs a summary table to stdout and saves it to `ai_workspace/test_report.md`.
+    - The script outputs a summary table to stdout and saves it to `.agent/scratchpad/test_report.md`.
     - Check for `❌ Failed` layers.
 
 3.  **Debug Failures**:

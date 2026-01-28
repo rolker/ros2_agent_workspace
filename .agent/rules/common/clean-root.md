@@ -27,7 +27,6 @@ output_file=".agent/scratchpad/build_report_$(date +%s).json"
 analysis_result=".agent/scratchpad/analysis.md"
 
 # ❌ INCORRECT
-output_file="./ai_workspace/report.json"      # Old location
 temp_file="workspaces/core_ws/temp_analysis" # Never in source dirs!
 ```
 

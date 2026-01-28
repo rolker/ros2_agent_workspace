@@ -94,7 +94,7 @@ make build
 
 This will:
 - Build all workspace layers in order
-- Generate a build report in `ai_workspace/build_report.md`
+- Generate a build report in `.agent/scratchpad/build_report.md`
 - Source each layer after successful build
 
 **Note:** First build may take 10-20 minutes depending on your system.
