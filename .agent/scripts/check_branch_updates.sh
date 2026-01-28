@@ -24,7 +24,10 @@ if [[ "$1" == "--strict" ]]; then
 fi
 
 # Get current branch
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD) || {
+    echo -e "${RED}✗ Error:${NC} Could not determine current Git branch. Are you in a Git repository with a checked-out branch?"
+    exit 2
+}
 
 # Detect default branch
 REMOTE_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo "")
