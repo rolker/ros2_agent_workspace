@@ -172,6 +172,7 @@ Before starting work, see what's currently happening:
    - Updated workflows for CLI detection
    - Enhanced identity automation
    
+   ---
    **🤖 Authored-By**: \`Copilot CLI Agent\`
    **🧠 Model**: \`GPT-4o\`"
    ```
@@ -237,6 +238,7 @@ ros2 run <package_name> <node_name>
 All GitHub content (Issues, PRs, Comments) **must** end with:
 
 ```markdown
+---
 **🤖 Authored-By**: `Copilot CLI Agent`
 **🧠 Model**: `GPT-4o`
 ```
