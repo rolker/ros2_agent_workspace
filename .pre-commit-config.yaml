@@ -30,7 +30,7 @@ repos:
         entry: python3 .agent/hooks/check-source-artifacts.py
         language: system
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
         always_run: true
 
       - id: check-branch-updates
@@ -38,7 +38,7 @@ repos:
         entry: python3 .agent/hooks/check-branch-updates.py
         language: system
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
         always_run: true
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
