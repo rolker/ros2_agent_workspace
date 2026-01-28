@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check
+.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check sync
 
 # Default target
 help:
@@ -17,6 +17,7 @@ help:
 	@echo "  status        - Show workspace status report"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
+	@echo "  sync          - Safely sync all workspace repositories"
 	@echo "  format        - Format Python code with black"
 	@echo "  lint          - Run linters on all code"
 	@echo ""
@@ -73,6 +74,9 @@ lock:
 
 unlock:
 	@./.agent/scripts/unlock.sh
+
+sync:
+	@python3 ./.agent/scripts/sync_repos.py
 
 format:
 	@echo "Formatting Python code with black..."
