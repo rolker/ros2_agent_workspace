@@ -71,7 +71,7 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     - High-priority items (labeled appropriately)
     - Recent completions (closed issues)
 
-## Secondary Operation (Local Sync)
+## Secondary Operations (Local Sync)
 
 ### 4. Sync ROADMAP from GitHub
 **Trigger**: "Update the roadmap" or after significant GitHub Issue changes
@@ -88,8 +88,10 @@ Use this skill when asked to "add a task", "update the roadmap", "what are we wo
     - Group assigned issues as "Active Tasks"
     - Group unassigned open issues as "Backlog"
     - List recently closed issues as "Completed"
+    - Add timestamp in ISO 8601 format (e.g., `2026-01-28T12:00:00Z`)
 3.  Prepend deprecation notice to generated file
-4.  **Never manually edit ROADMAP.md** - it should always be generated from GitHub data
+4.  **Note**: This is currently a manual process. A future automation script could be added to `.agent/scripts/sync_roadmap.sh` to standardize the JSON parsing and formatting.
+5.  **Never manually edit ROADMAP.md** - it should always be generated from GitHub data
 
 ## Best Practices
 
@@ -189,7 +191,7 @@ When syncing from GitHub, the generated ROADMAP.md should follow this structure:
 **⚠️ DEPRECATION NOTICE**: This file is a read-only snapshot synced from GitHub Issues. 
 Do not edit manually. Refer to **GitHub Issues** for the active task list.
 
-**Last Synced**: [timestamp]
+**Last Synced**: 2026-01-28T12:00:00Z (ISO 8601 format)
 
 ## Active Tasks (Assigned Issues)
 - [#42] Multi-sensor fusion support (Assigned: @user, Labels: enhancement, in-progress)
@@ -210,11 +212,15 @@ Do not edit manually. Refer to **GitHub Issues** for the active task list.
 ## Migration Notes
 
 **For Legacy ROADMAP.md Entries**:
-1. Review existing `[TASK-XXX]` entries in ROADMAP.md
+1. Review existing task entries in ROADMAP.md (may use `[TASK-XXX]` format or other patterns)
 2. For each active task, create a corresponding GitHub Issue
-3. Reference the original TASK-ID in the issue body: "Migration from ROADMAP.md TASK-XXX"
-4. After migration, regenerate ROADMAP.md from GitHub Issues
-5. Verify all tasks are accounted for
+3. Reference the original identifier in the issue body:
+   - If using TASK-ID format: "Migration from ROADMAP.md TASK-XXX"
+   - If no ID present: Include the original task title and description
+   - If using custom format: Note the original format in the issue
+4. After migration, regenerate ROADMAP.md from GitHub Issues using the sync procedure
+5. Verify all tasks are accounted for by comparing counts
+6. Archive the original ROADMAP.md content if needed for historical reference
 
 ## See Also
 - `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination using GitHub Issues
