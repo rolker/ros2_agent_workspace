@@ -19,14 +19,25 @@ Each agent has a complete identity consisting of:
 
 ### Identity Source of Truth
 
-Agent identity is stored and retrieved from:
-1. **`.agent/.identity`** - Configuration file containing all identity components
+Agent identity is determined from these sources (in order of preference):
+
+1. **Environment variables** (most reliable) - `AGENT_NAME`, `AGENT_EMAIL`, `AGENT_MODEL`, `AGENT_FRAMEWORK`
+   - Set by `set_git_identity_env.sh` when you configure your session
+   - Always current for the active shell session
+   - **Recommended method** for all identity needs
+
 2. **Auto-detection** - Runtime detection via `.agent/scripts/detect_agent_identity.sh`
-3. **Environment variables** - `AGENT_NAME`, `AGENT_EMAIL`, `AGENT_MODEL`, `AGENT_FRAMEWORK`
+   - Automatically detects framework and model from environment
+   - Can export variables or write to file
+
+3. **`.agent/.identity` file** (if it exists) - Runtime-generated configuration file
+   - Contains all identity components
+   - **Note**: This is a git-ignored runtime file that may become stale if model/config changes during session
+   - Template is at `.agent/.identity.template`
 
 **How to determine your identity:**
-1. **Auto-detect** using built-in scripts (recommended)
-2. **Read from** `.agent/.identity` file if it exists
+1. **Use environment variables** (recommended) - Set by `set_git_identity_env.sh --detect`
+2. **Read from** `.agent/.identity` file if it exists (check with `[ -f .agent/.identity ]`)
 3. **Ask the user** if auto-detection fails
 4. **Use fallback** values if necessary: "AI Agent" / "Unknown Model"
 5. **Configure git** with your identity before making any commits
@@ -157,10 +168,12 @@ The signature must include both:
 **Critical**: Agents must use their **actual runtime model name**, not copy example values.
 
 **How to determine your model:**
-1. **Check `.agent/.identity` file** - Read `AGENT_MODEL` variable
-2. **Use environment variables** - Check `$AGENT_MODEL` if set by initialization
-3. **Auto-detect** - Run `.agent/scripts/detect_agent_identity.sh`
+1. **Use environment variables** (recommended) - Check `$AGENT_MODEL` set by `set_git_identity_env.sh`
+2. **Read from `.agent/.identity` file** (if exists) - Check file exists first: `[ -f .agent/.identity ] && source .agent/.identity`
+3. **Auto-detect** - Run `.agent/scripts/detect_agent_identity.sh --export`
 4. **Fallback** - Use "Unknown Model" if detection fails
+
+**Note on `.agent/.identity` file**: This is a runtime-generated file (git-ignored) that may become stale if the model changes during a session. Environment variables set by `set_git_identity_env.sh` are always current for the active shell and are the preferred method.
 
 **DO NOT**:
 - ❌ Copy example model names from documentation (e.g., "GPT-4o", "Gemini 2.0 Flash")
@@ -169,12 +182,14 @@ The signature must include both:
 
 **Correct approach**:
 ```bash
-# Read from .identity file
-source .agent/.identity
+# Use environment variables (preferred - always current)
 echo "Model: $AGENT_MODEL"
 
-# Or use environment variable set during initialization
-echo "Model: $AGENT_MODEL"
+# Or read from file if it exists (may be stale)
+if [ -f .agent/.identity ]; then
+    source .agent/.identity
+    echo "Model: $AGENT_MODEL"
+fi
 ```
 
 Details: [**`.agent/rules/common/ai-signature.md`**](rules/common/ai-signature.md)

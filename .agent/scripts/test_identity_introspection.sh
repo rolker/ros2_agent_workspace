@@ -35,9 +35,15 @@ echo ""
 
 # Test 3: Identity file can be written
 echo "Test 3: Writing identity to file..."
+# Clean up any existing runtime file first
+rm -f .agent/.identity
 "$SCRIPT_DIR/detect_agent_identity.sh" --write > /dev/null 2>&1
 if [ -f .agent/.identity ]; then
     echo "✅ Identity file written successfully"
+    # Verify it's marked as runtime/git-ignored
+    if grep -q "RUNTIME" .agent/.identity && grep -q "git-ignored" .agent/.identity; then
+        echo "   (Correctly marked as runtime file)"
+    fi
 else
     echo "❌ Identity file creation failed"
     exit 1
@@ -46,33 +52,54 @@ echo ""
 
 # Test 4: Identity file can be sourced
 echo "Test 4: Sourcing identity file..."
-source .agent/.identity
-if [ -n "$AGENT_NAME" ] && [ -n "$AGENT_MODEL" ]; then
-    echo "✅ Identity file sourced successfully"
-    echo "   Name: $AGENT_NAME"
-    echo "   Model: $AGENT_MODEL"
+if [ -f .agent/.identity ]; then
+    source .agent/.identity
+    if [ -n "$AGENT_NAME" ] && [ -n "$AGENT_MODEL" ]; then
+        echo "✅ Identity file sourced successfully"
+        echo "   Name: $AGENT_NAME"
+        echo "   Model: $AGENT_MODEL"
+    else
+        echo "❌ Identity file sourcing failed"
+        exit 1
+    fi
 else
-    echo "❌ Identity file sourcing failed"
+    echo "❌ Identity file doesn't exist"
     exit 1
 fi
 echo ""
 
-# Test 5: set_git_identity_env.sh works with --agent flag
-echo "Test 5: Setting identity with --agent flag..."
+# Test 5: set_git_identity_env.sh works with --agent flag (in subshell)
+echo "Test 5: Setting identity with --agent flag (subshell test)..."
 EXIT_CODE=0
 (
-    source "$SCRIPT_DIR/set_git_identity_env.sh" --agent copilot
+    source "$SCRIPT_DIR/set_git_identity_env.sh" --agent copilot > /dev/null 2>&1
     if [ "$AGENT_NAME" = "Copilot CLI Agent" ] && [ "$AGENT_MODEL" = "GPT-4o" ]; then
-        echo "✅ Identity set successfully with --agent flag"
+        echo "✅ Identity set successfully in subshell"
         exit 0
     else
-        echo "❌ Identity setting with --agent flag failed"
+        echo "❌ Identity setting with --agent flag failed in subshell"
         exit 1
     fi
 ) || EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
     exit $EXIT_CODE
+fi
+echo ""
+
+# Test 5b: Variables persist in current shell when properly sourced
+echo "Test 5b: Variables available in current shell when sourced..."
+# Clear any existing variables
+unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
+# Source in current shell
+source "$SCRIPT_DIR/set_git_identity_env.sh" --agent copilot > /dev/null 2>&1
+if [ "$AGENT_NAME" = "Copilot CLI Agent" ] && [ "$AGENT_MODEL" = "GPT-4o" ]; then
+    echo "✅ Identity variables available in current shell after sourcing"
+else
+    echo "❌ Identity variables not available in current shell"
+    echo "   AGENT_NAME=$AGENT_NAME (expected: Copilot CLI Agent)"
+    echo "   AGENT_MODEL=$AGENT_MODEL (expected: GPT-4o)"
+    exit 1
 fi
 echo ""
 

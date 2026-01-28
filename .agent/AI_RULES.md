@@ -154,12 +154,14 @@ All GitHub Issues, PRs, and Comments **must** include:
 **⚠️ CRITICAL**: Use your **actual runtime identity**, not example values.
 
 **How to get your identity:**
-1. **Check environment variables** set during initialization:
+1. **Check environment variables** (recommended) set during initialization:
    - `$AGENT_NAME` - Your agent name
    - `$AGENT_MODEL` - Your model name
-2. **Read from `.agent/.identity` file**: `source .agent/.identity`
+2. **Read from `.agent/.identity` file** (if it exists): `[ -f .agent/.identity ] && source .agent/.identity`
 3. **Auto-detect**: Run `.agent/scripts/detect_agent_identity.sh --export`
 4. **Fallback**: Use "AI Agent" / "Unknown Model" if detection fails
+
+**Note**: Environment variables are preferred as they're always current. The `.agent/.identity` file is runtime-generated (git-ignored) and may become stale if configuration changes during a session.
 
 **DO NOT copy example model names** (e.g., "GPT-4o", "Gemini 2.0 Flash") from documentation.
 

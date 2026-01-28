@@ -29,18 +29,34 @@ This ensures that content created by agents (which may technically be authored b
 
 ## How to Get Your Identity
 
-### Option 1: Read from .agent/.identity file (Recommended)
+### Option 1: Use Environment Variables (Recommended)
+
+The most reliable way is to use environment variables set during initialization:
 
 ```bash
-# Source the identity file
-source .agent/.identity
-
-# Use the variables
+# After running set_git_identity_env.sh, these are available:
 echo "Agent: $AGENT_NAME"
 echo "Model: $AGENT_MODEL"
 ```
 
-### Option 2: Auto-detect at runtime
+These variables are always current for your active shell session and won't become stale if configuration changes.
+
+### Option 2: Read from .agent/.identity file (if it exists)
+
+```bash
+# Source the identity file if it exists
+if [ -f .agent/.identity ]; then
+    source .agent/.identity
+    echo "Agent: $AGENT_NAME"
+    echo "Model: $AGENT_MODEL"
+else
+    echo "Identity file not found. Run: .agent/scripts/detect_agent_identity.sh --write"
+fi
+```
+
+**Note**: The `.agent/.identity` file is runtime-generated and may become stale if model/config changes during a session. Prefer environment variables when possible.
+
+### Option 3: Auto-detect at runtime
 
 ```bash
 # Run detection script
@@ -49,13 +65,6 @@ echo "Model: $AGENT_MODEL"
 # Variables are now available:
 # $AGENT_NAME, $AGENT_EMAIL, $AGENT_MODEL, $AGENT_FRAMEWORK
 ```
-
-### Option 3: Check environment variables
-
-Some agents may have these set in their environment:
-- `AGENT_NAME` - Your agent name
-- `AGENT_MODEL` - Your model name
-- `AGENT_FRAMEWORK` - Your framework identifier
 
 ## Signature Format
 
