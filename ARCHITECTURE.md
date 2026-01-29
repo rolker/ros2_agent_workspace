@@ -58,18 +58,26 @@ ros2_agent_workspace/
 │   ├── templates/            # Templates for various tasks
 │   └── knowledge/            # Auto-generated knowledge links
 │
-├── configs/                   # Layer definitions
-│   ├── underlay.repos        # Extra dependencies
-│   ├── core.repos            # Main autonomy packages
-│   ├── platforms.repos       # Platform-specific code
-│   ├── sensors.repos         # Sensor packages
-│   ├── simulation.repos      # Simulation tools
-│   └── ui.repos              # Visualization & user interfaces
+├── configs/                   # Bootstrap configuration
+│   └── project_bootstrap.url # Key repository URL for layer definitions
 │
 ├── layers/                    # Generated layer directories (gitignored)
-│   ├── underlay_ws/
-│   ├── core_ws/
-│   ├── platforms_ws/
+│   ├── main/
+│   │   ├── underlay_ws/      # ROS dependencies overlay
+│   │   ├── core_ws/          # Core autonomy packages
+│   │   │   └── src/
+│   │   │       └── unh_marine_autonomy/  # Key repository
+│   │   │           └── config/repos/     # Layer .repos definitions
+│   │   │               ├── underlay.repos
+│   │   │               ├── core.repos
+│   │   │               ├── platforms.repos
+│   │   │               ├── sensors.repos
+│   │   │               ├── simulation.repos
+│   │   │               └── ui.repos
+│   │   ├── platforms_ws/    # Platform-specific code
+│   │   ├── sensors_ws/      # Sensor packages
+│   │   ├── simulation_ws/   # Simulation tools
+│   │   └── ui_ws/           # Visualization & user interfaces
 │   ├── sensors_ws/
 │   ├── simulation_ws/
 │   └── ui_ws/

@@ -58,7 +58,7 @@ This document maps:
 git status
 
 # Verbose with vcstool:
-vcs status layers/main/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**:
@@ -82,7 +82,7 @@ vcs status layers/main/ros2_ws/src
 **Example**:
 ```bash
 git status
-vcs status layers/main/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**:
@@ -167,13 +167,13 @@ git log --oneline --left-right HEAD...origin/main  # Divergence check
 
 **Example**:
 ```bash
-cd layers/main/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select my_package
 ```
 
 **CLI-native alternative**:
 ```bash
-cd layers/main/ros2_ws
+cd layers/main/core_ws
 colcon build --symlink-install
 # Or for specific package:
 colcon build --packages-select <package_name>
@@ -189,7 +189,7 @@ colcon build --packages-select <package_name>
 ### `/build-all`
 
 **File**: `.agent/workflows/ops/build-all.md`  
-**Script**: `.agent/scripts/build_all.sh`
+**Script**: `.agent/scripts/build.sh`
 
 **What it does**:
 - Builds underlay workspace first
@@ -198,7 +198,7 @@ colcon build --packages-select <package_name>
 
 **Example**:
 ```bash
-.agent/scripts/build_all.sh
+.agent/scripts/build.sh
 ```
 
 **When to use**:
@@ -341,10 +341,11 @@ gh pr create --title "Add CLI integration support" --body "Closes #46
 
 **Example**:
 ```bash
-# Edit configs/<workspace>.repos
-vcs import layers/main/ros2_ws/src < configs/ros2.repos
-rosdep install --from-paths layers/main/ros2_ws/src --ignore-src -r -y
-cd layers/main/ros2_ws && colcon build
+# Edit .repos file in key repository
+# layers/main/core_ws/src/unh_marine_autonomy/config/repos/<layer>.repos
+vcs import layers/main/core_ws/src < layers/main/core_ws/src/unh_marine_autonomy/config/repos/core.repos
+rosdep install --from-paths layers/main/core_ws/src --ignore-src -r -y
+cd layers/main/core_ws && colcon build
 ```
 
 **When to use**:
@@ -365,7 +366,7 @@ cd layers/main/ros2_ws && colcon build
 
 **Example**:
 ```bash
-cd layers/main/ros2_ws
+cd layers/main/core_ws
 colcon test
 colcon test-result --verbose
 ```
@@ -549,7 +550,7 @@ git push -u origin feature/my-task
 
 ```bash
 # Build single package (fast)
-cd layers/main/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select my_package
 
 # Build with dependencies
@@ -567,7 +568,7 @@ colcon build --parallel-workers 4
 
 ```bash
 # Test single package
-cd layers/main/ros2_ws
+cd layers/main/core_ws
 colcon test --packages-select my_package
 colcon test-result --verbose
 
@@ -582,14 +583,14 @@ colcon test --packages-select my_package --pytest-args -k test_my_function
 ### VCS Operations
 
 ```bash
-# Import repositories
-vcs import layers/main/ros2_ws/src < configs/ros2.repos
+# Import repositories from key repository config
+vcs import layers/main/core_ws/src < layers/main/core_ws/src/unh_marine_autonomy/config/repos/core.repos
 
 # Update repositories
-vcs pull layers/main/ros2_ws/src
+vcs pull layers/main/core_ws/src
 
 # Status across all repos
-vcs status layers/main/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**: Managing multiple repositories efficiently.

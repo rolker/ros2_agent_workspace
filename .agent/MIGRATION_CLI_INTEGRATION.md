@@ -185,6 +185,6 @@ None at this time. Old patterns continue to work but new patterns are recommende
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Related Issue**: #46  
 **Migration Support**: Ask questions in issue comments or PR discussions

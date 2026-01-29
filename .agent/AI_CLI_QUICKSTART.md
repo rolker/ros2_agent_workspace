@@ -242,7 +242,7 @@ Work directly with ROS tools:
 
 ```bash
 # Build specific package
-cd layers/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select <package_name>
 
 # Run tests
@@ -285,7 +285,7 @@ All GitHub content (Issues, PRs, Comments) **must** end with:
 ### Clean Workspace
 
 - ❌ Don't leave build artifacts in repo root
-- ✅ Build in `layers/ros2_ws/` (or workspace-specific dir)
+- ✅ Build in workspace layers (e.g., `layers/main/core_ws/`)
 - ✅ Use `.agent/scratchpad/` for temporary files (logs, analysis, etc.)
 
 ---
@@ -463,6 +463,6 @@ After your first task:
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Maintained By**: Framework Engineering Team  
 **Related**: [AI_RULES.md](AI_RULES.md), [CLI_COMMANDS.md](CLI_COMMANDS.md), [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md)
