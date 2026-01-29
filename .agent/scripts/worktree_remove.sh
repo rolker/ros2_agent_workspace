@@ -67,7 +67,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$ISSUE_NUM" ]; then
-    echo "Error: --issue is required"
+    echo "Error: Issue number is required"
     show_usage
     exit 1
 fi

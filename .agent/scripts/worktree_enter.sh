@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$ISSUE_NUM" ]; then
-    echo "Error: --issue is required"
+    echo "Error: Issue number is required"
     show_usage
     return 1 2>/dev/null || exit 1
 fi
@@ -134,4 +134,4 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo "  colcon build                  # Build packages"
     echo "  colcon test                   # Run tests"
 fi
-echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" --issue $ISSUE_NUM  # Remove worktree"
+echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" $ISSUE_NUM  # Remove worktree"
