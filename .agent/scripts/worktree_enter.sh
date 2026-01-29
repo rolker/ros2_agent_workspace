@@ -134,4 +134,4 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo "  colcon build                  # Build packages"
     echo "  colcon test                   # Run tests"
 fi
-echo "  ./.agent/scripts/worktree_remove.sh --issue $ISSUE_NUM  # Remove worktree"
+echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" --issue $ISSUE_NUM  # Remove worktree"

@@ -222,10 +222,13 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
     echo ""
     echo "Setting up workspace worktree..."
     
-    # Create symlink to main layers
+    # Create symlink to main layers (using relative path for portability)
+    # From: .workspace-worktrees/issue-N/layers/main
+    # To:   layers/main (at root)
+    # Path: ../../../layers/main (up through layers/ -> issue-N/ -> .workspace-worktrees/)
     echo "Creating symlink to main layers..."
     mkdir -p "$WORKTREE_DIR/layers"
-    ln -s "$ROOT_DIR/layers/main" "$WORKTREE_DIR/layers/main"
+    ln -s "../../../layers/main" "$WORKTREE_DIR/layers/main"
     
     # Ensure scratchpad exists
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"

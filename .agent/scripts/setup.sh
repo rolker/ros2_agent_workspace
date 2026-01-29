@@ -60,7 +60,7 @@ if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
 
             if [ -n "$KEY_REPO_URL" ] && [ -n "$KEY_REPO_BRANCH" ]; then
                 echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
-                mkdir -p layers/core_ws/src
+                mkdir -p layers/main/core_ws/src
                 git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
             else
                 echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
