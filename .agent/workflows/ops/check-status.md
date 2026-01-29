@@ -57,8 +57,8 @@ echo "Framework: $AGENT_FRAMEWORK"
 # Workspace repository status
 git status
 
-# All repositories in workspaces/
-vcs status workspaces/*/src 2>/dev/null || echo "No workspaces cloned yet"
+# All repositories in layers/
+vcs status layers/*/src 2>/dev/null || echo "No workspaces cloned yet"
 
 # Check for uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
@@ -72,7 +72,7 @@ fi
 Check if workspaces have been built:
 
 ```bash
-for ws in workspaces/*_ws; do
+for ws in layers/*_ws; do
     if [ -d "$ws/install" ]; then
         echo "✅ $(basename $ws): Built"
     else
@@ -146,7 +146,7 @@ LOCAL STATUS:
 $(git status --short)
 
 BUILD STATUS:
-$(for ws in workspaces/*_ws; do
+$(for ws in layers/*_ws; do
     if [ -d "$ws/install" ]; then
         echo "  ✅ $(basename $ws)"
     else

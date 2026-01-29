@@ -47,7 +47,7 @@ show_usage() {
     echo ""
     echo "This configures git identity in:"
     echo "  - The workspace repository (ros2_agent_workspace)"
-    echo "  - All repositories under workspaces/*/src/*"
+    echo "  - All repositories under layers/*/src/*"
 }
 
 # Auto-detect framework from environment
@@ -122,9 +122,9 @@ git config user.name "$AGENT_NAME"
 git config user.email "$AGENT_EMAIL"
 echo "  ✓ Workspace repository configured"
 
-# Configure all repositories in workspaces/
+# Configure all repositories in layers/
 
-if [ -d "workspaces" ]; then
+if [ -d "layers" ]; then
     REPO_COUNT=0
     # Use process substitution with find to be robust against weird filenames
     # and avoid subshell exit issues with set -e
@@ -141,15 +141,15 @@ if [ -d "workspaces" ]; then
             continue
         fi
         ((REPO_COUNT++))
-    done < <(find workspaces -type d -name ".git")
+    done < <(find layers -type d -name ".git")
     
     if [ $REPO_COUNT -gt 0 ]; then
-        echo "  ✓ Configured $REPO_COUNT repositories in workspaces/"
+        echo "  ✓ Configured $REPO_COUNT repositories in layers/"
     else
-        echo "  ℹ No repositories found in workspaces/ yet"
+        echo "  ℹ No repositories found in layers/ yet"
     fi
 else
-    echo "  ℹ No workspaces/ directory found yet"
+    echo "  ℹ No layers/ directory found yet"
 fi
 
 echo ""

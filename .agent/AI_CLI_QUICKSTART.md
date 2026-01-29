@@ -242,7 +242,7 @@ Work directly with ROS tools:
 
 ```bash
 # Build specific package
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon build --packages-select <package_name>
 
 # Run tests
@@ -285,7 +285,7 @@ All GitHub content (Issues, PRs, Comments) **must** end with:
 ### Clean Workspace
 
 - ❌ Don't leave build artifacts in repo root
-- ✅ Build in `workspaces/ros2_ws/` (or workspace-specific dir)
+- ✅ Build in `layers/ros2_ws/` (or workspace-specific dir)
 - ✅ Use `.agent/scratchpad/` for temporary files (logs, analysis, etc.)
 
 ---

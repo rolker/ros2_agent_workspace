@@ -49,22 +49,22 @@ JSON_LAYERS_ARRAY=()
 TIMESTAMP="$(date -Iseconds)"
 
 for layer in "${LAYERS[@]}"; do
-    WORKSPACE_DIR="$ROOT_DIR/workspaces/${layer}_ws"
+    LAYER_DIR="$ROOT_DIR/layers/${layer}_ws"
     LAYER_RESULT="skipped"
     LAYER_SUMMARY="No source"
     
-    if [ -d "$WORKSPACE_DIR/src" ]; then
+    if [ -d "$LAYER_DIR/src" ]; then
         echo "----------------------------------------"
         echo "Testing Layer: $layer"
         
 
         # Safety Check: Never run in root
-        if [ "$WORKSPACE_DIR" == "$ROOT_DIR" ]; then
-             echo "❌ Error: Layer workspace path resolves to root directory. Skipping."
+        if [ "$LAYER_DIR" == "$ROOT_DIR" ]; then
+             echo "❌ Error: Layer path resolves to root directory. Skipping."
              continue
         fi
 
-        cd "$WORKSPACE_DIR" || continue
+        cd "$LAYER_DIR" || continue
         
         # Source existing install if available
         if [ -f "install/setup.bash" ]; then

@@ -73,7 +73,7 @@ If you're running in a container or isolated environment:
 
 **Why this method?**
 - ✅ Persists across sessions
-- ✅ Configures workspace repo + all repos in `workspaces/*/src/`
+- ✅ Configures workspace repo + all repos in `layers/*/src/`
 - ✅ Isolated environment means no conflict with user
 
 **Not sure which to use?** See the decision tree in [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md).

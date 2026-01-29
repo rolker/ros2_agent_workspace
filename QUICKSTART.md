@@ -73,7 +73,7 @@ make setup-core
 ```
 
 This will:
-- Create `workspaces/core_ws/src`
+- Create `layers/core_ws/src`
 - Import all repositories from `configs/core.repos`
 - Clone Project11, Marine AIS, Navigation packages, etc.
 
@@ -194,7 +194,7 @@ make clean
 ### Update All Repositories
 
 ```bash
-cd workspaces/core_ws/src
+cd layers/core_ws/src
 vcs pull
 cd ../../..
 ./.agent/scripts/build.sh

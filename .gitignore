@@ -1,8 +1,8 @@
-# Ignore ROS2 workspaces because they are managed by vcs and .repos files
-workspaces/*/src/
-workspaces/*/build/
-workspaces/*/install/
-workspaces/*/log/
+# Ignore ROS2 layers because they are managed by vcs and .repos files
+layers/*/src/
+layers/*/build/
+layers/*/install/
+layers/*/log/
 
 # Ignore colcon/ROS artifacts in root if any
 build/

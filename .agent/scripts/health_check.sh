@@ -109,7 +109,7 @@ if [ -d "$ROOT_DIR/configs" ]; then
     REPOS_COUNT=$(ls -1 "$ROOT_DIR/configs"/*.repos 2>/dev/null | wc -l)
     
     # Check for migrated repos
-    MIGRATED_DIR="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/repos"
+    MIGRATED_DIR="$ROOT_DIR/layers/core_ws/src/unh_marine_autonomy/config/repos"
     if [ -d "$MIGRATED_DIR" ]; then
         MIGRATED_COUNT=$(ls -1 "$MIGRATED_DIR"/*.repos 2>/dev/null | wc -l)
         REPOS_COUNT=$((REPOS_COUNT + MIGRATED_COUNT))
@@ -151,7 +151,7 @@ if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     fi
 
     # Validate migrated repos (if exist)
-    MIGRATED_DIR="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/repos"
+    MIGRATED_DIR="$ROOT_DIR/layers/core_ws/src/unh_marine_autonomy/config/repos"
     if [ -d "$MIGRATED_DIR" ]; then
         if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$MIGRATED_DIR" --strict &>/dev/null; then
              VALIDATION_PASSED=false
@@ -194,19 +194,19 @@ echo ""
 
 # Check 7: Workspace Layers
 echo "7. Checking Workspace Layers..."
-if [ -d "$ROOT_DIR/workspaces" ]; then
-    WORKSPACE_COUNT=$(ls -d "$ROOT_DIR/workspaces"/*_ws 2>/dev/null | wc -l)
-    if [ "$WORKSPACE_COUNT" -gt 0 ]; then
-        check_pass "Found $WORKSPACE_COUNT workspace layer(s)"
+if [ -d "$ROOT_DIR/layers" ]; then
+    LAYER_COUNT=$(ls -d "$ROOT_DIR/layers"/*_ws 2>/dev/null | wc -l)
+    if [ "$LAYER_COUNT" -gt 0 ]; then
+        check_pass "Found $LAYER_COUNT layer(s)"
         
-        for ws_dir in "$ROOT_DIR/workspaces"/*_ws; do
-            if [ -d "$ws_dir" ]; then
-                ws_name=$(basename "$ws_dir")
-                if [ -d "$ws_dir/src" ]; then
-                    repo_count=$(find "$ws_dir/src" -mindepth 1 -maxdepth 1 -type d | wc -l)
-                    echo "  - $ws_name: $repo_count repositories"
+        for layer_dir in "$ROOT_DIR/layers"/*_ws; do
+            if [ -d "$layer_dir" ]; then
+                layer_name=$(basename "$layer_dir")
+                if [ -d "$layer_dir/src" ]; then
+                    repo_count=$(find "$layer_dir/src" -mindepth 1 -maxdepth 1 -type d | wc -l)
+                    echo "  - $layer_name: $repo_count repositories"
                     
-                    if [ -f "$ws_dir/install/setup.bash" ]; then
+                    if [ -f "$layer_dir/install/setup.bash" ]; then
                         echo "    ✓ Built"
                     else
                         echo "    ⚠ Not built"
@@ -215,10 +215,10 @@ if [ -d "$ROOT_DIR/workspaces" ]; then
             fi
         done
     else
-        check_warn "No workspace layers set up. Run: ./.agent/scripts/setup.sh <layer>"
+        check_warn "No layers set up. Run: ./.agent/scripts/setup.sh <layer>"
     fi
 else
-    check_warn "workspaces/ directory not found (will be created on setup)"
+    check_warn "layers/ directory not found (will be created on setup)"
 fi
 echo ""
 

@@ -59,7 +59,7 @@ TOTAL_FAILED=0
 FAILED_LAYERS=""
 
 for layer in "${LAYERS[@]}"; do
-    WORKSPACE_DIR="$ROOT_DIR/workspaces/${layer}_ws"
+    WORKSPACE_DIR="$ROOT_DIR/layers/${layer}_ws"
     
     if [ ! -d "$WORKSPACE_DIR/src" ]; then
         echo "Skipping layer $layer (no src directory)"

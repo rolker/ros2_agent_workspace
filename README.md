@@ -64,14 +64,14 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
-- **`configs/`**: Contains `.repos` files (YAML) defining the packages for each workspace layer.
+- **`configs/`**: Contains `.repos` files (YAML) defining the packages for each layer.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
-- **`workspaces/`**: The actual ROS2 workspaces (source code and build artifacts).
+- **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
 
 ## Usage
 
 ### 1. Setup a Layer
-To initialize a workspace layer defined in `configs/<name>.repos`:
+To initialize a layer defined in `configs/<name>.repos`:
 
 ```bash
 ./.agent/scripts/setup.sh <name>
@@ -82,11 +82,11 @@ To initialize a workspace layer defined in `configs/<name>.repos`:
 ```
 
 This will:
-1. Create `workspaces/<name>_ws/src`
+1. Create `layers/<name>_ws/src`
 2. Import repositories from `configs/<name>.repos`
 
 ### 2. Sourcing the Environment
-To source the workspaces in the correct order (Underlay -> ... -> Overlay):
+To source the layers in the correct order (Underlay -> ... -> Overlay):
 
 ```bash
 source .agent/scripts/env.sh
@@ -104,7 +104,7 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
     *   `/rebuild-all`: Clean and rebuild everything.
     *   `/submit-pr`: Create a PR for your changes.
     *   *See `.agent/workflows/` for the full list.*
-3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `workspaces/`, configs in `configs/`). Trust it to place files in the correct location.
+3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, configs in `configs/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
 
@@ -153,12 +153,12 @@ Ensure ROS 2 Jazzy is installed:
 1. Check the build report: `cat .agent/scratchpad/build_report.md`
 2. Try building a single layer:
    ```bash
-   cd workspaces/core_ws
+   cd layers/core_ws
    colcon build --symlink-install
    ```
 3. Check for missing dependencies:
    ```bash
-   rosdep install --from-paths workspaces/core_ws/src --ignore-src -r -y
+   rosdep install --from-paths layers/core_ws/src --ignore-src -r -y
    ```
 
 #### Workspace Locked

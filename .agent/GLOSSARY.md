@@ -13,8 +13,8 @@
 
 ### Project
 The **target ROS 2 software** being developed - the user's intellectual property and deliverable code.
-- **Examples**: `unh_marine_autonomy`, individual ROS 2 packages in `workspaces/*/src/`
-- **Location**: Within `workspaces/*/src/` directories
+- **Examples**: `unh_marine_autonomy`, individual ROS 2 packages in `layers/*/src/`
+- **Location**: Within `layers/*/src/` directories
 - **Agent Permissions**: ROS Developers can modify when assigned tasks
 
 ### Project-Specific Terms
@@ -22,8 +22,8 @@ Some terminology is specific to the active project.
 
 **For Project-Specific Glossaries:**
 - **Canonical Location (in project repo)**: `config/GLOSSARY.md` inside the **project/key repository itself** (e.g., in the `unh_marine_autonomy` repo)
-- **Workspace Path (after cloning)**: `workspaces/core_ws/src/<key_repo>/config/GLOSSARY.md` (e.g., `workspaces/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`)
-- **Git Note**: `workspaces/*/src/` is gitignored in this workspace repository; commit the project glossary to the **project/key repository**, not to this workspace repo
+- **Workspace Path (after cloning)**: `layers/core_ws/src/<key_repo>/config/GLOSSARY.md` (e.g., `layers/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`)
+- **Git Note**: `layers/*/src/` is gitignored in this workspace repository; commit the project glossary to the **project/key repository**, not to this workspace repo
 - **Rule**: Project glossary takes precedence over workspace glossary for conflicting terms
 
 ### Workspace
@@ -43,7 +43,7 @@ The **scaffolding, tooling, and infrastructure** that wraps and supports Project
 
 ### Underlay
 **Singular**: There is **ONE** underlay - the pre-built dependency foundation.
-- **Examples**: `/opt/ros/jazzy`, optionally extended with `workspaces/underlay_ws/install/`
+- **Examples**: `/opt/ros/jazzy`, optionally extended with `layers/underlay_ws/install/`
 - **Purpose**: Provides stable, known-good dependencies for all overlays
 - **Agent Rule**: READ only, DO NOT MODIFY
 - **Sourcing**: `source /opt/ros/jazzy/setup.bash` (or via `env.sh`)
@@ -69,15 +69,15 @@ A thematic grouping of related packages within the multi-workspace structure.
 ```
 /opt/ros/jazzy (underlay)
     ↓
-workspaces/core_ws/install (overlay 1)
+layers/core_ws/install (overlay 1)
     ↓
-workspaces/platforms_ws/install (overlay 2)
+layers/platforms_ws/install (overlay 2)
     ↓
-workspaces/sensors_ws/install (overlay 3)
+layers/sensors_ws/install (overlay 3)
     ↓
-workspaces/simulation_ws/install (overlay 4)
+layers/simulation_ws/install (overlay 4)
     ↓
-workspaces/ui_ws/install (overlay 5)
+layers/ui_ws/install (overlay 5)
 ```
 
 ---
@@ -129,7 +129,7 @@ See [PERMISSIONS.md](PERMISSIONS.md) for complete role definitions.
 Modifies workspace infrastructure (`.agent/`, workflows, build system).
 
 ### ROS Developer
-Modifies ROS 2 packages in `workspaces/*/src/` (when assigned tasks).
+Modifies ROS 2 packages in `layers/*/src/` (when assigned tasks).
 
 ---
 
@@ -173,12 +173,12 @@ ROS 2 build tool. See `.agent/knowledge/ros2_development_patterns.md` for detail
 ## Ambiguity Resolution Examples
 
 **"Update the project documentation"** → Clarify:
-- Project code docs (package README)? → Modify `workspaces/*/src/<pkg>/README.md`
+- Project code docs (package README)? → Modify `layers/*/src/<pkg>/README.md`
 - Workspace infrastructure docs? → Modify root-level `README.md` or `.agent/` docs
 
 **"Build the workspace"** → Clarify:
 - Build all layers? → `make build`
-- Build specific layer? → `cd workspaces/core_ws && colcon build`
+- Build specific layer? → `cd layers/core_ws && colcon build`
 - Build specific package? → `colcon build --packages-select <pkg>`
 
 **"Run tests"** → Clarify:
@@ -206,20 +206,20 @@ This section contains terms specific to the current project being developed in t
 
 ### Project11
 Legacy name for the UNH Marine Autonomy framework.
-- **Refers to**: The packages within `workspaces/core_ws/src/unh_marine_autonomy/`
+- **Refers to**: The packages within `layers/core_ws/src/unh_marine_autonomy/`
 - **History**: Original codebase name, now rebranded to "Marine Autonomy"
 - **Usage**: May appear in legacy code, documentation, or git history
 - **Modern term**: Use "Marine Autonomy" or "UNH Marine Autonomy" in new code/docs
 
 ### UNH Marine Autonomy
 The primary project developed in this workspace.
-- **Location**: `workspaces/core_ws/src/unh_marine_autonomy/`
+- **Location**: `layers/core_ws/src/unh_marine_autonomy/`
 - **Purpose**: Autonomous marine vehicle software framework
 - **Components**: Navigation, sensors, visualization, mission planning packages
 - **Also known as**: "Project11" (legacy), "marine framework"
 
 > **Note**: For other projects, create a project-specific glossary at:  
-> `workspaces/core_ws/src/<project_name>/config/GLOSSARY.md`
+> `layers/core_ws/src/<project_name>/config/GLOSSARY.md`
 
 ---
 

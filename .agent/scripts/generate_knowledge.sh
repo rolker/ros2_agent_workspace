@@ -32,18 +32,18 @@ echo "Generating workspace knowledge links..."
 # --- Definition of Knowledge Links ---
 
 # System
-link_doc "workspaces/core_ws/src/unh_marine_autonomy/marine_autonomy/README.md" "system__autonomy_overview.md"
+link_doc "layers/core_ws/src/unh_marine_autonomy/marine_autonomy/README.md" "system__autonomy_overview.md"
 
 # Components
-link_doc "workspaces/core_ws/src/unh_marine_autonomy/mission_manager/mission_manager/README.md" "component__mission_manager.md"
-link_doc "workspaces/core_ws/src/unh_marine_autonomy/helm_manager/README.md" "component__helm_manager.md"
-link_doc "workspaces/core_ws/src/marine_ais/marine_ais_msgs/README.md" "component__marine_ais.md"
+link_doc "layers/core_ws/src/unh_marine_autonomy/mission_manager/mission_manager/README.md" "component__mission_manager.md"
+link_doc "layers/core_ws/src/unh_marine_autonomy/helm_manager/README.md" "component__helm_manager.md"
+link_doc "layers/core_ws/src/marine_ais/marine_ais_msgs/README.md" "component__marine_ais.md"
 
 # UI
-link_doc "workspaces/ui_ws/src/camp/README.md" "component__camp_ui.md"
-link_doc "workspaces/ui_ws/src/camp/docs" "architecture__camp_docs"
+link_doc "layers/ui_ws/src/camp/README.md" "component__camp_ui.md"
+link_doc "layers/ui_ws/src/camp/docs" "architecture__camp_docs"
 
 # Simulation
-link_doc "workspaces/simulation_ws/src/unh_marine_simulation/README.md" "component__simulation.md"
+link_doc "layers/simulation_ws/src/unh_marine_simulation/README.md" "component__simulation.md"
 
 echo "Done."

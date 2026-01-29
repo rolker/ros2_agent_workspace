@@ -21,7 +21,7 @@ Initialize a workspace layer from a `.repos` configuration file.
 ```
 
 **What it does:**
-1. Creates `workspaces/<layer>_ws/src` directory
+1. Creates `layers/<layer>_ws/src` directory
 2. Imports repositories from `configs/<layer>.repos` using `vcs import`
 3. Initializes git for each repository
 
@@ -30,7 +30,7 @@ Initialize a workspace layer from a `.repos` configuration file.
 - `git`
 
 **Outputs:**
-- `workspaces/<layer>_ws/src/` directory with cloned repositories
+- `layers/<layer>_ws/src/` directory with cloned repositories
 
 ---
 
@@ -179,7 +179,7 @@ Build ROS 2 workspace layers with colcon.
 - System packages installed (see `bootstrap.sh`)
 
 **Outputs:**
-- Build artifacts in each `workspaces/<layer>_ws/build/`
+- Build artifacts in each `layers/<layer>_ws/build/`
 - `.agent/scratchpad/build_report.md` with build summary
 
 ---
@@ -260,7 +260,7 @@ Configure git identity persistently across all repositories by modifying `.git/c
 
 **What it does:**
 1. Configures git in workspace repository
-2. Configures git in all repositories under `workspaces/*/src/`
+2. Configures git in all repositories under `layers/*/src/`
 3. Sets git user.name and user.email in each `.git/config`
 
 **Why use this:**

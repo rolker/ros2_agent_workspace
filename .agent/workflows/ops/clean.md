@@ -11,7 +11,7 @@ This workflow cleans up build artifacts and removes repository directories that 
 ### 1. Clean Build Artifacts
 Run this to remove all build, install, and log directories across all workspace layers.
 ```bash
-rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
+rm -rf layers/*_ws/build layers/*_ws/install layers/*_ws/log
 ```
 
 ### 2. Prune Removed Repositories
@@ -22,7 +22,7 @@ To safely remove directories in `src/` that are no longer tracked in your `.repo
 source .agent/scripts/env.sh
 for layer in "${LAYERS[@]}"; do
     [ -z "$layer" ] && continue
-    WORKSPACE_DIR="workspaces/${layer}_ws"
+    WORKSPACE_DIR="layers/${layer}_ws"
     SRC_DIR="$WORKSPACE_DIR/src"
     REPO_CONFIG="configs/${layer}.repos"
     
@@ -58,7 +58,7 @@ done
 If you want to completely re-import everything and ensure a clean state:
 ```bash
 # 1. Clean everything
-rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
+rm -rf layers/*/build layers/*/install layers/*/log
 
 # 2. Run setup for all layers to ensure configs match local src
 source .agent/scripts/env.sh
@@ -69,4 +69,4 @@ done
 
 ## Verification
 - Run `ls workspaces` to ensure build directories are gone.
-- Run `ls workspaces/*_ws/src` to verify only configured repos remain.
+- Run `ls layers/*_ws/src` to verify only configured repos remain.

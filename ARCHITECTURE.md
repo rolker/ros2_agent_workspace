@@ -66,7 +66,7 @@ ros2_agent_workspace/
 │   ├── simulation.repos      # Simulation tools
 │   └── ui.repos              # Visualization & user interfaces
 │
-├── workspaces/                # Generated workspace directories (gitignored)
+├── layers/                    # Generated layer directories (gitignored)
 │   ├── underlay_ws/
 │   ├── core_ws/
 │   ├── platforms_ws/

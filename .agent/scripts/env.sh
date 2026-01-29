@@ -18,8 +18,8 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # 2. Workspace Layers
 # 2. Workspace Layers
-# Define the order of workspaces to source. Order determines overlay priority (last one is top).
-LAYERS_CONFIG="$ROOT_DIR/workspaces/core_ws/src/unh_marine_autonomy/config/layers.txt"
+# Define the order of layers to source. Order determines overlay priority (last one is top).
+LAYERS_CONFIG="$ROOT_DIR/layers/core_ws/src/unh_marine_autonomy/config/layers.txt"
 
 if [ -f "$LAYERS_CONFIG" ]; then
     # Read non-empty lines into array
@@ -33,12 +33,12 @@ fi
 echo "Sourcing ROS2 Agent Workspace layers..."
 
 for layer in "${LAYERS[@]}"; do
-    SETUP_FILE="$ROOT_DIR/workspaces/${layer}_ws/install/setup.bash"
+    SETUP_FILE="$ROOT_DIR/layers/${layer}_ws/install/setup.bash"
     if [ -f "$SETUP_FILE" ]; then
         echo "  - Sourcing $layer..."
         source "$SETUP_FILE"
     else
-        if [ -d "$ROOT_DIR/workspaces/${layer}_ws/src" ]; then
+        if [ -d "$ROOT_DIR/layers/${layer}_ws/src" ]; then
              echo "  ! Warning: $layer exists but is not built (setup.bash not found)."
         fi
     fi

@@ -28,7 +28,7 @@ When working with this workspace:
 
 - **SSH Keys**: Use SSH keys for repository access instead of passwords
 - **Dependencies**: Regularly update dependencies using `rosdep update`
-- **Build Artifacts**: Build artifacts in `workspaces/*/build/` and `workspaces/*/install/` are gitignored
+- **Build Artifacts**: Build artifacts in `layers/*/build/` and `layers/*/install/` are gitignored
 - **Secrets**: Never commit credentials, API keys, or sensitive configuration
 - **Code Review**: All changes should go through pull request review
 

@@ -47,8 +47,8 @@ Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS
 # Build all layers in order
 make build
 
-# Build specific workspace
-cd workspaces/core_ws && colcon build --symlink-install
+# Build specific layer
+cd layers/core_ws && colcon build --symlink-install
 
 # Build with output
 colcon build --symlink-install --event-handlers console_direct+
@@ -128,14 +128,14 @@ $ .agent/scripts/status_report.sh
 By default, Copilot CLI acts as **ROS Developer**:
 
 **Allowed:**
-- ✅ Create/modify ROS packages in `workspaces/*/src/` (when working on assigned tasks)
+- ✅ Create/modify ROS packages in `layers/*/src/` (when working on assigned tasks)
 - ✅ Write/update tests
 - ✅ Update package documentation
 - ✅ Modify config files in the key repository's `config/repos/*.repos`
 - ✅ Update build configurations (CMakeLists.txt, package.xml, setup.py)
 
 **Forbidden:**
-- ❌ Delete or restructure `workspaces/*/src/` without explicit instruction
+- ❌ Delete or restructure `layers/*/src/` without explicit instruction
 - ❌ Modify packages you weren't assigned to work on
 - ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
 - ❌ Commit build artifacts (`build/`, `install/`, `log/`)
@@ -147,7 +147,7 @@ By default, Copilot CLI acts as **ROS Developer**:
 
 Creating a new ROS2 Python package:
 ```bash
-cd workspaces/core_ws/src
+cd layers/core_ws/src
 ros2 pkg create --build-type ament_python my_package \
   --dependencies rclpy std_msgs
 ```

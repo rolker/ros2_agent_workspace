@@ -189,7 +189,7 @@ Examples (with correct introspection):
 - **Keep repository root clean** - No build artifacts, logs, or temporary files
 - **Use designated directories**:
   - `.agent/scratchpad/` - Persistent temporary artifacts (logs, reports, analysis)
-  - Workspace-specific build dirs (e.g., `workspaces/ros2_ws/build/`, `workspaces/ros2_ws/install/`)
+  - Workspace-specific build dirs (e.g., `layers/ros2_ws/build/`, `layers/ros2_ws/install/`)
 - **Pre-commit hook** checks for suspicious files in source directories
 
 **Reference**: [rules/common/clean-root.md](rules/common/clean-root.md)
@@ -206,8 +206,8 @@ Examples (with correct introspection):
 ### Build Location
 
 - **Always build in workspace directories**, never in repository root
-- **Standard location**: `workspaces/ros2_ws/` (or workspace-specific dir)
-- **Use colcon** for ROS 2 builds: `cd workspaces/ros2_ws && colcon build`
+- **Standard location**: `layers/ros2_ws/` (or workspace-specific dir)
+- **Use colcon** for ROS 2 builds: `cd layers/ros2_ws && colcon build`
 
 **Reference**: [rules/project/build-location.md](rules/project/build-location.md)
 

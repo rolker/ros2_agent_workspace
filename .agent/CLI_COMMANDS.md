@@ -54,7 +54,7 @@ This document maps:
 git status
 
 # Verbose with vcstool:
-vcs status workspaces/ros2_ws/src
+vcs status layers/ros2_ws/src
 ```
 
 **When to use**:
@@ -78,7 +78,7 @@ vcs status workspaces/ros2_ws/src
 **Example**:
 ```bash
 git status
-vcs status workspaces/ros2_ws/src
+vcs status layers/ros2_ws/src
 ```
 
 **When to use**:
@@ -163,13 +163,13 @@ git log --oneline --left-right HEAD...origin/main  # Divergence check
 
 **Example**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon build --packages-select my_package
 ```
 
 **CLI-native alternative**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon build --symlink-install
 # Or for specific package:
 colcon build --packages-select <package_name>
@@ -216,7 +216,7 @@ colcon build --packages-select <package_name>
 
 **Example**:
 ```bash
-rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
+rm -rf layers/*/build layers/*/install layers/*/log
 .agent/scripts/build_all.sh
 ```
 
@@ -238,7 +238,7 @@ rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
 
 **Example**:
 ```bash
-rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
+rm -rf layers/*_ws/build layers/*_ws/install layers/*_ws/log
 ```
 
 **When to use**:
@@ -338,9 +338,9 @@ gh pr create --title "Add CLI integration support" --body "Closes #46
 **Example**:
 ```bash
 # Edit configs/<workspace>.repos
-vcs import workspaces/ros2_ws/src < configs/ros2.repos
-rosdep install --from-paths workspaces/ros2_ws/src --ignore-src -r -y
-cd workspaces/ros2_ws && colcon build
+vcs import layers/ros2_ws/src < configs/ros2.repos
+rosdep install --from-paths layers/ros2_ws/src --ignore-src -r -y
+cd layers/ros2_ws && colcon build
 ```
 
 **When to use**:
@@ -361,7 +361,7 @@ cd workspaces/ros2_ws && colcon build
 
 **Example**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon test
 colcon test-result --verbose
 ```
@@ -430,7 +430,7 @@ git push -u origin feature/my-task
 
 ```bash
 # Build single package (fast)
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon build --packages-select my_package
 
 # Build with dependencies
@@ -448,7 +448,7 @@ colcon build --parallel-workers 4
 
 ```bash
 # Test single package
-cd workspaces/ros2_ws
+cd layers/ros2_ws
 colcon test --packages-select my_package
 colcon test-result --verbose
 
@@ -464,13 +464,13 @@ colcon test --packages-select my_package --pytest-args -k test_my_function
 
 ```bash
 # Import repositories
-vcs import workspaces/ros2_ws/src < configs/ros2.repos
+vcs import layers/ros2_ws/src < configs/ros2.repos
 
 # Update repositories
-vcs pull workspaces/ros2_ws/src
+vcs pull layers/ros2_ws/src
 
 # Status across all repos
-vcs status workspaces/ros2_ws/src
+vcs status layers/ros2_ws/src
 ```
 
 **When to use**: Managing multiple repositories efficiently.
