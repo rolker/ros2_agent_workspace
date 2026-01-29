@@ -152,8 +152,8 @@ git checkout -b feature/TASK-123-add-new-layer
 │   ├── rules/          # Always-on rules for agents
 │   ├── scripts/        # Helper scripts for setup, build, test
 │   └── knowledge/      # Generated knowledge links
-├── configs/            # .repos files defining workspace layers
-└── workspaces/         # ROS2 workspaces (gitignored, generated)
+├── configs/            # .repos files defining layers
+└── layers/             # ROS2 layers (gitignored, generated)
 ```
 
 ## Adding New Layers

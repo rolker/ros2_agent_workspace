@@ -15,6 +15,20 @@ To prevent conflicts and "messy" workspaces when multiple agents are active:
     *   **All changes via Pull Requests**: After pushing your feature branch, create a PR to merge into `main`.
     *   *exception*: If you are just updating documentation or non-code artifacts, you may use your discretion, but a branch + PR is still preferred.
 
+2.  **Git Worktrees for Parallel Work** (Recommended):
+    For complete isolation when multiple agents work simultaneously:
+    ```bash
+    # Create isolated worktree
+    .agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+    
+    # Enter worktree (sources ROS environment)
+    source .agent/scripts/worktree_enter.sh 42
+    
+    # List all active worktrees
+    .agent/scripts/worktree_list.sh
+    ```
+    Worktrees provide separate directories so agents don't interfere with each other's builds or uncommitted changes.
+
 ## Development Workflows
 
 ### 1. Sandboxed (Recommended)

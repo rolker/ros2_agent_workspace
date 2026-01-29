@@ -10,7 +10,7 @@ This directory contains custom pre-commit hooks for the ROS2 Agent Workspace.
 
 **What it does**:
 - Scans for suspicious file patterns (`.tmp`, `.temp`, `.bak`, `.log`, etc.)
-- Warns if such files are found in `workspaces/*/src/` directories
+- Warns if such files are found in `layers/*/src/` directories
 - Helps maintain clean source repositories
 
 **When it runs**: Before every commit (via pre-commit framework)

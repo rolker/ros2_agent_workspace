@@ -5,7 +5,18 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-WORKSPACES_DIR="$ROOT_DIR/workspaces"
+
+# Worktree detection - adjust paths based on context
+WORKTREE_INFO=""
+if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
+    WORKTREE_INFO="layer worktree"
+    LAYERS_DIR="$ROOT_DIR"  # In layer worktree, ROOT_DIR contains *_ws dirs
+elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
+    WORKTREE_INFO="workspace worktree"
+    LAYERS_DIR="$ROOT_DIR/layers/main"
+else
+    LAYERS_DIR="$ROOT_DIR/layers/main"
+fi
 
 # Helper function to print a table row
 print_row() {
@@ -20,6 +31,9 @@ print_header() {
 
 echo "# Workspace Status Report"
 echo "**Date**: $(date)"
+if [ -n "$WORKTREE_INFO" ]; then
+    echo "**Context**: Running in $WORKTREE_INFO"
+fi
 echo ""
 
 # 1. Root Repository Status
@@ -47,9 +61,9 @@ else
 fi
 echo ""
 
-# 2. Workspace Repositories (VCS)
+# 2. Layer Repositories (VCS)
 if ! command -v vcs &> /dev/null; then
-    echo "## Workspaces"
+    echo "## Layers"
     echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
     # We continue to show test results even if VCS fails
 else
@@ -60,7 +74,7 @@ else
         EXPECTED_REPOS=""
     fi
 
-    for ws_dir in "$WORKSPACES_DIR"/*; do
+    for ws_dir in "$LAYERS_DIR"/*; do
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
             

@@ -21,7 +21,7 @@ This directory contains symbolic links to key documentation found throughout the
 *Note: This index is manually maintained via the `index_knowledge` workflow. If you add new major components, please update this file and create the corresponding symlinks.*
 
 # 🔍 Search Tips for Agents
-> **Important**: The source code in `workspaces/` is **gitignored** (managed by `vcs`).
+> **Important**: The source code in `layers/` is **gitignored** (managed by `vcs`).
 > Tools like `find_by_name` will **not** find files in `src/` if searching from the root.
 >
 > **Best Practice**:

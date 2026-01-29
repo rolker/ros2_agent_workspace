@@ -84,14 +84,17 @@ source .agent/scripts/set_git_identity_env.sh --agent gemini
 Or configure manually:
 
 ```bash
-# For Copilot CLI:
+# For Copilot CLI (with model):
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "Claude Sonnet 4.5"
+
+# For Copilot CLI (without model, will show "Unknown Model"):
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 
-# For Gemini CLI:
-source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
+# For Gemini CLI (with model):
+source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu" "Gemini 2.0 Flash"
 
 # For other CLI frameworks:
-source .agent/scripts/set_git_identity_env.sh "<Your Framework> Agent" "roland+<framework>@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "<Your Framework> Agent" "roland+<framework>@ccom.unh.edu" "<Model Name>"
 ```
 
 **Verify it worked**:
@@ -242,7 +245,7 @@ Work directly with ROS tools:
 
 ```bash
 # Build specific package
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select <package_name>
 
 # Run tests
@@ -285,7 +288,7 @@ All GitHub content (Issues, PRs, Comments) **must** end with:
 ### Clean Workspace
 
 - ❌ Don't leave build artifacts in repo root
-- ✅ Build in `workspaces/ros2_ws/` (or workspace-specific dir)
+- ✅ Build in workspace layers (e.g., `layers/main/core_ws/`)
 - ✅ Use `.agent/scratchpad/` for temporary files (logs, analysis, etc.)
 
 ---
@@ -335,12 +338,16 @@ Add this to your workflow scripts if they need ROS commands.
 **Cause**: Identity not configured or using wrong method  
 **Fix**:
 ```bash
-# For CLI agents (ephemeral):
+# For CLI agents (ephemeral, with model):
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "Claude Sonnet 4.5"
+
+# Or without model (will show "Unknown Model"):
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 
 # Verify:
 git config user.name
 git config user.email
+echo $AGENT_MODEL
 ```
 
 **Still wrong?** Check that you're using `source` (not just running the script), and that the script succeeded.
@@ -416,10 +423,14 @@ See [PERMISSIONS.md](PERMISSIONS.md) for full details.
 
 **A**: Use the generic pattern:
 ```bash
+# With model name (recommended):
+source .agent/scripts/set_git_identity_env.sh "<Your Framework> Agent" "roland+<framework-slug>@ccom.unh.edu" "<Model Name>"
+
+# Without model name (will show "Unknown Model"):
 source .agent/scripts/set_git_identity_env.sh "<Your Framework> Agent" "roland+<framework-slug>@ccom.unh.edu"
 ```
 
-Example: "MyAI CLI Agent" / "roland+myai-cli@ccom.unh.edu"
+Example: "MyAI CLI Agent" / "roland+myai-cli@ccom.unh.edu" / "MyAI Pro v2"
 
 ---
 
@@ -463,6 +474,6 @@ After your first task:
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Maintained By**: Framework Engineering Team  
 **Related**: [AI_RULES.md](AI_RULES.md), [CLI_COMMANDS.md](CLI_COMMANDS.md), [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md)

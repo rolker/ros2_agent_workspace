@@ -14,7 +14,7 @@ Execute tests across all workspace layers in the correct order.
     - Check for `❌ Failed` layers.
 
 3.  **Debug Failures**:
-    - If a layer fails, navigate to `workspaces/<layer>_ws`.
+    - If a layer fails, navigate to `layers/<layer>_ws`.
     - View specific failure details:
       ```bash
       colcon test-result --verbose

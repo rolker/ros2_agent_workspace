@@ -2,16 +2,48 @@
 
 **Goal**: Enable multiple AI agents to work accurately and safely within the same workspace without stepping on each other's toes.
 
-## 1. Work Visibility (Draft PR Workflow)
+## 1. Task Isolation with Git Worktrees (Recommended)
+
+For parallel work by multiple agents, use **git worktrees** for complete isolation:
+
+### Quick Start
+```bash
+# Create isolated worktree for an issue
+.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+
+# Enter the worktree (sets up ROS environment)
+source .agent/scripts/worktree_enter.sh 42
+
+# Work in complete isolation - no conflicts with other agents
+# Build, test, commit, push - all isolated
+
+# When done, clean up
+.agent/scripts/worktree_remove.sh 42
+```
+
+### Worktree Types
+- **Layer worktree** (`--worktree layer`): For ROS package development. Created in `layers/worktrees/issue-N/`
+- **Workspace worktree** (`--worktree workspace`): For infrastructure work (.agent/, configs/, docs). Created in `.workspace-worktrees/issue-N/`
+
+### Benefits
+- **Complete isolation**: Each agent works in a separate directory
+- **No conflicts**: Agents can build/test simultaneously without interference
+- **Parallel development**: Multiple issues can be worked on at once
+- **Clean handover**: Worktrees maintain their own state
+
+## 2. Work Visibility (Draft PR Workflow)
 
 To prevent duplicate work and enable collaboration, agents must make work-in-progress visible:
 
 *   **Before Starting Work on an Issue**:
     *   Check for existing draft PRs (indicates another agent is working)
-    *   Use helper script: `.agent/scripts/start_issue_work.sh <issue_number> "Agent Name"`
-    *   This creates:
+    *   Use helper script: `.agent/scripts/start_issue_work.sh <issue_number> "Agent Name"` (branch) or add `--worktree layer` (worktree)
+    *   For branch workflow, this creates:
         - Feature branch `feature/ISSUE-<number>-<description>`
         - Work plan in `.agent/work-plans/PLAN_ISSUE-<number>.md`
+    *   For worktree workflow, this creates:
+        - Isolated worktree directory
+        - Feature branch for the worktree
     *   Edit the plan to document your approach
     *   Commit and push the plan
     *   Create a **draft PR** immediately with the plan

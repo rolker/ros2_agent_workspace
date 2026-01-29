@@ -80,8 +80,8 @@ This repository uses a layered workspace approach:
 ### Environment Sourcing Order
 ```bash
 source /opt/ros/<distro>/setup.bash  # ROS2 base
-source workspaces/underlay_ws/install/setup.bash
-source workspaces/core_ws/install/setup.bash
+source layers/main/underlay_ws/install/setup.bash
+source layers/main/core_ws/install/setup.bash
 # ... additional layers
 ```
 
