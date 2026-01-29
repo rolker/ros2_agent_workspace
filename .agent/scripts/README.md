@@ -486,6 +486,96 @@ Index ROS 2 packages and generate knowledge files.
 
 ---
 
+## Worktree Management (Task Isolation)
+
+These scripts enable parallel task development using git worktrees.
+
+### `worktree_create.sh`
+
+Create an isolated worktree for a specific issue/task.
+
+**Usage:**
+```bash
+./.agent/scripts/worktree_create.sh --issue <number> [--type layer|workspace]
+```
+
+**Examples:**
+```bash
+./.agent/scripts/worktree_create.sh --issue 123                    # Layer worktree (default)
+./.agent/scripts/worktree_create.sh --issue 123 --type workspace   # Workspace worktree
+./.agent/scripts/worktree_create.sh --issue 123 --branch feature/custom-name
+```
+
+**Worktree Types:**
+- **layer** (default): For ROS package development. Created in `layers/worktrees/issue-<N>/`
+- **workspace**: For infrastructure work (.agent/, configs/, docs). Created in `.workspace-worktrees/issue-<N>/`
+
+**What it does:**
+1. Creates a new git worktree at the specified location
+2. Creates a new branch `feature/issue-<N>` (or uses existing)
+3. Sets up task-specific scratchpad directory
+
+---
+
+### `worktree_list.sh`
+
+List all active git worktrees.
+
+**Usage:**
+```bash
+./.agent/scripts/worktree_list.sh [--verbose]
+```
+
+**Output example:**
+```
+📁 Main Workspace
+   Path:   /path/to/ros2_agent_workspace
+   Branch: main
+   Status: clean
+
+📦 Issue #123 (layer)
+   Path:   /path/to/ros2_agent_workspace/layers/worktrees/issue-123
+   Branch: feature/issue-123
+   Status: dirty
+```
+
+---
+
+### `worktree_enter.sh`
+
+Enter a worktree and set up the environment.
+
+**Usage:**
+```bash
+source ./.agent/scripts/worktree_enter.sh --issue <number>
+```
+
+**Note:** Must be **sourced** (not executed) to affect the current shell.
+
+**What it does:**
+1. Changes to the worktree directory
+2. Sources ROS 2 environment (for layer worktrees)
+3. Sets environment variables: `WORKTREE_ISSUE`, `WORKTREE_TYPE`, `WORKTREE_ROOT`
+
+---
+
+### `worktree_remove.sh`
+
+Remove a worktree and clean up.
+
+**Usage:**
+```bash
+./.agent/scripts/worktree_remove.sh --issue <number> [--force]
+```
+
+**What it does:**
+1. Checks for uncommitted changes (unless `--force`)
+2. Removes the worktree directory
+3. Prunes git worktree references
+4. Shows how to delete the branch if desired
+
+---
+
 ### `doc_analyzer.py`
 
 Analyze documentation quality of ROS 2 packages.

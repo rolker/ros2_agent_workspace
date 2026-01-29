@@ -4,6 +4,12 @@ layers/*/build/
 layers/*/install/
 layers/*/log/
 
+# Ignore layer worktrees (created dynamically for task isolation)
+layers/worktrees/
+
+# Ignore workspace worktrees (for infrastructure work)
+.workspace-worktrees/
+
 # Ignore colcon/ROS artifacts in root if any
 build/
 install/
