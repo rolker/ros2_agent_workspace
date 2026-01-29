@@ -36,8 +36,8 @@ echo "========================================"
 
 # Auto-detect layer
 FOUND_LAYER=""
-if [ -d "$ROOT_DIR/layers" ]; then
-    for layer in "$ROOT_DIR/layers/"*; do
+if [ -d "$ROOT_DIR/layers/main" ]; then
+    for layer in "$ROOT_DIR/layers/main/"*; do
         if [ -d "$layer/src" ]; then
             # Simple check: is there a directory with the package name?
             # Using find to handle nested structures

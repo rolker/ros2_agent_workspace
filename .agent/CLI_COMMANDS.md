@@ -58,7 +58,7 @@ This document maps:
 git status
 
 # Verbose with vcstool:
-vcs status layers/ros2_ws/src
+vcs status layers/main/ros2_ws/src
 ```
 
 **When to use**:
@@ -82,7 +82,7 @@ vcs status layers/ros2_ws/src
 **Example**:
 ```bash
 git status
-vcs status layers/ros2_ws/src
+vcs status layers/main/ros2_ws/src
 ```
 
 **When to use**:
@@ -167,13 +167,13 @@ git log --oneline --left-right HEAD...origin/main  # Divergence check
 
 **Example**:
 ```bash
-cd layers/ros2_ws
+cd layers/main/ros2_ws
 colcon build --packages-select my_package
 ```
 
 **CLI-native alternative**:
 ```bash
-cd layers/ros2_ws
+cd layers/main/ros2_ws
 colcon build --symlink-install
 # Or for specific package:
 colcon build --packages-select <package_name>
@@ -342,9 +342,9 @@ gh pr create --title "Add CLI integration support" --body "Closes #46
 **Example**:
 ```bash
 # Edit configs/<workspace>.repos
-vcs import layers/ros2_ws/src < configs/ros2.repos
-rosdep install --from-paths layers/ros2_ws/src --ignore-src -r -y
-cd layers/ros2_ws && colcon build
+vcs import layers/main/ros2_ws/src < configs/ros2.repos
+rosdep install --from-paths layers/main/ros2_ws/src --ignore-src -r -y
+cd layers/main/ros2_ws && colcon build
 ```
 
 **When to use**:
@@ -365,7 +365,7 @@ cd layers/ros2_ws && colcon build
 
 **Example**:
 ```bash
-cd layers/ros2_ws
+cd layers/main/ros2_ws
 colcon test
 colcon test-result --verbose
 ```
@@ -549,7 +549,7 @@ git push -u origin feature/my-task
 
 ```bash
 # Build single package (fast)
-cd layers/ros2_ws
+cd layers/main/ros2_ws
 colcon build --packages-select my_package
 
 # Build with dependencies
@@ -567,7 +567,7 @@ colcon build --parallel-workers 4
 
 ```bash
 # Test single package
-cd layers/ros2_ws
+cd layers/main/ros2_ws
 colcon test --packages-select my_package
 colcon test-result --verbose
 
@@ -583,13 +583,13 @@ colcon test --packages-select my_package --pytest-args -k test_my_function
 
 ```bash
 # Import repositories
-vcs import layers/ros2_ws/src < configs/ros2.repos
+vcs import layers/main/ros2_ws/src < configs/ros2.repos
 
 # Update repositories
-vcs pull layers/ros2_ws/src
+vcs pull layers/main/ros2_ws/src
 
 # Status across all repos
-vcs status layers/ros2_ws/src
+vcs status layers/main/ros2_ws/src
 ```
 
 **When to use**: Managing multiple repositories efficiently.

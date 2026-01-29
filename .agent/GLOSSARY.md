@@ -22,7 +22,7 @@ Some terminology is specific to the active project.
 
 **For Project-Specific Glossaries:**
 - **Canonical Location (in project repo)**: `config/GLOSSARY.md` inside the **project/key repository itself** (e.g., in the `unh_marine_autonomy` repo)
-- **Workspace Path (after cloning)**: `layers/core_ws/src/<key_repo>/config/GLOSSARY.md` (e.g., `layers/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`)
+- **Workspace Path (after cloning)**: `layers/main/core_ws/src/<key_repo>/config/GLOSSARY.md` (e.g., `layers/main/core_ws/src/unh_marine_autonomy/config/GLOSSARY.md`)
 - **Git Note**: `layers/*/src/` is gitignored in this workspace repository; commit the project glossary to the **project/key repository**, not to this workspace repo
 - **Rule**: Project glossary takes precedence over workspace glossary for conflicting terms
 
@@ -43,7 +43,7 @@ The **scaffolding, tooling, and infrastructure** that wraps and supports Project
 
 ### Underlay
 **Singular**: There is **ONE** underlay - the pre-built dependency foundation.
-- **Examples**: `/opt/ros/jazzy`, optionally extended with `layers/underlay_ws/install/`
+- **Examples**: `/opt/ros/jazzy`, optionally extended with `layers/main/underlay_ws/install/`
 - **Purpose**: Provides stable, known-good dependencies for all overlays
 - **Agent Rule**: READ only, DO NOT MODIFY
 - **Sourcing**: `source /opt/ros/jazzy/setup.bash` (or via `env.sh`)
@@ -69,15 +69,15 @@ A thematic grouping of related packages within the multi-workspace structure.
 ```
 /opt/ros/jazzy (underlay)
     ↓
-layers/core_ws/install (overlay 1)
+layers/main/core_ws/install (overlay 1)
     ↓
-layers/platforms_ws/install (overlay 2)
+layers/main/platforms_ws/install (overlay 2)
     ↓
-layers/sensors_ws/install (overlay 3)
+layers/main/sensors_ws/install (overlay 3)
     ↓
-layers/simulation_ws/install (overlay 4)
+layers/main/simulation_ws/install (overlay 4)
     ↓
-layers/ui_ws/install (overlay 5)
+layers/main/ui_ws/install (overlay 5)
 ```
 
 ---
@@ -178,7 +178,7 @@ ROS 2 build tool. See `.agent/knowledge/ros2_development_patterns.md` for detail
 
 **"Build the workspace"** → Clarify:
 - Build all layers? → `make build`
-- Build specific layer? → `cd layers/core_ws && colcon build`
+- Build specific layer? → `cd layers/main/core_ws && colcon build`
 - Build specific package? → `colcon build --packages-select <pkg>`
 
 **"Run tests"** → Clarify:
@@ -206,20 +206,20 @@ This section contains terms specific to the current project being developed in t
 
 ### Project11
 Legacy name for the UNH Marine Autonomy framework.
-- **Refers to**: The packages within `layers/core_ws/src/unh_marine_autonomy/`
+- **Refers to**: The packages within `layers/main/core_ws/src/unh_marine_autonomy/`
 - **History**: Original codebase name, now rebranded to "Marine Autonomy"
 - **Usage**: May appear in legacy code, documentation, or git history
 - **Modern term**: Use "Marine Autonomy" or "UNH Marine Autonomy" in new code/docs
 
 ### UNH Marine Autonomy
 The primary project developed in this workspace.
-- **Location**: `layers/core_ws/src/unh_marine_autonomy/`
+- **Location**: `layers/main/core_ws/src/unh_marine_autonomy/`
 - **Purpose**: Autonomous marine vehicle software framework
 - **Components**: Navigation, sensors, visualization, mission planning packages
 - **Also known as**: "Project11" (legacy), "marine framework"
 
 > **Note**: For other projects, create a project-specific glossary at:  
-> `layers/core_ws/src/<project_name>/config/GLOSSARY.md`
+> `layers/main/core_ws/src/<project_name>/config/GLOSSARY.md`
 
 ---
 

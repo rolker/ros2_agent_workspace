@@ -10,12 +10,12 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WORKTREE_INFO=""
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     WORKTREE_INFO="layer worktree"
-    LAYERS_DIR="$ROOT_DIR"  # In layer worktree, ROOT_DIR is the layer
+    LAYERS_DIR="$ROOT_DIR"  # In layer worktree, ROOT_DIR contains *_ws dirs
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     WORKTREE_INFO="workspace worktree"
-    LAYERS_DIR="$ROOT_DIR/layers"
+    LAYERS_DIR="$ROOT_DIR/layers/main"
 else
-    LAYERS_DIR="$ROOT_DIR/layers"
+    LAYERS_DIR="$ROOT_DIR/layers/main"
 fi
 
 # Helper function to print a table row

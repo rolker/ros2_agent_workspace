@@ -44,7 +44,7 @@ def get_overlay_repos(include_underlay=False):
     # Find all .repos files in configs/ and migrated Key Repo paths
     config_dirs = [
         os.path.join(workspace_root, "configs"),
-        os.path.join(workspace_root, "layers/core_ws/src/unh_marine_autonomy/config/repos")
+        os.path.join(workspace_root, "layers/main/core_ws/src/unh_marine_autonomy/config/repos")
     ]
     
     repo_files = []

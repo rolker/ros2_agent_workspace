@@ -31,7 +31,7 @@ repositories:
 
 **Building after changes:**
 ```bash
-cd layers/core_ws
+cd layers/main/core_ws
 colcon build --symlink-install --packages-select my_package
 # Source using the env script to get proper underlay and overlays
 source ../../.agent/scripts/env.sh

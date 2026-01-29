@@ -8,7 +8,7 @@ trigger: always_on
 **The workspace root and `layers/*/src/` must remain clean.** All agent-generated files must be isolated in designated temporary locations.
 
 ## Build Discipline
-- **No Builds in Root**: Do NOT run `colcon build` or similar build commands from the workspace root. Always build within specific layer directories (e.g., `layers/core_ws`).
+- **No Builds in Root**: Do NOT run `colcon build` or similar build commands from the workspace root. Always build within specific layer directories (e.g., `layers/main/core_ws`).
 - **No Builds in Source Dirs**: Do NOT run builds inside `layers/*/src/`. Use the corresponding workspace layer directory instead.
 
 ## Temporary Files Policy
@@ -44,7 +44,7 @@ analysis_result=".agent/scratchpad/analysis_$(date +%s%N).md"
 
 # ❌ INCORRECT - Static filenames cause collisions!
 output_file=".agent/scratchpad/report.json"  # Multiple agents will overwrite each other
-temp_file="layers/core_ws/temp_analysis"  # Never in source dirs!
+temp_file="layers/main/core_ws/temp_analysis"  # Never in source dirs!
 ```
 
 ### When to Use System `/tmp`
@@ -77,7 +77,7 @@ If you see **modified** files in source directories that you didn't touch, stop 
 **❌ Problematic Pattern (Old)**:
 ```bash
 # Agent creates file in source tree
-cd layers/core_ws/src/marine_autonomy
+cd layers/main/core_ws/src/marine_autonomy
 echo "debug info" > debug_output.txt
 # Forgets to clean up; later agent commits it
 ```

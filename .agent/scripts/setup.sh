@@ -20,7 +20,7 @@
 set -e
 
 LAYER_NAME=$1
-LAYER_DIR="layers/${LAYER_NAME}_ws"
+LAYER_DIR="layers/main/${LAYER_NAME}_ws"
 
 # Bootstrapping Configuration
 # Bootstrapping Configuration
@@ -28,7 +28,7 @@ BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
 # Default to assuming core_ws/src/unh_marine_autonomy if we can't determine otherwise yet,
 # but really we should read this from the fetched config.
 # For now, we'll assume the Key Repo goes into core_ws/src/unh_marine_autonomy until we parse the config.
-KEY_REPO_TARGET_DIR="layers/core_ws/src/unh_marine_autonomy"
+KEY_REPO_TARGET_DIR="layers/main/core_ws/src/unh_marine_autonomy"
 
 if [ -z "$LAYER_NAME" ]; then
     echo "Usage: $0 <layer_name>"

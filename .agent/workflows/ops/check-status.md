@@ -72,7 +72,7 @@ fi
 Check if workspaces have been built:
 
 ```bash
-for ws in layers/*_ws; do
+for ws in layers/main/*_ws; do
     if [ -d "$ws/install" ]; then
         echo "✅ $(basename $ws): Built"
     else
@@ -146,7 +146,7 @@ LOCAL STATUS:
 $(git status --short)
 
 BUILD STATUS:
-$(for ws in layers/*_ws; do
+$(for ws in layers/main/*_ws; do
     if [ -d "$ws/install" ]; then
         echo "  ✅ $(basename $ws)"
     else

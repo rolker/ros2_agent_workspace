@@ -1,10 +1,11 @@
 #!/bin/bash
 # Start work on a GitHub issue with visibility workflow
-# Usage: start_issue_work.sh <issue_number> [agent_name] [--worktree layer|workspace]
+# Usage: start_issue_work.sh <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>]
 #
 # Options:
-#   --worktree layer      Create a layer worktree (for ROS package development)
+#   --worktree layer      Create a layer worktree (requires --layer)
 #   --worktree workspace  Create a workspace worktree (for infrastructure work)
+#   --layer <name>        Which layer to work on (required with --worktree layer)
 #   (no --worktree)       Create a feature branch in the main workspace
 
 set -e
@@ -13,11 +14,16 @@ set -e
 ISSUE_NUMBER=""
 AGENT_NAME="AI Agent"
 WORKTREE_TYPE=""
+TARGET_LAYER=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --worktree)
             WORKTREE_TYPE="$2"
+            shift 2
+            ;;
+        --layer)
+            TARGET_LAYER="$2"
             shift 2
             ;;
         *)
@@ -32,12 +38,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$ISSUE_NUMBER" ]; then
-    echo "Usage: $0 <issue_number> [agent_name] [--worktree layer|workspace]"
+    echo "Usage: $0 <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>]"
     echo ""
     echo "Examples:"
-    echo "  $0 42 'Copilot CLI Agent'              # Create feature branch"
-    echo "  $0 42 'Copilot CLI Agent' --worktree layer    # Create layer worktree"
-    echo "  $0 42 'Copilot CLI Agent' --worktree workspace # Create workspace worktree"
+    echo "  $0 42 'Copilot CLI Agent'                                    # Create feature branch"
+    echo "  $0 42 'Copilot CLI Agent' --worktree layer --layer core      # Layer worktree for core"
+    echo "  $0 42 'Copilot CLI Agent' --worktree workspace               # Workspace worktree"
     exit 1
 fi
 
@@ -102,7 +108,18 @@ if [ -n "$WORKTREE_TYPE" ]; then
     echo "🌲 Creating $WORKTREE_TYPE worktree for issue #$ISSUE_NUMBER..."
     
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    "$SCRIPT_DIR/worktree_create.sh" --issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME"
+    
+    # Build worktree_create command
+    WORKTREE_CMD="$SCRIPT_DIR/worktree_create.sh --issue $ISSUE_NUMBER --type $WORKTREE_TYPE --branch $BRANCH_NAME"
+    if [ "$WORKTREE_TYPE" = "layer" ] && [ -n "$TARGET_LAYER" ]; then
+        WORKTREE_CMD="$WORKTREE_CMD --layer $TARGET_LAYER"
+    elif [ "$WORKTREE_TYPE" = "layer" ] && [ -z "$TARGET_LAYER" ]; then
+        echo "Error: --layer is required for layer worktrees"
+        echo "Example: $0 $ISSUE_NUMBER '$AGENT_NAME' --worktree layer --layer core"
+        exit 1
+    fi
+    
+    $WORKTREE_CMD
     
     if [ "$WORKTREE_TYPE" = "layer" ]; then
         WORKTREE_PATH="$REPO_ROOT/layers/worktrees/issue-$ISSUE_NUMBER"

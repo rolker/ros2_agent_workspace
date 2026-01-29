@@ -154,12 +154,12 @@ Ensure ROS 2 Jazzy is installed:
 1. Check the build report: `cat .agent/scratchpad/build_report.md`
 2. Try building a single layer:
    ```bash
-   cd layers/core_ws
+   cd layers/main/core_ws
    colcon build --symlink-install
    ```
 3. Check for missing dependencies:
    ```bash
-   rosdep install --from-paths layers/core_ws/src --ignore-src -r -y
+   rosdep install --from-paths layers/main/core_ws/src --ignore-src -r -y
    ```
 
 #### Workspace Locked

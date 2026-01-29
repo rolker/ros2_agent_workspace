@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Detect worktree context and set paths accordingly
-LAYERS_BASE="$ROOT_DIR/layers"
+LAYERS_BASE="$ROOT_DIR/layers/main"
 SCRATCHPAD_DIR="$ROOT_DIR/.agent/scratchpad"
 WORKTREE_INFO=""
 
@@ -20,12 +20,13 @@ WORKTREE_INFO=""
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     WORKTREE_INFO="layer worktree"
     SCRATCHPAD_DIR="$ROOT_DIR/.scratchpad"
-    if [ -d "$ROOT_DIR/layers" ]; then
-        LAYERS_BASE="$ROOT_DIR/layers"
-    fi
+    # In layer worktree, ROOT_DIR IS the layers base (contains *_ws dirs/symlinks)
+    LAYERS_BASE="$ROOT_DIR"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     WORKTREE_INFO="workspace worktree"
     SCRATCHPAD_DIR="$ROOT_DIR/.agent/scratchpad"
+    # Workspace worktree has symlinked layers/main
+    LAYERS_BASE="$ROOT_DIR/layers/main"
 fi
 
 REPORT_FILE="$SCRATCHPAD_DIR/test_report.md"

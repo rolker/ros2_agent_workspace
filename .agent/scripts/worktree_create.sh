@@ -3,21 +3,22 @@
 # Create a git worktree for isolated task development
 #
 # Usage:
-#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>]
+#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>]
 #
 # Examples:
-#   ./worktree_create.sh --issue 123                    # Layer worktree (default)
-#   ./worktree_create.sh --issue 123 --type workspace   # Workspace worktree
-#   ./worktree_create.sh --issue 123 --branch feature/custom-name
+#   ./worktree_create.sh --issue 123 --type layer --layer core    # Work on core layer
+#   ./worktree_create.sh --issue 123 --type workspace              # Workspace worktree
+#   ./worktree_create.sh --issue 123 --type layer --layer core --branch feature/custom-name
 #
 # Worktree Types:
-#   layer     - For ROS package development (default)
+#   layer     - For ROS package development
 #               Created in: layers/worktrees/issue-<N>/
-#               Includes isolated build/install/log per layer
+#               Contains target layer (real) + symlinks to main for others
+#               Requires --layer to specify which layer to work on
 #
 #   workspace - For infrastructure work (.agent/, configs/, docs)
 #               Created in: .workspace-worktrees/issue-<N>/
-#               Full workspace checkout
+#               Full workspace checkout with symlinked layers/
 
 set -e
 
@@ -28,19 +29,25 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 ISSUE_NUM=""
 WORKTREE_TYPE="layer"
 BRANCH_NAME=""
+TARGET_LAYER=""
+
+# Available layers (same order as env.sh)
+AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
 
 show_usage() {
-    echo "Usage: $0 --issue <number> [--type layer|workspace] [--branch <name>]"
+    echo "Usage: $0 --issue <number> --type <layer|workspace> [options]"
     echo ""
     echo "Options:"
     echo "  --issue <number>    Issue number (required)"
-    echo "  --type <type>       Worktree type: 'layer' (default) or 'workspace'"
+    echo "  --type <type>       Worktree type: 'layer' or 'workspace' (required)"
+    echo "  --layer <name>      Layer to work on (required for layer type)"
+    echo "                      Available: ${AVAILABLE_LAYERS[*]}"
     echo "  --branch <name>     Custom branch name (default: feature/issue-<N>)"
     echo ""
     echo "Examples:"
-    echo "  $0 --issue 123"
+    echo "  $0 --issue 123 --type layer --layer core"
     echo "  $0 --issue 123 --type workspace"
-    echo "  $0 --issue 123 --branch feature/add-new-sensor"
+    echo "  $0 --issue 123 --type layer --layer sensors --branch feature/add-new-sensor"
 }
 
 # Parse arguments
@@ -52,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --type)
             WORKTREE_TYPE="$2"
+            shift 2
+            ;;
+        --layer)
+            TARGET_LAYER="$2"
             shift 2
             ;;
         --branch)
@@ -81,6 +92,29 @@ fi
 if [ "$WORKTREE_TYPE" != "layer" ] && [ "$WORKTREE_TYPE" != "workspace" ]; then
     echo "Error: --type must be 'layer' or 'workspace'"
     exit 1
+fi
+
+# For layer worktrees, require --layer
+if [ "$WORKTREE_TYPE" == "layer" ] && [ -z "$TARGET_LAYER" ]; then
+    echo "Error: --layer is required for layer worktrees"
+    echo "Available layers: ${AVAILABLE_LAYERS[*]}"
+    exit 1
+fi
+
+# Validate layer name if provided
+if [ -n "$TARGET_LAYER" ]; then
+    VALID_LAYER=false
+    for layer in "${AVAILABLE_LAYERS[@]}"; do
+        if [ "$layer" == "$TARGET_LAYER" ]; then
+            VALID_LAYER=true
+            break
+        fi
+    done
+    if [ "$VALID_LAYER" = false ]; then
+        echo "Error: Invalid layer '$TARGET_LAYER'"
+        echo "Available layers: ${AVAILABLE_LAYERS[*]}"
+        exit 1
+    fi
 fi
 
 # Set default branch name if not provided
@@ -117,6 +151,7 @@ echo "Creating Worktree"
 echo "========================================"
 echo "  Issue:      #$ISSUE_NUM"
 echo "  Type:       $WORKTREE_TYPE"
+[ -n "$TARGET_LAYER" ] && echo "  Layer:      $TARGET_LAYER"
 echo "  Branch:     $BRANCH_NAME"
 echo "  Path:       $WORKTREE_DIR"
 echo ""
@@ -133,24 +168,66 @@ else
     git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
 fi
 
-# For layer worktrees, set up the layer structure
+# For layer worktrees, set up the layer structure with symlinks
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo ""
     echo "Setting up layer worktree structure..."
     
     # Create scratchpad for this worktree
     mkdir -p "$WORKTREE_DIR/.scratchpad"
-    echo "# Task Scratchpad for Issue #$ISSUE_NUM" > "$WORKTREE_DIR/.scratchpad/README.md"
-    echo "" >> "$WORKTREE_DIR/.scratchpad/README.md"
-    echo "This directory is for temporary files specific to this task." >> "$WORKTREE_DIR/.scratchpad/README.md"
-    echo "Files here are gitignored and isolated from other worktrees." >> "$WORKTREE_DIR/.scratchpad/README.md"
+    cat > "$WORKTREE_DIR/.scratchpad/README.md" << EOF
+# Task Scratchpad for Issue #$ISSUE_NUM
+
+This directory is for temporary files specific to this task.
+Files here are gitignored and isolated from other worktrees.
+
+**Working layer**: ${TARGET_LAYER}_ws
+EOF
     
-    # Note: build/install/log dirs will be created automatically by colcon
-    # when building within each layer's workspace
+    # Create symlinks to main for all layers except target
+    echo "Creating symlinks to main layers..."
+    for layer in "${AVAILABLE_LAYERS[@]}"; do
+        LAYER_WS="${layer}_ws"
+        if [ "$layer" == "$TARGET_LAYER" ]; then
+            # Target layer - create real directory structure
+            echo "  - $LAYER_WS: creating workspace (real)"
+            mkdir -p "$WORKTREE_DIR/${LAYER_WS}/src"
+            
+            # Import repos for this layer using vcs
+            REPOS_FILE="$ROOT_DIR/layers/main/${LAYER_WS}/src/unh_marine_autonomy/config/repos/${layer}.repos"
+            if [ ! -f "$REPOS_FILE" ]; then
+                REPOS_FILE="$ROOT_DIR/configs/${layer}.repos"
+            fi
+            
+            if [ -f "$REPOS_FILE" ]; then
+                echo "    Importing repositories from $REPOS_FILE..."
+                cd "$WORKTREE_DIR/${LAYER_WS}/src"
+                vcs import < "$REPOS_FILE" || echo "    Warning: Some repos may have failed to import"
+                cd "$ROOT_DIR"
+            else
+                echo "    Warning: No .repos file found for $layer"
+            fi
+        else
+            # Other layers - symlink to main
+            if [ -d "$ROOT_DIR/layers/main/${LAYER_WS}" ]; then
+                echo "  - $LAYER_WS: symlinking to main"
+                ln -s "../main/${LAYER_WS}" "$WORKTREE_DIR/${LAYER_WS}"
+            fi
+        fi
+    done
 fi
 
-# For workspace worktrees, create scratchpad as well
+# For workspace worktrees, symlink the layers directory
 if [ "$WORKTREE_TYPE" == "workspace" ]; then
+    echo ""
+    echo "Setting up workspace worktree..."
+    
+    # Create symlink to main layers
+    echo "Creating symlink to main layers..."
+    mkdir -p "$WORKTREE_DIR/layers"
+    ln -s "$ROOT_DIR/layers/main" "$WORKTREE_DIR/layers/main"
+    
+    # Ensure scratchpad exists
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"
 fi
 
@@ -166,6 +243,9 @@ echo "Or manually:"
 echo "  cd $WORKTREE_DIR"
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo "  source .agent/scripts/env.sh"
+    echo ""
+    echo "To build the $TARGET_LAYER layer:"
+    echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"
 fi
 echo ""
 echo "When done, remove with:"

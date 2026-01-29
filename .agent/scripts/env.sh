@@ -23,21 +23,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Detect if we're in a worktree and adjust paths accordingly
-LAYERS_BASE="$ROOT_DIR/layers"
+# Main builds live in layers/main/, worktree builds in layers/worktrees/issue-N/
+LAYERS_BASE="$ROOT_DIR/layers/main"
 WORKTREE_CONTEXT=""
 
 # Check if we're in a layer worktree (layers/worktrees/issue-N/)
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
-    # We're in a layer worktree - use this worktree's layers
+    # We're in a layer worktree - this directory IS the layers base
+    # It contains the working layer + symlinks to main for others
     WORKTREE_CONTEXT="layer"
-    # The worktree root contains the layers directly
-    # But we need to check if layers exist here or fall back to main
-    if [ -d "$ROOT_DIR/layers" ]; then
-        LAYERS_BASE="$ROOT_DIR/layers"
-    fi
+    LAYERS_BASE="$ROOT_DIR"
     echo "  ℹ Worktree detected: layer worktree"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
-    # We're in a workspace worktree
+    # We're in a workspace worktree - uses symlinked layers/main
     WORKTREE_CONTEXT="workspace"
     echo "  ℹ Worktree detected: workspace worktree"
 fi
@@ -50,6 +48,12 @@ export ROS2_LAYERS_BASE="$LAYERS_BASE"
 # 2. Workspace Layers
 # Define the order of layers to source. Order determines overlay priority (last one is top).
 LAYERS_CONFIG="$LAYERS_BASE/core_ws/src/unh_marine_autonomy/config/layers.txt"
+
+# For layer worktrees, check main's config if not found locally
+if [ ! -f "$LAYERS_CONFIG" ] && [ "$WORKTREE_CONTEXT" = "layer" ]; then
+    MAIN_LAYERS_BASE="$(dirname "$ROOT_DIR")/main"
+    LAYERS_CONFIG="$MAIN_LAYERS_BASE/core_ws/src/unh_marine_autonomy/config/layers.txt"
+fi
 
 if [ -f "$LAYERS_CONFIG" ]; then
     # Read non-empty lines into array

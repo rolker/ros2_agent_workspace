@@ -5,14 +5,14 @@
 ## Quick Start
 
 ```bash
-# Create a worktree for issue #42
-.agent/scripts/worktree_create.sh --issue 42 --type layer
+# Create a worktree for issue #42 to work on the core layer
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
 
 # Enter the worktree (sources ROS environment)
 source .agent/scripts/worktree_enter.sh 42
 
 # Work normally - build, test, commit
-colcon build --packages-select my_package
+cd core_ws && colcon build --packages-select my_package
 git add . && git commit -m "feat: my changes"
 
 # When done, clean up
@@ -37,27 +37,48 @@ Git worktrees create separate checkouts of the same repository:
 - All worktrees share the same git history
 - No conflicts, no locks needed
 
+## Directory Structure
+
+Main builds live in `layers/main/`, worktrees in `layers/worktrees/`:
+
+```
+layers/
+├── main/                      # Main builds (shared baseline)
+│   ├── underlay_ws/
+│   ├── core_ws/
+│   ├── platforms_ws/
+│   └── ...
+└── worktrees/
+    └── issue-42/              # Layer worktree for issue 42
+        ├── core_ws/           # Real - actively being modified
+        ├── underlay_ws -> ../main/underlay_ws  # Symlink
+        ├── platforms_ws -> ../main/platforms_ws
+        └── .scratchpad/       # Isolated scratchpad
+```
+
 ## Worktree Types
 
-### Layer Worktrees (`--type layer`)
+### Layer Worktrees (`--type layer --layer <name>`)
 
 **Location**: `layers/worktrees/issue-<N>/`
 
 **Use for**: ROS package development, code changes, feature work
 
-**What's available**:
-- All layer source code (core_ws, sensors_ws, etc.)
-- Isolated build/install/log directories
+**Requires**: `--layer` to specify which layer to work on
+
+**What's created**:
+- Target layer: Real directory with vcs-imported repos
+- Other layers: Symlinks to `layers/main/` (use pre-built)
 - Isolated scratchpad (`.scratchpad/`)
 
 **Example workflow**:
 ```bash
-# Create layer worktree
-.agent/scripts/worktree_create.sh --issue 42 --type layer
+# Create layer worktree for core layer
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
 
 # Enter and work
 source .agent/scripts/worktree_enter.sh 42
-cd layers/core_ws/src/my_package
+cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
 colcon test --packages-select my_package
@@ -74,10 +95,10 @@ git push -u origin feature/ISSUE-42-description
 
 **Use for**: Infrastructure changes, documentation, `.agent/` modifications
 
-**What's available**:
+**What's created**:
 - Full repository checkout
+- Symlink: `layers/main` → main workspace's built layers
 - All `.agent/` files and scripts
-- Configuration files
 
 **Example workflow**:
 ```bash
@@ -87,6 +108,7 @@ git push -u origin feature/ISSUE-42-description
 # Enter and work
 source .agent/scripts/worktree_enter.sh 99
 # ... modify .agent/scripts, documentation, etc ...
+# ROS environment sources from symlinked main builds
 
 # Commit and push
 git add .
@@ -99,13 +121,14 @@ git push -u origin feature/ISSUE-99-description
 ### Create Worktree
 
 ```bash
-.agent/scripts/worktree_create.sh --issue <N> --type <layer|workspace> [--branch <name>]
+.agent/scripts/worktree_create.sh --issue <N> --type <layer|workspace> [--layer <name>] [--branch <name>]
 ```
 
 | Option | Required | Description |
 |--------|----------|-------------|
 | `--issue <N>` | Yes | Issue number (used for directory name) |
 | `--type <type>` | Yes | `layer` or `workspace` |
+| `--layer <name>` | For layer type | Which layer to work on (core, sensors, etc.) |
 | `--branch <name>` | No | Custom branch name (default: `feature/ISSUE-<N>`) |
 
 ### List Worktrees

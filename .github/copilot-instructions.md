@@ -48,7 +48,7 @@ Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS
 make build
 
 # Build specific layer
-cd layers/core_ws && colcon build --symlink-install
+cd layers/main/core_ws && colcon build --symlink-install
 
 # Build with output
 colcon build --symlink-install --event-handlers console_direct+
@@ -147,7 +147,7 @@ By default, Copilot CLI acts as **ROS Developer**:
 
 Creating a new ROS2 Python package:
 ```bash
-cd layers/core_ws/src
+cd layers/main/core_ws/src
 ros2 pkg create --build-type ament_python my_package \
   --dependencies rclpy std_msgs
 ```
