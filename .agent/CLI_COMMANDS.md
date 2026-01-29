@@ -27,6 +27,10 @@ This document maps:
 | `/finish-feature` | Development | Finalize feature (tests, docs, clean commits) | Task complete, ready for review |
 | `/submit-pr` | Development | Create GitHub pull request | Ready to merge |
 | `/setup-environment` | Setup | One-command initial setup | First time in workspace |
+| `/create-worktree` | Worktree | Create isolated worktree for an issue | Parallel work, multi-agent coordination |
+| `/list-worktrees` | Worktree | List all active worktrees | See what's in progress |
+| `/enter-worktree` | Worktree | Enter worktree with ROS environment | Switching to existing worktree |
+| `/remove-worktree` | Worktree | Clean up completed worktree | Task complete, freeing resources |
 
 ---
 
@@ -401,6 +405,121 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 ---
 
+## Worktree Commands
+
+Git worktrees enable parallel development by creating isolated working directories. Each worktree has its own build artifacts, scratchpad, and environment.
+
+### `/create-worktree`
+
+**Script**: `.agent/scripts/worktree_create.sh`
+
+**What it does**:
+- Creates an isolated worktree for a specific issue
+- Sets up separate directory structure
+- Creates feature branch for the worktree
+- Initializes local scratchpad for build reports
+
+**Example**:
+```bash
+# Layer worktree (for ROS package development)
+.agent/scripts/worktree_create.sh --issue 42 --type layer
+
+# Workspace worktree (for infrastructure work)
+.agent/scripts/worktree_create.sh --issue 42 --type workspace
+
+# With custom branch name
+.agent/scripts/worktree_create.sh --issue 42 --type layer --branch feature/custom-name
+```
+
+**When to use**:
+- ✅ Multiple agents working simultaneously
+- ✅ Need to switch between issues without stashing
+- ✅ Want isolated build/test environment
+- ❌ Quick single-issue work (just use a branch)
+
+---
+
+### `/list-worktrees`
+
+**Script**: `.agent/scripts/worktree_list.sh`
+
+**What it does**:
+- Lists all active worktrees (layer and workspace)
+- Shows issue number, type, branch, and status
+- Indicates uncommitted changes
+
+**Example**:
+```bash
+.agent/scripts/worktree_list.sh
+```
+
+**Sample output**:
+```
+Worktrees in ros2_agent_workspace
+================================================================================
+Issue    Type       Branch                              Status
+--------------------------------------------------------------------------------
+42       layer      feature/ISSUE-42-add-sensor         Clean
+106      workspace  feature/issue-106-layers-rename     Modified
+--------------------------------------------------------------------------------
+Total: 2 worktrees (1 layer, 1 workspace)
+```
+
+**When to use**:
+- ✅ See what's currently in progress
+- ✅ Before creating new worktree
+- ✅ Coordinating with other agents
+
+---
+
+### `/enter-worktree`
+
+**Script**: `.agent/scripts/worktree_enter.sh` (must be sourced!)
+
+**What it does**:
+- Changes to the worktree directory
+- Sources ROS environment correctly
+- Sets WORKTREE_ISSUE, WORKTREE_TYPE, WORKTREE_ROOT env vars
+
+**Example**:
+```bash
+# MUST be sourced, not executed
+source .agent/scripts/worktree_enter.sh 42
+```
+
+**When to use**:
+- ✅ Switching to an existing worktree
+- ✅ Starting work session in worktree
+- ❌ Don't execute (./worktree_enter.sh) - must source
+
+---
+
+### `/remove-worktree`
+
+**Script**: `.agent/scripts/worktree_remove.sh`
+
+**What it does**:
+- Removes worktree directory
+- Cleans up git worktree references
+- Warns if uncommitted changes exist
+
+**Example**:
+```bash
+# Safe removal (warns if uncommitted changes)
+.agent/scripts/worktree_remove.sh 42
+
+# Force removal (ignores uncommitted changes)
+.agent/scripts/worktree_remove.sh 42 --force
+```
+
+**When to use**:
+- ✅ Issue complete and merged
+- ✅ Abandoning work on an issue
+- ✅ Cleaning up disk space
+- ❌ While still actively working on issue
+
+---
+
 ## CLI-Native Alternatives
 
 Sometimes using ROS/git commands directly is more efficient than workflows:
@@ -512,6 +631,9 @@ Check `.agent/instructions/gemini-cli.instructions.md` for Gemini-specific patte
 | **Create PR** | ✅ `/submit-pr` | ⚠️ Either (depends on complexity) |
 | **Run specific test** | ❌ Overhead | ✅ `colcon test --packages-select` |
 | **Clean workspace** | ✅ `/clean` | ⚠️ Either (safety) |
+| **Parallel agent work** | ✅ `/create-worktree` | ❌ Complex setup |
+| **Quick single issue** | ❌ Overhead | ✅ `git checkout -b` |
+| **Switch between issues** | ✅ `/enter-worktree` | ❌ Stash/context lost |
 
 ---
 
@@ -550,6 +672,6 @@ If you find yourself repeating a sequence of commands:
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Maintained By**: Framework Engineering Team  
 **Related**: [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md), [AI_RULES.md](AI_RULES.md), [AGENT_INDEX.md](AGENT_INDEX.md)
