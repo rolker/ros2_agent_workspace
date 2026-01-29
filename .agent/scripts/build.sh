@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/build.sh
+# .agent/scripts/build.sh
 # Unified build script for ROS2 Agent Workspace
 #
 # Usage: ./scripts/build.sh
@@ -7,11 +7,15 @@
 # This script will:
 # 1. Check for workspace locks (multi-agent coordination)
 # 2. Build all workspace layers in dependency order
-# 3. Generate a detailed build report in .agent/scratchpad/build_report.md
+# 3. Generate a detailed build report
 # 4. Source each layer after successful build for cascading overlays
 #
 # The build order follows the layer hierarchy defined in scripts/env.sh:
 #   underlay -> core -> platforms -> sensors -> simulation -> ui
+#
+# Worktree Support:
+#   When run from a worktree, builds are isolated to that worktree's layers.
+#   Reports go to the worktree's scratchpad (or .scratchpad for layer worktrees).
 #
 # Exit codes:
 #   0 - All layers built successfully
@@ -23,14 +27,35 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-REPORT_FILE="$ROOT_DIR/.agent/scratchpad/build_report.md"
 
-# Ensure .agent/scratchpad exists
-mkdir -p "$ROOT_DIR/.agent/scratchpad"
-LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
+# Detect worktree context and set paths accordingly
+LAYERS_BASE="$ROOT_DIR/layers"
+SCRATCHPAD_DIR="$ROOT_DIR/.agent/scratchpad"
+WORKTREE_INFO=""
 
-# Check for Lock
-if [ -f "$LOCK_FILE" ]; then
+# Check if we're in a layer worktree
+if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
+    WORKTREE_INFO="layer worktree"
+    # Use worktree-local scratchpad
+    SCRATCHPAD_DIR="$ROOT_DIR/.scratchpad"
+    # Layers are in the worktree root
+    if [ -d "$ROOT_DIR/layers" ]; then
+        LAYERS_BASE="$ROOT_DIR/layers"
+    fi
+elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
+    WORKTREE_INFO="workspace worktree"
+    # Use standard .agent/scratchpad within worktree
+    SCRATCHPAD_DIR="$ROOT_DIR/.agent/scratchpad"
+fi
+
+REPORT_FILE="$SCRATCHPAD_DIR/build_report.md"
+
+# Ensure scratchpad exists
+mkdir -p "$SCRATCHPAD_DIR"
+LOCK_FILE="$SCRATCHPAD_DIR/workspace.lock"
+
+# Check for Lock (only in main workspace, worktrees are isolated)
+if [ -z "$WORKTREE_INFO" ] && [ -f "$LOCK_FILE" ]; then
     echo "❌ Workspace is LOCKED."
     echo "This script cannot run because another agent/task is active."
     echo "Lock details:"
@@ -43,25 +68,27 @@ fi
 # Header for the Report
 {
     echo "# Build Report - $(date)"
+    [ -n "$WORKTREE_INFO" ] && echo "**Context**: $WORKTREE_INFO"
     echo ""
     echo "| Layer | Packages (Total/OK) | Output (Warnings/Errors) | Status |"
     echo "|---|---|---|---|"
 } > "$REPORT_FILE"
 
-# Load Layer Definitions
+# Load Layer Definitions (this also sets LAYERS array)
 source "$SCRIPT_DIR/env.sh" > /dev/null
 
 echo "========================================"
 echo "Starting Build Sequence"
+[ -n "$WORKTREE_INFO" ] && echo "Context: $WORKTREE_INFO"
 echo "========================================"
 
 TOTAL_FAILED=0
 FAILED_LAYERS=""
 
 for layer in "${LAYERS[@]}"; do
-    WORKSPACE_DIR="$ROOT_DIR/layers/${layer}_ws"
+    LAYER_DIR="$LAYERS_BASE/${layer}_ws"
     
-    if [ ! -d "$WORKSPACE_DIR/src" ]; then
+    if [ ! -d "$LAYER_DIR/src" ]; then
         echo "Skipping layer $layer (no src directory)"
         echo "| $layer | 0 | - | ⏭️ Skipped |" >> "$REPORT_FILE"
         continue
@@ -71,8 +98,8 @@ for layer in "${LAYERS[@]}"; do
     echo "Building Layer: $layer"
     echo "----------------------------------------"
 
-    # Go to workspace
-    cd "$WORKSPACE_DIR" || exit 1
+    # Go to layer directory
+    cd "$LAYER_DIR" || exit 1
 
     # Run Colcon Build
     # We rely on the log configuration to write to log/latest_build/events.log
@@ -84,9 +111,7 @@ for layer in "${LAYERS[@]}"; do
     BUILD_RC=$?
     
     # Generate Report Row
-    # python3 scripts/build_report_generator.py ...
-    # We need to be careful about where the log is. default is install/../log/latest_build
-    LOG_DIR="$WORKSPACE_DIR/log/latest_build"
+    LOG_DIR="$LAYER_DIR/log/latest_build"
     
     # Run the generator and append to report
     if [ -d "$LOG_DIR" ]; then
