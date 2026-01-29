@@ -150,7 +150,36 @@ This allows agents to quickly access relevant documentation without traversing a
 
 ## Coordination & Locking
 
-### Multi-Agent Locking
+### Git Worktrees (Recommended for Parallel Work)
+
+For scenarios where multiple agents or developers work simultaneously, the workspace supports **git worktrees** for complete isolation:
+
+```
+ros2_agent_workspace/           # Main workspace
+├── layers/
+│   ├── core_ws/               # Shared layers
+│   └── worktrees/             # Layer worktrees
+│       ├── issue-42/          # Isolated checkout for issue 42
+│       └── issue-43/          # Isolated checkout for issue 43
+└── .workspace-worktrees/      # Workspace worktrees
+    └── issue-99/              # Full repo checkout for infrastructure work
+```
+
+**Benefits of worktrees**:
+- Each worktree has isolated build artifacts
+- No lock contention between agents
+- Switch between issues without stashing
+- Parallel builds and tests
+
+**Commands**:
+- Create: `.agent/scripts/worktree_create.sh --issue N --type layer|workspace`
+- List: `.agent/scripts/worktree_list.sh`
+- Enter: `source .agent/scripts/worktree_enter.sh N`
+- Remove: `.agent/scripts/worktree_remove.sh N`
+
+See [WORKTREE_GUIDE.md](.agent/WORKTREE_GUIDE.md) for full documentation.
+
+### Multi-Agent Locking (Fallback)
 
 The workspace supports a locking mechanism (`.agent/scripts/lock.sh`, `.agent/scripts/unlock.sh`) to prevent conflicts when multiple agents or processes might work simultaneously:
 

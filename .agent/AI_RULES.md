@@ -106,6 +106,12 @@ Once environment is set up and status is clean:
 - Use workflows in `.agent/workflows/` for common tasks
 - Add AI signature to all GitHub content
 
+**For parallel work or multi-agent scenarios**, consider using git worktrees:
+```bash
+.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+```
+See [WORKTREE_GUIDE.md](WORKTREE_GUIDE.md) for details.
+
 ---
 
 ## Core Rules (Apply to All Agents)

@@ -53,6 +53,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 - ⚡ [AI CLI Quick Start](.agent/AI_CLI_QUICKSTART.md) - 5-minute setup for CLI agents
 - 📋 [AI Rules](.agent/AI_RULES.md) - Universal agent workflow and rules
 - 🔧 [CLI Commands](.agent/CLI_COMMANDS.md) - Workflow discovery and mapping
+- 🌲 [Worktree Guide](.agent/WORKTREE_GUIDE.md) - Parallel development with git worktrees
 - 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Detailed onboarding for specialized agents
 
 ### For All Users
