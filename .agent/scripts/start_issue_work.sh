@@ -109,27 +109,21 @@ if [ -n "$WORKTREE_TYPE" ]; then
     
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
-    # Build worktree_create command
-    WORKTREE_CMD="$SCRIPT_DIR/worktree_create.sh --issue $ISSUE_NUMBER --type $WORKTREE_TYPE --branch $BRANCH_NAME"
+    # Build worktree_create arguments safely to avoid command injection
+    WORKTREE_ARGS=(--issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME")
     if [ "$WORKTREE_TYPE" = "layer" ] && [ -n "$TARGET_LAYER" ]; then
-        WORKTREE_CMD="$WORKTREE_CMD --layer $TARGET_LAYER"
+        WORKTREE_ARGS+=(--layer "$TARGET_LAYER")
     elif [ "$WORKTREE_TYPE" = "layer" ] && [ -z "$TARGET_LAYER" ]; then
         echo "Error: --layer is required for layer worktrees"
         echo "Example: $0 $ISSUE_NUMBER '$AGENT_NAME' --worktree layer --layer core"
         exit 1
     fi
     
-    $WORKTREE_CMD
-    
-    if [ "$WORKTREE_TYPE" = "layer" ]; then
-        WORKTREE_PATH="$REPO_ROOT/layers/worktrees/issue-$ISSUE_NUMBER"
-    else
-        WORKTREE_PATH="$REPO_ROOT/.workspace-worktrees/issue-$ISSUE_NUMBER"
-    fi
+    "$SCRIPT_DIR/worktree_create.sh" "${WORKTREE_ARGS[@]}"
     
     echo ""
     echo "✅ Worktree created! Next steps:"
-    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh $ISSUE_NUMBER"
+    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh --issue $ISSUE_NUMBER"
     echo "   2. Work in isolation without affecting the main workspace"
     echo "   3. When done, commit and push from within the worktree"
     echo "   4. Create draft PR: gh pr create --draft --title 'feat: <description>' --body 'Closes #$ISSUE_NUMBER'"

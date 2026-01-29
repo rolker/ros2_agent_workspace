@@ -25,14 +25,17 @@ FORCE=false
 
 show_usage() {
     echo "Usage: $0 --issue <number> [--force]"
+    echo "   or: $0 <number> [--force]"
     echo ""
     echo "Options:"
     echo "  --issue <number>    Issue number (required)"
+    echo "  <number>            Issue number as positional argument"
     echo "  --force             Force removal even with uncommitted changes"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123"
-    echo "  $0 --issue 123 --force"
+    echo "  $0 123"
+    echo "  $0 123 --force"
 }
 
 # Parse arguments
@@ -49,6 +52,11 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             show_usage
             exit 0
+            ;;
+        [0-9]*)
+            # Positional argument (issue number without --issue flag)
+            ISSUE_NUM="$1"
+            shift
             ;;
         *)
             echo "Error: Unknown option $1"

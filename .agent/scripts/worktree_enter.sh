@@ -22,14 +22,17 @@ ISSUE_NUM=""
 
 show_usage() {
     echo "Usage: source $0 --issue <number>"
+    echo "   or: source $0 <number>"
     echo ""
     echo "Options:"
     echo "  --issue <number>    Issue number (required)"
+    echo "  <number>            Issue number as positional argument"
     echo ""
     echo "Note: This script must be SOURCED to affect your current shell."
     echo ""
     echo "Examples:"
     echo "  source $0 --issue 123"
+    echo "  source $0 123"
 }
 
 # Parse arguments
@@ -42,6 +45,11 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             show_usage
             return 0 2>/dev/null || exit 0
+            ;;
+        [0-9]*)
+            # Positional argument (issue number without --issue flag)
+            ISSUE_NUM="$1"
+            shift
             ;;
         *)
             echo "Error: Unknown option $1"
@@ -102,10 +110,11 @@ export WORKTREE_ROOT="$WORKTREE_DIR"
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
     
-    # Source ROS 2 environment if available
-    if [ -f "$WORKTREE_DIR/.agent/scripts/env.sh" ]; then
-        echo "Sourcing ROS 2 environment..."
-        source "$WORKTREE_DIR/.agent/scripts/env.sh"
+    # Source ROS 2 environment
+    # Layer worktrees share .agent/ via git worktree, so env.sh is in the root repo
+    if [ -f "$ROOT_DIR/.agent/scripts/env.sh" ]; then
+        echo "Sourcing ROS 2 environment from main repository..."
+        source "$ROOT_DIR/.agent/scripts/env.sh"
     fi
 fi
 

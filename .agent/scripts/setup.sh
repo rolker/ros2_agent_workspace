@@ -74,8 +74,8 @@ if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
     elif [ -f "configs/bootstrap.repos" ]; then
          # Fallback to legacy behavior if file exists
          echo "Warning: Using legacy configs/bootstrap.repos"
-         mkdir -p layers/core_ws/src
-         vcs import layers/core_ws/src < configs/bootstrap.repos
+         mkdir -p layers/main/core_ws/src
+         vcs import layers/main/core_ws/src < configs/bootstrap.repos
     else
         echo "Error: No bootstrap configuration found (checked $BOOTSTRAP_URL_FILE)."
         exit 1

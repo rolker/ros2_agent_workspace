@@ -211,7 +211,7 @@ EOF
             # Other layers - symlink to main
             if [ -d "$ROOT_DIR/layers/main/${LAYER_WS}" ]; then
                 echo "  - $LAYER_WS: symlinking to main"
-                ln -s "../main/${LAYER_WS}" "$WORKTREE_DIR/${LAYER_WS}"
+                ln -s "../../main/${LAYER_WS}" "$WORKTREE_DIR/${LAYER_WS}"
             fi
         fi
     done
