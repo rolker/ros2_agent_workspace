@@ -27,6 +27,7 @@ This document maps:
 | `/finish-feature` | Development | Finalize feature (tests, docs, clean commits) | Task complete, ready for review |
 | `/submit-pr` | Development | Create GitHub pull request | Ready to merge |
 | `/setup-environment` | Setup | One-command initial setup | First time in workspace |
+| `/continuous-improvement` | Improvement | Identify and report infrastructure friction | End of session, after major tasks |
 | `/create-worktree` | Worktree | Create isolated worktree for an issue | Parallel work, multi-agent coordination |
 | `/list-worktrees` | Worktree | List all active worktrees | See what's in progress |
 | `/enter-worktree` | Worktree | Enter worktree with ROS environment | Switching to existing worktree |
@@ -406,6 +407,54 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 ---
 
+## Improvement & Feedback Commands
+
+### `/continuous-improvement`
+
+**File**: `.agent/workflows/ops/continuous-improvement.md`  
+**Template**: `.agent/templates/improvement_issue.md`
+
+**What it does**:
+- Systematically identify infrastructure friction points
+- Check for duplicate issues
+- Draft well-formed improvement issues
+- Create GitHub issues with session evidence
+- Help continuously improve agent tooling and documentation
+
+**Example workflow**:
+```bash
+# 1. Review session for friction points
+# (What was confusing? What didn't work? What required workarounds?)
+
+# 2. Check for existing issues
+gh issue list --repo rolker/ros2_agent_workspace --state open --limit 50
+gh issue list --repo rolker/ros2_agent_workspace --search "documentation" --state open
+
+# 3. Draft issues using template
+cat .agent/templates/improvement_issue.md
+
+# 4. Create issues (after user approval)
+gh issue create --repo rolker/ros2_agent_workspace \
+  --title "Improve X documentation" \
+  --label "enhancement,documentation" \
+  --body-file /tmp/issue_draft.md
+```
+
+**When to use**:
+- ✅ End of significant work sessions
+- ✅ After completing major tasks  
+- ✅ When user asks "what could be better?"
+- ✅ When you notice repeated friction points
+- ✅ During periodic retrospectives
+- ❌ For user feature requests (use regular issues)
+- ❌ For bugs in ROS packages (report to upstream)
+
+**What to report**:
+- Documentation gaps or unclear instructions
+- Missing automation for repetitive tasks
+- Confusing workflows or error messages
+- Hard-to-discover tools or scripts
+- Environment/setup issues
 ## Worktree Commands
 
 Git worktrees enable parallel development by creating isolated working directories. Each worktree has its own build artifacts, scratchpad, and environment.
@@ -457,7 +506,6 @@ Git worktrees enable parallel development by creating isolated working directori
 **Sample output**:
 ```
 Worktrees in ros2_agent_workspace
-================================================================================
 Issue    Type       Branch                              Status
 --------------------------------------------------------------------------------
 42       layer      feature/ISSUE-42-add-sensor         Clean
