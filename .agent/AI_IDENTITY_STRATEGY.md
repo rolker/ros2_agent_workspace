@@ -86,7 +86,7 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 **Benefits**:
 - ✅ Persists across all shell sessions
-- ✅ Automatically configures all repositories in `workspaces/*/src/*`
+- ✅ Automatically configures all repositories in `layers/*/src/*`
 - ✅ No need to re-run for each session
 
 **Trade-offs**:
@@ -112,7 +112,7 @@ Are you running in a container or isolated environment?
 
 **Scope**: Identity must apply to:
 - The workspace repository (`ros2_agent_workspace`)
-- **All repositories under `workspaces/*/src/*`** (Note: Ephemeral method applies to all git commands in the session)
+- **All repositories under `layers/*/src/*`** (Note: Ephemeral method applies to all git commands in the session)
 
 ## Strategic Options
 
@@ -235,5 +235,5 @@ The user has configured the repository to require 0 reviews for merging.
 - [x] **Create Configuration Script**: `.agent/scripts/configure_git_identity.sh` to apply identity across all repos (persistent method).
 - [x] **Create Ephemeral Script**: `.agent/scripts/set_git_identity_env.sh` for host-based agents in shared workspaces.
 - [x] **Update Documentation**: Document both ephemeral and persistent approaches with decision tree.
-- [x] **Clarify Scope**: Identity applies to workspace repo AND all repos in `workspaces/`.
+- [x] **Clarify Scope**: Identity applies to workspace repo AND all repos in `layers/`.
 - [x] **Enforce Content Signatures**: Agents must sign GitHub comments/PRs (see `rules/common/ai-signature.md`).

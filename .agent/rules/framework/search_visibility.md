@@ -1,1 +1,1 @@
-# Agent Search Visibility\n\nRule: Use list_dir for 'workspaces/' as it is gitignored.
+# Agent Search Visibility\n\nRule: Use list_dir for 'layers/' as it is gitignored.

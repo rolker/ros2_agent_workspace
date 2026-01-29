@@ -60,9 +60,9 @@ test:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	@find workspaces -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
-	@find workspaces -type d -name "install" -exec rm -rf {} + 2>/dev/null || true
-	@find workspaces -type d -name "log" -exec rm -rf {} + 2>/dev/null || true
+	@find layers -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+	@find layers -type d -name "install" -exec rm -rf {} + 2>/dev/null || true
+	@find layers -type d -name "log" -exec rm -rf {} + 2>/dev/null || true
 	@echo "Done."
 
 status:

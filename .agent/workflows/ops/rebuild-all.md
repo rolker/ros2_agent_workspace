@@ -10,7 +10,7 @@ This workflow combines the cleanup of build artifacts and the sequential buildin
 
 1. **Clean Build Artifacts**: Remove `build`, `install`, and `log` directories from all workspace layers.
    ```bash
-   rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
+   rm -rf layers/*_ws/build layers/*_ws/install layers/*_ws/log
    ```
 
 2. **Run Build Script**: Execute the consolidated build script.

@@ -106,6 +106,12 @@ Once environment is set up and status is clean:
 - Use workflows in `.agent/workflows/` for common tasks
 - Add AI signature to all GitHub content
 
+**For parallel work or multi-agent scenarios**, consider using git worktrees:
+```bash
+.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+```
+See [WORKTREE_GUIDE.md](WORKTREE_GUIDE.md) for details.
+
 ---
 
 ## Core Rules (Apply to All Agents)
@@ -189,7 +195,7 @@ Examples (with correct introspection):
 - **Keep repository root clean** - No build artifacts, logs, or temporary files
 - **Use designated directories**:
   - `.agent/scratchpad/` - Persistent temporary artifacts (logs, reports, analysis)
-  - Workspace-specific build dirs (e.g., `workspaces/ros2_ws/build/`, `workspaces/ros2_ws/install/`)
+  - Layer-specific build dirs (e.g., `layers/main/core_ws/build/`, `layers/main/core_ws/install/`)
 - **Pre-commit hook** checks for suspicious files in source directories
 
 **Reference**: [rules/common/clean-root.md](rules/common/clean-root.md)
@@ -205,9 +211,9 @@ Examples (with correct introspection):
 
 ### Build Location
 
-- **Always build in workspace directories**, never in repository root
-- **Standard location**: `workspaces/ros2_ws/` (or workspace-specific dir)
-- **Use colcon** for ROS 2 builds: `cd workspaces/ros2_ws && colcon build`
+- **Always build in layer directories**, never in repository root
+- **Standard location**: `layers/main/core_ws/` (or other workspace layer)
+- **Use colcon** for ROS 2 builds: `cd layers/main/core_ws && colcon build`
 
 **Reference**: [rules/project/build-location.md](rules/project/build-location.md)
 
@@ -312,6 +318,6 @@ For platform-specific features and optimizations:
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Maintained By**: Framework Engineering Team  
 **Related**: [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md), [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md), [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md)

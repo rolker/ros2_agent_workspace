@@ -34,33 +34,33 @@ echo "Verifying Change: $PKG"
 echo "Type: $TYPE"
 echo "========================================"
 
-# Auto-detect workspace layer
-FOUND_WS=""
-if [ -d "$ROOT_DIR/workspaces" ]; then
-    for ws in "$ROOT_DIR/workspaces/"*; do
-        if [ -d "$ws/src" ]; then
+# Auto-detect layer
+FOUND_LAYER=""
+if [ -d "$ROOT_DIR/layers/main" ]; then
+    for layer in "$ROOT_DIR/layers/main/"*; do
+        if [ -d "$layer/src" ]; then
             # Simple check: is there a directory with the package name?
             # Using find to handle nested structures
-            if [ -n "$(find "$ws/src" -name "$PKG" -type d -print -quit 2>/dev/null)" ]; then
-                FOUND_WS="$ws"
+            if [ -n "$(find "$layer/src" -name "$PKG" -type d -print -quit 2>/dev/null)" ]; then
+                FOUND_LAYER="$layer"
                 break
             fi
         fi
     done
 fi
 
-if [ -n "$FOUND_WS" ]; then
-    echo "📂 Located package in: $FOUND_WS"
-    cd "$FOUND_WS" || exit 1
+if [ -n "$FOUND_LAYER" ]; then
+    echo "📂 Located package in: $FOUND_LAYER"
+    cd "$FOUND_LAYER" || exit 1
     
     # Source install if available to ensure environment is ready
     if [ -f "install/setup.bash" ]; then
         source "install/setup.bash"
     fi
 else
-    echo "❌ Error: Could not locate workspace for '$PKG'."
+    echo "❌ Error: Could not locate layer for '$PKG'."
     echo "Search locations checked:"
-    echo "  - $ROOT_DIR/workspaces/*/src"
+    echo "  - $ROOT_DIR/layers/*/src"
     exit 1
 fi
 

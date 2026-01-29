@@ -27,6 +27,10 @@ This document maps:
 | `/finish-feature` | Development | Finalize feature (tests, docs, clean commits) | Task complete, ready for review |
 | `/submit-pr` | Development | Create GitHub pull request | Ready to merge |
 | `/setup-environment` | Setup | One-command initial setup | First time in workspace |
+| `/create-worktree` | Worktree | Create isolated worktree for an issue | Parallel work, multi-agent coordination |
+| `/list-worktrees` | Worktree | List all active worktrees | See what's in progress |
+| `/enter-worktree` | Worktree | Enter worktree with ROS environment | Switching to existing worktree |
+| `/remove-worktree` | Worktree | Clean up completed worktree | Task complete, freeing resources |
 
 ---
 
@@ -54,7 +58,7 @@ This document maps:
 git status
 
 # Verbose with vcstool:
-vcs status workspaces/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**:
@@ -78,7 +82,7 @@ vcs status workspaces/ros2_ws/src
 **Example**:
 ```bash
 git status
-vcs status workspaces/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**:
@@ -163,13 +167,13 @@ git log --oneline --left-right HEAD...origin/main  # Divergence check
 
 **Example**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select my_package
 ```
 
 **CLI-native alternative**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon build --symlink-install
 # Or for specific package:
 colcon build --packages-select <package_name>
@@ -185,7 +189,7 @@ colcon build --packages-select <package_name>
 ### `/build-all`
 
 **File**: `.agent/workflows/ops/build-all.md`  
-**Script**: `.agent/scripts/build_all.sh`
+**Script**: `.agent/scripts/build.sh`
 
 **What it does**:
 - Builds underlay workspace first
@@ -194,7 +198,7 @@ colcon build --packages-select <package_name>
 
 **Example**:
 ```bash
-.agent/scripts/build_all.sh
+.agent/scripts/build.sh
 ```
 
 **When to use**:
@@ -216,7 +220,7 @@ colcon build --packages-select <package_name>
 
 **Example**:
 ```bash
-rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
+rm -rf layers/*/build layers/*/install layers/*/log
 .agent/scripts/build_all.sh
 ```
 
@@ -238,7 +242,7 @@ rm -rf workspaces/*/build workspaces/*/install workspaces/*/log
 
 **Example**:
 ```bash
-rm -rf workspaces/*_ws/build workspaces/*_ws/install workspaces/*_ws/log
+rm -rf layers/*_ws/build layers/*_ws/install layers/*_ws/log
 ```
 
 **When to use**:
@@ -337,10 +341,11 @@ gh pr create --title "Add CLI integration support" --body "Closes #46
 
 **Example**:
 ```bash
-# Edit configs/<workspace>.repos
-vcs import workspaces/ros2_ws/src < configs/ros2.repos
-rosdep install --from-paths workspaces/ros2_ws/src --ignore-src -r -y
-cd workspaces/ros2_ws && colcon build
+# Edit .repos file in key repository
+# layers/main/core_ws/src/unh_marine_autonomy/config/repos/<layer>.repos
+vcs import layers/main/core_ws/src < layers/main/core_ws/src/unh_marine_autonomy/config/repos/core.repos
+rosdep install --from-paths layers/main/core_ws/src --ignore-src -r -y
+cd layers/main/core_ws && colcon build
 ```
 
 **When to use**:
@@ -361,7 +366,7 @@ cd workspaces/ros2_ws && colcon build
 
 **Example**:
 ```bash
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon test
 colcon test-result --verbose
 ```
@@ -401,6 +406,121 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 ---
 
+## Worktree Commands
+
+Git worktrees enable parallel development by creating isolated working directories. Each worktree has its own build artifacts, scratchpad, and environment.
+
+### `/create-worktree`
+
+**Script**: `.agent/scripts/worktree_create.sh`
+
+**What it does**:
+- Creates an isolated worktree for a specific issue
+- Sets up separate directory structure
+- Creates feature branch for the worktree
+- Initializes local scratchpad for build reports
+
+**Example**:
+```bash
+# Layer worktree (for ROS package development)
+.agent/scripts/worktree_create.sh --issue 42 --type layer
+
+# Workspace worktree (for infrastructure work)
+.agent/scripts/worktree_create.sh --issue 42 --type workspace
+
+# With custom branch name
+.agent/scripts/worktree_create.sh --issue 42 --type layer --branch feature/custom-name
+```
+
+**When to use**:
+- ✅ Multiple agents working simultaneously
+- ✅ Need to switch between issues without stashing
+- ✅ Want isolated build/test environment
+- ❌ Quick single-issue work (just use a branch)
+
+---
+
+### `/list-worktrees`
+
+**Script**: `.agent/scripts/worktree_list.sh`
+
+**What it does**:
+- Lists all active worktrees (layer and workspace)
+- Shows issue number, type, branch, and status
+- Indicates uncommitted changes
+
+**Example**:
+```bash
+.agent/scripts/worktree_list.sh
+```
+
+**Sample output**:
+```
+Worktrees in ros2_agent_workspace
+================================================================================
+Issue    Type       Branch                              Status
+--------------------------------------------------------------------------------
+42       layer      feature/ISSUE-42-add-sensor         Clean
+106      workspace  feature/issue-106-layers-rename     Modified
+--------------------------------------------------------------------------------
+Total: 2 worktrees (1 layer, 1 workspace)
+```
+
+**When to use**:
+- ✅ See what's currently in progress
+- ✅ Before creating new worktree
+- ✅ Coordinating with other agents
+
+---
+
+### `/enter-worktree`
+
+**Script**: `.agent/scripts/worktree_enter.sh` (must be sourced!)
+
+**What it does**:
+- Changes to the worktree directory
+- Sources ROS environment correctly
+- Sets WORKTREE_ISSUE, WORKTREE_TYPE, WORKTREE_ROOT env vars
+
+**Example**:
+```bash
+# MUST be sourced, not executed
+source .agent/scripts/worktree_enter.sh 42
+```
+
+**When to use**:
+- ✅ Switching to an existing worktree
+- ✅ Starting work session in worktree
+- ❌ Don't execute (./worktree_enter.sh) - must source
+
+---
+
+### `/remove-worktree`
+
+**Script**: `.agent/scripts/worktree_remove.sh`
+
+**What it does**:
+- Removes worktree directory
+- Cleans up git worktree references
+- Warns if uncommitted changes exist
+
+**Example**:
+```bash
+# Safe removal (warns if uncommitted changes)
+.agent/scripts/worktree_remove.sh 42
+
+# Force removal (ignores uncommitted changes)
+.agent/scripts/worktree_remove.sh 42 --force
+```
+
+**When to use**:
+- ✅ Issue complete and merged
+- ✅ Abandoning work on an issue
+- ✅ Cleaning up disk space
+- ❌ While still actively working on issue
+
+---
+
 ## CLI-Native Alternatives
 
 Sometimes using ROS/git commands directly is more efficient than workflows:
@@ -430,7 +550,7 @@ git push -u origin feature/my-task
 
 ```bash
 # Build single package (fast)
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon build --packages-select my_package
 
 # Build with dependencies
@@ -448,7 +568,7 @@ colcon build --parallel-workers 4
 
 ```bash
 # Test single package
-cd workspaces/ros2_ws
+cd layers/main/core_ws
 colcon test --packages-select my_package
 colcon test-result --verbose
 
@@ -463,14 +583,14 @@ colcon test --packages-select my_package --pytest-args -k test_my_function
 ### VCS Operations
 
 ```bash
-# Import repositories
-vcs import workspaces/ros2_ws/src < configs/ros2.repos
+# Import repositories from key repository config
+vcs import layers/main/core_ws/src < layers/main/core_ws/src/unh_marine_autonomy/config/repos/core.repos
 
 # Update repositories
-vcs pull workspaces/ros2_ws/src
+vcs pull layers/main/core_ws/src
 
 # Status across all repos
-vcs status workspaces/ros2_ws/src
+vcs status layers/main/core_ws/src
 ```
 
 **When to use**: Managing multiple repositories efficiently.
@@ -512,6 +632,9 @@ Check `.agent/instructions/gemini-cli.instructions.md` for Gemini-specific patte
 | **Create PR** | ✅ `/submit-pr` | ⚠️ Either (depends on complexity) |
 | **Run specific test** | ❌ Overhead | ✅ `colcon test --packages-select` |
 | **Clean workspace** | ✅ `/clean` | ⚠️ Either (safety) |
+| **Parallel agent work** | ✅ `/create-worktree` | ❌ Complex setup |
+| **Quick single issue** | ❌ Overhead | ✅ `git checkout -b` |
+| **Switch between issues** | ✅ `/enter-worktree` | ❌ Stash/context lost |
 
 ---
 
@@ -550,6 +673,6 @@ If you find yourself repeating a sequence of commands:
 
 ---
 
-**Last Updated**: 2026-01-27  
+**Last Updated**: 2026-01-29  
 **Maintained By**: Framework Engineering Team  
 **Related**: [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md), [AI_RULES.md](AI_RULES.md), [AGENT_INDEX.md](AGENT_INDEX.md)

@@ -17,11 +17,11 @@ fi
 ## Steps
 
 1. **Determine Workspace**: Identify if you are building `underlay_ws`, a specific overlay (e.g., `core_ws`), or all of them.
-2. **Navigate**: Go to the workspace root: `workspaces/<name>_ws`.
+2. **Navigate**: Go to the workspace root: `layers/<name>_ws`.
 3. **Build Command**:
    Navigate to the workspace directory and run build:
    ```bash
-   cd workspaces/<name>_ws
+   cd layers/<name>_ws
    colcon build --symlink-install
    ```
    *Note: This keeps build, install, and log directories contained within the workspace.*

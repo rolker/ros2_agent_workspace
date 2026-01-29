@@ -45,16 +45,16 @@ fi
 
 6. **Install Dependencies**: Use `rosdep` to install any missing system dependencies for the new code.
    ```bash
-   rosdep install --from-paths workspaces/<layer_name>_ws/src --ignore-src -r -y
+   rosdep install --from-paths layers/<layer_name>_ws/src --ignore-src -r -y
    ```
 
-7. **Verify**: Check that the repository was cloned into `workspaces/<layer_name>_ws/src/<repo_name>`.
+7. **Verify**: Check that the repository was cloned into `layers/<layer_name>_ws/src/<repo_name>`.
    ```bash
-   ls workspaces/<layer_name>_ws/src/<repo_name>
+   ls layers/<layer_name>_ws/src/<repo_name>
    ```
 
 8. **Build (Optional)**: Build the workspace to ensure the new package is compatible.
    ```bash
-   cd workspaces/<layer_name>_ws
+   cd layers/<layer_name>_ws
    colcon build --symlink-install
    ```

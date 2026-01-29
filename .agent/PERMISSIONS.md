@@ -12,12 +12,12 @@ This document defines the permissions and responsibilities for different Agent R
 - `CHANGELOG.md`
 
 **Restrictions**:
-- Do NOT modify `workspaces/` (unless fixing build infrastructure).
+- Do NOT modify `layers/` (unless fixing build infrastructure).
 
 ## 2. ROS Developer
 **Role**: Develop robotic software within the ROS 2 layers.
 **Scope**:
-- `workspaces/*/src/`
+- `layers/*/src/`
 - `configs/*.repos` (Adding/removing repos)
 
 **Restrictions**:

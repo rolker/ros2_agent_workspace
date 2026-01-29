@@ -53,6 +53,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 - ⚡ [AI CLI Quick Start](.agent/AI_CLI_QUICKSTART.md) - 5-minute setup for CLI agents
 - 📋 [AI Rules](.agent/AI_RULES.md) - Universal agent workflow and rules
 - 🔧 [CLI Commands](.agent/CLI_COMMANDS.md) - Workflow discovery and mapping
+- 🌲 [Worktree Guide](.agent/WORKTREE_GUIDE.md) - Parallel development with git worktrees
 - 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Detailed onboarding for specialized agents
 
 ### For All Users
@@ -64,14 +65,14 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
-- **`configs/`**: Contains `.repos` files (YAML) defining the packages for each workspace layer.
+- **`configs/`**: Contains `.repos` files (YAML) defining the packages for each layer.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
-- **`workspaces/`**: The actual ROS2 workspaces (source code and build artifacts).
+- **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
 
 ## Usage
 
 ### 1. Setup a Layer
-To initialize a workspace layer defined in `configs/<name>.repos`:
+To initialize a layer defined in the key repository's `.repos` files:
 
 ```bash
 ./.agent/scripts/setup.sh <name>
@@ -82,11 +83,11 @@ To initialize a workspace layer defined in `configs/<name>.repos`:
 ```
 
 This will:
-1. Create `workspaces/<name>_ws/src`
+1. Create `layers/<name>_ws/src`
 2. Import repositories from `configs/<name>.repos`
 
 ### 2. Sourcing the Environment
-To source the workspaces in the correct order (Underlay -> ... -> Overlay):
+To source the layers in the correct order (Underlay -> ... -> Overlay):
 
 ```bash
 source .agent/scripts/env.sh
@@ -97,14 +98,16 @@ source .agent/scripts/env.sh
 This workspace is designed to be used with an AI Agent. If you are new to agentic coding, here is how you should interact with this repository:
 
 1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
-2.  **Slash Commands**: The agent has a set of workflows it can execute. You can trigger these by asking for them by name (e.g., "run the clean workflow") or by using the slash command directly if your interface supports it.
-    *   `/add-repo`: Add a new repository to a layer.
-    *   `/build-all`: Build all layers in the correct order.
-    *   `/clean`: specific cleanup of build artifacts.
-    *   `/rebuild-all`: Clean and rebuild everything.
-    *   `/submit-pr`: Create a PR for your changes.
-    *   *See `.agent/workflows/` for the full list.*
-3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `workspaces/`, configs in `configs/`). Trust it to place files in the correct location.
+2.  **Workflow Documentation**: The agent has workflow documentation it can reference. These are documented in `.agent/workflows/` as markdown files:
+    *   **`/add-repo`**: Add a new repository to a layer (see `.agent/workflows/dev/add-repo.md`)
+    *   **`/build-all`**: Build all layers in the correct order (see `.agent/workflows/ops/build-all.md`)
+    *   **`/clean`**: Specific cleanup of build artifacts (see `.agent/workflows/ops/clean.md`)
+    *   **`/rebuild-all`**: Clean and rebuild everything (see `.agent/workflows/ops/rebuild-all.md`)
+    *   **`/submit-pr`**: Create a PR for your changes (see `.agent/workflows/dev/submit-pr.md`)
+    *   *See `.agent/workflows/` for the full list of workflow guides.*
+    
+    Note: These are workflow guides that agents reference, not executable commands. How the agent implements them depends on the platform.
+3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, key repository configs in `layers/main/core_ws/src/unh_marine_autonomy/config/repos/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
 
@@ -128,7 +131,7 @@ This workspace can be configured to bootstrap from a "Key Repository" of your ch
 3. Run `./.agent/scripts/setup.sh <layer>` to import repositories defined in your Key Repo.
 
 ## Adding New Layers
-1. Create a `<new_layer>.repos` file in `configs/`.
+1. Create a `<new_layer>.repos` file in the key repository's `config/repos/` directory (e.g., `layers/main/core_ws/src/unh_marine_autonomy/config/repos/`).
 2. Run `./.agent/scripts/setup.sh <new_layer>`.
 
 ## Troubleshooting
@@ -153,12 +156,12 @@ Ensure ROS 2 Jazzy is installed:
 1. Check the build report: `cat .agent/scratchpad/build_report.md`
 2. Try building a single layer:
    ```bash
-   cd workspaces/core_ws
+   cd layers/main/core_ws
    colcon build --symlink-install
    ```
 3. Check for missing dependencies:
    ```bash
-   rosdep install --from-paths workspaces/core_ws/src --ignore-src -r -y
+   rosdep install --from-paths layers/main/core_ws/src --ignore-src -r -y
    ```
 
 #### Workspace Locked

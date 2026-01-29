@@ -1,8 +1,16 @@
-# Ignore ROS2 workspaces because they are managed by vcs and .repos files
-workspaces/*/src/
-workspaces/*/build/
-workspaces/*/install/
-workspaces/*/log/
+# Ignore ROS2 layers because they are managed by vcs and .repos files
+# Main builds live in layers/main/
+layers/main/*/src/
+layers/main/*/build/
+layers/main/*/install/
+layers/main/*/log/
+
+# Ignore layer worktrees (created dynamically for task isolation)
+# Each worktree contains target layer + symlinks to main
+layers/worktrees/
+
+# Ignore workspace worktrees (for infrastructure work)
+.workspace-worktrees/
 
 # Ignore colcon/ROS artifacts in root if any
 build/
