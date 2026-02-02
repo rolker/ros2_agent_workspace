@@ -234,6 +234,7 @@ Common commands (see [CLI_COMMANDS.md](CLI_COMMANDS.md) for full list):
 /build              # Build current workspace
 /build-all          # Build all workspaces
 /test-all           # Run all tests
+/sync-repos         # Safely sync all repositories
 /clean              # Clean build artifacts
 /add-repo           # Add new ROS package
 /check-status       # Comprehensive status check

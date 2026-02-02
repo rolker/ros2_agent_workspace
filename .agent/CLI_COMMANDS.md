@@ -22,6 +22,7 @@ This document maps:
 | `/rebuild-all` | Build | Clean + build all workspaces | Dependency issues, fresh start |
 | `/clean` | Cleanup | Remove build artifacts | Disk space, build corruption |
 | `/test-all` | Testing | Run all tests across workspaces | Pre-PR validation |
+| `/sync-repos` | Development | Safely sync all workspace repositories | After updates, periodically |
 | `/add-repo` | Development | Add new ROS package to workspace | Starting new package |
 | `/start-feature` | Development | Create feature branch from clean state | Beginning new task |
 | `/finish-feature` | Development | Finalize feature (tests, docs, clean commits) | Task complete, ready for review |
@@ -377,6 +378,51 @@ colcon test-result --verbose
 - ✅ After major refactoring
 - ✅ Validating CI will pass
 - ❌ During rapid iteration (slow)
+
+---
+
+### `/sync-repos`
+
+**File**: `.agent/workflows/ops/sync-repos.md`  
+**Script**: `.agent/scripts/sync_repos.py`
+
+**What it does**:
+- Safely syncs all workspace repositories
+- Pulls updates on main/jazzy/rolling branches
+- Only fetches on feature branches (no auto-merge)
+- Skips dirty repos to prevent conflicts
+- Notifies when feature branches are behind remote
+
+**Example**:
+```bash
+# Dry run (see what would happen)
+python3 .agent/scripts/sync_repos.py --dry-run
+
+# Execute sync
+make sync
+
+# Or directly
+python3 .agent/scripts/sync_repos.py
+```
+
+**CLI-native alternative**:
+```bash
+# Basic vcs pull (doesn't respect dirty repos or feature branches)
+vcs pull workspaces/
+```
+
+**When to use**:
+- ✅ After returning to workspace after time away
+- ✅ When you need latest changes from upstream
+- ✅ Periodically to stay current with team changes
+- ✅ Before starting new feature work
+- ❌ During active development on feature branch (use git commands directly)
+
+**Smart behavior**:
+- **Default branches** (main/jazzy/rolling): Auto-pulls with rebase
+- **Feature branches**: Fetches only, warns if behind (manual merge required)
+- **Dirty repos**: Skipped entirely to avoid conflicts
+- **Detached HEAD**: Skipped with warning
 
 ---
 
