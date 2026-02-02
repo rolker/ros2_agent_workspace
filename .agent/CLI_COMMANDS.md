@@ -29,6 +29,7 @@ This document maps:
 | `/submit-pr` | Development | Create GitHub pull request | Ready to merge |
 | `/setup-environment` | Setup | One-command initial setup | First time in workspace |
 | `/continuous-improvement` | Improvement | Identify and report infrastructure friction | End of session, after major tasks |
+| `/start-task` | Worktree | **Start work on any issue (REQUIRED)** | Every new task - creates isolated worktree |
 | `/create-worktree` | Worktree | Create isolated worktree for an issue | Parallel work, multi-agent coordination |
 | `/list-worktrees` | Worktree | List all active worktrees | See what's in progress |
 | `/enter-worktree` | Worktree | Enter worktree with ROS environment | Switching to existing worktree |
@@ -506,13 +507,56 @@ gh issue create \
 
 ## Worktree Commands
 
+⚠️ **CRITICAL**: All agents MUST use `/start-task` to begin work on any issue. Direct git checkout is prohibited.
+
 Git worktrees enable parallel development by creating isolated working directories. Each worktree has its own build artifacts, scratchpad, and environment.
+
+### `/start-task` (REQUIRED)
+
+**Script**: `.agent/scripts/agent start-task`
+
+**What it does**:
+- **Enforces** isolated worktree workflow for all task work
+- Creates worktree automatically based on issue type
+- Sets up proper directory structure and branch
+- Prevents workspace pollution from multiple agents
+
+**Example**:
+```bash
+# Infrastructure work (scripts, docs, configs)
+.agent/scripts/agent start-task 125
+
+# ROS package development  
+.agent/scripts/agent start-task 42 --layer core
+
+# Help
+.agent/scripts/agent --help
+```
+
+**When to use**:
+- ✅ **ALWAYS** - This is the ONLY approved way to start task work
+- ✅ Every new issue assignment
+- ✅ Before making any code changes
+
+**Why this is mandatory**:
+- Prevents workspace pollution
+- Enables multi-agent coordination
+- Enforces task isolation
+- Protects main source tree
+
+**🚫 Forbidden alternatives**:
+- Direct `git checkout -b feature/...`
+- Working in main workspace tree
+- Creating branches without worktrees
+
+---
 
 ### `/create-worktree`
 
 **Script**: `.agent/scripts/worktree_create.sh`
 
 **What it does**:
+- Low-level worktree creation (called by `/start-task`)
 - Creates an isolated worktree for a specific issue
 - Sets up separate directory structure
 - Creates feature branch for the worktree
@@ -521,20 +565,18 @@ Git worktrees enable parallel development by creating isolated working directori
 **Example**:
 ```bash
 # Layer worktree (for ROS package development)
-.agent/scripts/worktree_create.sh --issue 42 --type layer
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
 
 # Workspace worktree (for infrastructure work)
 .agent/scripts/worktree_create.sh --issue 42 --type workspace
 
 # With custom branch name
-.agent/scripts/worktree_create.sh --issue 42 --type layer --branch feature/custom-name
+.agent/scripts/worktree_create.sh --issue 42 --type workspace --branch feature/custom-name
 ```
 
 **When to use**:
-- ✅ Multiple agents working simultaneously
-- ✅ Need to switch between issues without stashing
-- ✅ Want isolated build/test environment
-- ❌ Quick single-issue work (just use a branch)
+- ❌ **DON'T** - Use `/start-task` instead
+- ℹ️ This is a low-level tool; use the `agent` wrapper for normal work
 
 ---
 

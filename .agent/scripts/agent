@@ -1,0 +1,152 @@
+#!/bin/bash
+# .agent/scripts/agent
+# Unified entry point for agent task operations with enforced isolation
+#
+# This wrapper enforces the worktree-based workflow to prevent agents from
+# accidentally working in the main source tree and risking workspace pollution.
+#
+# Usage:
+#   agent start-task <issue> [--layer <name>]
+#   agent --help
+#
+# Examples:
+#   agent start-task 125              # Workspace worktree (infrastructure)
+#   agent start-task 42 --layer core  # Layer worktree (ROS packages)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+show_usage() {
+    cat << 'EOF'
+agent - Enforced Task Isolation for AI Agents
+
+USAGE:
+    agent start-task <issue> [options]
+    agent --help
+
+COMMANDS:
+    start-task <issue>    Start work on an issue in isolated worktree
+                          Automatically creates worktree, enters it, and
+                          sets up the environment
+
+OPTIONS:
+    --layer <name>        Specify layer for ROS package work
+                          (core, platforms, sensors, simulation, ui, underlay)
+                          Omit for infrastructure/workspace work
+    --help, -h            Show this help message
+
+EXAMPLES:
+    # Infrastructure work (scripts, docs, configs)
+    agent start-task 125
+
+    # ROS package development
+    agent start-task 42 --layer core
+
+ENFORCEMENT:
+    This wrapper is the ONLY approved way for agents to start work.
+    Direct git checkout or working in main source tree is prohibited
+    to prevent workspace pollution and enable multi-agent coordination.
+
+SEE ALSO:
+    .agent/AI_RULES.md           - Core workflow rules
+    .agent/CLI_COMMANDS.md       - All available commands
+    worktree_create.sh --help    - Low-level worktree creation
+EOF
+}
+
+start_task() {
+    local issue_num="$1"
+    shift
+    
+    local layer=""
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --layer)
+                layer="$2"
+                shift 2
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                echo "Run 'agent --help' for usage"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Validate issue number
+    if [ -z "$issue_num" ]; then
+        echo "Error: Issue number required"
+        echo "Usage: agent start-task <issue> [--layer <name>]"
+        exit 1
+    fi
+    
+    if ! [[ "$issue_num" =~ ^[0-9]+$ ]]; then
+        echo "Error: Issue number must be numeric, got: $issue_num"
+        exit 1
+    fi
+    
+    echo "========================================="
+    echo "🤖 Agent Task Isolation"
+    echo "========================================="
+    echo "Issue: #$issue_num"
+    
+    # Determine worktree type
+    if [ -n "$layer" ]; then
+        echo "Type:  Layer worktree ($layer)"
+        echo ""
+        
+        # Create layer worktree
+        "$SCRIPT_DIR/worktree_create.sh" --issue "$issue_num" --type layer --layer "$layer"
+    else
+        echo "Type:  Workspace worktree (infrastructure)"
+        echo ""
+        
+        # Create workspace worktree
+        "$SCRIPT_DIR/worktree_create.sh" --issue "$issue_num" --type workspace
+    fi
+    
+    echo ""
+    echo "========================================="
+    echo "✅ Worktree Ready"
+    echo "========================================="
+    echo ""
+    echo "Next steps:"
+    echo "  1. Enter worktree:"
+    echo "     source .agent/scripts/worktree_enter.sh --issue $issue_num"
+    echo ""
+    echo "  2. Or manually:"
+    if [ -n "$layer" ]; then
+        echo "     cd layers/worktrees/issue-$issue_num"
+    else
+        echo "     cd .workspace-worktrees/issue-$issue_num"
+    fi
+    echo ""
+    echo "  3. When done:"
+    echo "     .agent/scripts/worktree_remove.sh --issue $issue_num"
+    echo ""
+}
+
+# Main command routing
+case "${1:-}" in
+    start-task)
+        shift
+        start_task "$@"
+        ;;
+    --help|-h|help)
+        show_usage
+        ;;
+    "")
+        echo "Error: Command required"
+        echo "Run 'agent --help' for usage"
+        exit 1
+        ;;
+    *)
+        echo "Error: Unknown command: $1"
+        echo "Run 'agent --help' for usage"
+        exit 1
+        ;;
+esac

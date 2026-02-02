@@ -101,16 +101,50 @@ Or use the workflow:
 ### 4. Start Working
 
 Once environment is set up and status is clean:
-- Pick a task from GitHub Issues (or create one if needed)
-- Follow git hygiene rules (feature branches, atomic commits)
-- Use workflows in `.agent/workflows/` for common tasks
-- Add AI signature to all GitHub content
 
-**For parallel work or multi-agent scenarios**, consider using git worktrees:
+**⚠️ CRITICAL: All agents MUST use isolated worktrees for task work.**
+
+#### Start Every Task with the Agent Wrapper
+
 ```bash
-.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+# For infrastructure work (scripts, docs, configs)
+.agent/scripts/agent start-task <issue-number>
+
+# For ROS package work
+.agent/scripts/agent start-task <issue-number> --layer <layer-name>
 ```
-See [WORKTREE_GUIDE.md](WORKTREE_GUIDE.md) for details.
+
+**Examples**:
+```bash
+# Work on documentation or agent scripts
+.agent/scripts/agent start-task 125
+
+# Work on core ROS packages
+.agent/scripts/agent start-task 42 --layer core
+
+# Work on sensor packages
+.agent/scripts/agent start-task 55 --layer sensors
+```
+
+Then enter the worktree:
+```bash
+source .agent/scripts/worktree_enter.sh --issue <issue-number>
+```
+
+**Why This Is Required**:
+- ✅ Prevents workspace pollution
+- ✅ Enables parallel work by multiple agents
+- ✅ Isolated build artifacts per task
+- ✅ Safe to abandon work without cleanup
+- ✅ Enforces task-based isolation
+
+**🚫 Forbidden**: Direct `git checkout -b` or working in main workspace tree
+
+After completing work in the worktree:
+- Follow git hygiene rules (atomic commits)
+- Add AI signature to all GitHub content
+- Create PR with proper signatures
+- Clean up: `.agent/scripts/worktree_remove.sh --issue <issue-number>`
 
 ---
 

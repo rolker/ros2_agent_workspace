@@ -162,22 +162,47 @@ Before starting work, see what's currently happening:
 
 ## ✅ You're Ready! Now What?
 
-### Option A: Start a New Task
+### Start Working on a Task
 
-1. **Check GitHub Issues** for available work:
-   ```
-   /check-github-status
-   ```
-   Or manually: https://github.com/rolker/ros2_agent_workspace/issues
+**⚠️ CRITICAL**: Use the agent wrapper to create isolated worktrees:
 
-2. **Create a feature branch**:
-   ```bash
-   git checkout -b feature/ISSUE-46-cli-integration
-   ```
+```bash
+# For infrastructure work (scripts, docs, configs)
+.agent/scripts/agent start-task <issue-number>
 
-3. **Work on your task** (write code, run tests, etc.)
+# For ROS package development
+.agent/scripts/agent start-task <issue-number> --layer <layer-name>
+```
 
-4. **Commit your changes**:
+**Examples**:
+```bash
+# Work on agent infrastructure
+.agent/scripts/agent start-task 125
+
+# Work on core ROS packages
+.agent/scripts/agent start-task 42 --layer core
+```
+
+**Then enter the worktree**:
+```bash
+source .agent/scripts/worktree_enter.sh --issue <issue-number>
+```
+
+**Why worktrees are mandatory**:
+- ✅ Prevents workspace pollution
+- ✅ Enables parallel work by multiple agents
+- ✅ Isolated build artifacts per task
+- ✅ Safe to abandon without cleanup
+
+**🚫 Forbidden**: Direct `git checkout -b` or working in main workspace tree
+
+### Working in the Worktree
+
+Once you're in the worktree:
+
+1. **Work on your task** (write code, run tests, etc.)
+
+2. **Commit your changes**:
    ```bash
    git add <files>
    git commit -m "Implement CLI integration
