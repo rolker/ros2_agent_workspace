@@ -245,6 +245,48 @@ Located in `.agent/workflows/`:
 - `/add-repo` - Add new ROS package to workspace
 - `/test-all` - Run all tests
 
+**Improvement** (`workflows/ops/`):
+- `/continuous-improvement` - Identify and report infrastructure friction
+
+---
+
+## Session Best Practices
+
+### Report Infrastructure Friction
+
+At the **end of significant work sessions**, take a moment to identify and report infrastructure friction points:
+
+**What to report:**
+- Unclear or incomplete documentation
+- Workflows that required workarounds
+- Scripts that failed or behaved unexpectedly
+- Repetitive manual steps that could be automated
+- Hard-to-discover tools or features
+
+**How to report:**
+```bash
+# Use the continuous improvement workflow
+cat .agent/workflows/ops/continuous-improvement.md
+
+# Draft issues using the template
+cat .agent/templates/improvement_issue.md
+```
+
+**Process:**
+1. Review session for friction points
+2. Check for duplicate issues: `gh issue list --search "topic"`
+3. Draft well-formed issues with examples and session evidence
+4. Show drafts to user for approval
+5. Create approved issues: `gh issue create --label "enhancement,agent-infrastructure"`
+
+**Benefits:**
+- ✅ Helps all future agents work more efficiently
+- ✅ Captures improvement opportunities while context is fresh
+- ✅ Builds knowledge base of real-world friction points
+- ✅ Drives continuous improvement of agent infrastructure
+
+**Reference**: [workflows/ops/continuous-improvement.md](workflows/ops/continuous-improvement.md), [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-infrastructure-friction)
+
 ---
 
 ## Permissions & Roles
