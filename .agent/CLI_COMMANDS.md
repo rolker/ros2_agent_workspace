@@ -427,14 +427,14 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 # (What was confusing? What didn't work? What required workarounds?)
 
 # 2. Check for existing issues
-gh issue list --repo rolker/ros2_agent_workspace --state open --limit 50
-gh issue list --repo rolker/ros2_agent_workspace --search "documentation" --state open
+gh issue list --state open --limit 50
+gh issue list --search "documentation" --state open
 
 # 3. Draft issues using template
 cat .agent/templates/improvement_issue.md
 
 # 4. Create issues (after user approval)
-gh issue create --repo rolker/ros2_agent_workspace \
+gh issue create \
   --title "Improve X documentation" \
   --label "enhancement,documentation" \
   --body-file /tmp/issue_draft.md
@@ -455,6 +455,9 @@ gh issue create --repo rolker/ros2_agent_workspace \
 - Confusing workflows or error messages
 - Hard-to-discover tools or scripts
 - Environment/setup issues
+
+---
+
 ## Worktree Commands
 
 Git worktrees enable parallel development by creating isolated working directories. Each worktree has its own build artifacts, scratchpad, and environment.
@@ -506,6 +509,7 @@ Git worktrees enable parallel development by creating isolated working directori
 **Sample output**:
 ```
 Worktrees in ros2_agent_workspace
+================================================================================
 Issue    Type       Branch                              Status
 --------------------------------------------------------------------------------
 42       layer      feature/ISSUE-42-add-sensor         Clean

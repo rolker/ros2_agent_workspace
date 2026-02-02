@@ -70,11 +70,11 @@ Before creating new issues, check if they already exist:
 
 ```bash
 # List open issues (check last 50)
-gh issue list --repo rolker/ros2_agent_workspace --state open --limit 50
+gh issue list --state open --limit 50
 
 # Search for specific topics
-gh issue list --repo rolker/ros2_agent_workspace --search "documentation" --state open
-gh issue list --repo rolker/ros2_agent_workspace --search "workflow" --state open
+gh issue list --search "documentation" --state open
+gh issue list --search "workflow" --state open
 ```
 
 If an issue already exists:
@@ -160,7 +160,7 @@ Session: 66b4eea3
 Use GitHub CLI to create issues with appropriate labels:
 
 ```bash
-gh issue create --repo rolker/ros2_agent_workspace \
+gh issue create \
   --title "Make sync-repos discoverable in CLI_COMMANDS.md" \
   --label "enhancement,documentation" \
   --body-file /tmp/issue_draft.md
