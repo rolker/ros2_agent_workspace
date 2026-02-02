@@ -4,9 +4,10 @@ Validate workspace matches .repos configuration.
 
 This script verifies that the actual workspace repositories match what is
 configured in the .repos files. It checks:
-1. All repos in configs are cloned
+1. All repos in configs are cloned in valid layers
 2. All cloned repos are in configs (detect orphans)
 3. Repos are on expected branches/versions
+4. Enforces agent isolation (ignores .agent/ directories)
 
 Usage:
     python3 validate_workspace.py [--fix] [--verbose]
@@ -16,142 +17,78 @@ import os
 import sys
 import argparse
 import subprocess
-import yaml
 from pathlib import Path
 
 # Add lib directory to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
 
-from workspace import get_workspace_root
+from workspace import get_workspace_root, get_overlay_repos, extract_github_owner_repo
 
 
-def get_all_repos_config():
+def get_actual_repos(workspace_root):
     """
-    Get all repositories defined in .repos files.
+    Get all repositories actually present in workspace layers.
     
+    Args:
+        workspace_root (str): Path to workspace root
+        
     Returns:
-        dict: Dictionary mapping repo name to config info:
-            {
-                'repo_name': {
-                    'url': str,
-                    'version': str,
-                    'source_file': str,
-                    'workspace': str (e.g., 'core_ws')
-                }
-            }
+        dict: Repository information keyed by repo name
     """
-    workspace_root = Path(get_workspace_root())
-    repos_config = {}
-    
-    # Check both configs/ directory and migrated Key Repo location
-    config_dirs = [
-        workspace_root / "configs",
-        workspace_root / "workspaces/core_ws/src/unh_marine_autonomy/config/repos"
-    ]
-    
-    for config_dir in config_dirs:
-        if not config_dir.exists():
-            continue
-            
-        for repos_file in config_dir.glob("*.repos"):
-            # Skip underlay.repos - those are system dependencies
-            if repos_file.name == "underlay.repos":
-                continue
-                
-            # Derive workspace name from filename (e.g., core.repos -> core_ws)
-            workspace_name = repos_file.stem + "_ws"
-            
-            try:
-                with open(repos_file, 'r', encoding='utf-8') as f:
-                    data = yaml.safe_load(f)
-                    
-                if not data or 'repositories' not in data:
-                    continue
-                    
-                for repo_name, repo_info in data['repositories'].items():
-                    # Validate repo_info is a dictionary
-                    if not isinstance(repo_info, dict):
-                        print(f"Warning: Invalid repo entry '{repo_name}' in {repos_file.name}", 
-                              file=sys.stderr)
-                        continue
-                        
-                    if repo_name in repos_config:
-                        print(f"Warning: Duplicate repo '{repo_name}' in {repos_file.name}", 
-                              file=sys.stderr)
-                        continue
-                        
-                    repos_config[repo_name] = {
-                        'url': repo_info.get('url', ''),
-                        'version': repo_info.get('version', ''),
-                        'source_file': repos_file.name,
-                        'workspace': workspace_name
-                    }
-                    
-            except yaml.YAMLError as e:
-                print(f"Error parsing {repos_file}: {e}", file=sys.stderr)
-                
-    return repos_config
-
-
-def get_actual_repos():
-    """
-    Get all repositories actually present in workspace src directories.
-    
-    Returns:
-        dict: Dictionary mapping repo name to actual location:
-            {
-                'repo_name': {
-                    'path': Path,
-                    'workspace': str,
-                    'branch': str or None
-                }
-            }
-    """
-    workspace_root = Path(get_workspace_root())
     actual_repos = {}
+    root_path = Path(workspace_root)
+    layers_dir = root_path / "layers"
     
-    workspaces_dir = workspace_root / "workspaces"
-    if not workspaces_dir.exists():
-        return actual_repos
-        
-    # Find all *_ws directories
-    for ws_dir in workspaces_dir.glob("*_ws"):
-        src_dir = ws_dir / "src"
-        if not src_dir.exists():
-            continue
+    if not layers_dir.exists():
+        # Fallback to workspaces/ if layers/ doesn't exist (legacy support)
+        workspaces_dir = root_path / "workspaces"
+        if workspaces_dir.exists():
+            search_dirs = [workspaces_dir]
+        else:
+            return actual_repos
+    else:
+        search_dirs = [layers_dir]
+
+    for search_dir in search_dirs:
+        # Walk through the directory structure
+        for root, dirs, files in os.walk(search_dir):
+            root_path_obj = Path(root)
             
-        workspace_name = ws_dir.name
-        
-        # Find all directories in src (each is potentially a repo)
-        for repo_dir in src_dir.iterdir():
-            if not repo_dir.is_dir() or repo_dir.name.startswith('.'):
+            # Skip .agent, .git, and hidden directories
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            if ".agent" in root_path_obj.parts:
                 continue
                 
-            # Check if it's a git repo
-            if (repo_dir / ".git").exists():
-                # Get current branch
-                branch = get_git_branch(repo_dir)
+            # Check if this directory is a git repo
+            if (root_path_obj / ".git").exists():
+                repo_name = root_path_obj.name
                 
-                actual_repos[repo_dir.name] = {
-                    'path': repo_dir,
-                    'workspace': workspace_name,
+                # Identify workspace/layer context
+                # Structure: layers/<layer>/<ws>/src/<repo>
+                try:
+                    rel_path = root_path_obj.relative_to(search_dir)
+                    # Use the first part as layer/workspace indicator mostly for reporting
+                    context = str(rel_path.parent)
+                except ValueError:
+                    context = "unknown"
+                
+                branch = get_git_branch(root_path_obj)
+                
+                actual_repos[repo_name] = {
+                    'path': root_path_obj,
+                    'context': context,
                     'branch': branch
                 }
+                
+                # Don't recurse into a git repo
+                dirs[:] = []
                 
     return actual_repos
 
 
 def get_git_branch(repo_path):
-    """
-    Get the current branch of a git repository.
-    
-    Args:
-        repo_path: Path to the repository
-        
-    Returns:
-        str: Branch name or None if detached HEAD or error
-    """
+    """Get the current branch of a git repository."""
     try:
         result = subprocess.run(
             ["git", "branch", "--show-current"],
@@ -161,284 +98,214 @@ def get_git_branch(repo_path):
             check=True
         )
         branch = result.stdout.strip()
-        return branch if branch else None
+        return branch if branch else None # None indicates detached HEAD or error
     except subprocess.CalledProcessError:
         return None
 
 
 def validate_workspace(verbose=False):
-    """
-    Validate workspace matches configuration.
-    
-    Args:
-        verbose: If True, print detailed information
-        
-    Returns:
-        tuple: (is_valid, missing_repos, extra_repos, version_mismatches)
-    """
+    """Validate workspace matches configuration."""
     print("Validating workspace against .repos configuration...")
     print()
     
-    # Get configured and actual repos
-    config_repos = get_all_repos_config()
-    actual_repos = get_actual_repos()
+    root = get_workspace_root()
+    
+    # Get configured repos using shared library
+    configured_list = get_overlay_repos(include_underlay=False)
+    # Convert list to dict for easy lookup
+    config_repos = {item['name']: item for item in configured_list}
+    
+    # Get actual repos
+    actual_repos = get_actual_repos(root)
     
     if verbose:
         print(f"Found {len(config_repos)} configured repositories")
         print(f"Found {len(actual_repos)} actual repositories in workspace")
         print()
     
-    # Find missing repos (in config but not in workspace)
+    # Find missing repos
     missing_repos = []
-    for repo_name, config in config_repos.items():
-        if repo_name not in actual_repos:
-            missing_repos.append({
-                'name': repo_name,
-                'config': config
-            })
-    
-    # Find extra repos (in workspace but not in config)
+    for name, config in config_repos.items():
+        if name not in actual_repos:
+            missing_repos.append({'name': name, 'config': config})
+            
+    # Find extra repos (orphans)
     extra_repos = []
-    for repo_name, actual in actual_repos.items():
-        if repo_name not in config_repos:
-            extra_repos.append({
-                'name': repo_name,
-                'actual': actual
-            })
-    
-    # Find version mismatches (wrong branch/version)
+    for name, actual in actual_repos.items():
+        if name not in config_repos:
+            extra_repos.append({'name': name, 'actual': actual})
+            
+    # Check versions
     version_mismatches = []
-    for repo_name in set(config_repos.keys()) & set(actual_repos.keys()):
-        config = config_repos[repo_name]
-        actual = actual_repos[repo_name]
+    for name in set(config_repos.keys()) & set(actual_repos.keys()):
+        config = config_repos[name]
+        actual = actual_repos[name]
         
-        expected_version = config['version']
-        actual_branch = actual['branch']
+        expected = config.get('version', '')
+        current = actual.get('branch')
         
-        # Check if workspace location matches
-        expected_ws = config['workspace']
-        actual_ws = actual['workspace']
-        
-        if expected_ws != actual_ws:
-            version_mismatches.append({
-                'name': repo_name,
-                'type': 'workspace_mismatch',
-                'expected': expected_ws,
-                'actual': actual_ws
-            })
-        
-        # Check if branch matches expected version
-        # Note: version can be a branch, tag, or commit SHA
-        # Handle detached HEAD state (actual_branch is None)
-        if actual_branch is None:
-            # Detached HEAD - report as mismatch unless expected
-            if expected_version.lower() not in ['head', 'detached']:
+        # Simple version check (branch name match)
+        # Note: 'version' in .repos could be branch, tag, or commit
+        if current is None:
+             if expected.lower() not in ['head', 'detached']:
                 version_mismatches.append({
-                    'name': repo_name,
+                    'name': name,
                     'type': 'detached_head',
-                    'expected': expected_version,
+                    'expected': expected,
                     'actual': 'DETACHED HEAD',
                     'path': actual['path']
                 })
-        elif actual_branch != expected_version:
-            version_mismatches.append({
-                'name': repo_name,
+        elif current != expected:
+             version_mismatches.append({
+                'name': name,
                 'type': 'version_mismatch',
-                'expected': expected_version,
-                'actual': actual_branch,
+                'expected': expected,
+                'actual': current,
                 'path': actual['path']
             })
-    
+
     # Print results
-    is_valid = len(missing_repos) == 0 and len(extra_repos) == 0 and len(version_mismatches) == 0
+    is_valid = not (missing_repos or extra_repos or version_mismatches)
     
     print("=" * 60)
     print("Workspace Validation Results")
     print("=" * 60)
     print(f"Configured repos: {len(config_repos)}")
-    print(f"Actual repos: {len(actual_repos)}")
+    print(f"Actual repos:     {len(actual_repos)}")
     print()
     
     if missing_repos:
-        print(f"❌ Missing repos (in config but NOT in workspace): {len(missing_repos)}")
-        for repo in sorted(missing_repos, key=lambda x: x['name']):
-            config = repo['config']
-            print(f"   - {repo['name']}")
-            if verbose:
-                print(f"     Source: {config['source_file']}")
-                print(f"     Workspace: {config['workspace']}")
-                print(f"     URL: {config['url']}")
-                print(f"     Version: {config['version']}")
+        print(f"❌ Missing repos ({len(missing_repos)}):")
+        for item in sorted(missing_repos, key=lambda x: x['name']):
+            print(f"   - {item['name']} (from {item['config'].get('source_file')})")
         print()
-    else:
-        print("✅ All configured repos are present")
-        print()
-    
+        
     if extra_repos:
-        print(f"⚠️  Extra repos (in workspace but NOT in config): {len(extra_repos)}")
-        for repo in sorted(extra_repos, key=lambda x: x['name']):
-            actual = repo['actual']
-            print(f"   - {repo['name']} (in {actual['workspace']})")
-            if verbose:
-                print(f"     Path: {actual['path']}")
-                print(f"     Branch: {actual['branch']}")
+        print(f"⚠️  Extra repos ({len(extra_repos)}):")
+        for item in sorted(extra_repos, key=lambda x: x['name']):
+            print(f"   - {item['name']} (in {item['actual']['context']})")
         print()
-    else:
-        print("✅ No orphaned repos found")
-        print()
-    
+        
     if version_mismatches:
-        print(f"⚠️  Version/location mismatches: {len(version_mismatches)}")
-        for mismatch in sorted(version_mismatches, key=lambda x: x['name']):
-            if mismatch['type'] == 'workspace_mismatch':
-                print(f"   - {mismatch['name']}: wrong workspace")
-                print(f"     Expected: {mismatch['expected']}")
-                print(f"     Actual: {mismatch['actual']}")
-            elif mismatch['type'] == 'detached_head':
-                print(f"   - {mismatch['name']}: in detached HEAD state")
-                print(f"     Expected branch: {mismatch['expected']}")
-                print(f"     Actual: {mismatch['actual']}")
-            else:  # version_mismatch
-                print(f"   - {mismatch['name']}: wrong branch/version")
-                print(f"     Expected: {mismatch['expected']}")
-                print(f"     Actual: {mismatch['actual']}")
+        print(f"⚠️  Version mismatches ({len(version_mismatches)}):")
+        for item in sorted(version_mismatches, key=lambda x: x['name']):
+            print(f"   - {item['name']}: {item['expected']} vs {item['actual']}")
+            if verbose:
+                print(f"     at {item['path']}")
         print()
-    else:
-        print("✅ All repos on expected branches")
-        print()
-    
-    print("=" * 60)
+        
     if is_valid:
         print("✅ Workspace validation PASSED!")
     else:
         print("❌ Workspace validation FAILED")
-        print()
-        print("Run with --fix to automatically import missing repositories")
+        if missing_repos:
+            print("   Run with --fix to import missing repositories.")
+            
     print("=" * 60)
     
-    return is_valid, missing_repos, extra_repos, version_mismatches
+    return is_valid, missing_repos
 
 
 def fix_workspace(missing_repos, verbose=False):
-    """
-    Fix workspace by importing missing repositories.
-    
-    Args:
-        missing_repos: List of missing repository information
-        verbose: If True, print detailed information
-        
-    Returns:
-        bool: True if all fixes succeeded
-    """
+    """Import missing repositories."""
     if not missing_repos:
-        print("No missing repos to fix!")
         return True
+        
+    root = Path(get_workspace_root())
     
-    workspace_root = Path(get_workspace_root())
+    # Default target directory for fixes is layers/main/core_ws/src/
+    # In a real scenario, we might want to be smarter about which layer/ws matches the repo file
+    # For now, we'll try to infer from source_file or default to main/core_ws
+    
     print(f"Attempting to import {len(missing_repos)} missing repositories...")
-    print()
     
-    # Group repos by workspace
-    repos_by_workspace = {}
-    for repo in missing_repos:
-        ws = repo['config']['workspace']
-        if ws not in repos_by_workspace:
-            repos_by_workspace[ws] = []
-        repos_by_workspace[ws].append(repo)
-    
-    all_success = True
-    
-    for workspace, repos in repos_by_workspace.items():
-        print(f"Importing {len(repos)} repos into {workspace}...")
+    # Group by source config file
+    by_config = {}
+    for item in missing_repos:
+        src = item['config'].get('source_file')
+        if src not in by_config:
+            by_config[src] = []
+        by_config[src].append(item)
         
-        # Find the .repos file
-        source_file = repos[0]['config']['source_file']
-        repos_file = None
+    success = True
+    
+    for src_file, items in by_config.items():
+        # Determine target workspace based on filename (heuristic)
+        # e.g. core.repos -> layers/main/core_ws/src
+        # e.g. platforms.repos -> layers/main/platforms_ws/src
         
-        # Check both possible locations
-        for config_dir in [workspace_root / "configs", 
-                          workspace_root / "workspaces/core_ws/src/unh_marine_autonomy/config/repos"]:
-            candidate = config_dir / source_file
-            if candidate.exists():
-                repos_file = candidate
+        ws_name = src_file.replace('.repos', '_ws')
+        target_dir = root / "layers" / "main" / ws_name / "src"
+        
+        # Ensure target dir exists
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Use vcs import
+        # We need to filter the original .repos file to only include missing repos?
+        # vcs import allows importing selected repos but it's easier to just feed the whole file
+        # and vcs skip existing ones. However, we want to be explicit.
+        # But we don't have the original file path easily handy without searching again.
+        
+        # Re-find the config file
+        config_path = None
+        for path_candidate in [root / "configs" / src_file, 
+                               root / "layers/main/core_ws/src/unh_marine_autonomy/config/repos" / src_file]:
+            if path_candidate.exists():
+                config_path = path_candidate
                 break
-        
-        if not repos_file:
-            print(f"  ❌ Could not find .repos file: {source_file}")
-            all_success = False
+                
+        if not config_path:
+            print(f"Could not find config file for {src_file}")
+            success = False
             continue
+            
+        print(f"Importing from {src_file} into {target_dir}...")
+        cmd = ["vcs", "import", str(target_dir)]
         
-        # Create workspace src directory if needed
-        ws_src = workspace_root / "workspaces" / workspace / "src"
-        ws_src.mkdir(parents=True, exist_ok=True)
+        # We only want to import the missing ones.
+        # vcs tool doesn't easily support "only these names".
+        # But vcs import skips existing directories.
+        # So running it for the whole file is safe.
         
-        # Use vcs import to clone the missing repos
         try:
-            cmd = ["vcs", "import", str(ws_src)]
-            
-            if verbose:
-                print(f"  Running: {' '.join(cmd)} < {repos_file}")
-            
-            with open(repos_file, 'r', encoding='utf-8') as f:
+            with open(config_path, 'r') as f:
                 result = subprocess.run(
                     cmd,
                     stdin=f,
-                    cwd=str(workspace_root),
+                    cwd=str(root),
                     capture_output=True,
                     text=True
                 )
-                
-            if result.returncode == 0:
-                print(f"  ✅ Successfully imported repos")
-                if verbose and result.stdout:
-                    print(f"     {result.stdout}")
-            else:
-                print(f"  ❌ Failed to import repos")
-                print(f"     {result.stderr}")
-                all_success = False
+            if result.returncode != 0:
+                print(f"Error importing: {result.stderr}")
+                success = False
+            elif verbose:
+                print(result.stdout)
                 
         except Exception as e:
-            print(f"  ❌ Error running vcs import: {e}")
-            all_success = False
-    
-    print()
-    return all_success
+            print(f"Exception importing: {e}")
+            success = False
+            
+    return success
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate workspace matches .repos configuration"
-    )
-    parser.add_argument(
-        "--fix",
-        action="store_true",
-        help="Automatically import missing repositories using vcs"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Print detailed information"
-    )
-    
+    parser = argparse.ArgumentParser(description="Validate workspace")
+    parser.add_argument("--fix", action="store_true", help="Fix missing repos")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
     
-    # Validate workspace
-    is_valid, missing_repos, extra_repos, version_mismatches = validate_workspace(args.verbose)
+    is_valid, missing = validate_workspace(args.verbose)
     
-    # If fix requested and there are missing repos, fix them
-    if args.fix and missing_repos:
-        print()
-        if fix_workspace(missing_repos, args.verbose):
-            print("✅ Workspace fixed successfully!")
-            print()
-            print("Re-validating workspace...")
-            print()
-            is_valid, _, _, _ = validate_workspace(args.verbose)
+    if not is_valid and args.fix and missing:
+        print("\nFixing workspace...")
+        if fix_workspace(missing, args.verbose):
+            print("Fix complete. Re-validating...")
+            validate_workspace(args.verbose)
         else:
-            print("❌ Some fixes failed. Please check the errors above.")
+            print("Fix encountered errors.")
             sys.exit(1)
-    
-    # Exit with appropriate code
+            
     sys.exit(0 if is_valid else 1)
 
 
