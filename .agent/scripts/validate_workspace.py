@@ -23,7 +23,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
 
-from workspace import get_workspace_root, get_overlay_repos, extract_github_owner_repo
+from workspace import get_workspace_root, get_overlay_repos
 
 
 def get_actual_repos(workspace_root):
@@ -51,9 +51,17 @@ def get_actual_repos(workspace_root):
         search_dirs = [layers_dir]
 
     for search_dir in search_dirs:
-        # Walk through the directory structure
+        # Walk through the directory structure (limit depth for performance)
+        # Repos are typically at: layers/<layer>/<ws>/src/<repo>
         for root, dirs, files in os.walk(search_dir):
             root_path_obj = Path(root)
+            
+            # Performance optimization: limit depth
+            # If we're more than 5 levels deep, we've gone too far
+            depth = len(root_path_obj.relative_to(search_dir).parts)
+            if depth > 5:
+                dirs[:] = []  # Stop descending
+                continue
             
             # Skip .agent, .git, and hidden directories
             dirs[:] = [d for d in dirs if not d.startswith('.')]
@@ -87,6 +95,21 @@ def get_actual_repos(workspace_root):
     return actual_repos
 
 
+def get_git_commit(repo_path):
+    """Get the current commit SHA of a git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(repo_path),
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def get_git_branch(repo_path):
     """Get the current branch of a git repository."""
     try:
@@ -99,7 +122,15 @@ def get_git_branch(repo_path):
         )
         branch = result.stdout.strip()
         return branch if branch else None # None indicates detached HEAD or error
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        if verbose:
+            print(f"Warning: git command failed for {repo_path}: {e}", file=sys.stderr)
+        return None
+    except FileNotFoundError:
+        print(f"Error: git command not found. Please ensure git is installed.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Error: Unexpected error getting branch for {repo_path}: {e}", file=sys.stderr)
         return None
 
 
@@ -142,12 +173,39 @@ def validate_workspace(verbose=False):
         actual = actual_repos[name]
         
         expected = config.get('version', '')
-        current = actual.get('branch')
+        current_branch = actual.get('branch')
+        current_commit = get_git_commit(actual['path'])
         
-        # Simple version check (branch name match)
-        # Note: 'version' in .repos could be branch, tag, or commit
-        if current is None:
-             if expected.lower() not in ['head', 'detached']:
+        # Improved version check: handle branches, tags, and commit SHAs
+        # Try to resolve expected version to a commit SHA
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", expected],
+                cwd=str(actual['path']),
+                capture_output=True,
+                text=True,
+                check=False  # Don't raise on error
+            )
+            expected_commit = result.stdout.strip() if result.returncode == 0 else None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            expected_commit = None
+        
+        # Compare commits if we have both
+        if current_commit and expected_commit:
+            if current_commit != expected_commit:
+                # Check if it's a branch name mismatch or actual version mismatch
+                if current_branch and current_branch != expected:
+                    version_mismatches.append({
+                        'name': name,
+                        'type': 'version_mismatch',
+                        'expected': expected,
+                        'actual': current_branch if current_branch else f"{current_commit[:8]} (detached)",
+                        'path': actual['path']
+                    })
+        elif current_branch is None and expected_commit is None:
+            # Detached HEAD but expected version couldn't be resolved
+            # Only flag if expected looks like a branch name (not a SHA)
+            if expected and not (len(expected) == 40 and all(c in '0123456789abcdef' for c in expected.lower())):
                 version_mismatches.append({
                     'name': name,
                     'type': 'detached_head',
@@ -155,12 +213,13 @@ def validate_workspace(verbose=False):
                     'actual': 'DETACHED HEAD',
                     'path': actual['path']
                 })
-        elif current != expected:
-             version_mismatches.append({
+        elif current_branch != expected:
+            # Simple branch name comparison fallback
+            version_mismatches.append({
                 'name': name,
                 'type': 'version_mismatch',
                 'expected': expected,
-                'actual': current,
+                'actual': current_branch if current_branch else 'DETACHED HEAD',
                 'path': actual['path']
             })
 
@@ -234,8 +293,36 @@ def fix_workspace(missing_repos, verbose=False):
         # e.g. core.repos -> layers/main/core_ws/src
         # e.g. platforms.repos -> layers/main/platforms_ws/src
         
+        # Validate src_file path to prevent path traversal
+        if not src_file or '..' in src_file or src_file.startswith('/'):
+            print(f"Error: Invalid config file name: {src_file}", file=sys.stderr)
+            success = False
+            continue
+        
         ws_name = src_file.replace('.repos', '_ws')
-        target_dir = root / "layers" / "main" / ws_name / "src"
+        
+        # Dynamically discover workspace directory under layers/*
+        # Don't assume layers/main - search all layer directories
+        layers_root = root / "layers"
+        candidate_dirs = []
+        if layers_root.exists():
+            for layer_dir in layers_root.iterdir():
+                if not layer_dir.is_dir() or layer_dir.name.startswith('.'):
+                    continue
+                candidate = layer_dir / ws_name / "src"
+                if candidate.exists():
+                    candidate_dirs.append(candidate)
+        
+        if not candidate_dirs:
+            # No existing workspace found, default to layers/main
+            target_dir = layers_root / "main" / ws_name / "src"
+            print(f"Warning: No existing workspace found for {ws_name}, using default: {target_dir}")
+        elif len(candidate_dirs) > 1:
+            print(f"Error: Multiple workspace directories found for {ws_name}: {candidate_dirs}", file=sys.stderr)
+            success = False
+            continue
+        else:
+            target_dir = candidate_dirs[0]
         
         # Ensure target dir exists
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -255,7 +342,7 @@ def fix_workspace(missing_repos, verbose=False):
                 break
                 
         if not config_path:
-            print(f"Could not find config file for {src_file}")
+            print(f"Error: Could not find config file for {src_file}", file=sys.stderr)
             success = False
             continue
             
