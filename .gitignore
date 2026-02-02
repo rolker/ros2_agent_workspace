@@ -1,13 +1,7 @@
-# Ignore ROS2 layers because they are managed by vcs and .repos files
-# Main builds live in layers/main/
-layers/main/*/src/
-layers/main/*/build/
-layers/main/*/install/
-layers/main/*/log/
-
-# Ignore layer worktrees (created dynamically for task isolation)
-# Each worktree contains target layer + symlinks to main
-layers/worktrees/
+# Ignore entire layers directory (managed by vcstool)
+# All ROS2 code is pulled via vcstool from .repos files
+# Nothing in layers/ is tracked by git
+layers/
 
 # Ignore workspace worktrees (for infrastructure work)
 .workspace-worktrees/
