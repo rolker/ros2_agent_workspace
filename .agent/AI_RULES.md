@@ -202,10 +202,10 @@ GIT_EDITOR=true git rebase --continue
 GIT_EDITOR=true git merge feature-branch
 ```
 
-**Method 2: --no-edit flag** (When available)
+**Method 2: --no-edit flag** (When supported; not recommended for `rebase`)
 ```bash
 # Explicitly skip editing
-git rebase --no-edit origin/main
+# Note: --no-edit for rebase is not available in all Git versions; prefer GIT_EDITOR=true (Method 1) for rebases
 git commit --amend --no-edit
 git merge --no-edit feature-branch
 ```
@@ -260,8 +260,8 @@ git merge --no-edit feature-branch
 If you accidentally trigger an interactive editor:
 
 1. **Try to exit gracefully** (may not work):
-   - For nano: Send `^X` via write_bash
-   - For vim: Send `:q!{enter}` via write_bash
+   - For nano: exit with `Ctrl+X` (or send the equivalent keystrokes via your CLI interface, if supported)
+   - For vim: exit with `:q!` followed by `Enter` (or send the equivalent keystrokes via your CLI interface, if supported)
 
 2. **If that fails, abort the operation**:
    ```bash

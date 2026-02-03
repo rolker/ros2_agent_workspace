@@ -7,9 +7,25 @@ safe_git_rebase() {
     GIT_EDITOR=true git rebase "$@"
 }
 
-# Safe git commit amend - keeps existing message
+# Safe git commit amend - keeps existing message by default
 safe_git_amend() {
-    git commit --amend --no-edit "$@"
+    # Detect message-related flags (-m/--message) which are incompatible with --no-edit.
+    # If such flags are present, omit --no-edit so git can use the provided message.
+    local has_message_flag=false
+
+    for arg in "$@"; do
+        case "$arg" in
+            -m|--message|-m*|--message=*)
+                has_message_flag=true
+                ;;
+        esac
+    done
+
+    if [ "$has_message_flag" = true ]; then
+        git commit --amend "$@"
+    else
+        git commit --amend --no-edit "$@"
+    fi
 }
 
 # Safe git merge - skips editor for merge commit message

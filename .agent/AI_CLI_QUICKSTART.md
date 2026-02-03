@@ -442,8 +442,8 @@ Then retry.
 CLI agents can get stuck in interactive git editors (nano/vim). **Always disable editors** for git operations:
 
 ```bash
-# Rebasing
-GIT_EDITOR=true git rebase origin/main
+# Rebasing (replace <default-branch> with your repo's default branch, e.g., main)
+GIT_EDITOR=true git rebase origin/<default-branch>
 
 # Amending commits
 git commit --amend --no-edit
