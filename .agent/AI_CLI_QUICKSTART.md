@@ -455,7 +455,7 @@ git add <resolved-files>
 GIT_EDITOR=true git rebase --continue
 
 # Merging
-GIT_EDITOR=true git merge --no-ff feature-branch
+GIT_EDITOR=true git merge feature-branch
 ```
 
 ### Helper Functions Available

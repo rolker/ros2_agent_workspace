@@ -86,7 +86,7 @@ If your feature branch has fallen behind the default branch, you may need to reb
    git status
    
    # Resolve conflicts manually in files
-   # (Look for <<<<<<, =======, >>>>>> markers)
+   # (Look for <<<<<<<, =======, >>>>>>> markers)
    
    # Stage resolved files
    git add <resolved-files>

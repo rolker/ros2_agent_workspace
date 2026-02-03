@@ -14,7 +14,7 @@ safe_git_amend() {
 
 # Safe git merge - skips editor for merge commit message
 safe_git_merge() {
-    GIT_EDITOR=true git merge --no-ff "$@"
+    GIT_EDITOR=true git merge "$@"
 }
 
 # Safe git rebase continue - skips editor after conflict resolution

@@ -199,7 +199,7 @@ Interactive git operations (rebase, commit --amend, merge) launch text editors (
 GIT_EDITOR=true git rebase origin/main
 GIT_EDITOR=true git commit --amend
 GIT_EDITOR=true git rebase --continue
-GIT_EDITOR=true git merge --no-ff feature-branch
+GIT_EDITOR=true git merge feature-branch
 ```
 
 **Method 2: --no-edit flag** (When available)
@@ -249,8 +249,10 @@ git commit --amend -m "new message"
 # ❌ DON'T: May hang in editor for merge commit
 git merge feature-branch
 
-# ✅ DO: Skip editor for merge commit
-GIT_EDITOR=true git merge --no-ff feature-branch
+# ✅ DO: Skip editor for merge commit (preserve default merge behavior)
+GIT_EDITOR=true git merge feature-branch
+# or
+git merge --no-edit feature-branch
 ```
 
 #### What If You Get Stuck?
