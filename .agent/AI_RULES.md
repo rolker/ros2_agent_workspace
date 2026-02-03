@@ -181,6 +181,114 @@ gh pr create --title "..." --body "Closes #123
 
 **Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md), [workflows/ops/check-branch-updates.md](workflows/ops/check-branch-updates.md)
 
+### Git Operations for CLI Agents
+
+**⚠️ CRITICAL**: CLI agents must avoid interactive git editors that cause the agent to hang.
+
+#### The Problem
+
+Interactive git operations (rebase, commit --amend, merge) launch text editors (nano/vim) that CLI agents cannot control properly. This causes the agent to get stuck waiting for editor input.
+
+#### The Solution
+
+**Always disable interactive editors** for git operations using one of these methods:
+
+**Method 1: GIT_EDITOR=true** (Recommended for most cases)
+```bash
+# Skip editor entirely - use existing commit messages
+GIT_EDITOR=true git rebase origin/main
+GIT_EDITOR=true git commit --amend
+GIT_EDITOR=true git rebase --continue
+GIT_EDITOR=true git merge --no-ff feature-branch
+```
+
+**Method 2: --no-edit flag** (When available)
+```bash
+# Explicitly skip editing
+git rebase --no-edit origin/main
+git commit --amend --no-edit
+git merge --no-edit feature-branch
+```
+
+**Method 3: -m flag** (For commits with messages)
+```bash
+# Provide message inline
+git commit -m "message"
+git commit --amend -m "updated message"
+```
+
+#### Common Scenarios
+
+**Rebasing with conflicts:**
+```bash
+# ❌ DON'T: Will hang in editor
+git rebase origin/main
+git rebase --continue
+
+# ✅ DO: Skip editor
+GIT_EDITOR=true git rebase origin/main
+# ... resolve conflicts ...
+git add <files>
+GIT_EDITOR=true git rebase --continue
+```
+
+**Amending commits:**
+```bash
+# ❌ DON'T: Will hang in editor
+git commit --amend
+
+# ✅ DO: Keep existing message
+git commit --amend --no-edit
+
+# ✅ DO: Provide new message
+git commit --amend -m "new message"
+```
+
+**Merging branches:**
+```bash
+# ❌ DON'T: May hang in editor for merge commit
+git merge feature-branch
+
+# ✅ DO: Skip editor for merge commit
+GIT_EDITOR=true git merge --no-ff feature-branch
+```
+
+#### What If You Get Stuck?
+
+If you accidentally trigger an interactive editor:
+
+1. **Try to exit gracefully** (may not work):
+   - For nano: Send `^X` via write_bash
+   - For vim: Send `:q!{enter}` via write_bash
+
+2. **If that fails, abort the operation**:
+   ```bash
+   git rebase --abort
+   git merge --abort
+   git cherry-pick --abort
+   ```
+
+3. **Then retry with GIT_EDITOR=true**
+
+#### Helper Functions Available
+
+Use the safe git helpers in `.agent/scripts/lib/git_helpers.sh`:
+
+```bash
+source .agent/scripts/lib/git_helpers.sh
+
+# Safe rebase that won't hang
+safe_git_rebase origin/main
+
+# Safe commit amend
+safe_git_amend
+
+# Safe merge
+safe_git_merge feature-branch
+```
+
+**Reference**: See issue #130 for full context and examples.
+
 ### AI Signature
 
 All GitHub Issues, PRs, and Comments **must** include:
