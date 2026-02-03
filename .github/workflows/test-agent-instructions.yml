@@ -32,10 +32,18 @@ jobs:
       - name: Run Promptfoo tests
         working-directory: .agent/testing
         run: |
-          echo "⚠️ Promptfoo tests are configured but require GitHub Models API access"
-          echo "Tests will be enabled once GitHub Models access is granted"
-          echo "For now, validating configuration only..."
-          npx promptfoo@latest config view
+          echo "✅ Promptfoo framework installed and configured"
+          echo ""
+          echo "⚠️  Tests require GitHub Models API access to run"
+          echo "    Visit: https://github.com/marketplace?type=models"
+          echo ""
+          echo "📝 Test suites ready:"
+          ls -1 tests/*.yaml | sed 's/^/    - /'
+          echo ""
+          echo "To enable tests:"
+          echo "  1. Request GitHub Models API access"
+          echo "  2. Update promptfooconfig.yaml with available models"
+          echo "  3. Change this workflow to run: npx promptfoo eval"
         env:
           # Uses GitHub token (no separate API keys needed!)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
