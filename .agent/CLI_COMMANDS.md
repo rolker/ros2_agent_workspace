@@ -36,6 +36,7 @@ This document maps:
 | `/list-worktrees` | Worktree | List all active worktrees | See what's in progress |
 | `/enter-worktree` | Worktree | Enter worktree with ROS environment | Switching to existing worktree |
 | `/remove-worktree` | Worktree | Clean up completed worktree | Task complete, freeing resources |
+| `/revert-feature` | Development | Revert all commits for a specific issue | Feature needs to be undone |
 
 ---
 
@@ -473,6 +474,50 @@ colcon test-result --verbose
 - ✅ After major refactoring
 - ✅ Validating CI will pass
 - ❌ During rapid iteration (slow)
+
+---
+
+### `/revert-feature`
+
+**Script**: `.agent/scripts/revert_feature.sh`
+
+**What it does**:
+- Finds all commits that reference a specific GitHub issue
+- Creates revert commits (in reverse chronological order)
+- Supports dry-run mode to preview changes
+- Handles conflicts gracefully with clear instructions
+
+**Example**:
+```bash
+# Preview what would be reverted
+.agent/scripts/revert_feature.sh --issue 137 --dry-run
+
+# Actually revert the feature
+.agent/scripts/revert_feature.sh --issue 137
+
+# Or via Makefile
+make revert-feature ISSUE=137
+```
+
+**What it does technically**:
+- Searches git log for commits mentioning `#<issue>`
+- Lists all matching commits with messages
+- Reverts in reverse order (newest first) to minimize conflicts
+- Prompts for confirmation before reverting
+- Provides clear instructions if conflicts occur
+
+**When to use**:
+- ✅ Feature didn't work out and needs to be completely undone
+- ✅ Issue was resolved incorrectly and needs clean rollback
+- ✅ Want to undo all changes associated with a specific issue
+- ❌ Fixing a bug in the feature (just commit a fix instead)
+- ❌ Making incremental improvements (use normal commits)
+
+**Safety features**:
+- Dry-run mode shows exactly what will happen
+- Requires user confirmation before reverting
+- Clear error messages with recovery instructions
+- Won't lose work (creates revert commits, not hard reset)
 
 ---
 

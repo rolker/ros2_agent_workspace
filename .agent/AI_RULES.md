@@ -150,6 +150,103 @@ After completing work in the worktree:
 
 ## Core Rules (Apply to All Agents)
 
+### Plan Before Implement
+
+For all features and non-trivial bug fixes, agents **must** follow this sequence:
+
+#### 1. Spec First
+Before writing any code, create or review the specification:
+- **What** are we building?
+- **Why** is this needed?
+- **What** are the acceptance criteria?
+- **What** is explicitly out of scope?
+
+#### 2. Plan Next
+Break down the work into phases and tasks:
+- Create a task breakdown with subtasks
+- Identify dependencies between tasks
+- Estimate effort for each phase (Small/Medium/Large)
+- Document approach and key design decisions
+
+#### 3. Get Approval
+Show the plan to the user before implementing:
+- Present the spec and plan clearly
+- Wait for user confirmation or feedback
+- Adjust the plan based on feedback
+- Do NOT start coding until approved
+
+#### 4. Then Implement
+Only after plan approval:
+- Follow the plan systematically
+- Update task checkboxes as you progress
+- Document key decisions in the issue's "Implementation Notes"
+- Notify user at phase boundaries (see Phase Verification below)
+
+**Exception**: Trivial changes can skip formal planning:
+- Documentation typos or formatting
+- Obvious one-line bug fixes
+- Renaming variables for clarity
+- Adding missing comments
+
+**Enforcement**: Agents should politely refuse to implement features without an approved plan. Use the Feature Track issue template (`.github/ISSUE_TEMPLATE/feature_track.md`) for structured planning.
+
+**Reference**: Feature Track template in `.github/ISSUE_TEMPLATE/feature_track.md`
+
+### Phase Verification Protocol
+
+For multi-phase features, agents **must** checkpoint with the user after each major phase:
+
+#### After Completing Each Phase:
+
+1. **Run Tests**: Execute relevant test suite
+   ```bash
+   # For ROS packages
+   colcon test --packages-select <package_name>
+   colcon test-result --verbose
+   
+   # For Python code
+   pytest tests/
+   
+   # For pre-commit checks
+   pre-commit run --all-files
+   ```
+
+2. **Build Verification**: Ensure clean build
+   ```bash
+   # For ROS packages
+   colcon build --packages-select <package_name>
+   
+   # For infrastructure changes
+   make validate
+   ```
+
+3. **User Checkpoint**: Pause and ask user
+   - "Phase {N} complete. Please verify:"
+   - List what was accomplished in this phase
+   - Show test results and build status
+   - Ask user to test/review behavior
+   - Wait for approval before continuing to next phase
+
+4. **Update Plan**: Mark phase complete in issue
+   - Check off completed phase tasks
+   - Document any deviations from the original plan
+   - Note any issues or blockers discovered
+   - Update effort estimates if needed
+
+**Purpose**: Catch problems early, keep user informed, ensure alignment before investing effort in subsequent phases.
+
+**Example Checkpoint Message**:
+```
+Phase 1 complete: GitHub issue template created
+
+Accomplished:
+- ✅ Created .github/ISSUE_TEMPLATE/feature_track.md
+- ✅ Template includes spec, plan, and verification sections
+- ✅ Tested template structure
+
+Please verify the template meets requirements before I proceed to Phase 2 (updating AI_RULES.md).
+```
+
 ### Git Hygiene
 
 - **Never commit directly to `main`** - Always use feature branches
