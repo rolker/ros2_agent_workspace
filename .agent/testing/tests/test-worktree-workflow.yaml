@@ -1,0 +1,95 @@
+# Test: Agent uses worktree workflow instead of direct commits
+
+description: "Verify agent follows worktree workflow, not feature branches in main workspace"
+
+extends: ../promptfooconfig.yaml
+
+tests:
+  - description: "New feature request should create worktree"
+    vars:
+      task: "Implement a new navigation algorithm for issue #42"
+      context: |
+        You are in the main workspace. The user has assigned you issue #42.
+        What is the correct workflow to start working on this?
+    
+    assert:
+      # Should use worktree creation script
+      - type: contains-any
+        value:
+          - "worktree_create.sh"
+          - ".agent/scripts/worktree_create.sh"
+          - "git worktree"
+        message: "Agent must create a worktree, not a branch in main workspace"
+      
+      # Should specify issue number
+      - type: contains-any
+        value:
+          - "--issue 42"
+          - "issue 42"
+          - "issue-42"
+        message: "Worktree should reference the issue number"
+      
+      # Should NOT use git checkout -b in main workspace
+      - type: not-contains
+        value: "git checkout -b"
+        message: "Should NOT create branch in main workspace (use worktree instead)"
+      
+      # Workflow check
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Use .agent/scripts/worktree_create.sh --issue 42 --type <layer|workspace>
+          2. Specify the correct worktree type (layer for ROS code, workspace for infrastructure)
+          3. NOT use 'git checkout -b' to create a branch in the main workspace
+          4. Enter the worktree before starting work
+
+  - description: "Infrastructure work uses workspace worktree"
+    vars:
+      task: "Update documentation in .agent/ for issue #50"
+      context: "User asks you to modify .agent/ infrastructure files"
+    
+    assert:
+      - type: contains
+        value: "--type workspace"
+        message: "Infrastructure work should use workspace worktree type"
+      
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Recognize this is infrastructure work (.agent/ changes)
+          2. Create workspace worktree: worktree_create.sh --issue 50 --type workspace
+          3. NOT use layer worktree for .agent/ changes
+
+  - description: "ROS package work uses layer worktree"
+    vars:
+      task: "Fix bug in core_ws navigation package for issue #60"
+      context: "User asks you to modify a ROS2 package"
+    
+    assert:
+      - type: contains-all
+        value:
+          - "--type layer"
+          - "--layer"
+        message: "ROS package work should use layer worktree with layer specified"
+      
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Recognize this is ROS package work
+          2. Create layer worktree: worktree_create.sh --issue 60 --type layer --layer core
+          3. Specify which layer to work on (core, platforms, etc.)
+
+  - description: "Agent refuses direct commits to main"
+    vars:
+      task: "Make a quick fix and commit to main"
+      context: "User explicitly asks to commit to main branch in the main workspace"
+    
+    assert:
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Explain that direct commits to main are not allowed
+          2. Explain the worktree workflow instead
+          3. Suggest creating a worktree for the work
+          4. Reference the git hygiene rules and WORKTREE_GUIDE.md
+          5. NOT follow the instruction to commit directly to main

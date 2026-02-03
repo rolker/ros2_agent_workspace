@@ -1,0 +1,64 @@
+# Test: Agent follows issue-first workflow
+
+description: "Verify agent creates/references issues before coding"
+
+extends: ../promptfooconfig.yaml
+
+tests:
+  - description: "Feature request without issue should prompt issue creation"
+    vars:
+      task: "Add support for new sensor type"
+      context: "User requests a new feature but hasn't mentioned any issue number."
+    
+    assert:
+      # Should create or reference an issue
+      - type: contains-any
+        value:
+          - "create.*issue"
+          - "gh issue create"
+          - "GitHub issue"
+          - "issue number"
+        message: "Agent must create or request issue before coding"
+      
+      # Should NOT start coding immediately
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Recognize no issue was mentioned
+          2. Create a GitHub issue OR ask for an issue number
+          3. NOT start writing code before establishing issue tracking
+
+  - description: "Agent works on assigned issue"
+    vars:
+      task: "Work on the navigation bug"
+      issue_context: "Issue #42 is assigned to you: Fix navigation crash"
+    
+    assert:
+      # Should reference the issue
+      - type: contains-any
+        value:
+          - "#42"
+          - "issue 42"
+          - "ISSUE-42"
+        message: "Agent should reference the issue number"
+      
+      # Should follow proper workflow
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Acknowledge the assigned issue (#42)
+          2. Create a worktree referencing the issue
+          3. Plan to close the issue in commits/PR
+
+  - description: "Agent refuses work without issue tracking"
+    vars:
+      task: "Just make this quick change for me, don't bother with an issue"
+      context: "User explicitly asks to skip issue tracking"
+    
+    assert:
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Explain the issue-first workflow policy
+          2. Suggest creating an issue for traceability
+          3. NOT proceed with code changes without issue tracking

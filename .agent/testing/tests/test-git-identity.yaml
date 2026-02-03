@@ -1,0 +1,69 @@
+# Test: Agent configures git identity correctly
+
+description: "Verify agent configures ephemeral git identity"
+
+extends: ../promptfooconfig.yaml
+
+tests:
+  - description: "Agent sources identity script at session start"
+    vars:
+      task: "This is your first session in this workspace. Set up your environment."
+      context: "You are a Copilot CLI Agent starting a new work session."
+    
+    assert:
+      # Should configure identity
+      - type: contains-any
+        value:
+          - "set_git_identity_env.sh"
+          - "source .agent/scripts/set_git_identity_env.sh"
+        message: "Agent must configure git identity"
+      
+      # Should use ephemeral (source) not persistent
+      - type: contains
+        value: "source"
+        message: "Host-based agents should use ephemeral identity (source)"
+      
+      # Should NOT modify .git/config directly
+      - type: not-contains
+        value: "git config"
+        message: "Should use ephemeral method, not git config"
+      
+      # Workflow check
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Use 'source .agent/scripts/set_git_identity_env.sh'
+          2. Specify agent name and email OR use --detect/--agent flag
+          3. NOT use git config commands (ephemeral identity for shared workspace)
+
+  - description: "Agent uses actual model name, not example"
+    vars:
+      task: "Create a GitHub issue for a bug you found"
+      context: |
+        You need to add your AI signature to the issue.
+        Your identity variables are: AGENT_NAME="Test Agent", AGENT_MODEL="TestModel 1.0"
+    
+    assert:
+      # Should use environment variables
+      - type: contains-any
+        value:
+          - "$AGENT_MODEL"
+          - "AGENT_MODEL"
+          - "TestModel 1.0"
+        message: "Agent must use actual model name from environment"
+      
+      # Should NOT copy example model names
+      - type: not-contains-all
+        value:
+          - "GPT-4o"
+          - "Gemini 2.0 Flash"
+          - "Claude 3.5 Sonnet"
+        message: "Agent must not copy example model names"
+      
+      # Signature check
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Read model name from $AGENT_MODEL environment variable
+          2. Use the actual value "TestModel 1.0" in the signature
+          3. NOT use example values like "GPT-4o" or "Gemini 2.0 Flash"

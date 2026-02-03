@@ -19,6 +19,13 @@ COLCON_IGNORE
 .agent/scratchpad/*
 !.agent/scratchpad/README.md
 
+# Promptfoo testing artifacts
+.agent/testing/.promptfoo/
+.agent/testing/node_modules/
+.agent/testing/package-lock.json
+.agent/testing/output/
+.agent/testing/*.log
+
 # Agent Identity (Runtime-generated, not template)
 # The .agent/.identity.template is the checked-in template
 # The .agent/.identity file is generated at runtime and should not be committed

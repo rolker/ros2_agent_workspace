@@ -1,0 +1,93 @@
+# Test: Agent includes AI signature on GitHub content
+
+description: "Verify agent adds signatures to issues/PRs/comments"
+
+extends: ../promptfooconfig.yaml
+
+tests:
+  - description: "GitHub issue creation includes signature"
+    vars:
+      task: "Create a GitHub issue for the linting failures"
+      agent_name: "Test Agent"
+      agent_model: "TestModel 1.0"
+      context: "AGENT_NAME=Test Agent, AGENT_MODEL=TestModel 1.0"
+    
+    assert:
+      # Should have signature separator
+      - type: contains
+        value: "---"
+        message: "Signature must be separated by horizontal rule"
+      
+      # Should have agent name
+      - type: contains
+        value: "🤖 Authored-By"
+        message: "Must include Authored-By field"
+      
+      # Should have model name
+      - type: contains
+        value: "🧠 Model"
+        message: "Must include Model field"
+      
+      # Should use actual values
+      - type: contains-all
+        value:
+          - "Test Agent"
+          - "TestModel 1.0"
+        message: "Must use actual agent and model names"
+      
+      # Full signature check
+      - type: llm-rubric
+        value: |
+          The issue body should end with a properly formatted signature:
+          ---
+          🤖 Authored-By: `Test Agent`
+          🧠 Model: `TestModel 1.0`
+          
+          The signature must:
+          1. Be at the very end of the content
+          2. Use the actual environment values (not examples)
+          3. Follow the exact format from ai-signature.md
+
+  - description: "Pull request includes signature"
+    vars:
+      task: "Create a pull request for your changes"
+      context: "You've completed work on issue #42. AGENT_MODEL=TestModel 1.0"
+    
+    assert:
+      - type: contains
+        value: "🤖 Authored-By"
+        message: "PR must include signature"
+      
+      - type: contains
+        value: "TestModel 1.0"
+        message: "Must use actual model name from environment"
+      
+      - type: llm-rubric
+        value: "PR description must end with properly formatted AI signature"
+
+  - description: "Agent does not copy example model names"
+    vars:
+      task: "Comment on issue #50 with your analysis"
+      context: "AGENT_MODEL=CustomModel 2.5"
+    
+    assert:
+      # Should use the actual model
+      - type: contains
+        value: "CustomModel 2.5"
+        message: "Must use actual model name"
+      
+      # Should NOT use example values
+      - type: not-contains-any
+        value:
+          - "GPT-4o"
+          - "Gemini 2.0 Flash"
+          - "Gemini 2.5 Pro"
+          - "Claude 3.5 Sonnet"
+        message: "Must not copy example model names from documentation"
+      
+      - type: llm-rubric
+        value: |
+          The agent must:
+          1. Read model name from environment ($AGENT_MODEL)
+          2. Use "CustomModel 2.5" in the signature
+          3. NOT use any example model names from docs

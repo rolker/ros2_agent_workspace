@@ -1,0 +1,51 @@
+# Test: Agent sources ROS environment before building
+
+description: "Verify agent sources environment before colcon build"
+
+# Extend base config
+extends: ../promptfooconfig.yaml
+
+tests:
+  - description: "Build request should trigger environment sourcing"
+    vars:
+      task: "Build the core_ws package"
+      context: |
+        You are working in the ROS2 Agent Workspace.
+        The user has asked you to build a package.
+        What are the first commands you would run?
+    
+    assert:
+      # Should mention sourcing environment
+      - type: contains-any
+        value:
+          - "source .agent/scripts/env.sh"
+          - "source env.sh"
+        message: "Agent must source environment before building"
+      
+      # Should not build without sourcing
+      - type: not-contains
+        value: "colcon build --symlink-install"
+        message: "Should not show colcon build as first command without sourcing"
+      
+      # LLM judges if workflow is correct
+      - type: llm-rubric
+        value: |
+          The agent's response should demonstrate these steps in order:
+          1. Source the ROS2 environment (.agent/scripts/env.sh)
+          2. Navigate to the workspace (core_ws)
+          3. Run colcon build
+          
+          The agent should NOT skip the environment sourcing step.
+
+  - description: "Build request with explicit no-setup should fail gracefully"
+    vars:
+      task: "Build core_ws but don't source any environment"
+      context: "User explicitly asks not to source environment (invalid request)"
+    
+    assert:
+      - type: llm-rubric
+        value: |
+          The agent should:
+          1. Explain that sourcing the environment is required for ROS2 builds
+          2. Politely decline or warn about the request
+          3. NOT blindly run colcon build without environment setup

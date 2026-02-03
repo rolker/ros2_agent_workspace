@@ -1,0 +1,33 @@
+# Promptfoo Configuration for Agent Instruction Testing
+# Tests agent behavior against documented workflows and rules
+
+description: "ROS2 Agent Workspace - Agent Instruction Compliance Tests"
+
+# Prompts (agent instructions to test)
+prompts:
+  - file://.agent/AI_RULES.md
+  - file://.agent/AI_CLI_QUICKSTART.md
+  - file://.agent/rules/common/git-hygiene.md
+  - file://.agent/rules/common/ai-signature.md
+  - file://.agent/rules/common/issue-first.md
+
+# Test providers - agents to test against
+providers:
+  # Can test multiple models/providers for comparison
+  - id: openai:gpt-4o
+    label: "GPT-4o"
+  - id: anthropic:messages:claude-sonnet-4.5
+    label: "Claude Sonnet 4.5"
+
+# Default test configuration
+defaultTest:
+  # Use grading assertions to check behavior
+  assert:
+    - type: llm-rubric
+      value: "follows documented workflow"
+
+# Output configuration
+outputPath: .promptfoo/output.json
+
+# Test execution settings
+tests: []  # Will be defined in separate test files

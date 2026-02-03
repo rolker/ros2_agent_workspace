@@ -1,0 +1,55 @@
+name: Test Agent Instructions
+
+on:
+  pull_request:
+    paths:
+      - '.agent/**'
+      - '.github/copilot-instructions.md'
+      - '.github/instructions/**'
+  workflow_dispatch:
+  schedule:
+    # Run nightly to detect instruction drift
+    - cron: '0 2 * * *'
+
+jobs:
+  test-instructions:
+    name: Promptfoo Agent Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run Promptfoo tests
+        working-directory: .agent/testing
+        run: |
+          npx promptfoo@latest eval --no-cache
+        env:
+          # Add API keys if needed for LLM evaluation
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-results
+          path: .agent/testing/.promptfoo/output/
+          retention-days: 30
+      
+      - name: Comment on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⚠️ Agent instruction tests failed. Please review the test results in the workflow artifacts.'
+            })
