@@ -16,6 +16,10 @@ jobs:
     name: Promptfoo Agent Tests
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: read
+      pull-requests: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,9 +34,8 @@ jobs:
         run: |
           npx promptfoo@latest eval --no-cache
         env:
-          # Add API keys if needed for LLM evaluation
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Uses GitHub token (no separate API keys needed!)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload test results
         if: always()
@@ -53,3 +56,4 @@ jobs:
               repo: context.repo.repo,
               body: '⚠️ Agent instruction tests failed. Please review the test results in the workflow artifacts.'
             })
+

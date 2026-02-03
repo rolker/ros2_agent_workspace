@@ -11,13 +11,20 @@ prompts:
   - file://.agent/rules/common/ai-signature.md
   - file://.agent/rules/common/issue-first.md
 
-# Test providers - agents to test against
+# Test providers - uses GitHub Models (no separate API keys needed)
+# Authenticates with GITHUB_TOKEN environment variable
 providers:
-  # Can test multiple models/providers for comparison
-  - id: openai:gpt-4o
-    label: "GPT-4o"
-  - id: anthropic:messages:claude-sonnet-4.5
-    label: "Claude Sonnet 4.5"
+  - id: github:openai/gpt-4o
+    label: "GPT-4o (via GitHub)"
+    config:
+      temperature: 0.7
+      max_tokens: 2048
+  
+  - id: github:anthropic/claude-sonnet-4
+    label: "Claude Sonnet 4 (via GitHub)"
+    config:
+      temperature: 0.7
+      max_tokens: 4096
 
 # Default test configuration
 defaultTest:
