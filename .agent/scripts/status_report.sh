@@ -86,8 +86,8 @@ else
             # Fetch updates quietly (suppress warnings)
             vcs custom --git --args fetch -q >/dev/null 2>&1
             
-            # Get status (suppress Python warnings to stderr)
-            raw_output=$(vcs custom --git --args status --porcelain -b 2>&1 | grep -v "DeprecationWarning" | grep -v "pkg_resources")
+            # Get status; rely on PYTHONWARNINGS to suppress Python deprecation warnings
+            raw_output=$(vcs custom --git --args status --porcelain -b)
             
             clean_count=0
             modified_count=0
