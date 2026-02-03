@@ -14,18 +14,20 @@ prompts:
 
 # Test providers - uses GitHub Models (no separate API keys needed)
 # Authenticates with GITHUB_TOKEN environment variable
+# NOTE: Commented out until GitHub Models access is configured
+# GitHub Models available: gpt-5-mini, phi-4, llama-3.2, etc.
+# See: https://github.com/marketplace?type=models
 providers:
-  - id: github:openai/gpt-4o
-    label: "GPT-4o (via GitHub)"
-    config:
-      temperature: 0.7
-      max_tokens: 2048
+  # Uncomment when GitHub Models access is available:
+  # - id: github:openai/gpt-5-mini
+  #   label: "GPT-5 Mini (via GitHub)"
+  #   config:
+  #     temperature: 0.7
+  #     max_tokens: 2048
   
-  - id: github:anthropic/claude-sonnet-4
-    label: "Claude Sonnet 4 (via GitHub)"
-    config:
-      temperature: 0.7
-      max_tokens: 4096
+  # For now, use local/mock provider for config validation
+  - id: echo
+    label: "Echo Provider (for testing config)"
 
 # Default test configuration
 defaultTest:
