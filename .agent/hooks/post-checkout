@@ -61,12 +61,12 @@ fi
 if [[ ! -d "../../layers" ]]; then
     echo "⚠️  Warning: Cannot find ../../layers directory"
     echo "   Skipping auto-symlink."
-    exit 1
+    exit 0
 fi
 
 # Create the symlink
 echo "🔗 Auto-symlinking layers/ directory for workspace worktree..."
-if ln -s ../../layers layers 2>/dev/null; then
+if ln -s ../../layers layers; then
     echo "   ✅ Created: layers -> ../../layers"
     echo ""
     echo "   This worktree now has access to all ROS2 workspace layers."

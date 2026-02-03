@@ -18,9 +18,11 @@ This directory contains custom git hooks for the ROS2 Agent Workspace.
 
 **Exit codes**:
 - `0` - Success or skipped (not a workspace worktree)
-- `1` - Error creating symlink
+- `1` - Error: `../../layers` directory missing or failed to create symlink
 
-**Installation**: Symlinked from `.git/hooks/post-checkout` to `.agent/hooks/post-checkout`
+**Installation**:
+- Make the hook executable: `chmod +x .agent/hooks/post-checkout`
+- Symlink into your local repo: `ln -s ../../.agent/hooks/post-checkout .git/hooks/post-checkout`
 
 **Related**: Issue #142, WORKTREE_GUIDE.md
 
