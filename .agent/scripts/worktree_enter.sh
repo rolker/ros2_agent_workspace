@@ -65,28 +65,54 @@ if [ -z "$ISSUE_NUM" ]; then
     return 1 2>/dev/null || exit 1
 fi
 
-# Find the worktree - check both locations
-LAYER_WORKTREE="$ROOT_DIR/layers/worktrees/issue-${ISSUE_NUM}"
-WORKSPACE_WORKTREE="$ROOT_DIR/.workspace-worktrees/issue-${ISSUE_NUM}"
+# Find the worktree - check both old and new naming formats
+# New format: issue-{REPO_SLUG}-{NUMBER}
+# Old format: issue-{NUMBER}
 
 WORKTREE_DIR=""
 WORKTREE_TYPE=""
 
-if [ -d "$LAYER_WORKTREE" ]; then
-    WORKTREE_DIR="$LAYER_WORKTREE"
+# Function to find worktree directory with fallback to old naming
+find_worktree() {
+    local base_dir="$1"
+    local issue_num="$2"
+    
+    # Try new format first (any repo slug)
+    # Look for directories matching issue-*-{NUMBER}
+    local matches=( "$base_dir"/issue-*-"${issue_num}" )
+    if [ -d "${matches[0]}" ] && [ "${matches[0]}" != "$base_dir/issue-*-${issue_num}" ]; then
+        echo "${matches[0]}"
+        return 0
+    fi
+    
+    # Fallback to old format
+    local old_format="$base_dir/issue-${issue_num}"
+    if [ -d "$old_format" ]; then
+        echo "$old_format"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Check layer worktrees
+if FOUND=$(find_worktree "$ROOT_DIR/layers/worktrees" "$ISSUE_NUM"); then
+    WORKTREE_DIR="$FOUND"
     WORKTREE_TYPE="layer"
-elif [ -d "$WORKSPACE_WORKTREE" ]; then
-    WORKTREE_DIR="$WORKSPACE_WORKTREE"
+# Check workspace worktrees
+elif FOUND=$(find_worktree "$ROOT_DIR/.workspace-worktrees" "$ISSUE_NUM"); then
+    WORKTREE_DIR="$FOUND"
     WORKTREE_TYPE="workspace"
 else
     echo "Error: No worktree found for issue #$ISSUE_NUM"
     echo ""
     echo "Checked locations:"
-    echo "  - $LAYER_WORKTREE"
-    echo "  - $WORKSPACE_WORKTREE"
+    echo "  - $ROOT_DIR/layers/worktrees/issue-*-$ISSUE_NUM"
+    echo "  - $ROOT_DIR/.workspace-worktrees/issue-*-$ISSUE_NUM"
     echo ""
     echo "Create one with:"
-    echo "  ./.agent/scripts/worktree_create.sh --issue $ISSUE_NUM"
+    echo "  ./.agent/scripts/worktree_create.sh --issue $ISSUE_NUM --type layer --layer <layer>"
+    echo "  ./.agent/scripts/worktree_create.sh --issue $ISSUE_NUM --type workspace"
     return 1 2>/dev/null || exit 1
 fi
 

@@ -49,18 +49,23 @@ layers/
 │   ├── platforms_ws/
 │   └── ...
 └── worktrees/
-    └── issue-42/              # Layer worktree for issue 42
+    └── issue-workspace-42/    # Layer worktree for issue 42 (workspace repo)
         ├── core_ws/           # Real - actively being modified
         ├── underlay_ws -> ../main/underlay_ws  # Symlink
         ├── platforms_ws -> ../main/platforms_ws
         └── .scratchpad/       # Isolated scratchpad
+    └── issue-marine_msgs-5/   # Layer worktree for issue 5 (marine_msgs repo)
+        ├── core_ws/           # Real - working on marine_msgs
+        └── ...
 ```
+
+**Note**: Worktrees are now named `issue-{REPO_SLUG}-{NUMBER}` to prevent collisions between same issue numbers from different repositories. The workspace repo uses "workspace" as its slug.
 
 ## Worktree Types
 
 ### Layer Worktrees (`--type layer --layer <name>`)
 
-**Location**: `layers/worktrees/issue-<N>/`
+**Location**: `layers/worktrees/issue-{REPO_SLUG}-{NUMBER}/`
 
 **Use for**: ROS package development, code changes, feature work
 
@@ -71,10 +76,17 @@ layers/
 - Other layers: Symlinks to `layers/main/` (use pre-built)
 - Isolated scratchpad (`.scratchpad/`)
 
+**Naming**: The `{REPO_SLUG}` is auto-detected from the repository where the issue was created. For the main workspace repository, it uses "workspace". For package repositories (e.g., `marine_msgs`), it uses the package name.
+
 **Example workflow**:
 ```bash
-# Create layer worktree for core layer
+# Create layer worktree for core layer (workspace issue #42)
 .agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
+# Creates: layers/worktrees/issue-workspace-42/
+
+# Or for a package repo issue (marine_msgs #5)
+.agent/scripts/worktree_create.sh --issue 5 --type layer --layer core --repo-slug marine_msgs
+# Creates: layers/worktrees/issue-marine_msgs-5/
 
 # Enter and work
 source .agent/scripts/worktree_enter.sh 42
@@ -91,7 +103,7 @@ git push -u origin feature/ISSUE-42-description
 
 ### Workspace Worktrees (`--type workspace`)
 
-**Location**: `.workspace-worktrees/issue-<N>/`
+**Location**: `.workspace-worktrees/issue-{REPO_SLUG}-{NUMBER}/`
 
 **Use for**: Infrastructure changes, documentation, `.agent/` modifications
 
@@ -100,10 +112,13 @@ git push -u origin feature/ISSUE-42-description
 - Symlink: `layers/main` → main workspace's built layers
 - All `.agent/` files and scripts
 
+**Naming**: Same as layer worktrees - includes repository slug to prevent collisions.
+
 **Example workflow**:
 ```bash
-# Create workspace worktree
+# Create workspace worktree (workspace issue #99)
 .agent/scripts/worktree_create.sh --issue 99 --type workspace
+# Creates: .workspace-worktrees/issue-workspace-99/
 
 # Enter and work
 source .agent/scripts/worktree_enter.sh 99
@@ -314,6 +329,38 @@ source .agent/scripts/worktree_enter.sh 42
 5. **Create draft PR early** - Signals active work to others
 6. **Commit frequently** - Worktrees don't protect against data loss
 
+## Migration from Old Naming Scheme
+
+**Old format**: `issue-{NUMBER}` (e.g., `issue-42`)  
+**New format**: `issue-{REPO_SLUG}-{NUMBER}` (e.g., `issue-workspace-42`, `issue-marine_msgs-5`)
+
+### Why the Change?
+
+The old naming scheme caused collisions when working on issues from different repositories with the same issue number. For example, issue #5 from `marine_msgs` and issue #5 from `sensor_driver` would try to use the same worktree path.
+
+### Backward Compatibility
+
+All worktree scripts automatically support both old and new formats:
+- `worktree_enter.sh` - Finds worktrees by either naming pattern
+- `worktree_remove.sh` - Removes worktrees by either naming pattern
+- `worktree_list.sh` - Displays repository context for both formats
+
+### Migrating Existing Worktrees (Optional)
+
+Existing worktrees using the old format will continue to work. If you want to migrate to the new naming:
+
+```bash
+# Example: Migrate issue-42 to issue-workspace-42
+cd layers/worktrees
+mv issue-42 issue-workspace-42
+
+# Update git's worktree reference
+cd /path/to/workspace/root
+git worktree repair
+```
+
+**Note**: Migration is optional. The scripts handle both formats transparently.
+
 ---
 
 **Related Documentation**:
@@ -321,4 +368,4 @@ source .agent/scripts/worktree_enter.sh 42
 - [Workforce Protocol](.agent/WORKFORCE_PROTOCOL.md) - Multi-agent coordination
 - [Git Hygiene](.agent/rules/common/git-hygiene.md) - Branch and commit practices
 
-**Last Updated**: 2026-01-29
+**Last Updated**: 2026-02-03

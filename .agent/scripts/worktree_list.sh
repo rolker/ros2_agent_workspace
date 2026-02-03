@@ -60,17 +60,36 @@ print_worktree() {
     local branch="$2"
     local head="$3"
     
-    # Determine type
+    # Determine type and extract issue/repo info
     local type="main"
     local issue=""
+    local repo=""
     
     if [[ "$path" == *"/layers/worktrees/"* ]]; then
         type="layer"
-        issue=$(basename "$path" | sed 's/issue-//')
+        local basename=$(basename "$path")
+        # New format: issue-{REPO_SLUG}-{NUMBER}
+        # Old format: issue-{NUMBER}
+        if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
+            repo="${BASH_REMATCH[1]}"
+            issue="${BASH_REMATCH[2]}"
+        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
+            repo="workspace"
+            issue="${BASH_REMATCH[1]}"
+        fi
         ((LAYER_COUNT++)) || true
     elif [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
-        issue=$(basename "$path" | sed 's/issue-//')
+        local basename=$(basename "$path")
+        # New format: issue-{REPO_SLUG}-{NUMBER}
+        # Old format: issue-{NUMBER}
+        if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
+            repo="${BASH_REMATCH[1]}"
+            issue="${BASH_REMATCH[2]}"
+        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
+            repo="workspace"
+            issue="${BASH_REMATCH[1]}"
+        fi
         ((WORKSPACE_COUNT++)) || true
     fi
     
@@ -92,7 +111,7 @@ print_worktree() {
         local icon="📦"
         [ "$type" == "workspace" ] && icon="🔧"
         
-        echo "$icon Issue #$issue ($type)"
+        echo "$icon Issue #$issue ($type) - Repository: $repo"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
