@@ -135,6 +135,32 @@ Before starting work, see what's currently happening:
 
 ---
 
+### Step 3.5: Validate Workspace (Optional but Recommended)
+
+Verify that all configured repositories are properly cloned:
+
+```bash
+make validate
+```
+
+**Or use the script directly**:
+```bash
+python3 .agent/scripts/validate_workspace.py --verbose
+```
+
+**What to look for**:
+- ✅ **All configured repos present** - Workspace is complete
+- ❌ **Missing repos** - Run with `--fix` to auto-import them
+- ⚠️ **Extra repos** - May be development repos or orphans
+- ⚠️ **Version mismatches** - Repos on wrong branches
+
+**Auto-fix missing repos**:
+```bash
+python3 .agent/scripts/validate_workspace.py --fix
+```
+
+---
+
 ## 🛑 CRITICAL: Issue-First Policy
 
 > **⚠️ STOP - Read This Before Touching Any Code ⚠️**

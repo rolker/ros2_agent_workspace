@@ -170,8 +170,21 @@ else
 fi
 echo ""
 
-# Check 6: Git Status
-echo "6. Checking Git Repository..."
+# Check 6: Validate Workspace Matches Configuration
+echo "6. Validating Workspace Matches Configuration..."
+if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
+    if python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null; then
+        check_pass "Workspace matches .repos configuration"
+    else
+        check_warn "Workspace does not match .repos configuration. Run: make validate"
+    fi
+else
+    check_warn "validate_workspace.py not found"
+fi
+echo ""
+
+# Check 7: Git Status
+echo "7. Checking Git Repository..."
 cd "$ROOT_DIR"
 if git rev-parse --git-dir > /dev/null 2>&1; then
     check_pass "Git repository initialized"
@@ -192,8 +205,8 @@ else
 fi
 echo ""
 
-# Check 7: Workspace Layers
-echo "7. Checking Workspace Layers..."
+# Check 8: Workspace Layers
+echo "8. Checking Workspace Layers..."
 if [ -d "$ROOT_DIR/layers/main" ]; then
     LAYER_COUNT=$(ls -d "$ROOT_DIR/layers/main"/*_ws 2>/dev/null | wc -l)
     if [ "$LAYER_COUNT" -gt 0 ]; then
@@ -222,8 +235,8 @@ else
 fi
 echo ""
 
-# Check 8: Lock Status
-echo "8. Checking Workspace Lock..."
+# Check 9: Lock Status
+echo "9. Checking Workspace Lock..."
 LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 if [ -f "$LOCK_FILE" ]; then
     check_warn "Workspace is LOCKED:"
