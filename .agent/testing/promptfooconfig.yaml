@@ -4,12 +4,13 @@
 description: "ROS2 Agent Workspace - Agent Instruction Compliance Tests"
 
 # Prompts (agent instructions to test)
+# Paths are relative to repo root (workflow runs from .agent/testing/)
 prompts:
-  - file://.agent/AI_RULES.md
-  - file://.agent/AI_CLI_QUICKSTART.md
-  - file://.agent/rules/common/git-hygiene.md
-  - file://.agent/rules/common/ai-signature.md
-  - file://.agent/rules/common/issue-first.md
+  - file://../../.agent/AI_RULES.md
+  - file://../../.agent/AI_CLI_QUICKSTART.md
+  - file://../../.agent/rules/common/git-hygiene.md
+  - file://../../.agent/rules/common/ai-signature.md
+  - file://../../.agent/rules/common/issue-first.md
 
 # Test providers - uses GitHub Models (no separate API keys needed)
 # Authenticates with GITHUB_TOKEN environment variable
