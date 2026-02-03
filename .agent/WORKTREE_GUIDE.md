@@ -39,45 +39,71 @@ Git worktrees create separate checkouts of the same repository:
 
 ## Directory Structure
 
-Main builds live in `layers/main/`, worktrees in `layers/worktrees/`:
+Main builds live in `layers/main/`, worktrees in `layers/worktrees/` and `.workspace-worktrees/`:
 
 ```
 layers/
 ├── main/                      # Main builds (shared baseline)
 │   ├── underlay_ws/
 │   ├── core_ws/
+│   │   └── src/
+│   │       ├── unh_marine_autonomy/  # Git repos
+│   │       ├── camp/
+│   │       └── ...
 │   ├── platforms_ws/
 │   └── ...
 └── worktrees/
     └── issue-42/              # Layer worktree for issue 42
-        ├── core_ws/           # Real - actively being modified
-        ├── underlay_ws -> ../main/underlay_ws  # Symlink
-        ├── platforms_ws -> ../main/platforms_ws
+        ├── core_ws/           # Hybrid structure (see below)
+        │   └── src/
+        │       ├── unh_marine_autonomy/  # Git worktree (modified)
+        │       ├── camp/ -> ../../../../main/core_ws/src/camp/  # Symlink
+        │       └── ...
+        ├── underlay_ws -> ../../main/underlay_ws  # Symlink
+        ├── platforms_ws -> ../../main/platforms_ws
         └── .scratchpad/       # Isolated scratchpad
+
+.workspace-worktrees/
+└── issue-137/                 # Workspace worktree (infrastructure work)
+    ├── .agent/                # Real - root repo worktree
+    ├── configs/               # Real - root repo worktree
+    └── layers -> ../../layers # Symlink - read-only access
 ```
 
 ## Worktree Types
 
-### Layer Worktrees (`--type layer --layer <name>`)
+### Layer Worktrees (`--type layer --layer <name> --packages <pkg,...>`)
 
 **Location**: `layers/worktrees/issue-<N>/`
 
 **Use for**: ROS package development, code changes, feature work
 
-**Requires**: `--layer` to specify which layer to work on
+**Requires**: 
+- `--layer` to specify which layer to work on
+- `--packages` to specify which package(s) to modify (comma-separated for multiple)
 
-**What's created**:
-- Target layer: Real directory with vcs-imported repos
-- Other layers: Symlinks to `layers/main/` (use pre-built)
+**What's created** (Hybrid Structure for Efficiency):
+- Target layer packages:
+  - **Modified packages**: Git worktrees (isolated changes, shared history)
+  - **Unmodified packages**: Symlinks to `layers/main/` (reuse builds, save disk)
+- Other layers: Symlinks to `layers/main/` (reuse pre-built artifacts)
 - Isolated scratchpad (`.scratchpad/`)
+
+**Benefits**:
+- ✅ Disk efficiency: Only modified packages have real checkouts
+- ✅ Build efficiency: Symlinked packages reuse compiled artifacts
+- ✅ Isolation: Git worktrees allow independent changes
 
 **Example workflow**:
 ```bash
-# Create layer worktree for core layer
-.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
+# Create layer worktree for single package
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages unh_marine_autonomy
+
+# For multiple packages (coordinated changes)
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages unh_marine_autonomy,camp
 
 # Enter and work
-source .agent/scripts/worktree_enter.sh 42
+source .agent/scripts/worktree_enter.sh --issue 42
 cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
