@@ -3,6 +3,9 @@
 # ROS2 Agent Workspace Status Report Script
 # Generates a concise Markdown report of the root git repo and all sub-repos.
 
+# Suppress Python deprecation warnings from vcstool
+export PYTHONWARNINGS="ignore::DeprecationWarning"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
@@ -80,9 +83,10 @@ else
             
             cd "$ws_dir/src"
             
-            # Fetch updates quietly
+            # Fetch updates quietly (suppress warnings)
             vcs custom --git --args fetch -q >/dev/null 2>&1
             
+            # Get status; rely on PYTHONWARNINGS to suppress Python deprecation warnings
             raw_output=$(vcs custom --git --args status --porcelain -b)
             
             clean_count=0
