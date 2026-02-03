@@ -19,11 +19,11 @@ prompts:
 # See: https://github.com/marketplace?type=models
 providers:
   # Uncomment when GitHub Models access is available:
-  # - id: github:openai/gpt-5-mini
-  #   label: "GPT-5 Mini (via GitHub)"
-  #   config:
-  #     temperature: 0.7
-  #     max_tokens: 2048
+  - id: github:anthropic/claude-4.5-sonnet
+    label: "Claude 4.5 Sonnet (via GitHub)"
+    config:
+      temperature: 0.7
+      max_tokens: 2048
   
   # For now, use local/mock provider for config validation
   - id: echo
