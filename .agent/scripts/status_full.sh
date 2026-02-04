@@ -81,14 +81,16 @@ if [ "$SKIP_SYNC" = false ]; then
     echo "## Step 1: Syncing Repositories"
     echo ""
     
-    # Sync root repository
-    cd "$ROOT_DIR"
-    echo -n "Syncing root repository... "
-    if git fetch --quiet 2>/dev/null; then
-        echo "✅"
-    else
-        echo "⚠️ (fetch failed or skipped)"
-    fi
+    # Sync root repository (use subshell to avoid changing working directory)
+    (
+        cd "$ROOT_DIR" || exit 0
+        echo -n "Syncing root repository... "
+        if git fetch --quiet 2>/dev/null; then
+            echo "✅"
+        else
+            echo "⚠️ (fetch failed or skipped)"
+        fi
+    )
     
     # Sync layer repositories
     if command -v vcs &> /dev/null; then
@@ -97,12 +99,15 @@ if [ "$SKIP_SYNC" = false ]; then
                 ws_name=$(basename "$ws_dir" | sed 's/_ws//')
                 echo -n "Syncing $ws_name workspace... "
                 
-                cd "$ws_dir/src"
-                if vcs custom --git --args fetch --quiet >/dev/null 2>&1; then
-                    echo "✅"
-                else
-                    echo "⚠️ (some repos may have failed)"
-                fi
+                # Use subshell to avoid changing working directory
+                (
+                    cd "$ws_dir/src" || exit 0
+                    if vcs custom --git --args fetch --quiet >/dev/null 2>&1; then
+                        echo "✅"
+                    else
+                        echo "⚠️ (some repos may have failed)"
+                    fi
+                )
             fi
         done
     else
@@ -277,17 +282,23 @@ echo ""
 if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
     # Ensure jq is available for GitHub-related JSON parsing
     if ! command -v jq &> /dev/null; then
-        echo "Error: 'jq' is required for GitHub status checks but is not installed." >&2
-        echo "Install 'jq' (https://stedolan.github.io/jq/) or re-run this script with --skip-github to skip GitHub checks." >&2
+        echo "Error: 'jq' is required for GitHub status checks but is not installed."
+        echo "Install 'jq' (https://stedolan.github.io/jq/) or re-run this script with --skip-github to skip GitHub checks."
         SKIP_GITHUB=true
     fi
 fi
 
-if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
-    # Generate repository list once for both PR and Issues sections
+if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null && command -v jq &> /dev/null; then
+    # Generate repository list once for both PR and Issues sections.
+    # The sed filters are applied sequentially to normalize URLs to "owner/repo":
+    # - For overlay repos we expect HTTPS URLs; we strip the https:// prefix and trailing ".git".
     REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
     
-    # Add root repository
+    # Add root repository, normalizing both SSH and HTTPS origin URLs to "owner/repo":
+    # - first sed removes SSH prefix "git@github.com:" if present
+    # - second sed removes HTTPS prefix "https://github.com/" if present
+    #   (for any given URL, only one of these prefixes will match)
+    # - third sed removes the trailing ".git"
     ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
     
     if [ -n "$ROOT_REPO" ]; then
@@ -380,6 +391,10 @@ if [ "$SKIP_GITHUB" = false ]; then
     
     if ! command -v gh &> /dev/null; then
         echo "⚠️ **GitHub CLI (\`gh\`) not found** (same as above)"
+        echo ""
+    elif ! gh auth status &> /dev/null; then
+        echo "⚠️ **GitHub CLI (\`gh\`) is not authenticated**"
+        echo "   Run \`gh auth login\` to configure GitHub authentication."
         echo ""
     else
         # Check if REPOS variable is set (should be from PR section above)
