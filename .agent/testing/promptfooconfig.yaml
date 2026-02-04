@@ -12,8 +12,8 @@ prompts:
   - file://../rules/common/ai-signature.md
   - file://../rules/common/issue-first.md
 
-# Test providers - uses Anthropic API and Google Gemini
-# Authenticates with ANTHROPIC_API_KEY and GOOGLE_API_KEY environment variables
+# Test providers - uses Anthropic API only (Gemini disabled due to hangs)
+# Authenticates with ANTHROPIC_API_KEY environment variable
 providers:
   - id: anthropic:messages:claude-sonnet-4-5-20250929
     label: "Claude Sonnet 4.5"
@@ -21,11 +21,12 @@ providers:
       temperature: 0.7
       max_tokens: 2048
   
-  - id: google:gemini-2.5-flash
-    label: "Gemini 2.5 Flash"
-    config:
-      temperature: 0.7
-      max_tokens: 2048
+  # Gemini provider disabled - causes test hangs
+  # - id: google:gemini-2.5-flash
+  #   label: "Gemini 2.5 Flash"
+  #   config:
+  #     temperature: 0.7
+  #     max_tokens: 2048
 
 # Default test configuration
 defaultTest:
@@ -38,6 +39,4 @@ defaultTest:
 outputPath: .promptfoo/output.json
 
 # Test execution settings
-maxConcurrency: 2  # Run 2 tests at a time to avoid API rate limits
-requestTimeout: 60000  # 60 second timeout per API request
 tests: []  # Will be defined in separate test files
