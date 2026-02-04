@@ -435,6 +435,47 @@ Then retry.
 
 ---
 
+## Git Tips for CLI Agents
+
+### ⚠️ Avoid Interactive Editors
+
+CLI agents can get stuck in interactive git editors (nano/vim). **Always disable editors** for git operations:
+
+```bash
+# Rebasing (replace <default-branch> with your repo's default branch, e.g., main)
+GIT_EDITOR=true git rebase origin/<default-branch>
+
+# Amending commits
+git commit --amend --no-edit
+# or
+git commit --amend -m "new message"
+
+# Continuing rebase after conflicts
+git add <resolved-files>
+GIT_EDITOR=true git rebase --continue
+
+# Merging
+GIT_EDITOR=true git merge feature-branch
+```
+
+### Helper Functions Available
+
+```bash
+# Source git helpers for convenience
+source .agent/scripts/lib/git_helpers.sh
+
+# Now use safe functions
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
+safe_git_amend
+safe_git_merge feature-branch
+safe_git_rebase_continue
+```
+
+**Why this matters**: Without `GIT_EDITOR=true`, git launches nano/vim, causing CLI agents to hang. See [AI_RULES.md](AI_RULES.md) section "Git Operations for CLI Agents" for full details.
+
+---
+
 ### "Already on branch feature/..." warning
 
 **What it means**: You're already on a feature branch (good!) but verify it's the right one for your task.
