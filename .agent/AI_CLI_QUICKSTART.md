@@ -465,7 +465,8 @@ GIT_EDITOR=true git merge feature-branch
 source .agent/scripts/lib/git_helpers.sh
 
 # Now use safe functions
-safe_git_rebase origin/main
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
 safe_git_amend
 safe_git_merge feature-branch
 safe_git_rebase_continue

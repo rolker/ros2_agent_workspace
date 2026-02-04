@@ -196,7 +196,8 @@ Interactive git operations (rebase, commit --amend, merge) launch text editors (
 **Method 1: GIT_EDITOR=true** (Recommended for most cases)
 ```bash
 # Skip editor entirely - use existing commit messages
-GIT_EDITOR=true git rebase origin/main
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
 GIT_EDITOR=true git commit --amend
 GIT_EDITOR=true git rebase --continue
 GIT_EDITOR=true git merge feature-branch
@@ -206,6 +207,7 @@ GIT_EDITOR=true git merge feature-branch
 ```bash
 # Explicitly skip editing
 # Note: --no-edit for rebase is not available in all Git versions; prefer GIT_EDITOR=true (Method 1) for rebases
+# Note: Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
 git commit --amend --no-edit
 git merge --no-edit feature-branch
 ```
@@ -222,11 +224,12 @@ git commit --amend -m "updated message"
 **Rebasing with conflicts:**
 ```bash
 # ❌ DON'T: Will hang in editor
-git rebase origin/main
+git rebase origin/<default-branch>
 git rebase --continue
 
 # ✅ DO: Skip editor
-GIT_EDITOR=true git rebase origin/main
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
 # ... resolve conflicts ...
 git add <files>
 GIT_EDITOR=true git rebase --continue
@@ -280,7 +283,8 @@ Use the safe git helpers in `.agent/scripts/lib/git_helpers.sh`:
 source .agent/scripts/lib/git_helpers.sh
 
 # Safe rebase that won't hang
-safe_git_rebase origin/main
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
 
 # Safe commit amend
 safe_git_amend

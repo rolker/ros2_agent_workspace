@@ -77,7 +77,8 @@ If your feature branch has fallen behind the default branch, you may need to reb
 
 2. **Rebase with editor disabled**:
    ```bash
-   GIT_EDITOR=true git rebase origin/main
+   # Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+   GIT_EDITOR=true git rebase origin/<default-branch>
    ```
 
 3. **If conflicts occur**:
@@ -108,7 +109,8 @@ For convenience, source the git helpers:
 source .agent/scripts/lib/git_helpers.sh
 
 # Now use safe functions
-safe_git_rebase origin/main
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
 
 # After resolving conflicts
 git add <files>
