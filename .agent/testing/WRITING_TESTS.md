@@ -154,12 +154,16 @@ tests:
       value: "CustomBot 3.0"
       message: "Must use actual model name"
     
-    - type: not-contains-any
-      value:
-        - "GPT-4o"
-        - "Gemini"
-        - "Claude"
-      message: "Must not copy example names"
+    # Should NOT use example values (use multiple not-contains)
+    - type: not-contains
+      value: "GPT-4o"
+      message: "Must not copy example model names"
+    - type: not-contains
+      value: "Gemini 2.0 Flash"
+      message: "Must not copy example model names"
+    - type: not-contains
+      value: "Claude 3.5 Sonnet"
+      message: "Must not copy example model names"
 ```
 
 ## Common Patterns
@@ -284,7 +288,7 @@ When adding new agent instructions:
 
 4. **Run and validate**
    ```bash
-   npx promptfoo@latest eval -c tests/your-new-test.yaml
+   npx promptfoo@0.120.21 eval -c tests/your-new-test.yaml
    ```
 
 ## Example: Complete Test File
@@ -345,7 +349,7 @@ tests:
 ## Next Steps
 
 After writing tests:
-1. Run locally: `npx promptfoo@latest eval -c tests/your-test.yaml`
+1. Run locally: `npx promptfoo@0.120.21 eval -c tests/your-test.yaml`
 2. Verify they catch violations
 3. Add to CI/CD (already automatic for tests in `tests/` directory)
 4. Document in main README if needed

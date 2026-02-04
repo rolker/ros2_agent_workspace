@@ -25,13 +25,13 @@ Or set them in the GitHub Actions workflow as secrets.
 ```bash
 # Run all tests
 cd .agent/testing
-npx promptfoo@latest eval
+npx promptfoo@0.120.21 eval
 
 # Run specific test file
-npx promptfoo@latest eval -c tests/test-environment-sourcing.yaml
+npx promptfoo@0.120.21 eval -c tests/test-environment-sourcing.yaml
 
 # View results in UI
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 ## Test Suite
@@ -97,16 +97,16 @@ Tests use LLM-as-a-judge to evaluate complex behaviors that can't be checked wit
 cd .agent/testing
 
 # Run all tests
-npx promptfoo@latest eval
+npx promptfoo@0.120.21 eval
 
 # Run with specific config
-npx promptfoo@latest eval -c promptfooconfig.yaml
+npx promptfoo@0.120.21 eval -c promptfooconfig.yaml
 
 # Run single test file
-npx promptfoo@latest eval -c tests/test-worktree-workflow.yaml
+npx promptfoo@0.120.21 eval -c tests/test-worktree-workflow.yaml
 
 # View results in web UI
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 ### In CI/CD
@@ -135,7 +135,7 @@ Results are stored in `.promptfoo/output.json` (gitignored).
 
 View results:
 ```bash
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 Or check JSON output:

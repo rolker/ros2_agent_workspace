@@ -30,9 +30,17 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Check API keys
+        run: |
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] || [ -z "${{ secrets.GOOGLE_API_KEY }}" ]; then
+            echo "❌ API keys not configured. Required: ANTHROPIC_API_KEY and GOOGLE_API_KEY"
+            echo "See .agent/testing/README.md for setup instructions"
+            exit 1
+          fi
+      
       - name: Run Promptfoo tests
         working-directory: .agent/testing
-        run: npx promptfoo@latest eval
+        run: npx promptfoo@0.120.21 eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -45,6 +53,7 @@ jobs:
           # Check if output.json exists
           if [ ! -f .promptfoo/output.json ]; then
             echo "❌ No test results found - tests may not have executed"
+            echo "::error::Promptfoo tests did not produce output.json"
             exit 1
           fi
           
@@ -138,4 +147,5 @@ jobs:
               repo: context.repo.repo,
               body: body
             });
+
 

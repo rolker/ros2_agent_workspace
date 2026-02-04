@@ -14,10 +14,10 @@ Guide for running Promptfoo tests locally and in CI/CD.
 cd .agent/testing
 
 # Run all tests
-npx promptfoo@latest eval
+npx promptfoo@0.120.21 eval
 
 # View results in browser
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 ## Running Tests
@@ -26,7 +26,7 @@ npx promptfoo@latest view
 
 ```bash
 cd .agent/testing
-npx promptfoo@latest eval
+npx promptfoo@0.120.21 eval
 ```
 
 Output shows pass/fail for each test case.
@@ -35,23 +35,23 @@ Output shows pass/fail for each test case.
 
 ```bash
 cd .agent/testing
-npx promptfoo@latest eval -c tests/test-worktree-workflow.yaml
+npx promptfoo@0.120.21 eval -c tests/test-worktree-workflow.yaml
 ```
 
 ### With Options
 
 ```bash
 # No caching (fresh evaluation)
-npx promptfoo@latest eval --no-cache
+npx promptfoo@0.120.21 eval --no-cache
 
 # Verbose output
-npx promptfoo@latest eval --verbose
+npx promptfoo@0.120.21 eval --verbose
 
 # Specific config file
-npx promptfoo@latest eval -c custom-config.yaml
+npx promptfoo@0.120.21 eval -c custom-config.yaml
 
 # Output to specific file
-npx promptfoo@latest eval -o results.json
+npx promptfoo@0.120.21 eval -o results.json
 ```
 
 ## Viewing Results
@@ -59,7 +59,7 @@ npx promptfoo@latest eval -o results.json
 ### Interactive UI
 
 ```bash
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 Opens web interface at `http://localhost:15500` showing:
@@ -103,17 +103,17 @@ cp test-environment-sourcing.yaml test-my-new-test.yaml
 ### 2. Run Single Test
 
 ```bash
-npx promptfoo@latest eval -c tests/test-my-new-test.yaml
+npx promptfoo@0.120.21 eval -c tests/test-my-new-test.yaml
 ```
 
 ### 3. Debug Failures
 
 ```bash
 # Run with verbose output
-npx promptfoo@latest eval -c tests/test-my-new-test.yaml --verbose
+npx promptfoo@0.120.21 eval -c tests/test-my-new-test.yaml --verbose
 
 # View in UI for detailed inspection
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 ### 4. Iterate
@@ -157,25 +157,25 @@ Workflow uploads results as artifacts:
 
 ```bash
 # Run tests with fresh cache
-npx promptfoo@latest eval --no-cache
+npx promptfoo@0.120.21 eval --no-cache
 
 # Run tests and view results immediately
-npx promptfoo@latest eval && npx promptfoo@latest view
+npx promptfoo@0.120.21 eval && npx promptfoo@0.120.21 view
 
 # Run specific test file
-npx promptfoo@latest eval -c tests/test-worktree-workflow.yaml
+npx promptfoo@0.120.21 eval -c tests/test-worktree-workflow.yaml
 
 # Run tests for specific provider only
-npx promptfoo@latest eval --filter-providers "openai:gpt-4o"
+npx promptfoo@0.120.21 eval --filter-providers "openai:gpt-4o"
 
 # Generate HTML report
-npx promptfoo@latest eval -o results.html
+npx promptfoo@0.120.21 eval -o results.html
 
 # Check Promptfoo version
-npx promptfoo@latest --version
+npx promptfoo@0.120.21 --version
 
 # Get help
-npx promptfoo@latest eval --help
+npx promptfoo@0.120.21 eval --help
 ```
 
 ## Interpreting Results
@@ -214,7 +214,7 @@ Result: PASS (3/3 assertions)
 ### 1. Use Interactive UI
 
 ```bash
-npx promptfoo@latest view
+npx promptfoo@0.120.21 view
 ```
 
 Click on failed tests to see:
@@ -296,24 +296,24 @@ Install Node.js 20+: https://nodejs.org/
 pkill -f promptfoo
 
 # Or use different port
-npx promptfoo@latest view --port 8080
+npx promptfoo@0.120.21 view --port 8080
 ```
 
 ## Best Practices
 
 1. **Run tests before committing**
    ```bash
-   cd .agent/testing && npx promptfoo@latest eval
+   cd .agent/testing && npx promptfoo@0.120.21 eval
    ```
 
 2. **Use no-cache for verification**
    ```bash
-   npx promptfoo@latest eval --no-cache
+   npx promptfoo@0.120.21 eval --no-cache
    ```
 
 3. **Check specific failures in UI**
    ```bash
-   npx promptfoo@latest view
+   npx promptfoo@0.120.21 view
    ```
 
 4. **Add regression test for each bug fix**
