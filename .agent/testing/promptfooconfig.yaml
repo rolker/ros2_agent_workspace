@@ -37,10 +37,5 @@ defaultTest:
 # Output configuration
 outputPath: .promptfoo/output.json
 
-# Test suites - load all test files from tests/ directory
-testSuites:
-  - tests/test-ai-signature.yaml
-  - tests/test-environment-sourcing.yaml
-  - tests/test-git-identity.yaml
-  - tests/test-issue-first-workflow.yaml
-  - tests/test-worktree-workflow.yaml
+# Test execution settings  
+tests: []  # Will be defined in separate test files
