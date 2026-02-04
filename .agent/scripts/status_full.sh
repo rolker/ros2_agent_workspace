@@ -152,13 +152,19 @@ if ! command -v vcs &> /dev/null; then
     echo "### Layers"
     echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
 else
+    # Fetch expected repositories (including underlay) for tracking checks
+    EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+        EXPECTED_REPOS=""
+    fi
+
     for ws_dir in "$LAYERS_DIR"/*; do
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
             
             cd "$ws_dir/src"
             
-            # Get status
+            # Get status with branch info
             raw_output=$(vcs custom --git --args status --porcelain -b 2>/dev/null || echo "")
             
             clean_count=0
@@ -168,34 +174,80 @@ else
             # Process the output
             current_repo=""
             is_dirty=false
+            sync_status=""
+            branch=""
+            
+            process_repo() {
+                if [ "$current_repo" != "" ]; then
+                    local status_str=""
+                    if [ "$is_dirty" = true ]; then
+                        status_str="⚠️ Modified"
+                    fi
+                    
+                    if [ "$sync_status" != "" ]; then
+                        status_str="${status_str:+$status_str, }$sync_status"
+                    fi
+                    
+                    # Fetch expected branch from config
+                    if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
+                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null)
+                    else
+                        expected_branch="unknown"
+                    fi
+                    
+                    if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
+                         if [ "$branch" != "$expected_branch" ]; then
+                            warning="🔀 $branch (Want: $expected_branch)"
+                            status_str="${status_str:+$status_str, }$warning"
+                         fi
+                    elif [ "$branch" != "jazzy" ] && [ "$current_repo" != "ros2_agent_workspace" ]; then
+                         status_str="${status_str:+$status_str, }🔀 Non-Jazzy?"
+                    fi
+
+                    if [ -n "$EXPECTED_REPOS" ]; then
+                        if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
+                             status_str="${status_str:+$status_str, }❓ Untracked"
+                        fi
+                    fi
+                    
+                    if [ "$status_str" != "" ]; then
+                        modified_repos+=("$current_repo|$status_str|$branch")
+                        modified_count=$((modified_count + 1))
+                    else
+                        clean_count=$((clean_count + 1))
+                    fi
+                fi
+            }
             
             while IFS= read -r line; do
                 if [[ "$line" == "="* ]]; then
-                    # Save previous repo if dirty
-                    if [ -n "$current_repo" ] && [ "$is_dirty" = true ]; then
-                        modified_repos+=("$current_repo")
-                        modified_count=$((modified_count + 1))
-                    elif [ -n "$current_repo" ]; then
-                        clean_count=$((clean_count + 1))
-                    fi
+                    # Process previous repo
+                    process_repo
                     
                     # Start new repo
                     current_repo=$(echo "$line" | sed 's/^=== \(.*\) (git) ===$/\1/')
                     is_dirty=false
+                    sync_status=""
+                    branch=""
+                elif [[ "$line" =~ ^##[[:space:]](.*)$ ]]; then
+                    # Extract branch and sync status
+                    branch_line="${BASH_REMATCH[1]}"
+                    if [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+)\] ]]; then
+                        sync_status="⬆️ Ahead ${BASH_REMATCH[1]}"
+                    elif [[ "$branch_line" =~ \.\.\..*\[behind[[:space:]]([0-9]+)\] ]]; then
+                        sync_status="⬇️ Behind ${BASH_REMATCH[1]}"
+                    elif [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+),[[:space:]]behind[[:space:]]([0-9]+)\] ]]; then
+                        sync_status="↕️ Ahead ${BASH_REMATCH[1]}, Behind ${BASH_REMATCH[2]}"
+                    fi
+                    # Extract branch name (first word)
+                    branch=$(echo "$branch_line" | awk '{print $1}')
                 elif [[ "$line" =~ ^[[:space:]]?[MADRCU?!] ]]; then
                     is_dirty=true
                 fi
             done <<< "$raw_output"
             
             # Handle last repo
-            if [ -n "$current_repo" ]; then
-                if [ "$is_dirty" = true ]; then
-                    modified_repos+=("$current_repo")
-                    modified_count=$((modified_count + 1))
-                else
-                    clean_count=$((clean_count + 1))
-                fi
-            fi
+            process_repo
             
             total=$((clean_count + modified_count))
             
@@ -203,9 +255,11 @@ else
             
             if [ $modified_count -gt 0 ]; then
                 echo ""
-                echo "**Modified Repositories:**"
-                for repo in "${modified_repos[@]}"; do
-                    echo "- ⚠️ $repo"
+                echo "| Repository | Status | Branch |"
+                echo "|---|---|---|"
+                for repo_entry in "${modified_repos[@]}"; do
+                    IFS='|' read -r repo_name status_info branch_info <<< "$repo_entry"
+                    printf "| %-30s | %-40s | %-20s |\n" "$repo_name" "$status_info" "$branch_info"
                 done
             fi
             echo ""
@@ -364,6 +418,40 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo ""
     fi
     
+    echo "---"
+    echo ""
+fi
+
+#######################################
+# STEP 5: LATEST TEST STATUS
+#######################################
+
+SUMMARY_JSON="$ROOT_DIR/.agent/scratchpad/test_summary.json"
+if [ -f "$SUMMARY_JSON" ]; then
+    STEP_NUM=$((STEP_NUM + 1))
+    echo "## Step $STEP_NUM: Latest Test Status"
+    python3 -c "
+import json, sys
+try:
+    with open('$SUMMARY_JSON') as f:
+        data = json.load(f)
+    ts = data.get('timestamp', 'Unknown')
+    overall = '✅ Passed' if data.get('overall_success') else '❌ Failed'
+    print(f'**Date**: {ts}')
+    print(f'**Overall**: {overall}')
+    print('')
+    print('| Layer | Result | Summary |')
+    print('|---|---|---|')
+    for layer in data.get('layers', []):
+        r = layer.get('result')
+        res = '✅ Passed' if r == 'passed' else ('⏭️ Skipped' if r == 'skipped' else '❌ Failed')
+        summ = layer.get('summary', '')
+        name = layer.get('name')
+        print(f'| {name} | {res} | {summ} |')
+except Exception as e:
+    print(f'Error parsing test summary: {e}')
+"
+    echo ""
     echo "---"
     echo ""
 fi
