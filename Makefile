@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-full lock unlock install-deps format lint health-check sync validate
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint health-check sync validate
 
 # Default target
 help:
@@ -14,8 +14,8 @@ help:
 	@echo "  build         - Build all workspace layers"
 	@echo "  test          - Run tests on all layers"
 	@echo "  clean         - Clean build artifacts"
-	@echo "  status        - Show workspace status report"
-	@echo "  status-full   - Show enhanced status with sync and GitHub integration"
+	@echo "  status        - Show enhanced status with sync and GitHub integration"
+	@echo "  status-quick  - Show quick local-only status (no sync, no GitHub)"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  sync          - Safely sync all workspace repositories"
@@ -68,10 +68,10 @@ clean:
 	@echo "Done."
 
 status:
-	@./.agent/scripts/status_report.sh
-
-status-full:
 	@./.agent/scripts/status_full.sh
+
+status-quick:
+	@./.agent/scripts/status_report.sh
 
 lock:
 	@./.agent/scripts/lock.sh "Manual lock via Makefile"

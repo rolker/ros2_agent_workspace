@@ -20,7 +20,7 @@
 #   Required: vcs, git, python3, jq
 #   Optional: gh (GitHub CLI) - for PR/issue tracking
 
-set -e
+# Note: do not use 'set -e' here; many status checks are best-effort and may fail.
 
 # Suppress Python deprecation warnings from vcstool
 export PYTHONWARNINGS="ignore::DeprecationWarning"
@@ -61,7 +61,7 @@ if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     LAYERS_DIR="$ROOT_DIR"  # In layer worktree, ROOT_DIR contains *_ws dirs
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     WORKTREE_INFO="workspace worktree"
-    LAYERS_DIR="$ROOT_DIR/layers"
+    LAYERS_DIR="$ROOT_DIR/layers/main"
 else
     LAYERS_DIR="$ROOT_DIR/layers/main"
 fi
@@ -93,12 +93,7 @@ if [ "$SKIP_SYNC" = false ]; then
     # Sync layer repositories
     if command -v vcs &> /dev/null; then
         # Determine which directory to use for layers
-        if [[ "$WORKTREE_INFO" == "workspace worktree" ]]; then
-            # In workspace worktree, layers is symlinked
-            LAYER_BASE="$LAYERS_DIR"
-        else
-            LAYER_BASE="$LAYERS_DIR"
-        fi
+        LAYER_BASE="$LAYERS_DIR"
         
         for ws_dir in "$LAYER_BASE"/*; do
             if [ -d "$ws_dir/src" ]; then
@@ -161,11 +156,7 @@ if ! command -v vcs &> /dev/null; then
     echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
 else
     # Determine layer base directory
-    if [[ "$WORKTREE_INFO" == "workspace worktree" ]]; then
-        LAYER_BASE="$LAYERS_DIR"
-    else
-        LAYER_BASE="$LAYERS_DIR"
-    fi
+    LAYER_BASE="$LAYERS_DIR"
     
     for ws_dir in "$LAYER_BASE"/*; do
         if [ -d "$ws_dir/src" ]; then
@@ -235,6 +226,21 @@ echo ""
 # STEP 3: GITHUB PULL REQUESTS
 #######################################
 
+if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
+    # Generate repository list once for both PR and Issues sections
+    REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+    
+    # Add root repository
+    ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+    
+    if [ -n "$ROOT_REPO" ]; then
+        REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
+    fi
+    
+    # Remove duplicates and sort
+    REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
+fi
+
 if [ "$SKIP_GITHUB" = false ]; then
     STEP_NUM=$((STEP_NUM + 1))
     echo "## Step $STEP_NUM: GitHub Pull Requests"
@@ -247,18 +253,7 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "Then authenticate: \`gh auth login\`"
         echo ""
     else
-        # Get list of repositories
-        REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-        
-        # Add root repository
-        ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-        
-        if [ -n "$ROOT_REPO" ]; then
-            REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
-        fi
-        
-        # Remove duplicates and sort
-        REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
+        # Repository list already generated above
         
         # Query PRs for each repository
         PR_COUNT=0
@@ -324,18 +319,7 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "⚠️ **GitHub CLI (\`gh\`) not found** (same as above)"
         echo ""
     else
-        # Get list of repositories (reuse from PR section)
-        REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-        
-        # Add root repository
-        ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-        
-        if [ -n "$ROOT_REPO" ]; then
-            REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
-        fi
-        
-        # Remove duplicates and sort
-        REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
+        # Repository list already generated above
         
         # Query issues for each repository
         ISSUE_COUNT=0
@@ -346,8 +330,8 @@ if [ "$SKIP_GITHUB" = false ]; then
                 continue
             fi
             
-            # Query GitHub API for open issue count
-            count=$(gh issue list --repo "$repo" --state open --json number --limit 1000 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
+            # Query GitHub API for open issue count using search API (accurate total_count)
+            count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
             
             # Ensure count is a valid integer
             if ! [[ "$count" =~ ^[0-9]+$ ]]; then
