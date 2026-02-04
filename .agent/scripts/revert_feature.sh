@@ -7,6 +7,7 @@
 # Usage: revert_feature.sh --issue <number> [--dry-run]
 
 set -e
+set -o pipefail
 
 usage() {
     echo "Usage: revert_feature.sh --issue <number> [--dry-run]"
@@ -121,10 +122,12 @@ echo "Reverting commits (newest to oldest)..."
 echo "========================================="
 
 # Revert in reverse order (newest first to avoid conflicts)
-REVERTED=0
-FAILED=0
+# Use mapfile to avoid subshell issues with pipe
+mapfile -t COMMIT_HASHES < <(git log --all --grep="#$ISSUE" --format=%H --reverse | tac)
 
-git log --all --grep="#$ISSUE" --format=%H --reverse | tac | while read commit; do
+REVERTED=0
+
+for commit in "${COMMIT_HASHES[@]}"; do
     COMMIT_MSG=$(git log --format=%s -n 1 "$commit")
     echo ""
     echo "Reverting: $commit"
@@ -154,17 +157,13 @@ git log --all --grep="#$ISSUE" --format=%H --reverse | tac | while read commit; 
     fi
 done
 
-# Check if loop succeeded
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "========================================="
-    echo "✅ Successfully reverted all commits for issue #$ISSUE"
-    echo "========================================="
-    echo ""
-    echo "Next steps:"
-    echo "  1. Review the revert commits: git log"
-    echo "  2. Push to remote: git push"
-    echo "  3. Close or update issue #$ISSUE on GitHub"
-else
-    exit 1
-fi
+# Report success
+echo ""
+echo "========================================="
+echo "✅ Successfully reverted $REVERTED commit(s) for issue #$ISSUE"
+echo "========================================="
+echo ""
+echo "Next steps:"
+echo "  1. Review the revert commits: git log"
+echo "  2. Push to remote: git push"
+echo "  3. Close or update issue #$ISSUE on GitHub"
