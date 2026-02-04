@@ -21,25 +21,45 @@ Provides visibility into PR pipeline status and interactive PR management.
 
 ## Usage
 
-### Basic Mode (Status Display)
+### For Humans (Interactive)
 
+**Basic Mode (Visual Dashboard):**
 ```bash
 .agent/scripts/pr_status.sh
 ```
+Shows categorized list with colors and emojis.
 
-Shows categorized list of all open PRs with comment counts and timing.
-
-### Interactive Mode
-
+**Interactive Mode (Menu-Driven):**
 ```bash
 .agent/scripts/pr_status.sh --interactive
 ```
+Menu interface for PR actions (review, fix, merge).
 
-Provides menu-driven interface for PR actions:
-1. Review a PR (launch Copilot review)
-2. Fix issues on a PR (instructions for agent handoff)
-3. Merge a PR
-4. Refresh status
+### For AI Agents (Programmatic)
+
+**Simple Text Summary:**
+```bash
+.agent/scripts/pr_status.sh --simple
+```
+Clean text output without colors/emojis, easy to parse.
+
+**JSON Output:**
+```bash
+.agent/scripts/pr_status.sh --json
+```
+Full structured data in JSON format.
+
+**Query Modes:**
+```bash
+# Get next PR with critical issues
+.agent/scripts/pr_status.sh --next-critical
+
+# Get next PR with minor issues only
+.agent/scripts/pr_status.sh --next-minor
+
+# Get next PR needing review
+.agent/scripts/pr_status.sh --next-review
+```
 
 ## Examples
 
@@ -61,6 +81,45 @@ $ .agent/scripts/pr_status.sh
 📊 Summary: 5 open PRs | 0 need review | 5 need fixes | 0 ready
 ```
 
+**Agent-friendly simple output:**
+```bash
+$ .agent/scripts/pr_status.sh --simple
+
+SUMMARY: 0 need review, 5 critical, 1 minor, 0 ready
+
+CRITICAL ISSUES:
+  #163: Add read_feature_status CLI tool (1 critical, 7 minor)
+  #160: feat: add repository-aware worktree naming (3 critical, 11 minor)
+  #159: Add Promptfoo framework for agent instruction testing (4 critical, 19 minor)
+```
+
+**Agent query for next critical PR:**
+```bash
+$ .agent/scripts/pr_status.sh --next-critical
+
+{
+  "category": "critical",
+  "number": "163",
+  "title": "Add read_feature_status CLI tool",
+  "time": "1h ago",
+  "critical": 1,
+  "minor": 7
+}
+```
+
+**Agent JSON output:**
+```bash
+$ .agent/scripts/pr_status.sh --json | jq '.summary'
+
+{
+  "total": 6,
+  "needs_review": 0,
+  "critical": 5,
+  "minor": 1,
+  "ready": 0
+}
+```
+
 **Interactive workflow:**
 ```bash
 $ .agent/scripts/pr_status.sh --interactive
@@ -78,6 +137,20 @@ q) Quit
 Enter PR number: 159
 To launch agent for PR #159, use:
   gh copilot 'Check comments on PR 159 and fix the issues'
+```
+
+**Agent workflow (via Copilot CLI):**
+```bash
+# Get simple summary
+$ .agent/scripts/pr_status.sh --simple
+SUMMARY: 0 need review, 5 critical, 1 minor, 0 ready
+
+# Get next critical PR to work on
+$ .agent/scripts/pr_status.sh --next-critical
+{"category":"critical","number":"163","title":"Add read_feature_status CLI tool"...}
+
+# Agent then works on PR #163
+# After fixes, check again to get next PR
 ```
 
 ## Comment Classification

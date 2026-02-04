@@ -215,6 +215,103 @@ display_category() {
     echo ""
 }
 
+# Function to output in JSON format (for agents)
+output_json() {
+    local prs_json=$1
+    local all_prs=[]
+    
+    while IFS= read -r pr; do
+        local analyzed=$(analyze_pr "$pr")
+        all_prs=$(echo "$all_prs" | jq --argjson item "$analyzed" '. + [$item]')
+    done < <(echo "$prs_json" | jq -c '.[]')
+    
+    echo "$all_prs" | jq '{
+        summary: {
+            total: (. | length),
+            needs_review: ([.[] | select(.category == "needs_review")] | length),
+            critical: ([.[] | select(.category == "critical")] | length),
+            minor: ([.[] | select(.category == "minor")] | length),
+            ready: ([.[] | select(.category == "ready")] | length)
+        },
+        prs: .
+    }'
+}
+
+# Function to get next actionable PR
+get_next_pr() {
+    local prs_json=$1
+    local category=${2:-"critical"}
+    
+    while IFS= read -r pr; do
+        local analyzed=$(analyze_pr "$pr")
+        local pr_category=$(echo "$analyzed" | jq -r '.category')
+        
+        if [ "$pr_category" = "$category" ]; then
+            echo "$analyzed"
+            return 0
+        fi
+    done < <(echo "$prs_json" | jq -c '.[]')
+    
+    # No PR found in requested category
+    return 1
+}
+
+# Function to output simple text summary (for agents)
+output_simple() {
+    local prs_json=$1
+    
+    local needs_review=()
+    local critical=()
+    local minor=()
+    local ready=()
+    
+    while IFS= read -r pr; do
+        local analyzed=$(analyze_pr "$pr")
+        local category=$(echo "$analyzed" | jq -r '.category')
+        
+        case "$category" in
+            needs_review) needs_review+=("$analyzed") ;;
+            critical) critical+=("$analyzed") ;;
+            minor) minor+=("$analyzed") ;;
+            ready) ready+=("$analyzed") ;;
+        esac
+    done < <(echo "$prs_json" | jq -c '.[]')
+    
+    echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
+    
+    if [ ${#critical[@]} -gt 0 ]; then
+        echo ""
+        echo "CRITICAL ISSUES:"
+        for item in "${critical[@]}"; do
+            local number=$(echo "$item" | jq -r '.number')
+            local title=$(echo "$item" | jq -r '.title')
+            local crit=$(echo "$item" | jq -r '.critical')
+            local min=$(echo "$item" | jq -r '.minor')
+            echo "  #$number: $title ($crit critical, $min minor)"
+        done
+    fi
+    
+    if [ ${#needs_review[@]} -gt 0 ]; then
+        echo ""
+        echo "NEEDS REVIEW:"
+        for item in "${needs_review[@]}"; do
+            local number=$(echo "$item" | jq -r '.number')
+            local title=$(echo "$item" | jq -r '.title')
+            echo "  #$number: $title"
+        done
+    fi
+    
+    if [ ${#ready[@]} -gt 0 ]; then
+        echo ""
+        echo "READY TO MERGE:"
+        for item in "${ready[@]}"; do
+            local number=$(echo "$item" | jq -r '.number')
+            local title=$(echo "$item" | jq -r '.title')
+            echo "  #$number: $title"
+        done
+    fi
+}
+
 # Function to run interactive mode
 run_interactive() {
     while true; do
@@ -268,6 +365,7 @@ run_interactive() {
 # Main
 main() {
     local interactive=false
+    local mode="dashboard"  # dashboard, json, simple, next-critical, next-minor
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -276,16 +374,44 @@ main() {
                 interactive=true
                 shift
                 ;;
+            --json)
+                mode="json"
+                shift
+                ;;
+            --simple)
+                mode="simple"
+                shift
+                ;;
+            --next-critical)
+                mode="next-critical"
+                shift
+                ;;
+            --next-minor)
+                mode="next-minor"
+                shift
+                ;;
+            --next-review)
+                mode="next-review"
+                shift
+                ;;
             -h|--help)
                 echo "Usage: $0 [OPTIONS]"
                 echo ""
                 echo "Options:"
-                echo "  -i, --interactive    Run in interactive mode"
+                echo "  -i, --interactive    Run in interactive mode (for human use)"
+                echo "  --json              Output full status as JSON (for agents)"
+                echo "  --simple            Output simple text summary (for agents)"
+                echo "  --next-critical     Output next PR with critical issues (for agents)"
+                echo "  --next-minor        Output next PR with minor issues (for agents)"
+                echo "  --next-review       Output next PR needing review (for agents)"
                 echo "  -h, --help          Show this help message"
                 echo ""
                 echo "Examples:"
-                echo "  $0                  # Show status dashboard"
-                echo "  $0 --interactive    # Run interactive menu"
+                echo "  $0                       # Show dashboard (human-friendly)"
+                echo "  $0 --interactive         # Interactive menu (human-friendly)"
+                echo "  $0 --simple              # Simple text output (agent-friendly)"
+                echo "  $0 --json                # JSON output (agent-friendly)"
+                echo "  $0 --next-critical       # Get next critical PR (agent-friendly)"
                 exit 0
                 ;;
             *)
@@ -298,10 +424,30 @@ main() {
     # Fetch PRs
     local prs=$(fetch_prs)
     
+    # Execute based on mode
     if [ "$interactive" = true ]; then
         run_interactive
     else
-        display_dashboard "$prs"
+        case "$mode" in
+            json)
+                output_json "$prs"
+                ;;
+            simple)
+                output_simple "$prs"
+                ;;
+            next-critical)
+                get_next_pr "$prs" "critical" || echo "No PRs with critical issues found"
+                ;;
+            next-minor)
+                get_next_pr "$prs" "minor" || echo "No PRs with minor issues found"
+                ;;
+            next-review)
+                get_next_pr "$prs" "needs_review" || echo "No PRs needing review found"
+                ;;
+            dashboard)
+                display_dashboard "$prs"
+                ;;
+        esac
     fi
 }
 
