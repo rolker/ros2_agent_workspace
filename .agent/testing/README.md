@@ -8,13 +8,19 @@ Agent instructions (in `.agent/`, `.github/copilot-instructions.md`, etc.) are t
 
 ## Environment Setup
 
-Set your Anthropic API key:
+Set your API keys:
 
 ```bash
+# Anthropic (paid)
 export ANTHROPIC_API_KEY="your-api-key-here"
+
+# Google Gemini (FREE - 1,500 requests/day)
+export GOOGLE_API_KEY="your-google-api-key"
 ```
 
-Or set it in the GitHub Actions workflow as a secret.
+Get a free Google API key at: https://aistudio.google.com
+
+Or set them in the GitHub Actions workflow as secrets.
 
 ```bash
 # Run all tests

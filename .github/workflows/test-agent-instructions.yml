@@ -34,6 +34,7 @@ jobs:
         run: npx promptfoo@latest eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       
       - name: Upload test results
         if: always()

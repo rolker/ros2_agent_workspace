@@ -12,11 +12,17 @@ prompts:
   - file://../../.agent/rules/common/ai-signature.md
   - file://../../.agent/rules/common/issue-first.md
 
-# Test providers - uses Anthropic API
-# Authenticates with ANTHROPIC_API_KEY environment variable
+# Test providers - uses Anthropic API and Google Gemini
+# Authenticates with ANTHROPIC_API_KEY and GOOGLE_API_KEY environment variables
 providers:
   - id: anthropic:messages:claude-sonnet-4-5-20250929
     label: "Claude Sonnet 4.5"
+    config:
+      temperature: 0.7
+      max_tokens: 2048
+  
+  - id: google:gemini-2.5-flash
+    label: "Gemini 2.5 Flash"
     config:
       temperature: 0.7
       max_tokens: 2048
