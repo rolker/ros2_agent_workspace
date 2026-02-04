@@ -19,8 +19,8 @@ prompts:
 # See: https://github.com/marketplace?type=models
 providers:
   # Uncomment when GitHub Models access is available:
-  - id: github:anthropic/claude-4.5-sonnet
-    label: "Claude 4.5 Sonnet (via GitHub)"
+  - id: github:anthropic/claude-3.7-sonnet
+    label: "Claude 3.7 Sonnet (via GitHub)"
     config:
       temperature: 0.7
       max_tokens: 2048
