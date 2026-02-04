@@ -75,7 +75,7 @@ echo ""
 
 # Find commits mentioning this issue (search for #ISSUE, Closes #ISSUE, Fixes #ISSUE, etc.)
 echo "Searching for commits referencing issue #$ISSUE..."
-COMMITS=$(git log --all --grep="#$ISSUE" --format="%H %s" --reverse 2>/dev/null || true)
+COMMITS=$(git log --grep="#$ISSUE" --format="%H %s" --reverse 2>/dev/null || true)
 
 if [ -z "$COMMITS" ]; then
     echo ""
@@ -123,7 +123,7 @@ echo "========================================="
 
 # Revert in reverse order (newest first to avoid conflicts)
 # Use mapfile to avoid subshell issues with pipe
-mapfile -t COMMIT_HASHES < <(git log --all --grep="#$ISSUE" --format=%H --reverse | tac)
+mapfile -t COMMIT_HASHES < <(git log --grep="#$ISSUE" --format=%H --reverse | tac)
 
 REVERTED=0
 
