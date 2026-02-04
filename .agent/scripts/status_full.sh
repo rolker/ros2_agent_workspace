@@ -92,10 +92,7 @@ if [ "$SKIP_SYNC" = false ]; then
     
     # Sync layer repositories
     if command -v vcs &> /dev/null; then
-        # Determine which directory to use for layers
-        LAYER_BASE="$LAYERS_DIR"
-        
-        for ws_dir in "$LAYER_BASE"/*; do
+        for ws_dir in "$LAYERS_DIR"/*; do
             if [ -d "$ws_dir/src" ]; then
                 ws_name=$(basename "$ws_dir" | sed 's/_ws//')
                 echo -n "Syncing $ws_name workspace... "
@@ -155,10 +152,7 @@ if ! command -v vcs &> /dev/null; then
     echo "### Layers"
     echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
 else
-    # Determine layer base directory
-    LAYER_BASE="$LAYERS_DIR"
-    
-    for ws_dir in "$LAYER_BASE"/*; do
+    for ws_dir in "$LAYERS_DIR"/*; do
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
             
@@ -225,6 +219,15 @@ echo ""
 #######################################
 # STEP 3: GITHUB PULL REQUESTS
 #######################################
+
+if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
+    # Ensure jq is available for GitHub-related JSON parsing
+    if ! command -v jq &> /dev/null; then
+        echo "Error: 'jq' is required for GitHub status checks but is not installed." >&2
+        echo "Install 'jq' (https://stedolan.github.io/jq/) or re-run this script with --skip-github to skip GitHub checks." >&2
+        SKIP_GITHUB=true
+    fi
+fi
 
 if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
     # Generate repository list once for both PR and Issues sections
@@ -319,40 +322,44 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "⚠️ **GitHub CLI (\`gh\`) not found** (same as above)"
         echo ""
     else
-        # Repository list already generated above
-        
-        # Query issues for each repository
-        ISSUE_COUNT=0
-        ISSUE_OUTPUT=""
-        
-        for repo in $REPOS; do
-            if [ -z "$repo" ]; then
-                continue
-            fi
-            
-            # Query GitHub API for open issue count using search API (accurate total_count)
-            count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
-            
-            # Ensure count is a valid integer
-            if ! [[ "$count" =~ ^[0-9]+$ ]]; then
-                count=0
-            fi
-            
-            if [ "$count" -gt 0 ]; then
-                repo_name=$(basename "$repo")
-                issue_url="https://github.com/$repo/issues"
-                ISSUE_OUTPUT+="| [$repo_name]($issue_url) | $count |"$'\n'
-                ISSUE_COUNT=$((ISSUE_COUNT + count))
-            fi
-        done
-        
-        if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
-            echo "| Repository | Open Issues |"
-            echo "|------------|-------------|"
-            echo "$ISSUE_OUTPUT"
-            echo "**Total Open Issues**: $ISSUE_COUNT"
+        # Check if REPOS variable is set (should be from PR section above)
+        if [ -z "${REPOS:-}" ]; then
+            echo "ℹ️  No repositories available for GitHub issue query."
+            echo ""
         else
-            echo "✅ No open issues"
+            # Query issues for each repository
+            ISSUE_COUNT=0
+            ISSUE_OUTPUT=""
+            
+            for repo in $REPOS; do
+                if [ -z "$repo" ]; then
+                    continue
+                fi
+                
+                # Query GitHub API for open issue count using search API (accurate total_count)
+                count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
+                
+                # Ensure count is a valid integer
+                if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+                    count=0
+                fi
+                
+                if [ "$count" -gt 0 ]; then
+                    repo_name=$(basename "$repo")
+                    issue_url="https://github.com/$repo/issues"
+                    ISSUE_OUTPUT+="| [$repo_name]($issue_url) | $count |"$'\n'
+                    ISSUE_COUNT=$((ISSUE_COUNT + count))
+                fi
+            done
+            
+            if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
+                echo "| Repository | Open Issues |"
+                echo "|------------|-------------|"
+                echo "$ISSUE_OUTPUT"
+                echo "**Total Open Issues**: $ISSUE_COUNT"
+            else
+                echo "✅ No open issues"
+            fi
         fi
         echo ""
     fi
