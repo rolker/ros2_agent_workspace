@@ -41,7 +41,10 @@ jobs:
       - name: Run Promptfoo tests
         working-directory: .agent/testing
         timeout-minutes: 5  # Timeout after 5 minutes (expected: ~1 minute)
-        run: npx promptfoo@0.120.21 eval
+        run: |
+          # Clear cache to ensure fresh config is used
+          rm -rf ~/.promptfoo/cache .promptfoo/cache
+          npx promptfoo@0.120.21 eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
