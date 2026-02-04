@@ -6,7 +6,7 @@
 
 ```bash
 # Create a worktree for issue #42 to work on the core layer
-.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages my_package
 
 # Enter the worktree (sources ROS environment)
 source .agent/scripts/worktree_enter.sh 42
@@ -148,7 +148,11 @@ git push -u origin feature/ISSUE-99-description
 ### Create Worktree
 
 ```bash
-.agent/scripts/worktree_create.sh --issue <N> --type <layer|workspace> [--layer <name>] [--branch <name>]
+# For layer worktrees (required: --layer and --packages)
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer <name> --packages <pkg1,pkg2,...>
+
+# For workspace worktrees
+.agent/scripts/worktree_create.sh --issue <N> --type workspace [--branch <name>]
 ```
 
 | Option | Required | Description |
@@ -156,6 +160,7 @@ git push -u origin feature/ISSUE-99-description
 | `--issue <N>` | Yes | Issue number (used for directory name) |
 | `--type <type>` | Yes | `layer` or `workspace` |
 | `--layer <name>` | For layer type | Which layer to work on (core, sensors, etc.) |
+| `--packages <pkg1,pkg2,...>` | For layer type | Comma-separated list of packages to include as worktrees |
 | `--branch <name>` | No | Custom branch name (default: `feature/ISSUE-<N>`) |
 
 ### List Worktrees
@@ -248,14 +253,14 @@ When run in a worktree, shows context:
 
 **Agent A** (working on issue #42):
 ```bash
-.agent/scripts/worktree_create.sh --issue 42 --type layer
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages sensor_driver
 source .agent/scripts/worktree_enter.sh 42
 # Works on sensor driver...
 ```
 
 **Agent B** (working on issue #43):
 ```bash
-.agent/scripts/worktree_create.sh --issue 43 --type layer
+.agent/scripts/worktree_create.sh --issue 43 --type layer --layer core --packages navigation
 source .agent/scripts/worktree_enter.sh 43
 # Works on navigation...
 ```
@@ -305,7 +310,7 @@ A worktree for this issue already exists. Either:
 
 The branch is in use elsewhere. Use a custom branch name:
 ```bash
-.agent/scripts/worktree_create.sh --issue 42 --type layer --branch feature/my-custom-name
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages my_package --branch feature/my-custom-name
 ```
 
 ### Uncommitted Changes Warning

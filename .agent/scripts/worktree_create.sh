@@ -216,9 +216,21 @@ EOF
             
             # Convert comma-separated packages to array without permanently changing IFS
             OLD_IFS=$IFS
-            IFS=',' 
-            read -ra PACKAGE_ARRAY <<< "$TARGET_PACKAGES"
+            IFS=','
+            # Read raw entries, then trim whitespace from each package name
+            read -ra RAW_PACKAGE_ARRAY <<< "$TARGET_PACKAGES"
             IFS=$OLD_IFS
+
+            PACKAGE_ARRAY=()
+            for raw_pkg in "${RAW_PACKAGE_ARRAY[@]}"; do
+                # Trim leading and trailing whitespace
+                pkg="${raw_pkg#"${raw_pkg%%[![:space:]]*}"}"
+                pkg="${pkg%"${pkg##*[![:space:]]}"}"
+                # Skip empty entries (e.g., from ",,")
+                if [ -n "$pkg" ]; then
+                    PACKAGE_ARRAY+=("$pkg")
+                fi
+            done
             
             # Get list of all packages in main layer
             MAIN_SRC_DIR="$ROOT_DIR/layers/main/${LAYER_WS}/src"
