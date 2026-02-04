@@ -214,8 +214,11 @@ EOF
             echo "  - $LAYER_WS: creating hybrid structure (git worktrees + symlinks)"
             mkdir -p "$WORKTREE_DIR/${LAYER_WS}/src"
             
-            # Convert comma-separated packages to array
-            IFS=',' read -ra PACKAGE_ARRAY <<< "$TARGET_PACKAGES"
+            # Convert comma-separated packages to array without permanently changing IFS
+            OLD_IFS=$IFS
+            IFS=',' 
+            read -ra PACKAGE_ARRAY <<< "$TARGET_PACKAGES"
+            IFS=$OLD_IFS
             
             # Get list of all packages in main layer
             MAIN_SRC_DIR="$ROOT_DIR/layers/main/${LAYER_WS}/src"
