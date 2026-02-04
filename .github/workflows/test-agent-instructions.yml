@@ -43,6 +43,7 @@ jobs:
           name: promptfoo-results
           path: .agent/testing/.promptfoo/
           retention-days: 30
+          include-hidden-files: true
       
       - name: Comment on PR
         if: failure() && github.event_name == 'pull_request'
