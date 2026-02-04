@@ -6,7 +6,15 @@ This directory contains automated tests for agent instructions and workflows usi
 
 Agent instructions (in `.agent/`, `.github/copilot-instructions.md`, etc.) are tested like code to prevent regressions and ensure agents follow documented workflows.
 
-## Quick Start
+## Environment Setup
+
+Set your Anthropic API key:
+
+```bash
+export ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+Or set it in the GitHub Actions workflow as a secret.
 
 ```bash
 # Run all tests

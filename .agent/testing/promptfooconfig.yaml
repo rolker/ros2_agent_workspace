@@ -12,22 +12,14 @@ prompts:
   - file://../../.agent/rules/common/ai-signature.md
   - file://../../.agent/rules/common/issue-first.md
 
-# Test providers - uses GitHub Models (no separate API keys needed)
-# Authenticates with GITHUB_TOKEN environment variable
-# NOTE: Commented out until GitHub Models access is configured
-# GitHub Models available: gpt-5-mini, phi-4, llama-3.2, etc.
-# See: https://github.com/marketplace?type=models
+# Test providers - uses Anthropic API
+# Authenticates with ANTHROPIC_API_KEY environment variable
 providers:
-  # Uncomment when GitHub Models access is available:
-  - id: github:anthropic/claude-3.7-sonnet
-    label: "Claude 3.7 Sonnet (via GitHub)"
+  - id: anthropic:messages:claude-sonnet-4-5-20250929
+    label: "Claude Sonnet 4.5"
     config:
       temperature: 0.7
       max_tokens: 2048
-  
-  # For now, use local/mock provider for config validation
-  - id: echo
-    label: "Echo Provider (for testing config)"
 
 # Default test configuration
 defaultTest:
