@@ -19,9 +19,9 @@ help:
 	@echo "  unlock        - Unlock workspace"
 	@echo "  sync          - Safely sync all workspace repositories"
 	@echo "  validate      - Validate workspace configuration"
-	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo "  format        - Format Python code with black"
 	@echo "  lint          - Run linters on all code"
+	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo ""
 
 health-check:
