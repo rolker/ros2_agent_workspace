@@ -19,7 +19,7 @@ import json
 import re
 import subprocess
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 def get_issue_body(issue_number: int) -> str:
@@ -72,7 +72,7 @@ def parse_checkboxes(body: str) -> List[Tuple[bool, str, int]]:
     return tasks
 
 
-def calculate_status(tasks: List[Tuple[bool, str, int]]) -> Dict[str, any]:
+def calculate_status(tasks: List[Tuple[bool, str, int]]) -> Dict[str, Any]:
     """
     Calculate feature status from parsed tasks.
     
@@ -106,9 +106,12 @@ def calculate_status(tasks: List[Tuple[bool, str, int]]) -> Dict[str, any]:
         status = "done"
         phase = tasks[-1][2] if tasks else 0  # Last phase
     else:
-        # Check if there's any indication of being blocked
-        # (Could be enhanced to detect specific "BLOCKED" markers)
-        status = "in_progress"
+        # Check for blocked status markers in task text
+        blocked_markers = ["BLOCKED", "[BLOCKED]", "⛔", "🚫"]
+        if any(marker in current_task.upper() for marker in blocked_markers):
+            status = "blocked"
+        else:
+            status = "in_progress"
         phase = current_phase
     
     percent_complete = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 100
