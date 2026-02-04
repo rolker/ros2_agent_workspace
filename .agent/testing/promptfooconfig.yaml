@@ -37,5 +37,7 @@ defaultTest:
 # Output configuration
 outputPath: .promptfoo/output.json
 
-# Test execution settings  
+# Test execution settings
+maxConcurrency: 2  # Run 2 tests at a time to avoid API rate limits
+requestTimeout: 60000  # 60 second timeout per API request
 tests: []  # Will be defined in separate test files
