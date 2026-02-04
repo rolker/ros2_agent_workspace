@@ -254,21 +254,20 @@ EOF
                         cd "$pkg_path"
                         WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
                         
-                        # Use existing branch or create new one
-                        CURRENT_BRANCH=$(git branch --show-current)
-                        if git worktree add "$WORKTREE_PKG_PATH" "$CURRENT_BRANCH" 2>/dev/null; then
-                            echo "      ✓ Worktree created from existing branch: $CURRENT_BRANCH"
+                        # Prefer the issue branch for this package: create it if needed, or reuse if it exists
+                        if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
+                            echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
+                        elif git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
+                            echo "      ✓ Worktree created from existing branch: $BRANCH_NAME"
                         else
-                            # Branch doesn't exist in package, create new branch from current HEAD
-                            if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
-                                echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
+                            # Fallback: attempt to use the package's current branch, then symlink on failure
+                            CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
+                            if [ -n "$CURRENT_BRANCH" ] && git worktree add "$WORKTREE_PKG_PATH" "$CURRENT_BRANCH" 2>/dev/null; then
+                                echo "      ✓ Worktree created from current branch: $CURRENT_BRANCH"
                             else
-                                # If branch already exists, check it out
-                                git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null || {
-                                    echo "      ✗ Failed to create worktree for $pkg_name"
-                                    echo "      Falling back to symlink"
-                                    ln -s "$pkg_path" "$WORKTREE_PKG_PATH"
-                                }
+                                echo "      ✗ Failed to create worktree for $pkg_name on branch: $BRANCH_NAME"
+                                echo "      Falling back to symlink"
+                                ln -s "$pkg_path" "$WORKTREE_PKG_PATH"
                             fi
                         fi
                         cd "$ROOT_DIR"

@@ -67,7 +67,8 @@ layers/
 └── issue-137/                 # Workspace worktree (infrastructure work)
     ├── .agent/                # Real - root repo worktree
     ├── configs/               # Real - root repo worktree
-    └── layers -> ../../layers # Symlink - read-only access
+    └── layers/                # Real - root repo worktree
+        └── main -> ../../layers/main  # Symlink - read-only access to main builds
 ```
 
 ## Worktree Types
@@ -86,12 +87,12 @@ layers/
 - Target layer packages:
   - **Modified packages**: Git worktrees (isolated changes, shared history)
   - **Unmodified packages**: Symlinks to `layers/main/` (reuse builds, save disk)
-- Other layers: Symlinks to `layers/main/` (reuse pre-built artifacts)
+- Other layers: Symlinks to `layers/main/` workspaces for read-only source access
 - Isolated scratchpad (`.scratchpad/`)
 
 **Benefits**:
 - ✅ Disk efficiency: Only modified packages have real checkouts
-- ✅ Build efficiency: Symlinked packages reuse compiled artifacts
+- ✅ Build efficiency: Symlinked packages reuse the main workspace's source tree; each worktree keeps its own build/install artifacts
 - ✅ Isolation: Git worktrees allow independent changes
 
 **Example workflow**:
