@@ -89,6 +89,8 @@ layers/
 # Creates: layers/worktrees/issue-marine_msgs-5/
 
 # Enter and work
+# Note: If multiple worktrees exist for issue #42 (e.g., from different repos),
+# you'll be prompted to disambiguate or use the full worktree name
 source .agent/scripts/worktree_enter.sh 42
 cd core_ws/src/my_package
 # ... make changes ...
@@ -344,6 +346,8 @@ All worktree scripts automatically support both old and new formats:
 - `worktree_enter.sh` - Finds worktrees by either naming pattern
 - `worktree_remove.sh` - Removes worktrees by either naming pattern
 - `worktree_list.sh` - Displays repository context for both formats
+
+**Note on collision handling:** When multiple worktrees exist for the same issue number from different repositories (e.g., both `issue-workspace-42` and `issue-marine_msgs-42`), you must specify the full worktree name or use `worktree_list.sh` to see all worktrees and their paths. The scripts will detect this ambiguity and report all matching worktrees.
 
 ### Migrating Existing Worktrees (Optional)
 

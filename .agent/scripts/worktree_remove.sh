@@ -82,10 +82,27 @@ find_worktree() {
     
     # Try new format first (any repo slug)
     # Look for directories matching issue-*-{NUMBER}
-    local matches=( "$base_dir"/issue-*-"${issue_num}" )
-    if [ -d "${matches[0]}" ] && [ "${matches[0]}" != "$base_dir/issue-*-${issue_num}" ]; then
-        echo "${matches[0]}"
+    local valid_matches=()
+    
+    # Collect only real directories and ignore the unexpanded glob literal
+    for path in "$base_dir"/issue-*-"${issue_num}"; do
+        if [ -d "$path" ] && [ "$path" != "$base_dir/issue-*-${issue_num}" ]; then
+            valid_matches+=( "$path" )
+        fi
+    done
+    
+    if [ "${#valid_matches[@]}" -eq 1 ]; then
+        # Exactly one new-format worktree found
+        echo "${valid_matches[0]}"
         return 0
+    elif [ "${#valid_matches[@]}" -gt 1 ]; then
+        # Ambiguous: multiple new-format worktrees match this issue number
+        echo "Error: Multiple worktrees found for issue ${issue_num}:" >&2
+        for path in "${valid_matches[@]}"; do
+            echo "  - $(basename "$path")" >&2
+        done
+        echo "Please specify the full worktree name to remove." >&2
+        return 1
     fi
     
     # Fallback to old format

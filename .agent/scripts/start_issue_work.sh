@@ -105,6 +105,9 @@ else
     REPO_SLUG="$ISSUE_REPO"
 fi
 
+# Sanitize repo slug: replace hyphens and other invalid characters with underscores
+REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+
 # Create slug from title (lowercase, replace spaces/special chars with hyphens)
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
 

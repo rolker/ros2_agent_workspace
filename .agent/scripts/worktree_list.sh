@@ -70,6 +70,7 @@ print_worktree() {
         local basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Old format: issue-{NUMBER}
+        # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
             repo="${BASH_REMATCH[1]}"
             issue="${BASH_REMATCH[2]}"
@@ -83,6 +84,7 @@ print_worktree() {
         local basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Old format: issue-{NUMBER}
+        # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
             repo="${BASH_REMATCH[1]}"
             issue="${BASH_REMATCH[2]}"

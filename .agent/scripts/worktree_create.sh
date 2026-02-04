@@ -137,6 +137,9 @@ if [ -z "$REPO_SLUG" ]; then
         if [ "$REPO_SLUG" == "ros2_agent_workspace" ]; then
             REPO_SLUG="workspace"
         fi
+        
+        # Sanitize repo slug: replace hyphens and other invalid characters with underscores
+        REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
     else
         # Fallback to "workspace" if no remote
         REPO_SLUG="workspace"
