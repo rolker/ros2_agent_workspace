@@ -32,7 +32,7 @@ jobs:
       
       - name: Run Promptfoo tests
         working-directory: .agent/testing
-        run: npx promptfoo@latest eval -c promptfooconfig.yaml tests/*.yaml
+        run: npx promptfoo@latest eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
