@@ -170,6 +170,8 @@ python3 .agent/scripts/validate_workspace.py --fix
 > Before making ANY code changes:
 > 1. **Check GitHub Issues** for an existing issue tracking this work
 > 2. **Create an issue** if one doesn't exist (or ask the user to create one)
+>    - For features: Use `.github/ISSUE_TEMPLATE/feature_track.md` template
+>    - For bugs: Use standard issue template
 > 3. **Reference the issue** in your branch name: `feature/ISSUE-<number>-description`
 > 4. **Link the issue** in all commits and PRs: "Closes #123"
 > 
@@ -177,12 +179,30 @@ python3 .agent/scripts/validate_workspace.py --fix
 > - ✅ Ensures all work is tracked and visible
 > - ✅ Provides context for "why" changes were made
 > - ✅ Prevents duplicate work across agent sessions
+> - ✅ Enables structured planning (for Feature Track issues)
 > 
 > **Exceptions** (rare):
 > - Trivial typo fixes in documentation
 > - Urgent hotfixes (but create an issue retrospectively)
 > 
 > **📚 Full details**: [rules/common/issue-first.md](rules/common/issue-first.md)
+
+---
+
+## 📋 Plan Before Implement (Required for Non-Trivial Work)
+
+For features and non-trivial bug fixes:
+
+1. **Create Feature Track issue** (`.github/ISSUE_TEMPLATE/feature_track.md`)
+2. **Fill out Spec**: User story, acceptance criteria, out of scope
+3. **Create Plan**: Break into phases with tasks
+4. **Get user approval** before implementing
+5. **Update plan** as you work (check off tasks, document decisions)
+6. **Verify at phase boundaries** (run tests, get user checkpoint)
+
+**Exception**: Skip for trivial changes (typos, obvious one-line fixes).
+
+**Reference**: `.agent/AI_RULES.md` - "Plan Before Implement" section
 
 ---
 
