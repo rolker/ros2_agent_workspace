@@ -15,6 +15,7 @@ jobs:
   test-instructions:
     name: Promptfoo Agent Tests
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     
     permissions:
       contents: read
@@ -43,14 +44,23 @@ jobs:
           
           # Check if output.json exists
           if [ ! -f .promptfoo/output.json ]; then
-            echo "No test results found"
-            exit 0
+            echo "❌ No test results found - tests may not have executed"
+            exit 1
           fi
           
-          # Parse results
-          TOTAL=$(jq '.results.results | length' .promptfoo/output.json)
-          PASSED=$(jq '[.results.results[] | select(.success == true)] | length' .promptfoo/output.json)
-          FAILED=$(jq '[.results.results[] | select(.success == false)] | length' .promptfoo/output.json)
+          # Parse results with error handling
+          if ! TOTAL=$(jq -e '.results.results | length' .promptfoo/output.json); then
+            echo "Error: Failed to parse total test count from .promptfoo/output.json"
+            exit 1
+          fi
+          if ! PASSED=$(jq -e '[.results.results[] | select(.success == true)] | length' .promptfoo/output.json); then
+            echo "Error: Failed to parse passed test count from .promptfoo/output.json"
+            exit 1
+          fi
+          if ! FAILED=$(jq -e '[.results.results[] | select(.success == false)] | length' .promptfoo/output.json); then
+            echo "Error: Failed to parse failed test count from .promptfoo/output.json"
+            exit 1
+          fi
           
           # Create summary for GitHub Actions
           echo "## 🧪 Agent Instruction Test Results" >> $GITHUB_STEP_SUMMARY

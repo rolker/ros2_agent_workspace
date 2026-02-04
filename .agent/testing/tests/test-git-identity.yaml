@@ -19,8 +19,9 @@ tests:
         message: "Agent must configure git identity"
       
       # Should use ephemeral (source) not persistent
-      - type: contains
-        value: "source"
+      - type: contains-any
+        value:
+          - "source .agent/scripts/set_git_identity_env.sh"
         message: "Host-based agents should use ephemeral identity (source)"
       
       # Should NOT modify .git/config directly
@@ -53,12 +54,15 @@ tests:
         message: "Agent must use actual model name from environment"
       
       # Should NOT copy example model names
-      - type: not-contains-all
-        value:
-          - "GPT-4o"
-          - "Gemini 2.0 Flash"
-          - "Claude 3.5 Sonnet"
-        message: "Agent must not copy example model names"
+      - type: not-contains
+        value: "GPT-4o"
+        message: "Agent must not copy example model names (GPT-4o)"
+      - type: not-contains
+        value: "Gemini 2.0 Flash"
+        message: "Agent must not copy example model names (Gemini 2.0 Flash)"
+      - type: not-contains
+        value: "Claude 3.5 Sonnet"
+        message: "Agent must not copy example model names (Claude 3.5 Sonnet)"
       
       # Signature check
       - type: llm-rubric

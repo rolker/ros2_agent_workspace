@@ -22,11 +22,6 @@ tests:
           - "source env.sh"
         message: "Agent must source environment before building"
       
-      # Should not build without sourcing
-      - type: not-contains
-        value: "colcon build --symlink-install"
-        message: "Should not show colcon build as first command without sourcing"
-      
       # LLM judges if workflow is correct
       - type: llm-rubric
         value: |

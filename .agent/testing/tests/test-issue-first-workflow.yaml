@@ -14,8 +14,9 @@ tests:
       # Should create or reference an issue
       - type: contains-any
         value:
-          - "create.*issue"
           - "gh issue create"
+          - "create an issue"
+          - "create the issue"
           - "GitHub issue"
           - "issue number"
         message: "Agent must create or request issue before coding"

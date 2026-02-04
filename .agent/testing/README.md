@@ -131,7 +131,7 @@ Main config: `promptfooconfig.yaml`
 
 ## Test Results
 
-Results are stored in `.promptfoo/output/` (gitignored).
+Results are stored in `.promptfoo/output.json` (gitignored).
 
 View results:
 ```bash

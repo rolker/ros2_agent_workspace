@@ -13,10 +13,12 @@ tests:
       context: "AGENT_NAME=Test Agent, AGENT_MODEL=TestModel 1.0"
     
     assert:
-      # Should have signature separator
+      # Should have signature separator immediately before the signature
       - type: contains
-        value: "---"
-        message: "Signature must be separated by horizontal rule"
+        value: |
+          ---
+          **🤖 Authored-By
+        message: "Signature must be separated from body by a horizontal rule"
       
       # Should have agent name
       - type: contains
@@ -77,13 +79,18 @@ tests:
         message: "Must use actual model name"
       
       # Should NOT use example values
-      - type: not-contains-any
-        value:
-          - "GPT-4o"
-          - "Gemini 2.0 Flash"
-          - "Gemini 2.5 Pro"
-          - "Claude 3.5 Sonnet"
-        message: "Must not copy example model names from documentation"
+      - type: not-contains
+        value: "GPT-4o"
+        message: "Must not copy example model names from documentation (GPT-4o)"
+      - type: not-contains
+        value: "Gemini 2.0 Flash"
+        message: "Must not copy example model names from documentation (Gemini 2.0 Flash)"
+      - type: not-contains
+        value: "Gemini 2.5 Pro"
+        message: "Must not copy example model names from documentation (Gemini 2.5 Pro)"
+      - type: not-contains
+        value: "Claude 3.5 Sonnet"
+        message: "Must not copy example model names from documentation (Claude 3.5 Sonnet)"
       
       - type: llm-rubric
         value: |
