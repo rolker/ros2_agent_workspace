@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help)
-            head -n 21 "$0" | tail -n +2 | sed 's/^# //' | sed 's/^#//'
+            awk 'NR>1 && /^# Note: do not use/ {exit} NR>1 {sub(/^# ?/, ""); print}' "$0"
             exit 0
             ;;
         *)
@@ -297,7 +297,7 @@ if [ "$SKIP_GITHUB" = false ]; then
         if [ $PR_COUNT -gt 0 ]; then
             echo "| Repository | PR | Title |"
             echo "|------------|-----|-------|"
-            echo "$PR_OUTPUT"
+            printf '%s\n' "$PR_OUTPUT"
             echo "**Total Open PRs**: $PR_COUNT"
         else
             echo "✅ No open pull requests"
@@ -355,7 +355,7 @@ if [ "$SKIP_GITHUB" = false ]; then
             if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
                 echo "| Repository | Open Issues |"
                 echo "|------------|-------------|"
-                echo "$ISSUE_OUTPUT"
+                printf '%s\n' "$ISSUE_OUTPUT"
                 echo "**Total Open Issues**: $ISSUE_COUNT"
             else
                 echo "✅ No open issues"
