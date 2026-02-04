@@ -36,6 +36,51 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       
+      - name: Generate test summary
+        if: always()
+        run: |
+          cd .agent/testing
+          
+          # Check if output.json exists
+          if [ ! -f .promptfoo/output.json ]; then
+            echo "No test results found"
+            exit 0
+          fi
+          
+          # Parse results
+          TOTAL=$(jq '.results.results | length' .promptfoo/output.json)
+          PASSED=$(jq '[.results.results[] | select(.success == true)] | length' .promptfoo/output.json)
+          FAILED=$(jq '[.results.results[] | select(.success == false)] | length' .promptfoo/output.json)
+          
+          # Create summary for GitHub Actions
+          echo "## 🧪 Agent Instruction Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Results:** ✅ $PASSED passed | ❌ $FAILED failed | **Total:** $TOTAL tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $FAILED -gt 0 ]; then
+            echo "### ❌ Failed Tests" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            jq -r '.results.results[] | select(.success == false) | 
+              "#### " + (.prompt.label | split("\n")[0] | .[0:80]) + "\n" +
+              "**Reason:** " + .gradingResult.reason + "\n" +
+              "<details><summary>View full output</summary>\n\n```\n" + .response.output + "\n```\n</details>\n"
+            ' .promptfoo/output.json >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Save summary for PR comment
+          echo "$PASSED" > /tmp/passed_count
+          echo "$FAILED" > /tmp/failed_count
+          echo "$TOTAL" > /tmp/total_count
+          
+          if [ $FAILED -gt 0 ]; then
+            jq -r '.results.results[] | select(.success == false) | 
+              "### ❌ " + (.prompt.label | split("\n")[0] | .[0:100]) + "\n" +
+              "**Reason:** " + .gradingResult.reason + "\n"
+            ' .promptfoo/output.json > /tmp/failures.md
+          fi
+      
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,14 +91,41 @@ jobs:
           include-hidden-files: true
       
       - name: Comment on PR
-        if: failure() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
+            
+            let passed = 0, failed = 0, total = 0;
+            try {
+              passed = parseInt(fs.readFileSync('/tmp/passed_count', 'utf8').trim());
+              failed = parseInt(fs.readFileSync('/tmp/failed_count', 'utf8').trim());
+              total = parseInt(fs.readFileSync('/tmp/total_count', 'utf8').trim());
+            } catch (e) {
+              console.log('Could not read test counts, skipping comment');
+              return;
+            }
+            
+            let body = `## 🧪 Agent Instruction Test Results\n\n`;
+            body += `**Results:** ✅ ${passed} passed | ❌ ${failed} failed | **Total:** ${total} tests\n\n`;
+            
+            if (failed > 0) {
+              try {
+                const failures = fs.readFileSync('/tmp/failures.md', 'utf8');
+                body += `${failures}\n`;
+              } catch (e) {
+                body += `See workflow artifacts for failure details.\n`;
+              }
+              body += `\n📎 [Download full test results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            } else {
+              body += `🎉 All tests passed!\n`;
+            }
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ Agent instruction tests failed. Please review the test results in the workflow artifacts.'
-            })
+              body: body
+            });
 
