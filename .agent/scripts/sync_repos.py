@@ -131,7 +131,7 @@ def main():
     for repo in repos:
         # Determine workspace directory from source file (e.g. core.repos -> core_ws)
         ws_name = repo['source_file'].replace('.repos', '_ws')
-        candidate_path = root_dir / "workspaces" / ws_name / "src" / repo['name']
+        candidate_path = root_dir / "layers" / "main" / ws_name / "src" / repo['name']
 
         repo_path = None
         tried_paths = [str(candidate_path)]

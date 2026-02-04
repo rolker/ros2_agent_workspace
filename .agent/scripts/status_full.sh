@@ -309,6 +309,12 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "Install with: \`sudo apt install gh\` or \`brew install gh\`"
         echo "Then authenticate: \`gh auth login\`"
         echo ""
+    elif ! gh auth status &> /dev/null; then
+        echo "⚠️ **GitHub CLI not authenticated**"
+        echo ""
+        echo "Please authenticate with: \`gh auth login\`"
+        echo "This is required to fetch PR and issue information."
+        echo ""
     else
         # Repository list already generated above
         

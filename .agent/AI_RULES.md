@@ -150,6 +150,103 @@ After completing work in the worktree:
 
 ## Core Rules (Apply to All Agents)
 
+### Plan Before Implement
+
+For all features and non-trivial bug fixes, agents **must** follow this sequence:
+
+#### 1. Spec First
+Before writing any code, create or review the specification:
+- **What** are we building?
+- **Why** is this needed?
+- **What** are the acceptance criteria?
+- **What** is explicitly out of scope?
+
+#### 2. Plan Next
+Break down the work into phases and tasks:
+- Create a task breakdown with subtasks
+- Identify dependencies between tasks
+- Estimate effort for each phase (Small/Medium/Large)
+- Document approach and key design decisions
+
+#### 3. Get Approval
+Show the plan to the user before implementing:
+- Present the spec and plan clearly
+- Wait for user confirmation or feedback
+- Adjust the plan based on feedback
+- Do NOT start coding until approved
+
+#### 4. Then Implement
+Only after plan approval:
+- Follow the plan systematically
+- Update task checkboxes as you progress
+- Document key decisions in the issue's "Implementation Notes"
+- Notify user at phase boundaries (see Phase Verification below)
+
+**Exception**: Trivial changes can skip formal planning:
+- Documentation typos or formatting
+- Obvious one-line bug fixes
+- Renaming variables for clarity
+- Adding missing comments
+
+**Enforcement**: Agents should politely refuse to implement features without an approved plan. Use the Feature Track issue template (`.github/ISSUE_TEMPLATE/feature_track.md`) for structured planning.
+
+**Reference**: Feature Track template in `.github/ISSUE_TEMPLATE/feature_track.md`
+
+### Phase Verification Protocol
+
+For multi-phase features, agents **must** checkpoint with the user after each major phase:
+
+#### After Completing Each Phase:
+
+1. **Run Tests**: Execute relevant test suite
+   ```bash
+   # For ROS packages
+   colcon test --packages-select <package_name>
+   colcon test-result --verbose
+   
+   # For Python code
+   pytest tests/
+   
+   # For pre-commit checks
+   pre-commit run --all-files
+   ```
+
+2. **Build Verification**: Ensure clean build
+   ```bash
+   # For ROS packages
+   colcon build --packages-select <package_name>
+   
+   # For infrastructure changes
+   make validate
+   ```
+
+3. **User Checkpoint**: Pause and ask user
+   - "Phase {N} complete. Please verify:"
+   - List what was accomplished in this phase
+   - Show test results and build status
+   - Ask user to test/review behavior
+   - Wait for approval before continuing to next phase
+
+4. **Update Plan**: Mark phase complete in issue
+   - Check off completed phase tasks
+   - Document any deviations from the original plan
+   - Note any issues or blockers discovered
+   - Update effort estimates if needed
+
+**Purpose**: Catch problems early, keep user informed, ensure alignment before investing effort in subsequent phases.
+
+**Example Checkpoint Message**:
+```
+Phase 1 complete: GitHub issue template created
+
+Accomplished:
+- ✅ Created .github/ISSUE_TEMPLATE/feature_track.md
+- ✅ Template includes spec, plan, and verification sections
+- ✅ Tested template structure
+
+Please verify the template meets requirements before I proceed to Phase 2 (updating AI_RULES.md).
+```
+
 ### Git Hygiene
 
 - **Never commit directly to `main`** - Always use feature branches
@@ -180,6 +277,120 @@ gh pr create --title "..." --body "Closes #123
 ```
 
 **Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md), [workflows/ops/check-branch-updates.md](workflows/ops/check-branch-updates.md)
+
+### Git Operations for CLI Agents
+
+**⚠️ CRITICAL**: CLI agents must avoid interactive git editors that cause the agent to hang.
+
+#### The Problem
+
+Interactive git operations (rebase, commit --amend, merge) launch text editors (nano/vim) that CLI agents cannot control properly. This causes the agent to get stuck waiting for editor input.
+
+#### The Solution
+
+**Always disable interactive editors** for git operations using one of these methods:
+
+**Method 1: GIT_EDITOR=true** (Recommended for most cases)
+```bash
+# Skip editor entirely - use existing commit messages
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
+GIT_EDITOR=true git commit --amend
+GIT_EDITOR=true git rebase --continue
+GIT_EDITOR=true git merge feature-branch
+```
+
+**Method 2: --no-edit flag** (When supported; not recommended for `rebase`)
+```bash
+# Explicitly skip editing
+# Note: --no-edit for rebase is not available in all Git versions; prefer GIT_EDITOR=true (Method 1) for rebases
+# Note: Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+git commit --amend --no-edit
+git merge --no-edit feature-branch
+```
+
+**Method 3: -m flag** (For commits with messages)
+```bash
+# Provide message inline
+git commit -m "message"
+git commit --amend -m "updated message"
+```
+
+#### Common Scenarios
+
+**Rebasing with conflicts:**
+```bash
+# ❌ DON'T: Will hang in editor
+git rebase origin/<default-branch>
+git rebase --continue
+
+# ✅ DO: Skip editor
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
+# ... resolve conflicts ...
+git add <files>
+GIT_EDITOR=true git rebase --continue
+```
+
+**Amending commits:**
+```bash
+# ❌ DON'T: Will hang in editor
+git commit --amend
+
+# ✅ DO: Keep existing message
+git commit --amend --no-edit
+
+# ✅ DO: Provide new message
+git commit --amend -m "new message"
+```
+
+**Merging branches:**
+```bash
+# ❌ DON'T: May hang in editor for merge commit
+git merge feature-branch
+
+# ✅ DO: Skip editor for merge commit (preserve default merge behavior)
+GIT_EDITOR=true git merge feature-branch
+# or
+git merge --no-edit feature-branch
+```
+
+#### What If You Get Stuck?
+
+If you accidentally trigger an interactive editor:
+
+1. **Try to exit gracefully** (may not work):
+   - For nano: exit with `Ctrl+X` (or send the equivalent keystrokes via your CLI interface, if supported)
+   - For vim: exit with `:q!` followed by `Enter` (or send the equivalent keystrokes via your CLI interface, if supported)
+
+2. **If that fails, abort the operation**:
+   ```bash
+   git rebase --abort
+   git merge --abort
+   git cherry-pick --abort
+   ```
+
+3. **Then retry with GIT_EDITOR=true**
+
+#### Helper Functions Available
+
+Use the safe git helpers in `.agent/scripts/lib/git_helpers.sh`:
+
+```bash
+source .agent/scripts/lib/git_helpers.sh
+
+# Safe rebase that won't hang
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
+
+# Safe commit amend
+safe_git_amend
+
+# Safe merge
+safe_git_merge feature-branch
+```
+
+**Reference**: See issue #130 for full context and examples.
 
 ### AI Signature
 

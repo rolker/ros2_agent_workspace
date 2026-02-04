@@ -62,6 +62,24 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 
 ## Development Workflow
 
+### Planning Before Implementation
+
+For features and non-trivial bug fixes, **always plan before implementing**:
+
+1. **Create or use Feature Track issue** - Use the `.github/ISSUE_TEMPLATE/feature_track.md` template
+2. **Fill out the Spec section**:
+   - User story (As a..., I want..., so that...)
+   - Acceptance criteria (what success looks like)
+   - Out of scope (what you're NOT doing)
+3. **Create a Plan** with phases and tasks
+4. **Get user approval** before writing code
+5. **Update plan as you work** - check off tasks, document decisions
+6. **Verify at phase boundaries** - run tests, get user checkpoint
+
+**Exception**: Trivial changes (typos, obvious one-liners) can skip formal planning.
+
+See `.agent/AI_RULES.md` "Plan Before Implement" section for complete details.
+
 ### Creating a Feature Branch
 
 Follow the git hygiene rules in `.agent/rules/git-hygiene.md` and [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md):
@@ -197,6 +215,23 @@ cat .agent/templates/improvement_issue.md
 2. Draft issue using `.agent/templates/improvement_issue.md`
 3. Include concrete examples and session evidence
 4. Create issue: `gh issue create --label "enhancement,agent-infrastructure"`
+
+## Feature Reversal
+
+If a feature needs to be completely undone (not fixed, but reverted):
+
+```bash
+# Preview what would be reverted
+.agent/scripts/revert_feature.sh --issue 137 --dry-run
+
+# Actually revert all commits for the issue
+.agent/scripts/revert_feature.sh --issue 137
+
+# Or via Makefile
+make revert-feature ISSUE=137
+```
+
+The script finds all commits referencing the issue number and creates revert commits in the correct order. Use this when a feature direction was wrong, not for fixing bugs in a feature.
 
 See [`.agent/workflows/ops/continuous-improvement.md`](.agent/workflows/ops/continuous-improvement.md) for the complete process.
 
