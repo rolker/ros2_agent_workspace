@@ -2,15 +2,19 @@
 # scripts/setup.sh
 # Sets up a ROS2 layer by importing repositories from a .repos file
 #
-# Usage: ./scripts/setup.sh <layer_name>
+# Usage: 
+#   ./scripts/setup.sh              # Auto-setup all layers from project's layers.txt
+#   ./scripts/setup.sh <layer_name> # Setup a specific layer
+#
 # Example: ./scripts/setup.sh core
 #
 # This script will:
-# 1. Create layers/<layer_name>_ws/src directory
-# 2. Import repositories from configs/<layer_name>.repos using vcs tool
+# 1. Bootstrap the project's key repository (if needed)
+# 2. Create layers/main/<layer_name>_ws/src directory
+# 3. Import repositories from the project's config/repos/<layer_name>.repos file
 #
-# Available layers:
-#   - underlay: Additional dependencies
+# Available layers are defined in the project repository (unh_marine_autonomy):
+#   - underlay: Additional dependencies (geodesy, audio_common, etc.)
 #   - core: Main autonomy framework (Project11, AIS, Navigation)
 #   - platforms: Platform-specific packages
 #   - sensors: Sensor drivers and perception
@@ -23,48 +27,53 @@ LAYER_NAME=$1
 LAYER_DIR="layers/main/${LAYER_NAME}_ws"
 
 # Bootstrapping Configuration
-# Bootstrapping Configuration
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
-# Default to assuming core_ws/src/unh_marine_autonomy if we can't determine otherwise yet,
-# but really we should read this from the fetched config.
-# For now, we'll assume the Key Repo goes into core_ws/src/unh_marine_autonomy until we parse the config.
 KEY_REPO_TARGET_DIR="layers/main/core_ws/src/unh_marine_autonomy"
+
+# Function to bootstrap the key repository if needed
+bootstrap_key_repo() {
+    if [ -d "$KEY_REPO_TARGET_DIR" ]; then
+        return 0  # Already bootstrapped
+    fi
+    
+    if [ ! -f "$BOOTSTRAP_URL_FILE" ]; then
+        echo "Error: Bootstrap configuration not found: $BOOTSTRAP_URL_FILE"
+        echo "This file should contain a URL to the project's bootstrap.yaml"
+        exit 1
+    fi
+    
+    echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
+    REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
+    
+    echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
+    TEMP_CONFIG=$(mktemp)
+    trap 'rm -f "$TEMP_CONFIG"' EXIT
+    
+    if ! curl -sSLf "$REMOTE_CONFIG_URL" -o "$TEMP_CONFIG"; then
+        echo "Error: Failed to download bootstrap config from $REMOTE_CONFIG_URL"
+        echo "Please ensure the remote file exists and is accessible."
+        exit 1
+    fi
+    
+    KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+    KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+
+    if [ -z "$KEY_REPO_URL" ] || [ -z "$KEY_REPO_BRANCH" ]; then
+        echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
+        exit 1
+    fi
+    
+    echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
+    mkdir -p layers/main/core_ws/src
+    git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
+}
 
 # If no layer specified, auto-setup all layers from project config
 if [ -z "$LAYER_NAME" ]; then
-    # First, ensure the key repo is bootstrapped
-    if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
-        if [ -f "$BOOTSTRAP_URL_FILE" ]; then
-            echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
-            REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
-            
-            echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
-            TEMP_CONFIG=$(mktemp)
-            if curl -sSLf "$REMOTE_CONFIG_URL" -o "$TEMP_CONFIG"; then
-                KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
-                KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
-                
-                rm "$TEMP_CONFIG"
-
-                if [ -n "$KEY_REPO_URL" ] && [ -n "$KEY_REPO_BRANCH" ]; then
-                    echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
-                    mkdir -p layers/main/core_ws/src
-                    git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
-                else
-                    echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
-                    exit 1
-                fi
-            else
-                echo "Error: Failed to download bootstrap config from $REMOTE_CONFIG_URL"
-                exit 1
-            fi
-        else
-            echo "Error: No bootstrap configuration found (checked $BOOTSTRAP_URL_FILE)."
-            exit 1
-        fi
-    fi
+    # Ensure the key repo is bootstrapped
+    bootstrap_key_repo
     
-    # Now check for layers.txt
+    # Check for layers.txt
     LAYERS_FILE="$KEY_REPO_TARGET_DIR/config/layers.txt"
     if [ -f "$LAYERS_FILE" ]; then
         echo "Auto-setup: Reading layers from $LAYERS_FILE..."
@@ -76,7 +85,12 @@ if [ -z "$LAYER_NAME" ]; then
             echo "========================================="
             echo "Setting up layer: $layer"
             echo "========================================="
-            "$0" "$layer"
+            if ! "$0" "$layer"; then
+                echo ""
+                echo "Error: Failed to set up layer: $layer"
+                echo "Aborting auto-setup."
+                exit 1
+            fi
         done < "$LAYERS_FILE"
         echo ""
         echo "========================================="
@@ -88,66 +102,31 @@ if [ -z "$LAYER_NAME" ]; then
         echo "  2. Build all layers:   .agent/scripts/build.sh"
         exit 0
     else
-        echo "Usage: $0 <layer_name>"
-        echo "Available configs:"
-        ls configs/*.repos "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort | uniq
-        exit 1
+        echo "Warning: $LAYERS_FILE not found in project repository."
+        echo "Falling back to default layer: core"
+        echo ""
+        echo "Available layers:"
+        ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
+        echo ""
+        echo "========================================="
+        echo "Setting up default layer: core"
+        echo "========================================="
+        "$0" core
+        exit 0
     fi
 fi
 
-# 1. Bootstrap if necessary
-# We check if the Key Repo exists. If not, we try to clone it using info from project_bootstrap.url
-if [ ! -d "$KEY_REPO_TARGET_DIR" ]; then
-    if [ -f "$BOOTSTRAP_URL_FILE" ]; then
-        echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
-        REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
-        
-        echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
-        # Create a temp file for the config
-        TEMP_CONFIG=$(mktemp)
-        if curl -sSLf "$REMOTE_CONFIG_URL" -o "$TEMP_CONFIG"; then
-            # Parse YAML (robust grep/awk approach)
-            # 1. grep for key
-            # 2. cut at comment (#)
-            # 3. awk to print value (handles leading/trailing whitespace)
-            KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
-            KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
-            
-            rm "$TEMP_CONFIG"
+# Bootstrap if necessary (for individual layer setup)
+bootstrap_key_repo
 
-            if [ -n "$KEY_REPO_URL" ] && [ -n "$KEY_REPO_BRANCH" ]; then
-                echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
-                mkdir -p layers/main/core_ws/src
-                git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
-            else
-                echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
-                exit 1
-            fi
-        else
-            echo "Error: Failed to download bootstrap config from $REMOTE_CONFIG_URL"
-            echo "Please ensure the remote file exists and is accessible."
-            exit 1
-        fi
-    elif [ -f "configs/bootstrap.repos" ]; then
-         # Fallback to legacy behavior if file exists
-         echo "Warning: Using legacy configs/bootstrap.repos"
-         mkdir -p layers/main/core_ws/src
-         vcs import layers/main/core_ws/src < configs/bootstrap.repos
-    else
-        echo "Error: No bootstrap configuration found (checked $BOOTSTRAP_URL_FILE)."
-        exit 1
-    fi
-fi
+# Locate the configuration file in the project repository
+CONFIG_FILE="$KEY_REPO_TARGET_DIR/config/repos/${LAYER_NAME}.repos"
 
-# 2. Locate the configuration file
-if [ -f "configs/${LAYER_NAME}.repos" ]; then
-    CONFIG_FILE="configs/${LAYER_NAME}.repos"
-elif [ -f "$KEY_REPO_TARGET_DIR/config/repos/${LAYER_NAME}.repos" ]; then
-    CONFIG_FILE="$KEY_REPO_TARGET_DIR/config/repos/${LAYER_NAME}.repos"
-else
-    echo "Error: Configuration file for '$LAYER_NAME' not found."
-    echo "Checked: configs/${LAYER_NAME}.repos"
-    echo "Checked: $KEY_REPO_TARGET_DIR/config/repos/${LAYER_NAME}.repos"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file not found: $CONFIG_FILE"
+    echo ""
+    echo "Available layers:"
+    ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
     exit 1
 fi
 
