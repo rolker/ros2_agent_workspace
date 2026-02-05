@@ -3,22 +3,27 @@
 # Create a git worktree for isolated task development
 #
 # Usage:
-#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>]
+#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>] [--packages <pkg,...>]
 #
 # Examples:
-#   ./worktree_create.sh --issue 123 --type layer --layer core    # Work on core layer
-#   ./worktree_create.sh --issue 123 --type workspace              # Workspace worktree
-#   ./worktree_create.sh --issue 123 --type layer --layer core --branch feature/custom-name
+#   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy
+#   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp
+#   ./worktree_create.sh --issue 123 --type workspace
+#   ./worktree_create.sh --issue 123 --type layer --layer core --packages sonar_driver --branch feature/custom-name
 #
 # Worktree Types:
 #   layer     - For ROS package development
 #               Created in: layers/worktrees/issue-<N>/
-#               Contains target layer (real) + symlinks to main for others
-#               Requires --layer to specify which layer to work on
+#               Uses hybrid structure for efficiency:
+#                 - Git worktrees for packages being modified (--packages)
+#                 - Symlinks for other packages in target layer (reuse builds)
+#                 - Symlinks for other layers (reuse builds)
+#               Requires --layer and --packages
 #
 #   workspace - For infrastructure work (.agent/, configs/, docs)
 #               Created in: .workspace-worktrees/issue-<N>/
 #               Full workspace checkout with symlinked layers/
+#               No package modification
 
 set -e
 
@@ -30,6 +35,7 @@ ISSUE_NUM=""
 WORKTREE_TYPE="layer"
 BRANCH_NAME=""
 TARGET_LAYER=""
+TARGET_PACKAGES=""  # Comma-separated list of packages to modify
 
 # Available layers (same order as env.sh)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
@@ -38,16 +44,19 @@ show_usage() {
     echo "Usage: $0 --issue <number> --type <layer|workspace> [options]"
     echo ""
     echo "Options:"
-    echo "  --issue <number>    Issue number (required)"
-    echo "  --type <type>       Worktree type: 'layer' or 'workspace' (required)"
-    echo "  --layer <name>      Layer to work on (required for layer type)"
-    echo "                      Available: ${AVAILABLE_LAYERS[*]}"
-    echo "  --branch <name>     Custom branch name (default: feature/issue-<N>)"
+    echo "  --issue <number>      Issue number (required)"
+    echo "  --type <type>         Worktree type: 'layer' or 'workspace' (required)"
+    echo "  --layer <name>        Layer to work on (required for layer type)"
+    echo "                        Available: ${AVAILABLE_LAYERS[*]}"
+    echo "  --packages <pkg,...>  Package(s) to modify (required for layer type)"
+    echo "                        Comma-separated list for multiple packages"
+    echo "  --branch <name>       Custom branch name (default: feature/issue-<N>)"
     echo ""
     echo "Examples:"
-    echo "  $0 --issue 123 --type layer --layer core"
+    echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy"
+    echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp"
     echo "  $0 --issue 123 --type workspace"
-    echo "  $0 --issue 123 --type layer --layer sensors --branch feature/add-new-sensor"
+    echo "  $0 --issue 123 --type layer --layer sensors --packages sonar_driver --branch feature/add-new-sensor"
 }
 
 # Parse arguments
@@ -67,6 +76,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --branch)
             BRANCH_NAME="$2"
+            shift 2
+            ;;
+        --packages)
+            TARGET_PACKAGES="$2"
             shift 2
             ;;
         -h|--help)
@@ -94,11 +107,19 @@ if [ "$WORKTREE_TYPE" != "layer" ] && [ "$WORKTREE_TYPE" != "workspace" ]; then
     exit 1
 fi
 
-# For layer worktrees, require --layer
-if [ "$WORKTREE_TYPE" == "layer" ] && [ -z "$TARGET_LAYER" ]; then
-    echo "Error: --layer is required for layer worktrees"
-    echo "Available layers: ${AVAILABLE_LAYERS[*]}"
-    exit 1
+# For layer worktrees, require --layer and --packages
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    if [ -z "$TARGET_LAYER" ]; then
+        echo "Error: --layer is required for layer worktrees"
+        echo "Available layers: ${AVAILABLE_LAYERS[*]}"
+        exit 1
+    fi
+    if [ -z "$TARGET_PACKAGES" ]; then
+        echo "Error: --packages is required for layer worktrees"
+        echo "Example: --packages unh_marine_autonomy"
+        echo "         --packages unh_marine_autonomy,camp  (for multiple)"
+        exit 1
+    fi
 fi
 
 # Validate layer name if provided
@@ -189,24 +210,97 @@ EOF
     for layer in "${AVAILABLE_LAYERS[@]}"; do
         LAYER_WS="${layer}_ws"
         if [ "$layer" == "$TARGET_LAYER" ]; then
-            # Target layer - create real directory structure
-            echo "  - $LAYER_WS: creating workspace (real)"
+            # Target layer - create hybrid structure: git worktrees for modified packages, symlinks for others
+            echo "  - $LAYER_WS: creating hybrid structure (git worktrees + symlinks)"
             mkdir -p "$WORKTREE_DIR/${LAYER_WS}/src"
             
-            # Import repos for this layer using vcs
-            REPOS_FILE="$ROOT_DIR/layers/main/${LAYER_WS}/src/unh_marine_autonomy/config/repos/${layer}.repos"
-            if [ ! -f "$REPOS_FILE" ]; then
-                REPOS_FILE="$ROOT_DIR/configs/${layer}.repos"
+            # Convert comma-separated packages to array without permanently changing IFS
+            OLD_IFS=$IFS
+            IFS=','
+            # Read raw entries, then trim whitespace from each package name
+            read -ra RAW_PACKAGE_ARRAY <<< "$TARGET_PACKAGES"
+            IFS=$OLD_IFS
+
+            PACKAGE_ARRAY=()
+            for raw_pkg in "${RAW_PACKAGE_ARRAY[@]}"; do
+                # Trim leading and trailing whitespace
+                pkg="${raw_pkg#"${raw_pkg%%[![:space:]]*}"}"
+                pkg="${pkg%"${pkg##*[![:space:]]}"}"
+                # Skip empty entries (e.g., from ",,")
+                if [ -n "$pkg" ]; then
+                    PACKAGE_ARRAY+=("$pkg")
+                fi
+            done
+            
+            # Get list of all packages in main layer
+            MAIN_SRC_DIR="$ROOT_DIR/layers/main/${LAYER_WS}/src"
+            if [ ! -d "$MAIN_SRC_DIR" ]; then
+                echo "    Error: Layer directory not found: $MAIN_SRC_DIR"
+                exit 1
             fi
             
-            if [ -f "$REPOS_FILE" ]; then
-                echo "    Importing repositories from $REPOS_FILE..."
-                cd "$WORKTREE_DIR/${LAYER_WS}/src"
-                vcs import < "$REPOS_FILE" || echo "    Warning: Some repos may have failed to import"
-                cd "$ROOT_DIR"
-            else
-                echo "    Warning: No .repos file found for $layer"
-            fi
+            # Process each package in main
+            for pkg_path in "$MAIN_SRC_DIR"/*; do
+                if [ ! -d "$pkg_path" ]; then
+                    continue
+                fi
+                
+                pkg_name=$(basename "$pkg_path")
+                
+                # Check if this package should have a worktree
+                CREATE_WORKTREE=false
+                for target_pkg in "${PACKAGE_ARRAY[@]}"; do
+                    if [ "$pkg_name" == "$target_pkg" ]; then
+                        CREATE_WORKTREE=true
+                        break
+                    fi
+                done
+                
+                if [ "$CREATE_WORKTREE" = true ]; then
+                    # Create git worktree for this package
+                    echo "    - $pkg_name: creating git worktree (modified)"
+                    
+                    # Check if package is a git repository
+                    if [ -d "$pkg_path/.git" ]; then
+                        # Create worktree from this package's git repo
+                        cd "$pkg_path"
+                        WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
+                        
+                        # Prefer the issue branch for this package: create it if needed, or reuse if it exists
+                        if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
+                            echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
+                        elif git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
+                            echo "      ✓ Worktree created from existing branch: $BRANCH_NAME"
+                        else
+                            # Fallback: attempt to use the package's current branch, then symlink on failure
+                            CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
+                            if [ -n "$CURRENT_BRANCH" ] && git worktree add "$WORKTREE_PKG_PATH" "$CURRENT_BRANCH" 2>/dev/null; then
+                                echo "      ✓ Worktree created from current branch: $CURRENT_BRANCH"
+                            else
+                                echo "      ✗ Failed to create worktree for $pkg_name on branch: $BRANCH_NAME"
+                                echo "      Falling back to symlink"
+                                ln -s "$pkg_path" "$WORKTREE_PKG_PATH"
+                            fi
+                        fi
+                        cd "$ROOT_DIR"
+                    else
+                        # Not a git repo, just symlink it
+                        echo "      ! Not a git repo, symlinking instead"
+                        ln -s "$pkg_path" "$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
+                    fi
+                else
+                    # Symlink to main for unmodified packages
+                    echo "    - $pkg_name: symlinking to main"
+                    ln -s "$pkg_path" "$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
+                fi
+            done
+            
+            # Verify all requested packages were found
+            for target_pkg in "${PACKAGE_ARRAY[@]}"; do
+                if [ ! -e "$WORKTREE_DIR/${LAYER_WS}/src/$target_pkg" ]; then
+                    echo "    ⚠️  Warning: Package '$target_pkg' not found in layer '$layer'"
+                fi
+            done
         else
             # Other layers - symlink to main
             if [ -d "$ROOT_DIR/layers/main/${LAYER_WS}" ]; then
