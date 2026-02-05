@@ -1,0 +1,42 @@
+# Promptfoo Configuration for Agent Instruction Testing
+# Tests agent behavior against documented workflows and rules
+
+description: "ROS2 Agent Workspace - Agent Instruction Compliance Tests"
+
+# Prompts (agent instructions to test)
+# Paths are relative to this config file location (.agent/testing/)
+prompts:
+  - file://../AI_RULES.md
+  - file://../AI_CLI_QUICKSTART.md
+  - file://../rules/common/git-hygiene.md
+  - file://../rules/common/ai-signature.md
+  - file://../rules/common/issue-first.md
+
+# Test providers - uses Anthropic API only (Gemini disabled due to hangs)
+# Authenticates with ANTHROPIC_API_KEY environment variable
+providers:
+  - id: anthropic:messages:claude-sonnet-4-5-20250929
+    label: "Claude Sonnet 4.5"
+    config:
+      temperature: 0.7
+      max_tokens: 2048
+  
+  # Gemini provider disabled - causes test hangs
+  # - id: google:gemini-2.5-flash
+  #   label: "Gemini 2.5 Flash"
+  #   config:
+  #     temperature: 0.7
+  #     max_tokens: 2048
+
+# Default test configuration
+defaultTest:
+  # Use grading assertions to check behavior
+  assert:
+    - type: llm-rubric
+      value: "follows documented workflow"
+
+# Output configuration
+outputPath: .promptfoo/output.json
+
+# Test execution settings
+tests: []  # Will be defined in separate test files
