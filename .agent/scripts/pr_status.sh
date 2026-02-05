@@ -109,7 +109,17 @@ analyze_pr() {
     fi
     
     # Calculate time since update
-    local time_ago=$(date -d "$updated" +%s 2>/dev/null || echo "0")
+    local time_ago
+    if command -v gdate >/dev/null 2>&1; then
+        # Prefer GNU date if available as gdate (common on macOS via coreutils)
+        time_ago=$(gdate -d "$updated" +%s 2>/dev/null || echo "0")
+    elif date -d "$updated" +%s >/dev/null 2>&1; then
+        # GNU date available as date (Linux)
+        time_ago=$(date -d "$updated" +%s 2>/dev/null || echo "0")
+    else
+        # Fallback for BSD/macOS date; assumes ISO-8601 like 2024-02-03T12:34:56Z
+        time_ago=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$updated" "+%s" 2>/dev/null || echo "0")
+    fi
     local now=$(date +%s)
     local diff=$((now - time_ago))
     local hours=$((diff / 3600))
