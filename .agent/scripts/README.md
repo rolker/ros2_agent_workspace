@@ -680,6 +680,59 @@ for repo in repos:
 
 ---
 
+## Issue Management
+
+### `read_feature_status.py`
+
+Parse Feature Track issue status and return machine-readable JSON output.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/read_feature_status.py --issue <number>
+python3 ./.agent/scripts/read_feature_status.py --issue <number> --pretty
+```
+
+**Examples:**
+```bash
+python3 ./.agent/scripts/read_feature_status.py --issue 146
+python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
+```
+
+**What it does:**
+1. Fetches issue body from GitHub using `gh` CLI
+2. Parses markdown checkboxes from issue body
+3. Detects phase numbers from section headers (e.g., "### Phase 2: Implementation")
+4. Calculates completion percentage based on checked/total tasks
+5. Identifies current unchecked task
+6. Returns JSON with status: 'in_progress' or 'done'
+
+**Output format:**
+```json
+{
+  "phase": 2,
+  "current_task": "Write implementation code",
+  "status": "in_progress",
+  "percent_complete": 65
+}
+```
+
+**When to use:**
+- Automated tracking of Feature Track issue progress
+- Integration with CI/CD workflows
+- Agent scripts that need to determine task status
+- Generating progress reports
+
+**Dependencies:**
+- `python3`
+- `gh` CLI authenticated (`gh auth login`)
+- Issue must follow Feature Track format with markdown checkboxes
+
+**Exit codes:**
+- `0` - Success
+- `1` - Error (issue not found, authentication failure, etc.)
+
+---
+
 ## Common Workflows
 
 ### Daily status check
