@@ -89,9 +89,12 @@ layers/
 # Creates: layers/worktrees/issue-marine_msgs-5/
 
 # Enter and work
-# Note: If multiple worktrees exist for issue #42 (e.g., from different repos),
-# you'll be prompted to disambiguate or use the full worktree name
 source .agent/scripts/worktree_enter.sh 42
+
+# If multiple worktrees exist for issue #42 (from different repos),
+# specify the repository slug:
+source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
+
 cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
@@ -338,32 +341,39 @@ source .agent/scripts/worktree_enter.sh 42
 
 ### Why the Change?
 
-The old naming scheme caused collisions when working on issues from different repositories with the same issue number. For example, issue #5 from `marine_msgs` and issue #5 from `sensor_driver` would try to use the same worktree path.
+The old naming scheme (`issue-{NUMBER}`) caused collisions when working on issues from different repositories with the same issue number. For example, issue #5 from `marine_msgs` and issue #5 from `sensor_driver` would try to use the same worktree path.
 
-### Backward Compatibility
+The new naming scheme (`issue-{REPO_SLUG}-{NUMBER}`) eliminates this problem by including the repository context in the directory name.
 
-All worktree scripts automatically support both old and new formats:
-- `worktree_enter.sh` - Finds worktrees by either naming pattern
-- `worktree_remove.sh` - Removes worktrees by either naming pattern
-- `worktree_list.sh` - Displays repository context for both formats
+### Repository Slug Sanitization
 
-**Note on collision handling:** When multiple worktrees exist for the same issue number from different repositories (e.g., both `issue-workspace-42` and `issue-marine_msgs-42`), you must specify the full worktree name or use `worktree_list.sh` to see all worktrees and their paths. The scripts will detect this ambiguity and report all matching worktrees.
+Repository names may contain characters (like hyphens) that are not suitable for directory names or regex parsing. The scripts automatically sanitize repository slugs by replacing all non-alphanumeric characters (except underscores) with underscores.
 
-### Migrating Existing Worktrees (Optional)
+**Examples**:
+- `my-repo-name` → `my_repo_name`
+- `ros2-driver` → `ros2_driver`
 
-Existing worktrees using the old format will continue to work. If you want to migrate to the new naming:
+### Handling Multiple Worktrees for the Same Issue
+
+When multiple worktrees exist for the same issue number from different repositories, the helper scripts will detect the ambiguity:
 
 ```bash
-# Example: Migrate issue-42 to issue-workspace-42
-cd layers/worktrees
-mv issue-42 issue-workspace-42
+$ source .agent/scripts/worktree_enter.sh 42
+Error: Multiple worktrees found for issue 42:
+  - issue-workspace-42
+  - issue-marine_msgs-42
 
-# Update git's worktree reference
-cd /path/to/workspace/root
-git worktree repair
+Use --repo-slug to specify which one:
+  source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug workspace
+  source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 ```
 
-**Note**: Migration is optional. The scripts handle both formats transparently.
+Use the `--repo-slug` parameter to disambiguate:
+
+```bash
+source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
+.agent/scripts/worktree_remove.sh --issue 42 --repo-slug workspace
+```
 
 ---
 
