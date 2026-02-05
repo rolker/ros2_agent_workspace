@@ -4,7 +4,7 @@ This repository allows for the management of multiple layered ROS2 workspaces, c
 
 **It is pre-configured to host the UNH Marine Autonomy Framework.**
 
-The core configuration (`configs/core.repos`) includes repositories for:
+The workspace automatically imports repositories from the project's configuration files located in the `unh_marine_autonomy` repository:
 - **Project11**: Main autonomy system.
 - **Marine AIS**: AIS message decoding and handling.
 - **UNH Marine Navigation**: Navigation tools and utilities.
@@ -65,26 +65,27 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Structure
 
 - **`.agent/`**: Contains agent-specific workflows and knowledge.
-- **`configs/`**: Contains `.repos` files (YAML) defining the packages for each layer.
+- **`configs/`**: Contains `project_bootstrap.url` linking to project configuration.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
 - **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
 
 ## Usage
 
-### 1. Setup a Layer
-To initialize a layer defined in the key repository's `.repos` files:
+### 1. Setup Layers
+To initialize workspace layers:
 
 ```bash
-./.agent/scripts/setup.sh <name>
+# Auto-setup all layers (recommended)
+./.agent/scripts/setup.sh
+
+# Or setup specific layer
 ./.agent/scripts/setup.sh core
-# Examples:
-# ./.agent/scripts/setup.sh core   (Installs Project11, Marine AIS, etc.)
-# ./.agent/scripts/setup.sh ui     (Installs RQT and visualization tools)
 ```
 
 This will:
-1. Create `layers/<name>_ws/src`
-2. Import repositories from `configs/<name>.repos`
+1. Bootstrap the project repository (if needed)
+2. Read layer definitions from project's `config/layers.txt`
+3. Import repositories from project's `config/repos/<layer>.repos` files
 
 ### 2. Sourcing the Environment
 To source the layers in the correct order (Underlay -> ... -> Overlay):
@@ -128,11 +129,12 @@ This workspace can be configured to bootstrap from a "Key Repository" of your ch
      ```
    - `config/repos/`: Directory containing `.repos` files (e.g., `core.repos`, `ui.repos`).
 
-3. Run `./.agent/scripts/setup.sh <layer>` to import repositories defined in your Key Repo.
+3. Run `./.agent/scripts/setup.sh` to import all repositories defined in your Key Repo.
 
 ## Adding New Layers
-1. Create a `<new_layer>.repos` file in the key repository's `config/repos/` directory (e.g., `layers/main/core_ws/src/unh_marine_autonomy/config/repos/`).
-2. Run `./.agent/scripts/setup.sh <new_layer>`.
+1. Create a `<new_layer>.repos` file in the key repository's `config/repos/` directory (e.g., `unh_marine_autonomy/config/repos/my_layer.repos`).
+2. Add the layer name to `config/layers.txt` in the key repository.
+3. Run `./.agent/scripts/setup.sh` to set up all layers (including the new one).
 
 ## Troubleshooting
 

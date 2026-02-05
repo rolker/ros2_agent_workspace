@@ -59,23 +59,25 @@ make health-check
 
 This will check that all required tools are installed and the workspace is properly configured.
 
-## Step 5: Setup Core Workspace
+## Step 5: Setup Workspace Layers
 
-Import and setup the core autonomy packages:
+Import and setup all workspace layers:
 
 ```bash
-./.agent/scripts/setup.sh core
+./.agent/scripts/setup.sh
 ```
 
 Or using make:
 ```bash
-make setup-core
+make setup-all
 ```
 
 This will:
-- Create `layers/main/core_ws/src`
-- Import all repositories from `configs/core.repos`
-- Clone Project11, Marine AIS, Navigation packages, etc.
+- Bootstrap the project repository
+- Read `config/layers.txt` to determine which layers to set up
+- Create workspace directories (`layers/main/underlay_ws`, `layers/main/core_ws`, etc.)
+- Import all repositories from project's `.repos` files
+- Clone Project11, Marine AIS, Navigation packages, geodesy dependencies, etc.
 
 **Note:** This requires SSH access to the repositories. Make sure your SSH key is configured on GitHub.
 
@@ -125,9 +127,9 @@ You should see various project11 packages listed.
 
 ## Next Steps
 
-### Setup Additional Layers
+### Optional: Setup Individual Layers
 
-Depending on your needs, setup additional workspace layers:
+If you only ran setup for specific layers earlier, you can add more as needed:
 
 ```bash
 # Platform-specific packages (e.g., for Ben robot)
@@ -143,9 +145,9 @@ Depending on your needs, setup additional workspace layers:
 ./.agent/scripts/setup.sh ui
 ```
 
-Or setup all layers at once:
+Or re-run auto-setup to get all layers:
 ```bash
-make setup-all
+./.agent/scripts/setup.sh   # Sets up all layers from project config
 ```
 
 ### Run Tests
