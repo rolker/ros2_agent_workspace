@@ -1,8 +1,32 @@
-# Pre-Commit Hooks
+# Git Hooks
 
-This directory contains custom pre-commit hooks for the ROS2 Agent Workspace.
+This directory contains custom git hooks for the ROS2 Agent Workspace.
 
 ## Available Hooks
+
+### `post-checkout`
+
+**Purpose**: Automatically symlink `layers/` directory to workspace worktrees for full functionality.
+
+**What it does**:
+- Detects when a workspace worktree is created (`.workspace-worktrees/issue-N/`)
+- Automatically creates symlink: `layers -> ../../layers`
+- Enables `make sync`, `make build`, and other layer-dependent commands in worktrees
+- Skips if symlink already exists or if not a workspace worktree
+
+**When it runs**: After git checkout, git worktree add, or git clone
+
+**Exit codes**:
+- `0` - Success or skipped (not a workspace worktree)
+- `1` - Error: `../../layers` directory missing or failed to create symlink
+
+**Installation**:
+- Make the hook executable: `chmod +x .agent/hooks/post-checkout`
+- Symlink into your local repo: `ln -s ../../.agent/hooks/post-checkout .git/hooks/post-checkout`
+
+**Related**: Issue #142, WORKTREE_GUIDE.md
+
+---
 
 ### `check-source-artifacts.py`
 

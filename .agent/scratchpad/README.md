@@ -27,8 +27,6 @@ gh issue create --body-file "$BODY_FILE"
 rm "$BODY_FILE"  # Clean up after use
 ```
 
-See `.agent/SCRATCHPAD_COLLISION_ANALYSIS.md` for detailed analysis of collision scenarios.
-
 ## Purpose
 Use this location for:
 - Analysis artifacts (CSVs, JSON reports, markdown documents)

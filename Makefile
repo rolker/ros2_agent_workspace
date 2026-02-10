@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status lock unlock install-deps format lint health-check sync validate
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint health-check sync validate revert-feature
 
 # Default target
 help:
@@ -14,12 +14,15 @@ help:
 	@echo "  build         - Build all workspace layers"
 	@echo "  test          - Run tests on all layers"
 	@echo "  clean         - Clean build artifacts"
-	@echo "  status        - Show workspace status report"
+	@echo "  status        - Show enhanced status with sync and GitHub integration"
+	@echo "  status-quick  - Show quick local-only status (no sync, no GitHub)"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  sync          - Safely sync all workspace repositories"
+	@echo "  validate      - Validate workspace configuration"
 	@echo "  format        - Format Python code with black"
 	@echo "  lint          - Run linters on all code"
+	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo ""
 
 health-check:
@@ -67,6 +70,9 @@ clean:
 	@echo "Done."
 
 status:
+	@./.agent/scripts/status_full.sh
+
+status-quick:
 	@./.agent/scripts/status_report.sh
 
 lock:
@@ -80,6 +86,14 @@ sync:
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py
+
+revert-feature:
+	@if [ -z "$(ISSUE)" ]; then \
+		echo "Error: ISSUE parameter required"; \
+		echo "Usage: make revert-feature ISSUE=<number>"; \
+		exit 1; \
+	fi
+	@./.agent/scripts/revert_feature.sh --issue $(ISSUE)
 
 format:
 	@echo "Formatting Python code with black..."

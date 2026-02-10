@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# post-checkout hook: Auto-symlink layers/ directory to workspace worktrees
+#
+# This hook runs after:
+#   - git checkout
+#   - git worktree add
+#   - git clone
+#
+# For workspace worktrees (.workspace-worktrees/issue-N/), it automatically
+# creates a symlink to the main workspace layers/ directory, enabling
+# full workspace functionality without manual setup.
+#
+# Related: Issue #142
+
+set -euo pipefail
+
+# Hook arguments provided by git:
+# $1 = ref of previous HEAD
+# $2 = ref of new HEAD
+# $3 = flag indicating whether checkout was a branch checkout (1) or file checkout (0)
+PREV_HEAD="${1:-}"
+NEW_HEAD="${2:-}"
+BRANCH_CHECKOUT="${3:-0}"
+
+# Only act on branch checkouts (skip file checkouts)
+if [[ "$BRANCH_CHECKOUT" != "1" ]]; then
+    exit 0
+fi
+
+# Detect if this is a workspace worktree
+# Workspace worktrees are in .workspace-worktrees/issue-N/
+WORKTREE_DIR="$(pwd)"
+if [[ ! "$WORKTREE_DIR" =~ \.workspace-worktrees/issue-[0-9]+ ]]; then
+    # Not a workspace worktree, skip
+    exit 0
+fi
+
+# Check if layers/ symlink already exists
+if [[ -L "layers" ]]; then
+    # Symlink exists, verify it's correct
+    TARGET="$(readlink layers)"
+    if [[ "$TARGET" == "../../layers" ]]; then
+        # Already correctly linked
+        exit 0
+    else
+        echo "⚠️  Warning: layers/ symlink exists but points to unexpected target: $TARGET"
+        echo "   Expected: ../../layers"
+        echo "   Skipping auto-symlink."
+        exit 0
+    fi
+fi
+
+# Check if layers/ exists as a real directory (shouldn't happen, but check)
+if [[ -d "layers" && ! -L "layers" ]]; then
+    echo "⚠️  Warning: layers/ exists as a directory, not a symlink"
+    echo "   Skipping auto-symlink to avoid data loss."
+    exit 0
+fi
+
+# Verify that ../../layers exists (should be the main workspace layers/)
+if [[ ! -d "../../layers" ]]; then
+    echo "⚠️  Warning: Cannot find ../../layers directory"
+    echo "   Skipping auto-symlink."
+    exit 0
+fi
+
+# Create the symlink
+echo "🔗 Auto-symlinking layers/ directory for workspace worktree..."
+if ln -s ../../layers layers; then
+    echo "   ✅ Created: layers -> ../../layers"
+    echo ""
+    echo "   This worktree now has access to all ROS2 workspace layers."
+    echo "   You can use 'make sync', 'make build', etc. as usual."
+    echo ""
+else
+    echo "   ❌ Failed to create symlink"
+    exit 1
+fi
+
+exit 0

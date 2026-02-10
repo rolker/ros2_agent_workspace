@@ -67,10 +67,33 @@ if [ "$USER" == "antigravity" ] || [ -n "$ANTIGRAVITY_SESSION" ]; then
     return 0
 fi
 
-# Claude CLI detection (if applicable in the future)
-if [ -n "$CLAUDE_API_KEY" ] || command -v claude &> /dev/null; then
-    export AGENT_FRAMEWORK="claude-cli"
+# Claude Code detection
+# Check for Claude Code specific environment variables or command
+if [ -n "$CLAUDE_CODE" ] || [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_API_KEY" ]; then
+    export AGENT_FRAMEWORK="claude-code"
+    # Try to detect version from claude command
+    if command -v claude &> /dev/null; then
+        VERSION=$(claude --version 2>/dev/null | head -n 1)
+        if [ -n "$VERSION" ]; then
+            export AGENT_FRAMEWORK_VERSION="$VERSION"
+        fi
+    fi
     return 0
+fi
+
+# Fallback: Check for claude command with version validation
+if command -v claude &> /dev/null; then
+    CLAUDE_VERSION_OUTPUT=$(claude --version 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        CLAUDE_VERSION_LINE=$(echo "$CLAUDE_VERSION_OUTPUT" | head -n 1)
+        if echo "$CLAUDE_VERSION_LINE" | grep -qi "claude"; then
+            export AGENT_FRAMEWORK="claude-code"
+            if [ -n "$CLAUDE_VERSION_LINE" ]; then
+                export AGENT_FRAMEWORK_VERSION="$CLAUDE_VERSION_LINE"
+            fi
+            return 0
+        fi
+    fi
 fi
 
 # Check for generic AI agent indicators

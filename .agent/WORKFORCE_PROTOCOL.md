@@ -2,6 +2,8 @@
 
 **Goal**: Enable multiple AI agents to work accurately and safely within the same workspace without stepping on each other's toes.
 
+**Supported frameworks**: GitHub Copilot, Gemini CLI, Antigravity, Claude Code. All agents follow the same isolation, visibility, and handover rules below.
+
 ## 1. Task Isolation with Git Worktrees (Recommended)
 
 For parallel work by multiple agents, use **git worktrees** for complete isolation:
@@ -63,13 +65,7 @@ To prevent duplicate work and enable collaboration, agents must make work-in-pro
 -   Plans enable seamless handover between agents
 -   Approach is reviewable before code implementation
 
-## 2. Task Locking (GitHub Issues Authority)
-GitHub Issues are the **Source of Truth** for what is being worked on.
-
-*   **Before Starting**:
-    *   Search for open issues or projects.
-    *   **Do not** pick up an issue assigned to another user/agent unless explicitly instructed to "Join" or "Collaborate".
-## 2. Task Locking (GitHub Issues Authority)
+## 3. Task Locking (GitHub Issues Authority)
 GitHub Issues are the **Source of Truth** for what is being worked on.
 
 *   **Before Starting**:
@@ -83,7 +79,7 @@ GitHub Issues are the **Source of Truth** for what is being worked on.
     *   Reference the issue in your PR (e.g., "Closes #123").
     *   Mark draft PR as ready for review.
 
-## 3. The "Clean Handover" Standard
+## 4. The "Clean Handover" Standard
 Every agent invocation is a "shift". When your shift ends (you call `notify_user` or terminate), the workspace must be in a clean state.
 
 *   **The Golden Rule**: *Leave the campsite cleaner than you found it.*
@@ -92,12 +88,12 @@ Every agent invocation is a "shift". When your shift ends (you call `notify_user
     *   **Alert**: If you see modifications in repositories you didn't touch, **WARN THE USER**. Do not commit them blindly.
     *   **Action**: Commit your own work to a `feature/` branch.
 
-## 4. Git Discipline
+## 5. Git Discipline
 *   **Feature Branches**: Always.
 *   **Atomic Commits**: One logical change per commit.
 *   **Bundled Changes**: Do not mix "Refactoring the entire Navigation Stack" with "Fixing a typo in README".
 
-## 5. Conflict Resolution
+## 6. Conflict Resolution
 If you discover you are modifying a file that has uncommitted changes from another process:
 1.  **Stop**.
 2.  **Diff** the changes.

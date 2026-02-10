@@ -62,8 +62,66 @@ When working on a GitHub issue, use the **work visibility workflow** to make you
 4.  **Branch**
     -   Create your feature branch: `git checkout -b feature/<task-id>-<description>`
 
+## Handling Merge Conflicts During Rebase
+
+If your feature branch has fallen behind the default branch, you may need to rebase:
+
+**⚠️ CRITICAL for CLI Agents**: Always use `GIT_EDITOR=true` to avoid getting stuck in interactive editors.
+
+### Safe Rebase Process
+
+1. **Fetch latest changes**:
+   ```bash
+   git fetch origin
+   ```
+
+2. **Rebase with editor disabled**:
+   ```bash
+   # Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+   GIT_EDITOR=true git rebase origin/<default-branch>
+   ```
+
+3. **If conflicts occur**:
+   ```bash
+   # View conflicts
+   git status
+   
+   # Resolve conflicts manually in files
+   # (Look for <<<<<<<, =======, >>>>>>> markers)
+   
+   # Stage resolved files
+   git add <resolved-files>
+   
+   # Continue rebase (IMPORTANT: Use GIT_EDITOR=true)
+   GIT_EDITOR=true git rebase --continue
+   ```
+
+4. **If you need to abort**:
+   ```bash
+   git rebase --abort
+   ```
+
+### Using Helper Functions
+
+For convenience, source the git helpers:
+
+```bash
+source .agent/scripts/lib/git_helpers.sh
+
+# Now use safe functions
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
+
+# After resolving conflicts
+git add <files>
+safe_git_rebase_continue
+```
+
+**Why this matters**: Without `GIT_EDITOR=true`, git will launch nano/vim for commit message editing, causing CLI agents to hang. See issue #130 for details.
+
 ## See Also
 
 - `.agent/work-plans/README.md` - Work plan workflow details
 - `.agent/templates/ISSUE_PLAN.md` - Plan template
 - `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination
+- `.agent/AI_RULES.md` - Git Operations for CLI Agents section

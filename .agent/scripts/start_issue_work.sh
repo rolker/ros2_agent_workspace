@@ -1,11 +1,12 @@
 #!/bin/bash
 # Start work on a GitHub issue with visibility workflow
-# Usage: start_issue_work.sh <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>]
+# Usage: start_issue_work.sh <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>] [--packages <pkg1,pkg2>]
 #
 # Options:
-#   --worktree layer      Create a layer worktree (requires --layer)
+#   --worktree layer      Create a layer worktree (requires --layer and --packages)
 #   --worktree workspace  Create a workspace worktree (for infrastructure work)
 #   --layer <name>        Which layer to work on (required with --worktree layer)
+#   --packages <list>     Comma-separated list of packages to modify (required with --worktree layer)
 #   (no --worktree)       Create a feature branch in the main workspace
 
 set -e
@@ -15,6 +16,7 @@ ISSUE_NUMBER=""
 AGENT_NAME="AI Agent"
 WORKTREE_TYPE=""
 TARGET_LAYER=""
+TARGET_PACKAGES=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -24,6 +26,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --layer)
             TARGET_LAYER="$2"
+            shift 2
+            ;;
+        --packages)
+            TARGET_PACKAGES="$2"
             shift 2
             ;;
         *)
@@ -38,12 +44,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$ISSUE_NUMBER" ]; then
-    echo "Usage: $0 <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>]"
+    echo "Usage: $0 <issue_number> [agent_name] [--worktree layer|workspace] [--layer <name>] [--packages <pkg1,pkg2>]"
     echo ""
     echo "Examples:"
-    echo "  $0 42 'Copilot CLI Agent'                                    # Create feature branch"
-    echo "  $0 42 'Copilot CLI Agent' --worktree layer --layer core      # Layer worktree for core"
-    echo "  $0 42 'Copilot CLI Agent' --worktree workspace               # Workspace worktree"
+    echo "  $0 42 'Copilot CLI Agent'                                                      # Create feature branch"
+    echo "  $0 42 'Copilot CLI Agent' --worktree layer --layer core --packages my_pkg     # Layer worktree"
+    echo "  $0 42 'Copilot CLI Agent' --worktree workspace                                 # Workspace worktree"
     exit 1
 fi
 
@@ -122,12 +128,18 @@ if [ -n "$WORKTREE_TYPE" ]; then
     
     # Build worktree_create arguments safely to avoid command injection
     WORKTREE_ARGS=(--issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME" --repo-slug "$REPO_SLUG")
-    if [ "$WORKTREE_TYPE" = "layer" ] && [ -n "$TARGET_LAYER" ]; then
-        WORKTREE_ARGS+=(--layer "$TARGET_LAYER")
-    elif [ "$WORKTREE_TYPE" = "layer" ] && [ -z "$TARGET_LAYER" ]; then
-        echo "Error: --layer is required for layer worktrees"
-        echo "Example: $0 $ISSUE_NUMBER '$AGENT_NAME' --worktree layer --layer core"
-        exit 1
+    if [ "$WORKTREE_TYPE" = "layer" ]; then
+        if [ -z "$TARGET_LAYER" ]; then
+            echo "Error: --layer is required for layer worktrees"
+            echo "Example: $0 $ISSUE_NUMBER '$AGENT_NAME' --worktree layer --layer core --packages my_pkg"
+            exit 1
+        fi
+        if [ -z "$TARGET_PACKAGES" ]; then
+            echo "Error: --packages is required for layer worktrees"
+            echo "Example: $0 $ISSUE_NUMBER '$AGENT_NAME' --worktree layer --layer core --packages my_pkg"
+            exit 1
+        fi
+        WORKTREE_ARGS+=(--layer "$TARGET_LAYER" --packages "$TARGET_PACKAGES")
     fi
     
     "$SCRIPT_DIR/worktree_create.sh" "${WORKTREE_ARGS[@]}"

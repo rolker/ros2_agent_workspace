@@ -6,31 +6,39 @@ Helper scripts in `.agent/scripts/` for workspace management. These scripts are 
 
 ### `setup.sh`
 
-Initialize a workspace layer from a `.repos` configuration file.
+Initialize workspace layers from project configuration.
 
 **Usage:**
 ```bash
-./.agent/scripts/setup.sh <layer_name>
+./.agent/scripts/setup.sh              # Auto-setup all layers (recommended)
+./.agent/scripts/setup.sh <layer_name> # Setup specific layer
 ```
 
 **Examples:**
 ```bash
-./.agent/scripts/setup.sh core        # Setup core layer (Project11, Marine AIS, etc.)
-./.agent/scripts/setup.sh ui          # Setup UI layer (RQT, visualization tools)
-./.agent/scripts/setup.sh sensors     # Setup sensors layer
+./.agent/scripts/setup.sh              # Setup all layers (underlay, core, platforms, etc.)
+./.agent/scripts/setup.sh core         # Setup only core layer
+./.agent/scripts/setup.sh underlay     # Setup only underlay layer
 ```
 
 **What it does:**
-1. Creates `layers/<layer>_ws/src` directory
-2. Imports repositories from `configs/<layer>.repos` using `vcs import`
-3. Initializes git for each repository
+1. Bootstraps the project repository (if needed) using `configs/project_bootstrap.url`
+2. For auto-setup: Reads `config/layers.txt` from project to determine which layers to set up
+3. Creates `layers/main/<layer>_ws/src` directory for each layer
+4. Imports repositories from project's `config/repos/<layer>.repos` using vcs tool
+
+**When to use:**
+- First time workspace setup (just run with no arguments)
+- Adding a new layer that was added to the project
+- Re-importing repositories after cleaning
 
 **Dependencies:**
 - `vcstool` (`pip install vcstool` or `apt install python3-vcstool`)
 - `git`
+- Internet connection to clone repositories
 
 **Outputs:**
-- `layers/<layer>_ws/src/` directory with cloned repositories
+- `layers/main/<layer>_ws/src/` directories with cloned repositories
 
 ---
 
@@ -680,6 +688,59 @@ for repo in repos:
 
 ---
 
+## Issue Management
+
+### `read_feature_status.py`
+
+Parse Feature Track issue status and return machine-readable JSON output.
+
+**Usage:**
+```bash
+python3 ./.agent/scripts/read_feature_status.py --issue <number>
+python3 ./.agent/scripts/read_feature_status.py --issue <number> --pretty
+```
+
+**Examples:**
+```bash
+python3 ./.agent/scripts/read_feature_status.py --issue 146
+python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
+```
+
+**What it does:**
+1. Fetches issue body from GitHub using `gh` CLI
+2. Parses markdown checkboxes from issue body
+3. Detects phase numbers from section headers (e.g., "### Phase 2: Implementation")
+4. Calculates completion percentage based on checked/total tasks
+5. Identifies current unchecked task
+6. Returns JSON with status: 'in_progress', 'done', or 'blocked'
+
+**Output format:**
+```json
+{
+  "phase": 2,
+  "current_task": "Write implementation code",
+  "status": "in_progress",
+  "percent_complete": 65
+}
+```
+
+**When to use:**
+- Automated tracking of Feature Track issue progress
+- Integration with CI/CD workflows
+- Agent scripts that need to determine task status
+- Generating progress reports
+
+**Dependencies:**
+- `python3`
+- `gh` CLI authenticated (`gh auth login`)
+- Issue must follow Feature Track format with markdown checkboxes
+
+**Exit codes:**
+- `0` - Success
+- `1` - Error (issue not found, authentication failure, etc.)
+
+---
+
 ## Common Workflows
 
 ### Daily status check
@@ -690,10 +751,9 @@ python3 ./.agent/scripts/check_full_status.py  # Quick morning report
 ### Initialize workspace (first time)
 ```bash
 ./.agent/scripts/bootstrap.sh          # Install ROS 2 and tools
-./.agent/scripts/setup.sh core         # Clone core repositories
-./.agent/scripts/setup.sh ui           # Clone UI repositories
-source ./.agent/scripts/env.sh         # Source environment
-./.agent/scripts/build.sh              # Build all layers
+./.agent/scripts/setup.sh               # Auto-setup all layers
+source ./.agent/scripts/env.sh          # Source environment
+./.agent/scripts/build.sh               # Build all layers
 ```
 
 ### Daily development

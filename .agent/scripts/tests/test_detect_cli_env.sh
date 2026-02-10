@@ -17,10 +17,10 @@ if command -v gh &> /dev/null && gh copilot --version &> /dev/null 2>&1; then
     source "$SCRIPT_DIR/../detect_cli_env.sh"
     if [ "$AGENT_FRAMEWORK" == "copilot-cli" ]; then
         echo "✅ PASS: Detected copilot-cli"
-        ((TEST_PASS++))
+        TEST_PASS=$((TEST_PASS + 1))
     else
         echo "❌ FAIL: Expected copilot-cli, got $AGENT_FRAMEWORK"
-        ((TEST_FAIL++))
+        TEST_FAIL=$((TEST_FAIL + 1))
     fi
 else
     echo "⊘  SKIP: GitHub CLI not available or copilot extension not installed"
@@ -41,9 +41,9 @@ echo "Test 2: Gemini CLI detection via GEMINI_API_KEY"
     fi
 )
 if [ $? -eq 0 ]; then
-    ((TEST_PASS++))
+    TEST_PASS=$((TEST_PASS + 1))
 else
-    ((TEST_FAIL++))
+    TEST_FAIL=$((TEST_FAIL + 1))
 fi
 echo ""
 
@@ -61,9 +61,69 @@ echo "Test 3: Antigravity detection via USER variable"
     fi
 )
 if [ $? -eq 0 ]; then
-    ((TEST_PASS++))
+    TEST_PASS=$((TEST_PASS + 1))
 else
-    ((TEST_FAIL++))
+    TEST_FAIL=$((TEST_FAIL + 1))
+fi
+echo ""
+
+# Test 4: Claude Code detection via CLAUDE_CODE env var
+echo "Test 4: Claude Code detection via CLAUDE_CODE"
+(
+    export CLAUDE_CODE=1
+    source "$SCRIPT_DIR/../detect_cli_env.sh"
+    if [ "$AGENT_FRAMEWORK" == "claude-code" ]; then
+        echo "✅ PASS: Detected claude-code via CLAUDE_CODE"
+        exit 0
+    else
+        echo "❌ FAIL: Expected claude-code, got $AGENT_FRAMEWORK"
+        exit 1
+    fi
+)
+if [ $? -eq 0 ]; then
+    TEST_PASS=$((TEST_PASS + 1))
+else
+    TEST_FAIL=$((TEST_FAIL + 1))
+fi
+echo ""
+
+# Test 5: Claude Code detection via ANTHROPIC_API_KEY
+echo "Test 5: Claude Code detection via ANTHROPIC_API_KEY"
+(
+    export ANTHROPIC_API_KEY="test_key"
+    source "$SCRIPT_DIR/../detect_cli_env.sh"
+    if [ "$AGENT_FRAMEWORK" == "claude-code" ]; then
+        echo "✅ PASS: Detected claude-code via ANTHROPIC_API_KEY"
+        exit 0
+    else
+        echo "❌ FAIL: Expected claude-code, got $AGENT_FRAMEWORK"
+        exit 1
+    fi
+)
+if [ $? -eq 0 ]; then
+    TEST_PASS=$((TEST_PASS + 1))
+else
+    TEST_FAIL=$((TEST_FAIL + 1))
+fi
+echo ""
+
+# Test 6: Claude Code detection via CLAUDE_API_KEY
+echo "Test 6: Claude Code detection via CLAUDE_API_KEY"
+(
+    export CLAUDE_API_KEY="test_key"
+    source "$SCRIPT_DIR/../detect_cli_env.sh"
+    if [ "$AGENT_FRAMEWORK" == "claude-code" ]; then
+        echo "✅ PASS: Detected claude-code via CLAUDE_API_KEY"
+        exit 0
+    else
+        echo "❌ FAIL: Expected claude-code, got $AGENT_FRAMEWORK"
+        exit 1
+    fi
+)
+if [ $? -eq 0 ]; then
+    TEST_PASS=$((TEST_PASS + 1))
+else
+    TEST_FAIL=$((TEST_FAIL + 1))
 fi
 echo ""
 

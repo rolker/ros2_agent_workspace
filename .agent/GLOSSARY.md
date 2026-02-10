@@ -115,9 +115,9 @@ A branch for developing a specific feature or fix.
 - **Naming**: `feature/ISSUE-<number>-<description>` (Issue-based naming supersedes older `TASK-` patterns)
 - **Rule**: Never commit directly to `main`
 
-### Worktree (Planned)
+### Worktree
 Git feature for multiple working directories from one repository.
-- **Status**: Phase 3 (see [PROPOSAL_MULTI_AGENT_WORKFLOW.md](../PROPOSAL_MULTI_AGENT_WORKFLOW.md))
+- **Status**: Implemented. See [WORKTREE_GUIDE.md](WORKTREE_GUIDE.md)
 
 ---
 
@@ -224,4 +224,4 @@ The primary project developed in this workspace.
 ---
 
 **Last Updated**: 2026-01-29  
-**Related**: [AI_RULES.md](AI_RULES.md), [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md), [PROPOSAL_MULTI_AGENT_WORKFLOW.md](../PROPOSAL_MULTI_AGENT_WORKFLOW.md)
+**Related**: [AI_RULES.md](AI_RULES.md), [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md)

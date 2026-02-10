@@ -1,6 +1,6 @@
 # Universal AI Agent Rules
 
-**Purpose**: This document defines the core workflow and rules that apply to **ALL** AI agents working in this ROS2 workspace, regardless of platform (Copilot CLI, Gemini CLI, Antigravity, or custom agents).
+**Purpose**: This document defines the core workflow and rules that apply to **ALL** AI agents working in this ROS2 workspace, regardless of platform (Claude Code, Copilot CLI, Gemini CLI, Antigravity, or custom agents).
 
 > **🚀 Quick Start for CLI Agents**: See [`.agent/AI_CLI_QUICKSTART.md`](AI_CLI_QUICKSTART.md) for a fast-path onboarding guide.
 
@@ -45,15 +45,16 @@ source .agent/scripts/env.sh
 
 Before making ANY commits, configure your identity using the appropriate method:
 
-#### Host-Based Agents (Copilot CLI, Gemini CLI)
+#### Host-Based Agents (Claude Code, Copilot CLI, Gemini CLI)
 
 If you're running directly on the host and sharing the working copy with the user:
 
 ```bash
-source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude-code@ccom.unh.edu"
 ```
 
 **Replace with your framework**:
+- Claude Code: `"Claude Code Agent"` / `"roland+claude-code@ccom.unh.edu"`
 - Copilot CLI: `"Copilot CLI Agent"` / `"roland+copilot-cli@ccom.unh.edu"`
 - Gemini CLI: `"Gemini CLI Agent"` / `"roland+gemini-cli@ccom.unh.edu"`
 
@@ -150,6 +151,103 @@ After completing work in the worktree:
 
 ## Core Rules (Apply to All Agents)
 
+### Plan Before Implement
+
+For all features and non-trivial bug fixes, agents **must** follow this sequence:
+
+#### 1. Spec First
+Before writing any code, create or review the specification:
+- **What** are we building?
+- **Why** is this needed?
+- **What** are the acceptance criteria?
+- **What** is explicitly out of scope?
+
+#### 2. Plan Next
+Break down the work into phases and tasks:
+- Create a task breakdown with subtasks
+- Identify dependencies between tasks
+- Estimate effort for each phase (Small/Medium/Large)
+- Document approach and key design decisions
+
+#### 3. Get Approval
+Show the plan to the user before implementing:
+- Present the spec and plan clearly
+- Wait for user confirmation or feedback
+- Adjust the plan based on feedback
+- Do NOT start coding until approved
+
+#### 4. Then Implement
+Only after plan approval:
+- Follow the plan systematically
+- Update task checkboxes as you progress
+- Document key decisions in the issue's "Implementation Notes"
+- Notify user at phase boundaries (see Phase Verification below)
+
+**Exception**: Trivial changes can skip formal planning:
+- Documentation typos or formatting
+- Obvious one-line bug fixes
+- Renaming variables for clarity
+- Adding missing comments
+
+**Enforcement**: Agents should politely refuse to implement features without an approved plan. Use the Feature Track issue template (`.github/ISSUE_TEMPLATE/feature_track.md`) for structured planning.
+
+**Reference**: Feature Track template in `.github/ISSUE_TEMPLATE/feature_track.md`
+
+### Phase Verification Protocol
+
+For multi-phase features, agents **must** checkpoint with the user after each major phase:
+
+#### After Completing Each Phase:
+
+1. **Run Tests**: Execute relevant test suite
+   ```bash
+   # For ROS packages
+   colcon test --packages-select <package_name>
+   colcon test-result --verbose
+   
+   # For Python code
+   pytest tests/
+   
+   # For pre-commit checks
+   pre-commit run --all-files
+   ```
+
+2. **Build Verification**: Ensure clean build
+   ```bash
+   # For ROS packages
+   colcon build --packages-select <package_name>
+   
+   # For infrastructure changes
+   make validate
+   ```
+
+3. **User Checkpoint**: Pause and ask user
+   - "Phase {N} complete. Please verify:"
+   - List what was accomplished in this phase
+   - Show test results and build status
+   - Ask user to test/review behavior
+   - Wait for approval before continuing to next phase
+
+4. **Update Plan**: Mark phase complete in issue
+   - Check off completed phase tasks
+   - Document any deviations from the original plan
+   - Note any issues or blockers discovered
+   - Update effort estimates if needed
+
+**Purpose**: Catch problems early, keep user informed, ensure alignment before investing effort in subsequent phases.
+
+**Example Checkpoint Message**:
+```
+Phase 1 complete: GitHub issue template created
+
+Accomplished:
+- ✅ Created .github/ISSUE_TEMPLATE/feature_track.md
+- ✅ Template includes spec, plan, and verification sections
+- ✅ Tested template structure
+
+Please verify the template meets requirements before I proceed to Phase 2 (updating AI_RULES.md).
+```
+
 ### Git Hygiene
 
 - **Never commit directly to `main`** - Always use feature branches
@@ -181,6 +279,120 @@ gh pr create --title "..." --body "Closes #123
 
 **Reference**: [rules/common/git-hygiene.md](rules/common/git-hygiene.md), [workflows/ops/check-branch-updates.md](workflows/ops/check-branch-updates.md)
 
+### Git Operations for CLI Agents
+
+**⚠️ CRITICAL**: CLI agents must avoid interactive git editors that cause the agent to hang.
+
+#### The Problem
+
+Interactive git operations (rebase, commit --amend, merge) launch text editors (nano/vim) that CLI agents cannot control properly. This causes the agent to get stuck waiting for editor input.
+
+#### The Solution
+
+**Always disable interactive editors** for git operations using one of these methods:
+
+**Method 1: GIT_EDITOR=true** (Recommended for most cases)
+```bash
+# Skip editor entirely - use existing commit messages
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
+GIT_EDITOR=true git commit --amend
+GIT_EDITOR=true git rebase --continue
+GIT_EDITOR=true git merge feature-branch
+```
+
+**Method 2: --no-edit flag** (When supported; not recommended for `rebase`)
+```bash
+# Explicitly skip editing
+# Note: --no-edit for rebase is not available in all Git versions; prefer GIT_EDITOR=true (Method 1) for rebases
+# Note: Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+git commit --amend --no-edit
+git merge --no-edit feature-branch
+```
+
+**Method 3: -m flag** (For commits with messages)
+```bash
+# Provide message inline
+git commit -m "message"
+git commit --amend -m "updated message"
+```
+
+#### Common Scenarios
+
+**Rebasing with conflicts:**
+```bash
+# ❌ DON'T: Will hang in editor
+git rebase origin/<default-branch>
+git rebase --continue
+
+# ✅ DO: Skip editor
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+GIT_EDITOR=true git rebase origin/<default-branch>
+# ... resolve conflicts ...
+git add <files>
+GIT_EDITOR=true git rebase --continue
+```
+
+**Amending commits:**
+```bash
+# ❌ DON'T: Will hang in editor
+git commit --amend
+
+# ✅ DO: Keep existing message
+git commit --amend --no-edit
+
+# ✅ DO: Provide new message
+git commit --amend -m "new message"
+```
+
+**Merging branches:**
+```bash
+# ❌ DON'T: May hang in editor for merge commit
+git merge feature-branch
+
+# ✅ DO: Skip editor for merge commit (preserve default merge behavior)
+GIT_EDITOR=true git merge feature-branch
+# or
+git merge --no-edit feature-branch
+```
+
+#### What If You Get Stuck?
+
+If you accidentally trigger an interactive editor:
+
+1. **Try to exit gracefully** (may not work):
+   - For nano: exit with `Ctrl+X` (or send the equivalent keystrokes via your CLI interface, if supported)
+   - For vim: exit with `:q!` followed by `Enter` (or send the equivalent keystrokes via your CLI interface, if supported)
+
+2. **If that fails, abort the operation**:
+   ```bash
+   git rebase --abort
+   git merge --abort
+   git cherry-pick --abort
+   ```
+
+3. **Then retry with GIT_EDITOR=true**
+
+#### Helper Functions Available
+
+Use the safe git helpers in `.agent/scripts/lib/git_helpers.sh`:
+
+```bash
+source .agent/scripts/lib/git_helpers.sh
+
+# Safe rebase that won't hang
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
+
+# Safe commit amend
+safe_git_amend
+
+# Safe merge
+safe_git_merge feature-branch
+```
+
+**Reference**: See issue #130 for full context and examples.
+
 ### AI Signature
 
 All GitHub Issues, PRs, and Comments **must** include:
@@ -206,6 +418,11 @@ All GitHub Issues, PRs, and Comments **must** include:
 **DO NOT copy example model names** (e.g., "GPT-4o", "Gemini 2.0 Flash") from documentation.
 
 Examples (with correct introspection):
+- If you're Claude Code running Claude Opus 4.5:
+  ```markdown
+  **🤖 Authored-By**: `Claude Code Agent`
+  **🧠 Model**: `Claude Opus 4.5`
+  ```
 - If you're Copilot CLI running GPT-4o:
   ```markdown
   **🤖 Authored-By**: `Copilot CLI Agent`
@@ -376,8 +593,9 @@ Solution: Follow Step 2 above (Configure Git Identity)
 
 For platform-specific features and optimizations:
 
+- **Claude Code**: [`instructions/claude-code.instructions.md`](instructions/claude-code.instructions.md)
 - **GitHub Copilot CLI**: [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
-- **Gemini CLI**: [`.agent/instructions/gemini-cli.instructions.md`](.agent/instructions/gemini-cli.instructions.md)
+- **Gemini CLI**: [`instructions/gemini-cli.instructions.md`](instructions/gemini-cli.instructions.md)
 - **Antigravity**: Use this document (no special instructions)
 
 ---
@@ -394,6 +612,6 @@ For platform-specific features and optimizations:
 
 ---
 
-**Last Updated**: 2026-01-29  
-**Maintained By**: Framework Engineering Team  
+**Last Updated**: 2026-02-10
+**Maintained By**: Framework Engineering Team
 **Related**: [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md), [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md), [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md)

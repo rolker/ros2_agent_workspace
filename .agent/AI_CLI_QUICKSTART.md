@@ -170,6 +170,8 @@ python3 .agent/scripts/validate_workspace.py --fix
 > Before making ANY code changes:
 > 1. **Check GitHub Issues** for an existing issue tracking this work
 > 2. **Create an issue** if one doesn't exist (or ask the user to create one)
+>    - For features: Use `.github/ISSUE_TEMPLATE/feature_track.md` template
+>    - For bugs: Use standard issue template
 > 3. **Reference the issue** in your branch name: `feature/ISSUE-<number>-description`
 > 4. **Link the issue** in all commits and PRs: "Closes #123"
 > 
@@ -177,12 +179,30 @@ python3 .agent/scripts/validate_workspace.py --fix
 > - ✅ Ensures all work is tracked and visible
 > - ✅ Provides context for "why" changes were made
 > - ✅ Prevents duplicate work across agent sessions
+> - ✅ Enables structured planning (for Feature Track issues)
 > 
 > **Exceptions** (rare):
 > - Trivial typo fixes in documentation
 > - Urgent hotfixes (but create an issue retrospectively)
 > 
 > **📚 Full details**: [rules/common/issue-first.md](rules/common/issue-first.md)
+
+---
+
+## 📋 Plan Before Implement (Required for Non-Trivial Work)
+
+For features and non-trivial bug fixes:
+
+1. **Create Feature Track issue** (`.github/ISSUE_TEMPLATE/feature_track.md`)
+2. **Fill out Spec**: User story, acceptance criteria, out of scope
+3. **Create Plan**: Break into phases with tasks
+4. **Get user approval** before implementing
+5. **Update plan** as you work (check off tasks, document decisions)
+6. **Verify at phase boundaries** (run tests, get user checkpoint)
+
+**Exception**: Skip for trivial changes (typos, obvious one-line fixes).
+
+**Reference**: `.agent/AI_RULES.md` - "Plan Before Implement" section
 
 ---
 
@@ -432,6 +452,47 @@ chmod +x .agent/scripts/<script_name>.sh
 ```
 
 Then retry.
+
+---
+
+## Git Tips for CLI Agents
+
+### ⚠️ Avoid Interactive Editors
+
+CLI agents can get stuck in interactive git editors (nano/vim). **Always disable editors** for git operations:
+
+```bash
+# Rebasing (replace <default-branch> with your repo's default branch, e.g., main)
+GIT_EDITOR=true git rebase origin/<default-branch>
+
+# Amending commits
+git commit --amend --no-edit
+# or
+git commit --amend -m "new message"
+
+# Continuing rebase after conflicts
+git add <resolved-files>
+GIT_EDITOR=true git rebase --continue
+
+# Merging
+GIT_EDITOR=true git merge feature-branch
+```
+
+### Helper Functions Available
+
+```bash
+# Source git helpers for convenience
+source .agent/scripts/lib/git_helpers.sh
+
+# Now use safe functions
+# Replace <default-branch> with your repo's default branch (e.g., main, master, jazzy)
+safe_git_rebase origin/<default-branch>
+safe_git_amend
+safe_git_merge feature-branch
+safe_git_rebase_continue
+```
+
+**Why this matters**: Without `GIT_EDITOR=true`, git launches nano/vim, causing CLI agents to hang. See [AI_RULES.md](AI_RULES.md) section "Git Operations for CLI Agents" for full details.
 
 ---
 

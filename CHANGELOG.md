@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **PR Status Dashboard** (Issue #164):
+  - `.agent/scripts/pr_status.sh` - Interactive PR pipeline visibility tool
+  - Automatic categorization: Needs Review, Critical Issues, Minor Issues, Ready to Merge
+  - Comment severity classification (critical vs minor keywords)
+  - Interactive mode for workflow actions (review, fix, merge)
+  - `.agent/scripts/PR_STATUS_README.md` - Usage documentation
+- **Conductor-Inspired Workflow Patterns** (Issue #139):
+  - `.github/ISSUE_TEMPLATE/feature_track.md` - Structured planning template for features/bugs
+  - Plan-Before-Code rule in `.agent/AI_RULES.md` - Enforces planning before implementation
+  - Phase Verification Protocol in `.agent/AI_RULES.md` - User checkpoints between major phases
+  - `.agent/scripts/revert_feature.sh` - Revert all commits for a specific issue
+  - `/revert-feature` command added to CLI_COMMANDS.md and Makefile
+  - Updated CONTRIBUTING.md with planning workflow and feature reversal guidance
+  - Updated AI_CLI_QUICKSTART.md with Feature Track template reference
 - **AI CLI Integration** (Issue #46):
   - `.agent/AI_RULES.md` - Universal agent rules (single source of truth)
   - `.agent/AI_CLI_QUICKSTART.md` - 5-minute setup guide for CLI agents
