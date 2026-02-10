@@ -704,7 +704,7 @@ python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
 3. Detects phase numbers from section headers (e.g., "### Phase 2: Implementation")
 4. Calculates completion percentage based on checked/total tasks
 5. Identifies current unchecked task
-6. Returns JSON with status: 'in_progress' or 'done'
+6. Returns JSON with status: 'in_progress', 'done', or 'blocked'
 
 **Output format:**
 ```json

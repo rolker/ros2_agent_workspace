@@ -4,7 +4,7 @@ Parse Feature Track issue status and return machine-readable JSON.
 
 Usage:
     read_feature_status.py --issue <number>
-    
+
 Output JSON format:
     {
         "phase": 2,
@@ -12,11 +12,18 @@ Output JSON format:
         "status": "in_progress",
         "percent_complete": 65
     }
+
+Status values:
+    - "in_progress": There are unchecked tasks remaining
+    - "done": All tasks are checked (or no tasks found)
+    - "blocked": The current task contains a blocked marker
+      (BLOCKED, [BLOCKED], or block emoji)
 """
 
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from typing import Any, Dict, List, Tuple
@@ -32,6 +39,9 @@ def get_issue_body(issue_number: int) -> str:
             check=True
         )
         return result.stdout
+    except FileNotFoundError:
+        print("Error: 'gh' CLI not found. Install from https://cli.github.com/", file=sys.stderr)
+        sys.exit(1)
     except subprocess.CalledProcessError as e:
         print(f"Error fetching issue #{issue_number}: {e.stderr}", file=sys.stderr)
         sys.exit(1)
@@ -124,6 +134,26 @@ def calculate_status(tasks: List[Tuple[bool, str, int]]) -> Dict[str, Any]:
     }
 
 
+def check_gh_available():
+    """Check if gh CLI is installed and authenticated."""
+    if not shutil.which("gh"):
+        print("Error: 'gh' CLI not found. Install from https://cli.github.com/", file=sys.stderr)
+        sys.exit(1)
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode != 0:
+            print("Error: GitHub CLI is not authenticated. Run `gh auth login`.", file=sys.stderr)
+            sys.exit(1)
+    except FileNotFoundError:
+        print("Error: 'gh' CLI not found. Install from https://cli.github.com/", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Parse Feature Track issue status and return JSON'
@@ -139,9 +169,12 @@ def main():
         action='store_true',
         help='Pretty-print JSON output'
     )
-    
+
     args = parser.parse_args()
-    
+
+    # Verify gh CLI is available and authenticated
+    check_gh_available()
+
     # Fetch issue body
     body = get_issue_body(args.issue)
     
@@ -158,5 +191,5 @@ def main():
         print(json.dumps(status))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
