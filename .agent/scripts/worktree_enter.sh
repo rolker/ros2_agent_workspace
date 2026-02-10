@@ -72,6 +72,11 @@ if [ -z "$ISSUE_NUM" ]; then
     return 1 2>/dev/null || exit 1
 fi
 
+# Sanitize repo slug: replace non-alphanumeric characters (except underscore) with underscores
+if [ -n "$REPO_SLUG" ]; then
+    REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+fi
+
 # Find the worktree directory
 # Format: issue-{REPO_SLUG}-{NUMBER}
 

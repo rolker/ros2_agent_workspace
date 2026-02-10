@@ -3,11 +3,12 @@
 # Remove a git worktree and clean up
 #
 # Usage:
-#   ./worktree_remove.sh --issue <number> [--force]
+#   ./worktree_remove.sh --issue <number> [--repo-slug <slug>] [--force]
 #
 # Examples:
 #   ./worktree_remove.sh --issue 123
 #   ./worktree_remove.sh --issue 123 --force
+#   ./worktree_remove.sh --issue 5 --repo-slug marine_msgs
 #
 # This will:
 #   1. Check for uncommitted changes (unless --force)
@@ -22,20 +23,23 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 ISSUE_NUM=""
 FORCE=false
+REPO_SLUG=""
 
 show_usage() {
-    echo "Usage: $0 --issue <number> [--force]"
+    echo "Usage: $0 --issue <number> [--repo-slug <slug>] [--force]"
     echo "   or: $0 <number> [--force]"
     echo ""
     echo "Options:"
-    echo "  --issue <number>    Issue number (required)"
-    echo "  <number>            Issue number as positional argument"
-    echo "  --force             Force removal even with uncommitted changes"
+    echo "  --issue <number>        Issue number (required)"
+    echo "  <number>                Issue number as positional argument"
+    echo "  --repo-slug <slug>      Repository slug (optional, for disambiguation)"
+    echo "  --force                 Force removal even with uncommitted changes"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123"
     echo "  $0 123"
     echo "  $0 123 --force"
+    echo "  $0 --issue 5 --repo-slug marine_msgs"
 }
 
 # Parse arguments
@@ -43,6 +47,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --issue)
             ISSUE_NUM="$2"
+            shift 2
+            ;;
+        --repo-slug)
+            REPO_SLUG="$2"
             shift 2
             ;;
         --force|-f)
@@ -66,43 +74,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ISSUE_NUM=""
-REPO_SLUG=""
-
-show_usage() {
-    echo "Usage: $0 --issue <number> [--repo-slug <slug>]"
-    echo ""
-    echo "Options:"
-    echo "  --issue <number>        Issue number (required)"
-    echo "  --repo-slug <slug>      Repository slug (optional, for disambiguation)"
-    echo ""
-    echo "Examples:"
-    echo "  $0 --issue 123"
-    echo "  $0 --issue 5 --repo-slug marine_msgs"
-}
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --issue)
-            ISSUE_NUM="$2"
-            shift 2
-            ;;
-        --repo-slug)
-            REPO_SLUG="$2"
-            shift 2
-            ;;
-        -h|--help)
-            show_usage
-            exit 0
-            ;;
-        *)
-            echo "Error: Unknown option $1"
-            show_usage
-            exit 1
-            ;;
-    esac
-done
+# Sanitize repo slug: replace non-alphanumeric characters (except underscore) with underscores
+if [ -n "$REPO_SLUG" ]; then
+    REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+fi
 
 if [ -z "$ISSUE_NUM" ]; then
     echo "Error: Issue number is required"

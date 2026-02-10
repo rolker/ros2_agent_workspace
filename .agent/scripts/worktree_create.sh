@@ -132,12 +132,12 @@ if [ -z "$REPO_SLUG" ]; then
         # e.g., https://github.com/org/repo.git -> repo
         # e.g., git@github.com:org/repo.git -> repo
         REPO_SLUG=$(basename "$REMOTE_URL" .git)
-        
+
         # If this is the main workspace repo, use "workspace" as the slug
         if [ "$REPO_SLUG" == "ros2_agent_workspace" ]; then
             REPO_SLUG="workspace"
         fi
-        
+
         # Sanitize repo slug: replace hyphens and other invalid characters with underscores
         REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
     else
@@ -145,6 +145,9 @@ if [ -z "$REPO_SLUG" ]; then
         REPO_SLUG="workspace"
     fi
     echo "Auto-detected repository slug: $REPO_SLUG"
+else
+    # Sanitize explicitly provided repo slug using the same rules
+    REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 fi
 
 # Set default branch name if not provided

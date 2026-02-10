@@ -68,21 +68,29 @@ print_worktree() {
     if [[ "$path" == *"/layers/worktrees/"* ]]; then
         type="layer"
         local basename=$(basename "$path")
-        # Format: issue-{REPO_SLUG}-{NUMBER}
+        # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
             repo="${BASH_REMATCH[1]}"
             issue="${BASH_REMATCH[2]}"
+        # Legacy format: issue-{NUMBER}
+        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
+            issue="${BASH_REMATCH[1]}"
+            repo="(legacy)"
         fi
         ((LAYER_COUNT++)) || true
     elif [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
         local basename=$(basename "$path")
-        # Format: issue-{REPO_SLUG}-{NUMBER}
+        # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
             repo="${BASH_REMATCH[1]}"
             issue="${BASH_REMATCH[2]}"
+        # Legacy format: issue-{NUMBER}
+        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
+            issue="${BASH_REMATCH[1]}"
+            repo="(legacy)"
         fi
         ((WORKSPACE_COUNT++)) || true
     fi
