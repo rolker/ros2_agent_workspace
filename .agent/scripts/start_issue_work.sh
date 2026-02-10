@@ -134,7 +134,7 @@ if [ -n "$WORKTREE_TYPE" ]; then
     
     echo ""
     echo "✅ Worktree created! Next steps:"
-    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh $ISSUE_NUMBER"
+    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh --issue $ISSUE_NUMBER --repo-slug $REPO_SLUG"
     echo "   2. Work in isolation without affecting the main workspace"
     echo "   3. When done, commit and push from within the worktree"
     echo "   4. Create draft PR: gh pr create --draft --title 'feat: <description>' --body 'Closes #$ISSUE_NUMBER'"

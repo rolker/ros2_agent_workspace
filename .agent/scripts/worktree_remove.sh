@@ -101,14 +101,20 @@ find_worktree() {
         return 1
     fi
     
-    # Otherwise, search for matching worktrees
+    # Otherwise, search for matching worktrees (new format and legacy)
     local matches=()
     for path in "$base_dir"/issue-*-"${issue_num}"; do
         if [ -d "$path" ] && [ "$path" != "$base_dir/issue-*-${issue_num}" ]; then
             matches+=( "$path" )
         fi
     done
-    
+
+    # Also check legacy format: issue-{NUMBER}
+    local legacy_path="$base_dir/issue-${issue_num}"
+    if [ -d "$legacy_path" ]; then
+        matches+=( "$legacy_path" )
+    fi
+
     if [ "${#matches[@]}" -eq 1 ]; then
         echo "${matches[0]}"
         return 0
@@ -125,7 +131,7 @@ find_worktree() {
         done
         return 1
     fi
-    
+
     return 1
 }
 
