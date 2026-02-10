@@ -17,6 +17,12 @@
 
 set -e
 
+# Capture caller's working directory before any cd operations.
+# We need this to detect if the caller is inside the worktree being removed.
+# Since this script is executed (not sourced), we cannot change the caller's
+# cwd — so we must refuse to proceed if they're inside the target worktree.
+CALLER_PWD="$(pwd)"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
@@ -127,11 +133,15 @@ if [ -d "$WORKTREE_DIR" ]; then
     cd "$ROOT_DIR"
 fi
 
-# Check if we're currently in the worktree we're trying to remove
-if [[ "$(pwd)" == "$WORKTREE_DIR"* ]]; then
-    echo "⚠️  Warning: You are currently inside this worktree."
-    echo "   Changing to workspace root first..."
-    cd "$ROOT_DIR"
+# Refuse to proceed if the caller's shell is inside the worktree.
+# This script runs as a subprocess, so it cannot change the caller's cwd.
+# Removing the directory while the caller is inside it leaves their shell broken.
+if [[ "$CALLER_PWD" == "$WORKTREE_DIR"* ]]; then
+    echo "❌ Error: Your shell is currently inside this worktree."
+    echo ""
+    echo "   Run this first:  cd $ROOT_DIR"
+    echo "   Then re-run:     $0 --issue $ISSUE_NUM"
+    exit 1
 fi
 
 # Remove the worktree
