@@ -78,10 +78,31 @@ for layer in "${LAYERS[@]}"; do
     fi
 done
 
-# 3. Prevent interactive editor hangs (safe for both agents and humans)
+# 3. Guard against branch switching with git checkout.
+# Agents must use worktrees instead. This wrapper blocks `git checkout <branch>`
+# while still allowing file-restore forms like `git checkout -- <file>`.
+git() {
+    if [[ "${1:-}" == "checkout" ]]; then
+        # Allow restore forms: git checkout -- <file>, git checkout -p, git checkout .
+        if [[ "${2:-}" == "--" || "${2:-}" == "-p" ]]; then
+            command git "$@"
+            return $?
+        fi
+        echo "❌ 'git checkout' for branch switching is disabled in this workspace."
+        echo "   Use worktrees instead:"
+        echo "     .agent/scripts/worktree_create.sh --issue <N> --type workspace"
+        echo "     source .agent/scripts/worktree_enter.sh --issue <N>"
+        echo ""
+        echo "   To restore files, use: git checkout -- <file>"
+        return 1
+    fi
+    command git "$@"
+}
+
+# 4. Prevent interactive editor hangs (safe for both agents and humans)
 export GIT_EDITOR=true
 
-# 4. Auto-configure git identity for agents
+# 5. Auto-configure git identity for agents
 if [ -z "${GIT_AUTHOR_NAME:-}" ]; then
     # No identity set yet — try to detect and configure
     if source "$SCRIPT_DIR/detect_cli_env.sh" 2>/dev/null && [ "$AGENT_FRAMEWORK" != "unknown" ]; then
