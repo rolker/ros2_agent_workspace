@@ -192,7 +192,7 @@ if [ -f .agent/.identity ]; then
 fi
 ```
 
-Details: [**`.agent/rules/common/ai-signature.md`**](rules/common/ai-signature.md)
+Details: See your framework's instruction file (e.g., `CLAUDE.md`, `.github/copilot-instructions.md`).
 
 ## Proposed Plan
 

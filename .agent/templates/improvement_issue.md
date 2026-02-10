@@ -23,8 +23,7 @@ Use this template when reporting infrastructure friction through the Continuous 
 [Provide a specific, actionable fix. Examples:
 - Update section X in file Y to clarify Z
 - Add new script .agent/scripts/do_thing.sh that automates X
-- Add /command-name to CLI_COMMANDS.md
-- Create workflow .agent/workflows/ops/handle-case.md]
+- Update framework instruction files (CLAUDE.md, copilot-instructions.md, etc.)]
 
 ## Impact
 

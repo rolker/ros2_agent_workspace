@@ -391,7 +391,6 @@ $ ./.agent/scripts/check_branch_updates.sh
 - Recommended before `/finish-feature`
 
 **See also:**
-- `.agent/workflows/ops/check-branch-updates.md` - Detailed usage guide
 - `.agent/hooks/check-branch-updates.py` - Pre-commit hook implementation
 
 ---

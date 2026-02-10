@@ -22,43 +22,18 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 
 ## Agent Rules
 > [!IMPORTANT]
-> Since we use AI Agents extensively, we have codified rules in `.agent/rules/`.
+> Each AI agent framework has a self-contained instruction file with all rules inline.
 
-### For AI CLI Agents (Copilot CLI, Gemini CLI)
-- **Quick Start**: See [`.agent/AI_CLI_QUICKSTART.md`](.agent/AI_CLI_QUICKSTART.md) for 5-minute setup
-- **Universal Rules**: [`.agent/AI_RULES.md`](.agent/AI_RULES.md) - Single source of truth for all agents
-- **Command Reference**: [`.agent/CLI_COMMANDS.md`](.agent/CLI_COMMANDS.md) - Workflow discovery
+### Framework Instruction Files
+- **Claude Code**: [`CLAUDE.md`](CLAUDE.md) (auto-loaded every conversation)
+- **GitHub Copilot**: [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
+- **Gemini CLI**: [`.agent/instructions/gemini-cli.instructions.md`](.agent/instructions/gemini-cli.instructions.md)
+- **Other/Unknown**: [`.agent/AI_RULES.md`](.agent/AI_RULES.md) (universal fallback)
 
-### For All Agents
-- **Planning**: See [PLANNING_MODE.md](.agent/rules/PLANNING_MODE.md) before starting complex tasks.
-- **Execution**: See [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md) for coding and verification standards.
-
-### Documentation Maintenance
-
-**Important**: The agent documentation follows a layered structure to avoid duplication:
-
-1. **`.agent/AI_RULES.md`** - Universal rules for ALL agents (single source of truth)
-2. **`.agent/AI_CLI_QUICKSTART.md`** - Fast path for CLI agents
-3. **`.agent/CLI_COMMANDS.md`** - Command mapping and discovery
-4. **Framework-specific overlays**:
-   - `.github/copilot-instructions.md` - Copilot CLI repository-wide instructions
-   - `.github/instructions/*.instructions.md` - Path-specific instructions with YAML frontmatter
-   - `.agent/instructions/gemini-cli.instructions.md` - Gemini CLI references
-   - `.agent/AGENT_ONBOARDING.md` - Specialized/container agents
-
-**GitHub Copilot Instruction Structure** (follows [best practices](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)):
-- **Repository-wide**: `.github/copilot-instructions.md` - applies to all files
-- **Path-specific**: `.github/instructions/*.instructions.md` - use `applies_to:` glob patterns in YAML frontmatter
-
-**When updating agent documentation**:
-- ✅ Update `AI_RULES.md` for universal changes (applies to all agents)
-- ✅ Update framework-specific files only for platform-specific features
-- ✅ Include concrete code examples (not just descriptions)
-- ✅ Include build/test commands and version information
-- ✅ Verify YAML frontmatter is valid
-- ❌ Don't duplicate universal rules across files - link to `AI_RULES.md` instead
-
-**Documentation Owner**: Framework Engineering Team
+### When Updating Agent Documentation
+- Update each framework's instruction file directly — rules are inlined, not shared
+- Keep changes consistent across all framework files
+- Include concrete code examples and build/test commands
 
 ## Development Workflow
 
@@ -78,11 +53,11 @@ For features and non-trivial bug fixes, **always plan before implementing**:
 
 **Exception**: Trivial changes (typos, obvious one-liners) can skip formal planning.
 
-See `.agent/AI_RULES.md` "Plan Before Implement" section for complete details.
+See your framework's instruction file for complete details.
 
 ### Creating a Feature Branch
 
-Follow the git hygiene rules in `.agent/rules/git-hygiene.md` and [EXECUTION_MODE.md](.agent/rules/EXECUTION_MODE.md):
+Follow the git hygiene rules:
 
 - Features: `feature/TASK-<ID>-<description>` (e.g., `feature/TASK-001-multi-distro`)
 - Fixes: `fix/<description>`
@@ -94,7 +69,7 @@ git checkout -b feature/TASK-123-add-new-layer
 
 ### Making Changes
 
-1. **Keep the workspace root clean** - See `.agent/rules/clean-root.md`
+1. **Keep the workspace root clean**
 2. **Run builds in layer directories**, not the root
 3. **Test your changes**:
    ```bash
@@ -128,7 +103,6 @@ git checkout -b feature/TASK-123-add-new-layer
 ### Documentation
 
 - Update README.md if adding new features
-- Add/update workflow documentation in `.agent/workflows/` if needed
 - Include usage examples for new scripts
 - Update this CONTRIBUTING.md if changing development processes
 
@@ -165,11 +139,11 @@ git checkout -b feature/TASK-123-add-new-layer
 
 ```
 .
-├── .agent/              # Agent-specific workflows and knowledge
-│   ├── workflows/       # Agentic workflows (slash commands)
-│   ├── rules/          # Always-on rules for agents
+├── .agent/              # Agent infrastructure
 │   ├── scripts/        # Helper scripts for setup, build, test
-│   └── knowledge/      # Generated knowledge links
+│   ├── knowledge/      # ROS 2 patterns and CLI best practices
+│   ├── templates/      # Issue and test templates
+│   └── hooks/          # Git hooks (pre-commit)
 ├── configs/            # .repos files defining layers
 └── layers/             # ROS2 layers (gitignored, generated)
 ```
@@ -190,9 +164,6 @@ To add a new workspace layer:
 If you experience issues with agent infrastructure (documentation, workflows, scripts), use the **Continuous Improvement workflow**:
 
 ```bash
-# See the workflow guide
-cat .agent/workflows/ops/continuous-improvement.md
-
 # Use the issue template
 cat .agent/templates/improvement_issue.md
 ```
@@ -233,7 +204,7 @@ make revert-feature ISSUE=137
 
 The script finds all commits referencing the issue number and creates revert commits in the correct order. Use this when a feature direction was wrong, not for fixing bugs in a feature.
 
-See [`.agent/workflows/ops/continuous-improvement.md`](.agent/workflows/ops/continuous-improvement.md) for the complete process.
+Use the improvement issue template at `.agent/templates/improvement_issue.md` to structure your report.
 
 ## Questions or Issues?
 

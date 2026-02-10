@@ -104,7 +104,6 @@ The underlying script (`.agent/scripts/check_branch_updates.sh`) provides the ac
 
 **Related**:
 - Script: `.agent/scripts/check_branch_updates.sh`
-- Workflow: `.agent/workflows/ops/check-branch-updates.md`
 - Can be run manually with `--strict` mode to block commits
 
 **Example output**:
@@ -238,6 +237,4 @@ pre-commit autoupdate
 ## See Also
 
 - [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml) - Hook configuration
-- [`.agent/workflows/dev/submit-pr.md`](../workflows/dev/submit-pr.md) - PR workflow
-- [`.agent/rules/common/git-hygiene.md`](../rules/common/git-hygiene.md) - Git best practices
 - [Pre-commit framework documentation](https://pre-commit.com/)

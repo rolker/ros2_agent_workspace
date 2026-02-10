@@ -51,12 +51,12 @@ This ensures that packages in higher layers can override or extend packages in l
 
 ```
 ros2_agent_workspace/
-├── .agent/                    # Agent intelligence
-│   ├── workflows/            # Executable workflows (e.g., /build-all)
-│   ├── rules/                # Always-on guidelines for agents
+├── .agent/                    # Agent infrastructure
 │   ├── scripts/              # Automation scripts (setup, build, test, etc.)
-│   ├── templates/            # Templates for various tasks
-│   └── knowledge/            # Auto-generated knowledge links
+│   ├── templates/            # Templates for issues and tests
+│   ├── knowledge/            # ROS 2 patterns and CLI best practices
+│   ├── hooks/                # Git hooks (pre-commit)
+│   └── instructions/         # Framework-specific instruction files
 │
 ├── configs/                   # Bootstrap configuration
 │   └── project_bootstrap.url # Key repository URL for layer definitions
@@ -93,32 +93,17 @@ ros2_agent_workspace/
     └── *.md                   # Other generated reports
 ```
 
-## Workflow System
+## Agent System
 
-### Agent Workflows
+### Framework Instruction Files
 
-Located in `.agent/workflows/`, these are markdown files that define procedures agents can execute:
+Each AI agent framework has a self-contained instruction file:
+- **`CLAUDE.md`**: Claude Code (auto-loaded every conversation)
+- **`.github/copilot-instructions.md`**: GitHub Copilot
+- **`.agent/instructions/gemini-cli.instructions.md`**: Gemini CLI
+- **`.agent/AI_RULES.md`**: Universal fallback for unknown agents
 
-- **build-all.md**: Build all layers in sequence
-- **rebuild-all.md**: Clean and rebuild everything
-- **add-repo.md**: Add a new repository to a layer
-- **clean.md**: Clean build artifacts
-- **test_all.md**: Run tests across all layers
-- **submit-pr.md**: Create a pull request
-- **check_status.md**: Generate workspace status report
-
-Workflows can be triggered by:
-1. Natural language: "build all layers"
-2. Slash commands: `/build-all` (if supported by interface)
-
-### Agent Rules
-
-Located in `.agent/rules/`, these define always-on constraints:
-
-- **clean-root.md**: Never build in workspace root
-- **build-location.md**: Build in specific layer directories
-- **git-hygiene.md**: Branch naming and commit practices
-- **search_visibility.md**: How to find things efficiently
+These files inline all operational rules (git hygiene, identity, signatures, build commands) so agents read one file instead of many.
 
 ## Build System
 
@@ -231,14 +216,6 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 - Make executable: `chmod +x .agent/scripts/new_script.sh`
 - Follow existing patterns (lock checking, error handling)
 - Update CONTRIBUTING.md with usage
-
-### Adding Agent Workflows
-
-1. Create `.agent/workflows/new_workflow.md`
-2. Include YAML frontmatter with description
-3. Document steps clearly
-4. Include verification steps
-5. Test with an agent
 
 ## Design Principles
 

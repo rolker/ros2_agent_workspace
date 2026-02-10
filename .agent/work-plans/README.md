@@ -83,6 +83,5 @@ One plan per issue. Keep plans concise but complete.
 ## See Also
 
 - `.agent/templates/ISSUE_PLAN.md` - Plan template
-- `.agent/workflows/dev/start-feature.md` - Feature workflow
 - `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination
-- `.agent/work-plans/PLAN_ISSUE-69.md` - Example plan (this workflow's implementation)
+- `.agent/work-plans/PLAN_ISSUE-69.md` - Example plan
