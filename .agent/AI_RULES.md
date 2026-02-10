@@ -1,6 +1,6 @@
 # Universal AI Agent Rules
 
-**Purpose**: This document defines the core workflow and rules that apply to **ALL** AI agents working in this ROS2 workspace, regardless of platform (Copilot CLI, Gemini CLI, Antigravity, or custom agents).
+**Purpose**: This document defines the core workflow and rules that apply to **ALL** AI agents working in this ROS2 workspace, regardless of platform (Claude Code, Copilot CLI, Gemini CLI, Antigravity, or custom agents).
 
 > **🚀 Quick Start for CLI Agents**: See [`.agent/AI_CLI_QUICKSTART.md`](AI_CLI_QUICKSTART.md) for a fast-path onboarding guide.
 
@@ -45,15 +45,16 @@ source .agent/scripts/env.sh
 
 Before making ANY commits, configure your identity using the appropriate method:
 
-#### Host-Based Agents (Copilot CLI, Gemini CLI)
+#### Host-Based Agents (Claude Code, Copilot CLI, Gemini CLI)
 
 If you're running directly on the host and sharing the working copy with the user:
 
 ```bash
-source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude-code@ccom.unh.edu"
 ```
 
 **Replace with your framework**:
+- Claude Code: `"Claude Code Agent"` / `"roland+claude-code@ccom.unh.edu"`
 - Copilot CLI: `"Copilot CLI Agent"` / `"roland+copilot-cli@ccom.unh.edu"`
 - Gemini CLI: `"Gemini CLI Agent"` / `"roland+gemini-cli@ccom.unh.edu"`
 
@@ -417,6 +418,11 @@ All GitHub Issues, PRs, and Comments **must** include:
 **DO NOT copy example model names** (e.g., "GPT-4o", "Gemini 2.0 Flash") from documentation.
 
 Examples (with correct introspection):
+- If you're Claude Code running Claude Opus 4.5:
+  ```markdown
+  **🤖 Authored-By**: `Claude Code Agent`
+  **🧠 Model**: `Claude Opus 4.5`
+  ```
 - If you're Copilot CLI running GPT-4o:
   ```markdown
   **🤖 Authored-By**: `Copilot CLI Agent`
@@ -587,8 +593,9 @@ Solution: Follow Step 2 above (Configure Git Identity)
 
 For platform-specific features and optimizations:
 
+- **Claude Code**: [`instructions/claude-code.instructions.md`](instructions/claude-code.instructions.md)
 - **GitHub Copilot CLI**: [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
-- **Gemini CLI**: [`.agent/instructions/gemini-cli.instructions.md`](.agent/instructions/gemini-cli.instructions.md)
+- **Gemini CLI**: [`instructions/gemini-cli.instructions.md`](instructions/gemini-cli.instructions.md)
 - **Antigravity**: Use this document (no special instructions)
 
 ---
@@ -605,6 +612,6 @@ For platform-specific features and optimizations:
 
 ---
 
-**Last Updated**: 2026-01-29  
-**Maintained By**: Framework Engineering Team  
+**Last Updated**: 2026-02-10
+**Maintained By**: Framework Engineering Team
 **Related**: [AI_CLI_QUICKSTART.md](AI_CLI_QUICKSTART.md), [AGENT_ONBOARDING.md](AGENT_ONBOARDING.md), [WORKFORCE_PROTOCOL.md](WORKFORCE_PROTOCOL.md)
