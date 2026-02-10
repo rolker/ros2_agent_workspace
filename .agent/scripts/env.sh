@@ -78,4 +78,21 @@ for layer in "${LAYERS[@]}"; do
     fi
 done
 
+# 3. Prevent interactive editor hangs (safe for both agents and humans)
+export GIT_EDITOR=true
+
+# 4. Auto-configure git identity for agents
+if [ -z "${GIT_AUTHOR_NAME:-}" ]; then
+    # No identity set yet — try to detect and configure
+    if source "$SCRIPT_DIR/detect_cli_env.sh" 2>/dev/null && [ "$AGENT_FRAMEWORK" != "unknown" ]; then
+        # Framework detected — configure identity via --detect
+        source "$SCRIPT_DIR/set_git_identity_env.sh" --detect
+    else
+        echo "  ! Warning: Could not auto-detect agent framework. Git identity not configured."
+        echo "    Run: source .agent/scripts/set_git_identity_env.sh --agent <framework>"
+    fi
+else
+    echo "  Git identity: $GIT_AUTHOR_NAME <${GIT_AUTHOR_EMAIL:-not set}>"
+fi
+
 echo "Environment ready."

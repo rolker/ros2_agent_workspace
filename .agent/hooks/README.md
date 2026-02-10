@@ -47,6 +47,41 @@ This directory contains custom git hooks for the ROS2 Agent Workspace.
 
 ---
 
+### `check-commit-identity.py`
+
+**Purpose**: Block commits when git identity is unconfigured or unrecognized.
+
+**What it does**:
+- Reads `GIT_AUTHOR_EMAIL` env var (takes precedence), falls back to `git config user.email`
+- Accepts if email matches: `roland+*@ccom.unh.edu` (any agent) or `roland@ccom.unh.edu` / `roland@rolker.net` (human)
+- Rejects with clear fix instructions otherwise
+- Email-pattern based — no dependency on `framework_config.sh`, so adding a new agent framework just works
+
+**When it runs**: Before every commit (via pre-commit framework)
+
+**Exit codes**:
+- `0` - Identity is recognized
+- `1` - Identity is missing or unrecognized (commit blocked)
+
+**Configuration**: See `.pre-commit-config.yaml`
+
+**Related**: Issues #124, #144
+
+**Example output** (when identity is not configured):
+```
+ERROR: Commit identity is not configured or not recognized!
+
+  Current email: (not set)
+
+  Accepted patterns: roland+*@ccom.unh.edu, roland@ccom.unh.edu, roland@rolker.net
+
+  To fix, run one of:
+    source .agent/scripts/set_git_identity_env.sh --detect
+    source .agent/scripts/set_git_identity_env.sh --agent <framework>
+```
+
+---
+
 ### `check-branch-updates.py`
 
 **Purpose**: Check if the default branch has new commits before committing to a feature branch.
