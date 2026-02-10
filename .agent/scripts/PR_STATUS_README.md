@@ -186,5 +186,4 @@ Reduces manual PR scanning time and provides actionable next steps.
 
 ## See Also
 
-- `.agent/workflows/dev/start-feature.md` - Feature development workflow
 - `CONTRIBUTING.md` - Contribution guidelines

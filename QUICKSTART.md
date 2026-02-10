@@ -167,8 +167,7 @@ This workspace is designed for AI-assisted development. If using with an AI agen
 
 1. **Let the agent manage the workspace** - It knows the structure and conventions
 2. **Use natural language** - "build the workspace", "add a new package", etc.
-3. **Use workflows** - Trigger with slash commands like `/build-all`, `/clean`
-4. **Check `.agent/workflows/`** for available workflows
+3. **Check your instruction file** — `CLAUDE.md`, `.github/copilot-instructions.md`, or `.agent/AI_RULES.md` for rules and script reference
 
 ## Common Tasks
 

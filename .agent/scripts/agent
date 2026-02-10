@@ -50,8 +50,8 @@ ENFORCEMENT:
     to prevent workspace pollution and enable multi-agent coordination.
 
 SEE ALSO:
-    .agent/AI_RULES.md           - Core workflow rules
-    .agent/CLI_COMMANDS.md       - All available commands
+    CLAUDE.md                    - Claude Code operational rules
+    .agent/AI_RULES.md           - Universal agent rules
     worktree_create.sh --help    - Low-level worktree creation
 EOF
 }

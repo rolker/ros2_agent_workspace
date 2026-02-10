@@ -12,23 +12,13 @@ The workspace automatically imports repositories from the project's configuratio
 
 ## Quick Start
 
-### For AI CLI Agents (Copilot CLI, Gemini CLI)
+### For AI Agents
 
-**⚡ Fast Path**: See [`.agent/AI_CLI_QUICKSTART.md`](.agent/AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
-
-**3-Step Setup**:
-```bash
-# 1. Source ROS environment
-source .agent/scripts/env.sh
-
-# 2. Configure git identity (for Copilot CLI)
-source .agent/scripts/set_git_identity_env.sh --agent copilot
-
-# 3. Check workspace status
-.agent/scripts/status_report.sh
-```
-
-**Common Workflows**: See [`.agent/CLI_COMMANDS.md`](.agent/CLI_COMMANDS.md) for command reference.
+Each framework has a self-contained instruction file with all rules inline:
+- **Claude Code**: [`CLAUDE.md`](CLAUDE.md) (auto-loaded)
+- **GitHub Copilot**: [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
+- **Gemini CLI**: [`.agent/instructions/gemini-cli.instructions.md`](.agent/instructions/gemini-cli.instructions.md)
+- **Other/Unknown**: [`.agent/AI_RULES.md`](.agent/AI_RULES.md)
 
 ### For Human Users
 
@@ -36,9 +26,9 @@ source .agent/scripts/set_git_identity_env.sh --agent copilot
 
 **Experienced users?** Jump to [Usage](#usage) below.
 
-### For Specialized Agents (Antigravity, Custom Platforms)
+### For Containerized/Custom Agents
 
-See [`.agent/AGENT_ONBOARDING.md`](.agent/AGENT_ONBOARDING.md) for detailed onboarding.
+See [`.agent/AGENT_ONBOARDING.md`](.agent/AGENT_ONBOARDING.md) for setup instructions.
 
 ## Sandboxed Development (Recommended)
 
@@ -50,11 +40,10 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Documentation
 
 ### For AI Agents
-- ⚡ [AI CLI Quick Start](.agent/AI_CLI_QUICKSTART.md) - 5-minute setup for CLI agents
-- 📋 [AI Rules](.agent/AI_RULES.md) - Universal agent workflow and rules
-- 🔧 [CLI Commands](.agent/CLI_COMMANDS.md) - Workflow discovery and mapping
+- 📋 [CLAUDE.md](CLAUDE.md) - Claude Code operational rules (auto-loaded)
+- 📋 [AI Rules](.agent/AI_RULES.md) - Universal fallback rules
 - 🌲 [Worktree Guide](.agent/WORKTREE_GUIDE.md) - Parallel development with git worktrees
-- 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Detailed onboarding for specialized agents
+- 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Onboarding for containerized agents
 
 ### For All Users
 - 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes
@@ -64,7 +53,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 
 ## Structure
 
-- **`.agent/`**: Contains agent-specific workflows and knowledge.
+- **`.agent/`**: Agent infrastructure (scripts, hooks, knowledge, templates, identity).
 - **`configs/`**: Contains `project_bootstrap.url` linking to project configuration.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
 - **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
@@ -99,15 +88,7 @@ source .agent/scripts/env.sh
 This workspace is designed to be used with an AI Agent. If you are new to agentic coding, here is how you should interact with this repository:
 
 1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
-2.  **Workflow Documentation**: The agent has workflow documentation it can reference. These are documented in `.agent/workflows/` as markdown files:
-    *   **`/add-repo`**: Add a new repository to a layer (see `.agent/workflows/dev/add-repo.md`)
-    *   **`/build-all`**: Build all layers in the correct order (see `.agent/workflows/ops/build-all.md`)
-    *   **`/clean`**: Specific cleanup of build artifacts (see `.agent/workflows/ops/clean.md`)
-    *   **`/rebuild-all`**: Clean and rebuild everything (see `.agent/workflows/ops/rebuild-all.md`)
-    *   **`/submit-pr`**: Create a PR for your changes (see `.agent/workflows/dev/submit-pr.md`)
-    *   *See `.agent/workflows/` for the full list of workflow guides.*
-    
-    Note: These are workflow guides that agents reference, not executable commands. How the agent implements them depends on the platform.
+2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`.agent/scripts/status_report.sh`).
 3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, key repository configs in `layers/main/core_ws/src/unh_marine_autonomy/config/repos/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
@@ -205,11 +186,11 @@ make test          # Run all tests
 make clean         # Clean build artifacts
 make status        # Show workspace status
 make lint          # Run linters
+```
 
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
 - `status_report.sh`: Comprehensive workspace status with test history.
-```
 
 ### Pre-commit Hooks
 Install pre-commit hooks for automatic validation:

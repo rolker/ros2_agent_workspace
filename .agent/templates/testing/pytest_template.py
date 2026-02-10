@@ -18,16 +18,21 @@ from rclpy.node import Node
 def ros_context():
     """
     Fixture to initialize and cleanup ROS 2 context.
-    
-    This fixture is automatically used by tests that need ROS 2.
-    It initializes rclpy before tests and shuts it down after.
-    
+
+    Include this fixture as a parameter in tests that need ROS 2.
+    It initializes rclpy before the test and shuts it down after.
+
     Yields:
         None
     """
-    rclpy.init()
-    yield
-    rclpy.shutdown()
+    already_initialized = rclpy.ok()
+    if not already_initialized:
+        rclpy.init()
+    try:
+        yield
+    finally:
+        if not already_initialized and rclpy.ok():
+            rclpy.shutdown()
 
 
 @pytest.fixture

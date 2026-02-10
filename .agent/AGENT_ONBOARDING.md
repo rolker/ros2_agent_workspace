@@ -1,155 +1,53 @@
-# Agent Onboarding Checklist
+# Agent Onboarding (Containerized / Unknown Agents)
 
-> **🚀 CLI Agents (Copilot CLI, Gemini CLI)**: Skip this detailed guide and use [**AI_CLI_QUICKSTART.md**](AI_CLI_QUICKSTART.md) instead for a faster 5-minute setup.
+For agents without a framework-specific instruction file.
 
-This document provides detailed onboarding for specialized agent platforms (Antigravity, custom agents, or container-based agents). CLI users should follow the streamlined quick start guide linked above.
+**If your framework has a dedicated file, use that instead:**
+- Claude Code: [`CLAUDE.md`](../CLAUDE.md) (auto-loaded)
+- GitHub Copilot: [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
+- Gemini CLI: [`instructions/gemini-cli.instructions.md`](instructions/gemini-cli.instructions.md)
 
----
-
-Before starting ANY task in this workspace, complete these steps in order:
-
-## 1. Read Critical Documentation (5 min)
-
-**Core universal rules** are now consolidated in [**AI_RULES.md**](AI_RULES.md).
-
-These documents are **required reading** for every agent session:
-
-- **[`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md)** ⚠️ **READ FIRST**
-  - Explains how to identify yourself in git commits
-  - Shows identity format: `<Platform> Agent` / `roland+<platform>@ccom.unh.edu`
-  - Documents ephemeral vs. persistent identity configuration methods
-  - Includes decision tree for choosing the right approach
-
-- **[`rules/common/git-hygiene.md`](rules/common/git-hygiene.md)**
-  - **Never commit to `main`** — always use feature branches
-  - Branch naming: `feature/ISSUE-<ID>-<description>` or `fix/<description>`
-  - Always stash/commit uncommitted changes before finishing
-
-- **[`rules/common/ai-signature.md`](rules/common/ai-signature.md)**
-  - **Signature Required**: Must append AI signature with **🤖 Authored-By** (agent name) and **🧠 Model** (model name) to all GitHub Issues/PRs/Comments.
-
-- **[`rules/common/github-cli-best-practices.md`](rules/common/github-cli-best-practices.md)**
-  - **Protocol**: MUST use "File-First" approach (temp file + `--body-file`) for all multiline GitHub interactions (Issues/PRs).
-
-
-
-## 2. Source the Environment (1 min)
-
-Ensure your shell has the correct ROS 2 environment paths:
+## Setup
 
 ```bash
+# 1. Source ROS 2 environment
 source .agent/scripts/env.sh
+
+# 2. Configure git identity
+# Host-based (shared workspace):
+source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
+# Container/isolated:
+.agent/scripts/configure_git_identity.sh "<Agent Name>" "<email>"
+
+# 3. Check workspace status
+.agent/scripts/status_report.sh
 ```
 
-## 3. Configure Git Identity (1 min)
+See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity decision tree.
 
-Before making ANY commits, configure your complete identity (name, email, AND model) using the appropriate method:
+## Core Rules
 
-### Host-Based Agents (Copilot CLI, Gemini CLI)
+See [`AI_RULES.md`](AI_RULES.md) for the 9 universal rules all agents must follow.
 
-If you're running directly on the host and sharing the working copy with the user:
+Key points:
+- Never commit to `main` — use worktrees for isolation
+- Never `git checkout <branch>` — `env.sh` blocks it
+- AI signature required on all GitHub Issues/PRs/Comments
+- Use `--body-file` for `gh` CLI, not inline `--body`
+- Build in layer directories only
+
+## Starting Work
 
 ```bash
-# Auto-detect (recommended)
-source .agent/scripts/set_git_identity_env.sh --detect
-
-# Or specify framework explicitly
-source .agent/scripts/set_git_identity_env.sh --agent copilot
+# Create isolated worktree for your issue
+.agent/scripts/worktree_create.sh --issue <N> --type workspace
+source .agent/scripts/worktree_enter.sh --issue <N>
 ```
 
-**Why this method?**
-- ✅ Session-only (doesn't modify `.git/config`)
-- ✅ User's identity remains intact for their own commits
-- ✅ Perfect for shared workspaces
-- ✅ Exports `AGENT_MODEL` for use in GitHub signatures
+## References
 
-### Containerized Agents (Antigravity)
-
-If you're running in a container or isolated environment:
-
-```bash
-./.agent/scripts/configure_git_identity.sh "Antigravity Agent" "roland+antigravity@ccom.unh.edu"
-```
-
-**Why this method?**
-- ✅ Persists across sessions
-- ✅ Configures workspace repo + all repos in `layers/*/src/`
-- ✅ Isolated environment means no conflict with user
-
-**Not sure which to use?** See the decision tree in [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md).
-
-### Verify Your Identity
-
-After configuration, verify that your identity (including model) is set correctly:
-
-```bash
-echo "Agent: $AGENT_NAME"
-echo "Email: $AGENT_EMAIL"
-echo "Model: $AGENT_MODEL"
-echo "Framework: $AGENT_FRAMEWORK"
-```
-
-Use these environment variables in your GitHub signatures.
-
-## 4. Ticket the Task (2 min)
-
-1.  **Check if a GitHub Issue exists** for your current objective.
-2.  If not, **ask the user**: *"Should I open an issue to track this?"*
-3.  Use the issue number in your branch name: `feature/ISSUE-<number>-<description>`.
-4.  **Note**: When you submit the PR, you MUST include `Closes #<issue-number>` in the description.
-
-## 5. Create a Feature Branch (30 sec)
-
-```bash
-git checkout -b feature/ISSUE-<number>-<description>
-```
-
-Example:
-```bash
-git checkout -b feature/ISSUE-45-standardize-issues
-```
-
-## 6. Discover Available Workflows (Optional, as needed)
-
-When you need to perform a common task (build, test, status check, etc.):
-
-1. **Check the workflow index**: [`AGENT_INDEX.md`](AGENT_INDEX.md)
-2. **Or check the scripts reference**: [`scripts/README.md`](scripts/README.md)
-
-This prevents "task creep" where you manually implement something that already has a workflow.
-
-## 7. Review Other Key Resources
-
-- **[`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md)** — Multi-agent coordination and GitHub Issues workflow
-- **GitHub Issues** — Check open issues to see what's currently being worked on
-- **[`README.md`](../README.md)** — Repository structure and usage
-- **[`.agent/scratchpad/ROADMAP.md`](.agent/scratchpad/ROADMAP.md)** (If exists) — Read-only snapshot of GitHub Issues for offline reference
-
-## Quick Checklist for Your Session
-
-Before starting work, verify:
-
-- [ ] Read `AI_IDENTITY_STRATEGY.md`
-- [ ] Read `rules/common/git-hygiene.md`
-- [ ] Read `rules/common/ai-signature.md`
-- [ ] Read `rules/common/github-cli-best-practices.md`
-- [ ] Sourced environment: `source .agent/scripts/env.sh`
-- [ ] Configured git identity (ephemeral or persistent, based on your environment)
-- [ ] **Verified/Created GitHub Issue for task**
-- [ ] Created feature branch with `feature/ISSUE-*` naming
-- [ ] Checked `AGENT_INDEX.md` for existing workflows
-- [ ] Reviewed GitHub Issues for ongoing tasks
-
-## Why This Matters
-
-Following this checklist prevents:
-- ❌ Accidentally committing to main
-- ❌ Using the wrong git identity (confusing commit history)
-- ❌ Disrupting user workflow with persistent config in shared workspaces
-- ❌ Asking the user questions already answered in docs
-- ❌ Implementing workflows that already exist
-- ❌ Duplicating work from other agents
-
----
-
-**Need help?** Check this directory for additional guidance documents.
+- [`AI_RULES.md`](AI_RULES.md) — Universal rules
+- [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) — Identity configuration
+- [`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md) — Multi-agent coordination
+- [`WORKTREE_GUIDE.md`](WORKTREE_GUIDE.md) — Worktree patterns
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — System design

@@ -409,8 +409,7 @@ source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 ---
 
 **Related Documentation**:
-- [CLI Commands](.agent/CLI_COMMANDS.md) - Command reference
-- [Workforce Protocol](.agent/WORKFORCE_PROTOCOL.md) - Multi-agent coordination
-- [Git Hygiene](.agent/rules/common/git-hygiene.md) - Branch and commit practices
+- [AI Rules](AI_RULES.md) - Universal agent rules
+- [Workforce Protocol](WORKFORCE_PROTOCOL.md) - Multi-agent coordination
 
 **Last Updated**: 2026-02-03
