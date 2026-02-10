@@ -53,7 +53,7 @@ layers/
 │   ├── platforms_ws/
 │   └── ...
 └── worktrees/
-    └── issue-42/              # Layer worktree for issue 42
+    └── issue-workspace-42/    # Layer worktree for issue 42 (workspace repo)
         ├── core_ws/           # Hybrid structure (see below)
         │   └── src/
         │       ├── unh_marine_autonomy/  # Git worktree (modified)
@@ -62,20 +62,25 @@ layers/
         ├── underlay_ws -> ../../main/underlay_ws  # Symlink
         ├── platforms_ws -> ../../main/platforms_ws
         └── .scratchpad/       # Isolated scratchpad
+    └── issue-marine_msgs-5/   # Layer worktree for issue 5 (marine_msgs repo)
+        ├── core_ws/           # Hybrid structure
+        └── ...
 
 .workspace-worktrees/
-└── issue-137/                 # Workspace worktree (infrastructure work)
+└── issue-workspace-137/       # Workspace worktree (infrastructure work)
     ├── .agent/                # Real - root repo worktree
     ├── configs/               # Real - root repo worktree
     └── layers/                # Real - root repo worktree
         └── main -> ../../layers/main  # Symlink - read-only access to main builds
 ```
 
+**Note**: Worktrees are now named `issue-{REPO_SLUG}-{NUMBER}` to prevent collisions between same issue numbers from different repositories. The workspace repo uses "workspace" as its slug.
+
 ## Worktree Types
 
 ### Layer Worktrees (`--type layer --layer <name> --packages <pkg,...>`)
 
-**Location**: `layers/worktrees/issue-<N>/`
+**Location**: `layers/worktrees/issue-{REPO_SLUG}-{NUMBER}/`
 
 **Use for**: ROS package development, code changes, feature work
 
@@ -90,21 +95,32 @@ layers/
 - Other layers: Symlinks to `layers/main/` workspaces for read-only source access
 - Isolated scratchpad (`.scratchpad/`)
 
+**Naming**: The `{REPO_SLUG}` is auto-detected from the repository where the issue was created. For the main workspace repository, it uses "workspace". For package repositories (e.g., `marine_msgs`), it uses the package name.
+
 **Benefits**:
-- ✅ Disk efficiency: Only modified packages have real checkouts
-- ✅ Build efficiency: Symlinked packages reuse the main workspace's source tree; each worktree keeps its own build/install artifacts
-- ✅ Isolation: Git worktrees allow independent changes
+- Disk efficiency: Only modified packages have real checkouts
+- Build efficiency: Symlinked packages reuse the main workspace's source tree; each worktree keeps its own build/install artifacts
+- Isolation: Git worktrees allow independent changes
 
 **Example workflow**:
 ```bash
-# Create layer worktree for single package
+# Create layer worktree for single package (workspace issue #42)
 .agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages unh_marine_autonomy
+# Creates: layers/worktrees/issue-workspace-42/
 
 # For multiple packages (coordinated changes)
 .agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages unh_marine_autonomy,camp
 
+# Or for a package repo issue (marine_msgs #5)
+.agent/scripts/worktree_create.sh --issue 5 --type layer --layer core --packages marine_msgs --repo-slug marine_msgs
+# Creates: layers/worktrees/issue-marine_msgs-5/
+
 # Enter and work
 source .agent/scripts/worktree_enter.sh --issue 42
+
+# If multiple worktrees exist for issue #42 (from different repos),
+# specify the repository slug:
+source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
@@ -118,7 +134,7 @@ git push -u origin feature/ISSUE-42-description
 
 ### Workspace Worktrees (`--type workspace`)
 
-**Location**: `.workspace-worktrees/issue-<N>/`
+**Location**: `.workspace-worktrees/issue-{REPO_SLUG}-{NUMBER}/`
 
 **Use for**: Infrastructure changes, documentation, `.agent/` modifications
 
@@ -127,10 +143,13 @@ git push -u origin feature/ISSUE-42-description
 - Symlink: `layers/main` → main workspace's built layers
 - All `.agent/` files and scripts
 
+**Naming**: Same as layer worktrees - includes repository slug to prevent collisions.
+
 **Example workflow**:
 ```bash
-# Create workspace worktree
+# Create workspace worktree (workspace issue #99)
 .agent/scripts/worktree_create.sh --issue 99 --type workspace
+# Creates: .workspace-worktrees/issue-workspace-99/
 
 # Enter and work
 source .agent/scripts/worktree_enter.sh 99
@@ -346,6 +365,47 @@ source .agent/scripts/worktree_enter.sh 42
 5. **Create draft PR early** - Signals active work to others
 6. **Commit frequently** - Worktrees don't protect against data loss
 
+## Migration from Old Naming Scheme
+
+**Old format**: `issue-{NUMBER}` (e.g., `issue-42`)  
+**New format**: `issue-{REPO_SLUG}-{NUMBER}` (e.g., `issue-workspace-42`, `issue-marine_msgs-5`)
+
+### Why the Change?
+
+The old naming scheme (`issue-{NUMBER}`) caused collisions when working on issues from different repositories with the same issue number. For example, issue #5 from `marine_msgs` and issue #5 from `sensor_driver` would try to use the same worktree path.
+
+The new naming scheme (`issue-{REPO_SLUG}-{NUMBER}`) eliminates this problem by including the repository context in the directory name.
+
+### Repository Slug Sanitization
+
+Repository names may contain characters (like hyphens) that are not suitable for directory names or regex parsing. The scripts automatically sanitize repository slugs by replacing all non-alphanumeric characters (except underscores) with underscores.
+
+**Examples**:
+- `my-repo-name` → `my_repo_name`
+- `ros2-driver` → `ros2_driver`
+
+### Handling Multiple Worktrees for the Same Issue
+
+When multiple worktrees exist for the same issue number from different repositories, the helper scripts will detect the ambiguity:
+
+```bash
+$ source .agent/scripts/worktree_enter.sh 42
+Error: Multiple worktrees found for issue 42:
+  - issue-workspace-42
+  - issue-marine_msgs-42
+
+Use --repo-slug to specify which one:
+  source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug workspace
+  source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
+```
+
+Use the `--repo-slug` parameter to disambiguate:
+
+```bash
+source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
+.agent/scripts/worktree_remove.sh --issue 42 --repo-slug workspace
+```
+
 ---
 
 **Related Documentation**:
@@ -353,4 +413,4 @@ source .agent/scripts/worktree_enter.sh 42
 - [Workforce Protocol](.agent/WORKFORCE_PROTOCOL.md) - Multi-agent coordination
 - [Git Hygiene](.agent/rules/common/git-hygiene.md) - Branch and commit practices
 
-**Last Updated**: 2026-01-29
+**Last Updated**: 2026-02-03

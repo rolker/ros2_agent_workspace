@@ -99,9 +99,20 @@ if ! gh auth status &> /dev/null; then
     exit 1
 fi
 
-ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json title,body,number)
+ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json title,body,number,repository)
 ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
 ISSUE_BODY=$(echo "$ISSUE_JSON" | jq -r '.body // ""')
+ISSUE_REPO=$(echo "$ISSUE_JSON" | jq -r '.repository.name // "ros2_agent_workspace"')
+
+# Determine repo slug for worktree naming
+if [ "$ISSUE_REPO" == "ros2_agent_workspace" ]; then
+    REPO_SLUG="workspace"
+else
+    REPO_SLUG="$ISSUE_REPO"
+fi
+
+# Sanitize repo slug: replace hyphens and other invalid characters with underscores
+REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 
 # Create slug from title (lowercase, replace spaces/special chars with hyphens)
 SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
@@ -116,7 +127,7 @@ if [ -n "$WORKTREE_TYPE" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
     # Build worktree_create arguments safely to avoid command injection
-    WORKTREE_ARGS=(--issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME")
+    WORKTREE_ARGS=(--issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME" --repo-slug "$REPO_SLUG")
     if [ "$WORKTREE_TYPE" = "layer" ]; then
         if [ -z "$TARGET_LAYER" ]; then
             echo "Error: --layer is required for layer worktrees"
@@ -135,7 +146,7 @@ if [ -n "$WORKTREE_TYPE" ]; then
     
     echo ""
     echo "✅ Worktree created! Next steps:"
-    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh $ISSUE_NUMBER"
+    echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh --issue $ISSUE_NUMBER --repo-slug $REPO_SLUG"
     echo "   2. Work in isolation without affecting the main workspace"
     echo "   3. When done, commit and push from within the worktree"
     echo "   4. Create draft PR: gh pr create --draft --title 'feat: <description>' --body 'Closes #$ISSUE_NUMBER'"

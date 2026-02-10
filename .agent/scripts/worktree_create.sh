@@ -35,6 +35,7 @@ ISSUE_NUM=""
 WORKTREE_TYPE="layer"
 BRANCH_NAME=""
 TARGET_LAYER=""
+REPO_SLUG=""
 TARGET_PACKAGES=""  # Comma-separated list of packages to modify
 
 # Available layers (same order as env.sh)
@@ -50,13 +51,14 @@ show_usage() {
     echo "                        Available: ${AVAILABLE_LAYERS[*]}"
     echo "  --packages <pkg,...>  Package(s) to modify (required for layer type)"
     echo "                        Comma-separated list for multiple packages"
+    echo "  --repo-slug <slug>    Repository slug for naming (auto-detected if not provided)"
     echo "  --branch <name>       Custom branch name (default: feature/issue-<N>)"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp"
     echo "  $0 --issue 123 --type workspace"
-    echo "  $0 --issue 123 --type layer --layer sensors --packages sonar_driver --branch feature/add-new-sensor"
+    echo "  $0 --issue 5 --type layer --layer sensors --packages sonar_driver --repo-slug marine_msgs"
 }
 
 # Parse arguments
@@ -72,6 +74,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --layer)
             TARGET_LAYER="$2"
+            shift 2
+            ;;
+        --repo-slug)
+            REPO_SLUG="$2"
             shift 2
             ;;
         --branch)
@@ -138,6 +144,33 @@ if [ -n "$TARGET_LAYER" ]; then
     fi
 fi
 
+# Auto-detect repo slug if not provided
+if [ -z "$REPO_SLUG" ]; then
+    # Try to detect from git remote URL
+    if git remote get-url origin &>/dev/null; then
+        REMOTE_URL=$(git remote get-url origin)
+        # Extract repo name from URL (works for both HTTPS and SSH)
+        # e.g., https://github.com/org/repo.git -> repo
+        # e.g., git@github.com:org/repo.git -> repo
+        REPO_SLUG=$(basename "$REMOTE_URL" .git)
+
+        # If this is the main workspace repo, use "workspace" as the slug
+        if [ "$REPO_SLUG" == "ros2_agent_workspace" ]; then
+            REPO_SLUG="workspace"
+        fi
+
+        # Sanitize repo slug: replace hyphens and other invalid characters with underscores
+        REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+    else
+        # Fallback to "workspace" if no remote
+        REPO_SLUG="workspace"
+    fi
+    echo "Auto-detected repository slug: $REPO_SLUG"
+else
+    # Sanitize explicitly provided repo slug using the same rules
+    REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+fi
+
 # Set default branch name if not provided
 if [ -z "$BRANCH_NAME" ]; then
     BRANCH_NAME="feature/issue-${ISSUE_NUM}"
@@ -145,9 +178,9 @@ fi
 
 # Determine worktree path based on type
 if [ "$WORKTREE_TYPE" == "layer" ]; then
-    WORKTREE_DIR="$ROOT_DIR/layers/worktrees/issue-${ISSUE_NUM}"
+    WORKTREE_DIR="$ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
 else
-    WORKTREE_DIR="$ROOT_DIR/.workspace-worktrees/issue-${ISSUE_NUM}"
+    WORKTREE_DIR="$ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
 fi
 
 # Check if worktree already exists
@@ -171,6 +204,7 @@ echo "========================================"
 echo "Creating Worktree"
 echo "========================================"
 echo "  Issue:      #$ISSUE_NUM"
+echo "  Repository: $REPO_SLUG"
 echo "  Type:       $WORKTREE_TYPE"
 [ -n "$TARGET_LAYER" ] && echo "  Layer:      $TARGET_LAYER"
 echo "  Branch:     $BRANCH_NAME"
