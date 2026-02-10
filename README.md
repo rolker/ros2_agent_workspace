@@ -53,7 +53,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 
 ## Structure
 
-- **`.agent/`**: Contains agent-specific workflows and knowledge.
+- **`.agent/`**: Agent infrastructure (scripts, hooks, knowledge, templates, identity).
 - **`configs/`**: Contains `project_bootstrap.url` linking to project configuration.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
 - **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
@@ -186,11 +186,11 @@ make test          # Run all tests
 make clean         # Clean build artifacts
 make status        # Show workspace status
 make lint          # Run linters
+```
 
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
 - `status_report.sh`: Comprehensive workspace status with test history.
-```
 
 ### Pre-commit Hooks
 Install pre-commit hooks for automatic validation:

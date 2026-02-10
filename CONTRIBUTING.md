@@ -153,7 +153,7 @@ git checkout -b feature/TASK-123-add-new-layer
 To add a new workspace layer:
 
 1. Create `configs/<layer-name>.repos` with repository definitions
-2. Update `LAYERS` array in `.agent/scripts/env.sh` if the layer should be auto-sourced (note: this is now configured via `layers.txt`)
+2. Update `config/layers.txt` in the key repository if the layer should be auto-sourced
 3. Document the layer in README.md
 4. Test setup: `./.agent/scripts/setup.sh <layer-name>`
 

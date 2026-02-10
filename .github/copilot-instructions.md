@@ -131,9 +131,9 @@ layers/main/
 
 ## References (Read When Needed, Not Upfront)
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — System design and layering
-- [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) — Detailed worktree patterns
-- [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
-- [`.agent/WORKFORCE_PROTOCOL.md`](.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
-- [`.agent/knowledge/`](.agent/knowledge/) — ROS 2 development patterns and CLI best practices
-- [`.agent/templates/`](.agent/templates/) — Issue and test templates
+- [`ARCHITECTURE.md`](../ARCHITECTURE.md) — System design and layering
+- [`.agent/WORKTREE_GUIDE.md`](../.agent/WORKTREE_GUIDE.md) — Detailed worktree patterns
+- [`.agent/AI_IDENTITY_STRATEGY.md`](../.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
+- [`.agent/WORKFORCE_PROTOCOL.md`](../.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
+- [`.agent/knowledge/`](../.agent/knowledge/) — ROS 2 development patterns and CLI best practices
+- [`.agent/templates/`](../.agent/templates/) — Issue and test templates

@@ -222,7 +222,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 1. **Separation of Concerns**: Configuration (configs/), automation (.agent/scripts/), intelligence (.agent/)
 2. **GitOps**: Workspace structure defined in version control, generated artifacts are gitignored
 3. **Reproducibility**: Bootstrap and setup scripts ensure consistent environments
-4. **Agent-Friendly**: Clear structure, comprehensive documentation, executable workflows
+4. **Agent-Friendly**: Clear structure, comprehensive documentation, automation scripts
 5. **Developer-Friendly**: Works for humans too, not just agents
 6. **Layered Complexity**: Simple tasks are simple, complex tasks are possible
 
@@ -234,7 +234,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 - **Bash**: Automation scripts
 - **Python 3**: Utilities and parsers
 - **YAML**: Configuration format for .repos files
-- **Markdown**: Documentation and workflows
+- **Markdown**: Documentation and agent instruction files
 
 ## Future Considerations
 
