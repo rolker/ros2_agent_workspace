@@ -99,22 +99,26 @@ class TestNodeCommunication(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test class - runs once before all tests."""
-        rclpy.init()
-    
+        cls._rclpy_initialized_here = False
+        if not rclpy.ok():
+            rclpy.init()
+            cls._rclpy_initialized_here = True
+
     @classmethod
     def tearDownClass(cls):
         """Clean up test class - runs once after all tests."""
-        rclpy.shutdown()
-    
+        if getattr(cls, '_rclpy_initialized_here', False) and rclpy.ok():
+            rclpy.shutdown()
+
     def setUp(self):
         """Set up each test - runs before each test method."""
         self.node = RclpyNode('test_node')
         self.received_messages = []
-    
+
     def tearDown(self):
         """Clean up each test - runs after each test method."""
         self.node.destroy_node()
-    
+
     def test_topic_published(self):
         """
         Test that the node publishes to the expected topic.
@@ -244,6 +248,7 @@ class TestNodeCommunication(unittest.TestCase):
         
         # Verify response
         response = future.result()
+        self.assertIsNotNone(response, 'Service response is None')
         # self.assertTrue(response.success)
         # self.assertEqual(response.message, 'expected_message')
         
@@ -256,12 +261,16 @@ class TestNodeParameters(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test class."""
-        rclpy.init()
-    
+        cls._rclpy_initialized_here = False
+        if not rclpy.ok():
+            rclpy.init()
+            cls._rclpy_initialized_here = True
+
     @classmethod
     def tearDownClass(cls):
         """Clean up test class."""
-        rclpy.shutdown()
+        if getattr(cls, '_rclpy_initialized_here', False) and rclpy.ok():
+            rclpy.shutdown()
     
     def setUp(self):
         """Set up each test."""

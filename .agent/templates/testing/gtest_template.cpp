@@ -23,12 +23,16 @@ class ComponentNameTest : public ::testing::Test
 protected:
   /**
    * @brief Set up test fixture before each test
+   *
+   * Note: If your tests don't modify rclcpp state, consider moving init/shutdown
+   * to SetUpTestSuite/TearDownTestSuite (static methods) to run once per suite
+   * instead of once per test.
    */
   void SetUp() override
   {
     // Initialize ROS 2 (if needed for your component)
     rclcpp::init(0, nullptr);
-    
+
     // Initialize your component or test resources here
     // Example: component_ = std::make_shared<ComponentName>();
   }
@@ -40,7 +44,7 @@ protected:
   {
     // Clean up resources
     // Example: component_.reset();
-    
+
     // Shutdown ROS 2
     rclcpp::shutdown();
   }
