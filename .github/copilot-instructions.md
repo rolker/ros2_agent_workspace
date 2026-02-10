@@ -1,174 +1,139 @@
-# GitHub Copilot CLI Instructions
+# GitHub Copilot — Operational Rules
 
-**🚀 Quick Start**: See [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md) for a 5-minute setup guide.
+This file is the single source of truth for GitHub Copilot agents in this workspace.
+All rules are inline — no need to read other docs before starting work.
 
----
-
-## Universal Agent Rules
-
-All AI agents (Copilot CLI, Gemini CLI, Antigravity, etc.) follow the same core workflow and rules documented in:
-
-👉 **[`.agent/AI_RULES.md`](../.agent/AI_RULES.md)** - Single source of truth for:
-- Essential documentation to read
-- Standard 4-step workflow (source env → configure identity → check status → start work)
-- Core rules (git hygiene, AI signatures, clean workspace, issue-first)
-- Permissions and roles
-- Troubleshooting common issues
-
----
-
-## Copilot CLI-Specific Notes
-
-### Environment & Versions
-
-This workspace uses:
-- **ROS 2**: Jazzy, Kilted, and Rolling (multi-distro support)
-- **Build System**: colcon
-- **VCS Tool**: vcstool
-- **Python**: 3.10+
-
-### Quick Command Reference
-
-Common workflows are mapped in [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS.md):
+## Environment Setup
 
 ```bash
-/check-status      # Full workspace status
-/build             # Build specific package
-/build-all         # Build all workspaces
-/test-all          # Run all tests
-/start-feature     # Create feature branch
-/submit-pr         # Create pull request
-```
-
-### Build & Test Commands
-
-**Build workspace layers:**
-```bash
-# Build all layers in order
-make build
-
-# Build specific layer
-cd layers/main/core_ws && colcon build --symlink-install
-
-# Build with output
-colcon build --symlink-install --event-handlers console_direct+
-```
-
-**Run tests:**
-```bash
-# All tests
-make test
-
-# Specific package tests
-colcon test --packages-select <package_name>
-colcon test-result --verbose
-```
-
-**Lint & Validate:**
-```bash
-# Pre-commit checks
-pre-commit run --all-files
-
-# Validate configs
-python3 .agent/scripts/validate_repos.py
-```
-
-### GitHub Integration
-
-Copilot CLI has native GitHub access. Use it for faster operations:
-
-```bash
-gh pr list                          # List open PRs
-gh issue list --assignee @me        # Your assigned issues
-gh pr view 123                      # View PR details
-gh issue view 46                    # View issue details
-```
-
-### ROS2 Knowledge
-
-For ROS2 development patterns and CLI usage:
-- **[`.agent/knowledge/ros2_development_patterns.md`](../.agent/knowledge/ros2_development_patterns.md)** - Package structure, colcon, vcstool
-- **[`.agent/knowledge/ros2_cli_best_practices.md`](../.agent/knowledge/ros2_cli_best_practices.md)** - Runtime ROS commands
-
----
-
-## First-Time Setup (3 Steps)
-
-If this is your first session in this workspace:
-
-```bash
-# 1. Source ROS environment
-source .agent/scripts/env.sh
-
-# 2. Configure git identity (ephemeral, session-only)
+source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
-
-# 3. Check workspace status
-.agent/scripts/status_report.sh
 ```
 
-**📚 Full details**: [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md)
+## Git Rules
 
-**Expected Output After Setup:**
+- **Never commit to `main`** — branch is protected; direct pushes are rejected.
+- **Never `git checkout <branch>`** — `env.sh` blocks it. Use worktrees instead.
+- **GIT_EDITOR=true** for rebase/amend/merge to avoid hanging on interactive editors.
+- **Branch naming**: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`.
+- **Atomic commits**: one logical change per commit. Don't bundle unrelated fixes.
+- **All changes via Pull Requests**.
+
+## Worktree Workflow (Required)
+
+Every task must use an isolated worktree — never work in the main tree.
+
 ```bash
-$ source .agent/scripts/env.sh
-[ROS 2 Jazzy sourced]
+# Create + enter
+.agent/scripts/worktree_create.sh --issue <N> --type workspace
+source .agent/scripts/worktree_enter.sh --issue <N>
 
-$ .agent/scripts/status_report.sh
-✓ ROS 2 environment: Jazzy
-✓ Workspace layers: core_ws (3 packages)
-✓ Git branch: main
-✓ No uncommitted changes
+# For ROS package work, use layer worktrees
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core
+
+# List / remove
+.agent/scripts/worktree_list.sh
+.agent/scripts/worktree_remove.sh --issue <N>
 ```
 
+## Issue-First Policy
+
+No code without a ticket. Check for an existing GitHub issue first; if none exists,
+ask the user: "Should I open an issue to track this?" Use the issue number in branches
+and reference it in PRs with `Closes #<N>`.
+
+**Exception**: trivial typo/doc fixes.
+
+## AI Signature (Required on all GitHub Issues/PRs/Comments)
+
+```markdown
 ---
+**Authored-By**: `Copilot CLI Agent`
+**Model**: `<your actual model name>`
+```
 
-## Role Assignment & Boundaries
+Use your actual runtime identity — never copy example model names from docs.
+Check `$AGENT_NAME` / `$AGENT_MODEL` environment variables if unsure.
 
-By default, Copilot CLI acts as **ROS Developer**:
+## GitHub CLI: Use `--body-file`, Not `--body`
 
-**Allowed:**
-- ✅ Create/modify ROS packages in `layers/*/src/` (when working on assigned tasks)
-- ✅ Write/update tests
-- ✅ Update package documentation
-- ✅ Modify config files in the key repository's `config/repos/*.repos`
-- ✅ Update build configurations (CMakeLists.txt, package.xml, setup.py)
+Multiline `--body` strings break newlines. Always write to a temp file first:
 
-**Forbidden:**
-- ❌ Delete or restructure `layers/*/src/` without explicit instruction
-- ❌ Modify packages you weren't assigned to work on
-- ❌ Modify `.agent/` infrastructure (unless explicitly assigned Framework Engineer role)
-- ❌ Commit build artifacts (`build/`, `install/`, `log/`)
-- ❌ Commit directly to `main` branch (always use feature branches)
-- ❌ Modify `.github/workflows/` without review
-- ❌ Commit secrets or credentials
-
-**Code Examples:**
-
-Creating a new ROS2 Python package:
 ```bash
-cd layers/main/core_ws/src
-ros2 pkg create --build-type ament_python my_package \
-  --dependencies rclpy std_msgs
+BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+cat << 'EOF' > "$BODY_FILE"
+Your markdown content here.
+EOF
+gh pr create --title "Title" --body-file "$BODY_FILE"
+rm "$BODY_FILE"
 ```
 
-Adding additional dependencies to existing package.xml:
-```xml
-<!-- Beyond those specified in ros2 pkg create -->
-<depend>geometry_msgs</depend>
-<depend>tf2_ros</depend>
+## Build & Test
+
+```bash
+make build                                       # Build all layers
+make test                                        # Run all tests
+make validate                                    # Validate workspace
+
+# Single package
+cd layers/main/core_ws && colcon build --packages-select <package>
+colcon test --packages-select <package> && colcon test-result --verbose
+
+pre-commit run --all-files                       # Lint + hooks
 ```
 
-See [`.agent/PERMISSIONS.md`](../.agent/PERMISSIONS.md) for full role definitions.
+**Build in layer directories only** — never `colcon build` from the workspace root.
 
----
+## Workspace Cleanliness
 
-**Next Steps**:
-- Read [`.agent/AI_CLI_QUICKSTART.md`](../.agent/AI_CLI_QUICKSTART.md) for fast onboarding
-- Reference [`.agent/AI_RULES.md`](../.agent/AI_RULES.md) for complete workflow
-- Use [`.agent/CLI_COMMANDS.md`](../.agent/CLI_COMMANDS.md) to discover workflows
+- Keep repo root and `layers/*/src/` clean — no temp files, build artifacts, or logs.
+- Use `.agent/scratchpad/` for persistent temp files (unique names via `mktemp`).
+- Use `/tmp` for ephemeral files cleaned up in the same command.
 
----
+## Copilot-Specific Notes
 
-**Last Updated**: 2026-01-27  
-**Related**: [AI_RULES.md](../.agent/AI_RULES.md), [AI_CLI_QUICKSTART.md](../.agent/AI_CLI_QUICKSTART.md), [CLI_COMMANDS.md](../.agent/CLI_COMMANDS.md)
+- **Native GitHub access**: Use `gh` CLI for fast PR/issue operations.
+- **ROS 2**: Jazzy, Kilted, and Rolling (multi-distro support).
+- **Build system**: colcon. **VCS tool**: vcstool. **Python**: 3.10+.
+
+## Script Reference
+
+| Script | Purpose |
+|--------|---------|
+| `.agent/scripts/env.sh` | Source ROS 2 env + checkout guardrail |
+| `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) |
+| `.agent/scripts/worktree_create.sh` | Create isolated worktree |
+| `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
+| `.agent/scripts/worktree_remove.sh` | Remove worktree |
+| `.agent/scripts/worktree_list.sh` | List active worktrees |
+| `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
+| `.agent/scripts/status_report.sh` | Full workspace status |
+| `.agent/scripts/build.sh` | Build all layers in order |
+| `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |
+| `.agent/scripts/gh_create_issue.sh` | Create issue with label validation |
+| `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
+| `.agent/scripts/sync_repos.py` | Sync all workspace repositories |
+| `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
+
+## Layered Architecture
+
+```
+layers/main/
+├── underlay_ws/    # Additional dependencies
+├── core_ws/        # UNH Marine Autonomy Framework
+├── platforms_ws/   # Platform-specific code
+├── sensors_ws/     # Sensor drivers
+├── simulation_ws/  # Simulation tools
+└── ui_ws/          # Visualization
+```
+
+`layers/` is gitignored — use `ls` to inspect it, not grep/glob.
+
+## References (Read When Needed, Not Upfront)
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — System design and layering
+- [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) — Detailed worktree patterns
+- [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
+- [`.agent/WORKFORCE_PROTOCOL.md`](.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
+- [`.agent/knowledge/`](.agent/knowledge/) — ROS 2 development patterns and CLI best practices
+- [`.agent/templates/`](.agent/templates/) — Issue and test templates
