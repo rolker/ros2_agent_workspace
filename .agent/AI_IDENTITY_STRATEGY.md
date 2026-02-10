@@ -236,4 +236,4 @@ The user has configured the repository to require 0 reviews for merging.
 - [x] **Create Ephemeral Script**: `.agent/scripts/set_git_identity_env.sh` for host-based agents in shared workspaces.
 - [x] **Update Documentation**: Document both ephemeral and persistent approaches with decision tree.
 - [x] **Clarify Scope**: Identity applies to workspace repo AND all repos in `layers/`.
-- [x] **Enforce Content Signatures**: Agents must sign GitHub comments/PRs (see `rules/common/ai-signature.md`).
+- [x] **Enforce Content Signatures**: Agents must sign GitHub comments/PRs (see framework instruction files).
