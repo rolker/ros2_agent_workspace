@@ -33,6 +33,14 @@ repos:
         stages: [pre-commit]
         always_run: true
 
+      - id: check-commit-identity
+        name: Verify commit identity is configured
+        entry: python3 .agent/hooks/check-commit-identity.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        always_run: true
+
       - id: check-branch-updates
         name: Check for updates in default branch
         entry: python3 .agent/hooks/check-branch-updates.py
