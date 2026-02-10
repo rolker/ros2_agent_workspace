@@ -2,6 +2,8 @@
 
 **Goal**: Enable multiple AI agents to work accurately and safely within the same workspace without stepping on each other's toes.
 
+**Supported frameworks**: GitHub Copilot, Gemini CLI, Antigravity, Claude Code. All agents follow the same isolation, visibility, and handover rules below.
+
 ## 1. Task Isolation with Git Worktrees (Recommended)
 
 For parallel work by multiple agents, use **git worktrees** for complete isolation:

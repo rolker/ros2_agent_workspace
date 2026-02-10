@@ -81,14 +81,19 @@ if [ -n "$CLAUDE_CODE" ] || [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_API_KEY
     return 0
 fi
 
-# Fallback: Check for claude command
+# Fallback: Check for claude command with version validation
 if command -v claude &> /dev/null; then
-    export AGENT_FRAMEWORK="claude-code"
-    VERSION=$(claude --version 2>/dev/null | head -n 1)
-    if [ -n "$VERSION" ]; then
-        export AGENT_FRAMEWORK_VERSION="$VERSION"
+    CLAUDE_VERSION_OUTPUT=$(claude --version 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        CLAUDE_VERSION_LINE=$(echo "$CLAUDE_VERSION_OUTPUT" | head -n 1)
+        if echo "$CLAUDE_VERSION_LINE" | grep -qi "claude"; then
+            export AGENT_FRAMEWORK="claude-code"
+            if [ -n "$CLAUDE_VERSION_LINE" ]; then
+                export AGENT_FRAMEWORK_VERSION="$CLAUDE_VERSION_LINE"
+            fi
+            return 0
+        fi
     fi
-    return 0
 fi
 
 # Check for generic AI agent indicators
