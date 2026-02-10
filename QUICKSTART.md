@@ -127,27 +127,18 @@ You should see various project11 packages listed.
 
 ## Next Steps
 
-### Optional: Setup Individual Layers
+### Optional: Re-setup or Add Individual Layers
 
-If you only ran setup for specific layers earlier, you can add more as needed:
+Step 5 above sets up all layers automatically. You can also re-run setup for
+a specific layer if needed, or add a new layer that was added to the project
+configuration after your initial setup:
 
 ```bash
-# Platform-specific packages (e.g., for Ben robot)
-./.agent/scripts/setup.sh platforms
+# Re-setup a specific layer
+./.agent/scripts/setup.sh core
 
-# Sensor drivers and perception
-./.agent/scripts/setup.sh sensors
-
-# Simulation tools
-./.agent/scripts/setup.sh simulation
-
-# User interfaces and visualization
-./.agent/scripts/setup.sh ui
-```
-
-Or re-run auto-setup to get all layers:
-```bash
-./.agent/scripts/setup.sh   # Sets up all layers from project config
+# Or re-run auto-setup to get all layers
+./.agent/scripts/setup.sh
 ```
 
 ### Run Tests

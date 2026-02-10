@@ -24,7 +24,6 @@
 set -e
 
 LAYER_NAME=$1
-LAYER_DIR="layers/main/${LAYER_NAME}_ws"
 
 # Bootstrapping Configuration
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
@@ -45,16 +44,22 @@ bootstrap_key_repo() {
     echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
     REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
     
+    # Note: The bootstrap config URL is controlled by this project's own
+    # configs/project_bootstrap.url file. The downloaded YAML provides
+    # git_url and branch values used in git clone. This is trusted because
+    # the URL file is committed to this repository and points to a known
+    # project-controlled location. If stronger integrity guarantees are
+    # needed in the future, consider pinning to a specific commit hash.
     echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
     TEMP_CONFIG=$(mktemp)
     trap 'rm -f "$TEMP_CONFIG"' EXIT
-    
+
     if ! curl -sSLf "$REMOTE_CONFIG_URL" -o "$TEMP_CONFIG"; then
         echo "Error: Failed to download bootstrap config from $REMOTE_CONFIG_URL"
         echo "Please ensure the remote file exists and is accessible."
         exit 1
     fi
-    
+
     KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
     KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
 
@@ -115,6 +120,15 @@ if [ -z "$LAYER_NAME" ]; then
         exit 0
     fi
 fi
+
+# Validate layer name: must be alphanumeric with optional hyphens/underscores
+if ! [[ "$LAYER_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "Error: Invalid layer name '$LAYER_NAME'."
+    echo "Layer names must contain only letters, numbers, hyphens, and underscores."
+    exit 1
+fi
+
+LAYER_DIR="layers/main/${LAYER_NAME}_ws"
 
 # Bootstrap if necessary (for individual layer setup)
 bootstrap_key_repo
