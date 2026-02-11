@@ -8,9 +8,9 @@ description: Applies UNH CCOM/JHC official brand colors, typography, naming conv
 ## Overview
 
 This skill provides the official brand identity and editorial standards for the
-University of New Hampshire Center for Coastal and Ocean Mapping / Joint
-Hydrographic Center (CCOM/JHC). Apply these guidelines when creating or updating
-documentation, web content, presentations, or any project artifacts.
+Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at
+the University of New Hampshire (UNH). Apply these guidelines when creating or
+updating documentation, web content, presentations, or any project artifacts.
 
 **Keywords**: branding, CCOM, JHC, UNH, visual identity, editorial style, brand
 colors, typography, documentation styling, ocean mapping
@@ -21,7 +21,7 @@ colors, typography, documentation styling, ocean mapping
 
 | Context | Usage |
 |---------|-------|
-| First reference | University of New Hampshire Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) |
+| First reference | Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH) |
 | Subsequent references | CCOM/JHC, or "the Center" |
 | Component names | CCOM (mapping focus), JHC (hydrographic focus) |
 | Parent institution | University of New Hampshire (UNH) |
@@ -84,7 +84,7 @@ CCOM/JHC follows **AP Stylebook** with UNH-specific exceptions:
 | Em dashes | With spaces: ` -- ` (not `---` or `—`) |
 | Numbers | Spell out one through nine; numerals for 10+ |
 | Times | Lowercase with periods: 3:30 p.m. |
-| Months with dates | Abbreviate 6+ letter months: Sept. 8, but July 12 |
+| Months with dates | With a specific date, abbreviate Jan., Feb., Aug., Sept., Oct., Nov., Dec.; spell out March, April, May, June, July. Spell out all months when they stand alone. |
 | Phone numbers | (603) 862-XXXX format |
 | Websites | Omit "www" prefix; lowercase "website," "web," "internet" |
 | Degrees | Lowercase generic: bachelor's, master's, doctorate |
