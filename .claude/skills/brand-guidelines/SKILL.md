@@ -21,7 +21,7 @@ colors, typography, documentation styling, ocean mapping
 
 | Context | Usage |
 |---------|-------|
-| First reference | Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) |
+| First reference | University of New Hampshire Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) |
 | Subsequent references | CCOM/JHC, or "the Center" |
 | Component names | CCOM (mapping focus), JHC (hydrographic focus) |
 | Parent institution | University of New Hampshire (UNH) |
