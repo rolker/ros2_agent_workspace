@@ -1,10 +1,10 @@
-# Contributing to ROS2 Agent Workspace
+# Contributing to the ROS 2 Agent Workspace
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the workspace.
+Thank you for your interest in contributing! This document provides guidelines for contributing to the workspace, developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH).
 
 ## Code of Conduct
 
-We are committed to providing a welcoming and inclusive environment. Please be respectful and professional in all interactions.
+The Center is committed to providing a welcoming and inclusive environment. All contributors are expected to be respectful and professional in all interactions.
 
 ## Getting Started
 
@@ -145,7 +145,7 @@ git checkout -b feature/TASK-123-add-new-layer
 │   ├── templates/      # Issue and test templates
 │   └── hooks/          # Git hooks (pre-commit)
 ├── configs/            # .repos files defining layers
-└── layers/             # ROS2 layers (gitignored, generated)
+└── layers/             # ROS 2 layers (gitignored, generated)
 ```
 
 ## Adding New Layers

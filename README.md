@@ -1,8 +1,8 @@
-# ROS2 Agent Workspace
+# ROS 2 Agent Workspace
 
-This repository allows for the management of multiple layered ROS2 workspaces, configured specifically for use with AI agents like GitHub Copilot and Antigravity.
+This repository provides management of multiple layered ROS 2 workspaces, configured for use with AI agents. It is developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH) -- a national center of expertise in ocean mapping and hydrographic sciences.
 
-**It is pre-configured to host the UNH Marine Autonomy Framework.**
+**The workspace is pre-configured to host the UNH Marine Autonomy Framework.**
 
 The workspace automatically imports repositories from the project's configuration files located in the `unh_marine_autonomy` repository:
 - **Project11**: Main autonomy system.
@@ -56,7 +56,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 - **`.agent/`**: Agent infrastructure (scripts, hooks, knowledge, templates, identity).
 - **`configs/`**: Contains `project_bootstrap.url` linking to project configuration.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
-- **`layers/`**: The ROS2 workspace layers (source code and build artifacts).
+- **`layers/`**: The ROS 2 workspace layers (source code and build artifacts).
 
 ## Usage
 
@@ -179,7 +179,7 @@ Common operations are available via make:
 ```bash
 make help          # Show all available targets
 make health-check  # Run comprehensive health check
-make bootstrap     # Install ROS2 and dependencies
+make bootstrap     # Install ROS 2 and dependencies
 make setup-all     # Setup all workspace layers
 make build         # Build all layers
 make test          # Run all tests
