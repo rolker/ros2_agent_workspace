@@ -60,10 +60,10 @@ colors, typography, documentation styling, ocean mapping
 
 ### Typography
 
-- **Headings**: System sans-serif stack — Arial, Helvetica, sans-serif
-- **Body Text**: System serif stack — Georgia, "Times New Roman", serif
-- **Code/Technical**: Monospace stack — "Courier New", Courier, monospace
-- **Note**: UNH's logo wordmark uses Glypha Bold, which is reserved for official logo artwork only — never recreate it with fonts.
+- **Headings**: System sans-serif stack -- Arial, Helvetica, sans-serif
+- **Body Text**: System serif stack -- Georgia, "Times New Roman", serif
+- **Code/Technical**: Monospace stack -- "Courier New", Courier, monospace
+- **Note**: UNH's logo wordmark uses Glypha Bold, which is reserved for official logo artwork only -- never recreate it with fonts.
 
 ### Logo Usage
 
@@ -93,20 +93,20 @@ CCOM/JHC follows **AP Stylebook** with UNH-specific exceptions:
 
 ### Tone of Voice
 
-- **Professional and academic** — formal without being stiff
-- **Research-forward** — lead with capabilities and achievements, not promotional language
-- **Factual and accomplishment-oriented** — demonstrate expertise through what has been done
-- **Accessible** — technical when describing research, but provide context for non-specialists
-- **Third person** — use "the Center" or "CCOM/JHC," not "we" in formal documentation
-- **Collaborative** — emphasize partnerships with NOAA, agencies, universities, and industry
-- **Educational** — "train the next generation" is a recurring theme
+- **Professional and academic** -- formal without being stiff
+- **Research-forward** -- lead with capabilities and achievements, not promotional language
+- **Factual and accomplishment-oriented** -- demonstrate expertise through what has been done
+- **Accessible** -- technical when describing research, but provide context for non-specialists
+- **Third person** -- use "the Center" or "CCOM/JHC," not "we" in formal documentation
+- **Collaborative** -- emphasize partnerships with NOAA, agencies, universities, and industry
+- **Educational** -- "train the next generation" is a recurring theme
 
 ### Writing Patterns
 
 - Emphasize the dual mission: developing ocean mapping tools **and** training the next generation of hydrographers.
 - Position within institutional hierarchy when relevant: "a key component of UNH's School of Marine Science and Ocean Engineering."
 - Research areas in navigation/headings may be capitalized (Autonomous Systems, Data Visualization); use lowercase in running text.
-- Define technical terms on first use for general audiences (e.g., "hydrography — the science of measuring and describing the physical features of bodies of water").
+- Define technical terms on first use for general audiences (e.g., "hydrography -- the science of measuring and describing the physical features of bodies of water").
 
 ## Mission Statement
 
