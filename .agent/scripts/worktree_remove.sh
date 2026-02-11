@@ -183,7 +183,93 @@ echo "  Path:   $WORKTREE_DIR"
 echo "  Branch: ${BRANCH_NAME:-detached HEAD}"
 echo ""
 
-# Check for uncommitted changes
+# Refuse to proceed if the caller's shell is inside the worktree.
+# This script runs as a subprocess, so it cannot change the caller's cwd.
+# Removing the directory while the caller is inside it leaves their shell broken.
+if [[ "$CALLER_PWD" == "$WORKTREE_DIR"* ]]; then
+    echo "❌ Error: Your shell is currently inside this worktree."
+    echo ""
+    echo "   Run this first:  cd $ROOT_DIR"
+    echo "   Then re-run:     $0 --issue $ISSUE_NUM"
+    exit 1
+fi
+
+# For layer worktrees, check inner package worktrees for uncommitted changes,
+# then clean up layer infrastructure (symlinks, .scratchpad) so that the
+# workspace-level git status only reports genuine uncommitted files.
+INNER_WORKTREE_REPOS=()  # Parent repos of inner worktrees (for pruning later)
+
+if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
+    HAS_INNER_UNCOMMITTED=false
+
+    # Find inner package git worktrees (directories in *_ws/src/ that are NOT symlinks)
+    for ws_dir in "$WORKTREE_DIR"/*_ws; do
+        [ -d "$ws_dir" ] || continue
+        [ -L "$ws_dir" ] && continue  # skip symlinked layers
+        SRC_DIR="$ws_dir/src"
+        [ -d "$SRC_DIR" ] || continue
+
+        for pkg_dir in "$SRC_DIR"/*; do
+            [ -d "$pkg_dir" ] || continue
+            [ -L "$pkg_dir" ] && continue  # skip symlinked packages
+
+            # Check if this is a git worktree with uncommitted changes
+            if git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                PKG_NAME=$(basename "$pkg_dir")
+                PKG_STATUS=$(git -C "$pkg_dir" status --porcelain 2>/dev/null)
+                if [ -n "$PKG_STATUS" ]; then
+                    if [ "$FORCE" != true ]; then
+                        echo "⚠️  Warning: Package '$PKG_NAME' has uncommitted changes:"
+                        echo ""
+                        git -C "$pkg_dir" status --short
+                        echo ""
+                        HAS_INNER_UNCOMMITTED=true
+                    fi
+                fi
+
+                # Track the parent repo for pruning later
+                MAIN_REPO=$(git -C "$pkg_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')
+                if [ -n "$MAIN_REPO" ] && [ -d "$MAIN_REPO" ]; then
+                    INNER_WORKTREE_REPOS+=("$MAIN_REPO")
+                fi
+            fi
+        done
+    done
+
+    if [ "$HAS_INNER_UNCOMMITTED" = true ]; then
+        echo "Use --force to remove anyway, or commit/stash your changes first."
+        exit 1
+    fi
+
+    # Clean up layer infrastructure before checking workspace git status.
+    # This removes symlinks and generated directories so git status is clean.
+    for ws_dir in "$WORKTREE_DIR"/*_ws; do
+        [ -e "$ws_dir" ] || continue
+        if [ -L "$ws_dir" ]; then
+            # Remove symlinked layers (e.g., underlay_ws, platforms_ws)
+            rm "$ws_dir"
+        elif [ -d "$ws_dir" ]; then
+            # Target layer directory - remove inner symlinks and git worktrees
+            SRC_DIR="$ws_dir/src"
+            if [ -d "$SRC_DIR" ]; then
+                for pkg_dir in "$SRC_DIR"/*; do
+                    [ -e "$pkg_dir" ] || continue
+                    if [ -L "$pkg_dir" ]; then
+                        rm "$pkg_dir"
+                    elif [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                        git worktree remove "$pkg_dir" --force 2>/dev/null || rm -rf "$pkg_dir"
+                    fi
+                done
+            fi
+            rm -rf "$ws_dir"
+        fi
+    done
+
+    # Remove .scratchpad
+    rm -rf "$WORKTREE_DIR/.scratchpad"
+fi
+
+# Check for uncommitted changes in the workspace worktree itself
 if [ -d "$WORKTREE_DIR" ]; then
     cd "$WORKTREE_DIR"
     UNCOMMITTED=$(git status --porcelain 2>/dev/null)
@@ -200,23 +286,15 @@ if [ -d "$WORKTREE_DIR" ]; then
     cd "$ROOT_DIR"
 fi
 
-# Refuse to proceed if the caller's shell is inside the worktree.
-# This script runs as a subprocess, so it cannot change the caller's cwd.
-# Removing the directory while the caller is inside it leaves their shell broken.
-if [[ "$CALLER_PWD" == "$WORKTREE_DIR"* ]]; then
-    echo "❌ Error: Your shell is currently inside this worktree."
-    echo ""
-    echo "   Run this first:  cd $ROOT_DIR"
-    echo "   Then re-run:     $0 --issue $ISSUE_NUM"
-    exit 1
-fi
-
 # Remove the worktree
 echo "Removing worktree..."
 git worktree remove "$WORKTREE_DIR" ${FORCE:+--force}
 
-# Prune worktree references
+# Prune worktree references (workspace repo + inner package repos)
 git worktree prune
+for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
+    git -C "$repo_path" worktree prune 2>/dev/null || true
+done
 
 echo ""
 echo "✅ Worktree removed successfully"
