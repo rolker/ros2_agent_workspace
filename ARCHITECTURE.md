@@ -2,7 +2,7 @@
 
 ## Overview
 
-The ROS2 Agent Workspace is a **layered workspace management system** designed for complex ROS2 projects, specifically pre-configured for the UNH Marine Autonomy Framework. It supports AI-driven development through structured workflows and knowledge management.
+The ROS 2 Agent Workspace is a **layered workspace management system** designed for complex ROS 2 projects. It is developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH) and pre-configured for the UNH Marine Autonomy Framework. The workspace supports AI-driven development through structured workflows and knowledge management.
 
 ## Core Concepts
 

@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-This workspace is configured for ROS 2 Jazzy. We maintain security updates for:
+This workspace, developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH), is configured for ROS 2 Jazzy. The Center maintains security updates for:
 
 | Version | Supported          |
 | ------- | ------------------ |

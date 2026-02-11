@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-This guide will help you get started with the ROS2 Agent Workspace in just a few minutes.
+This guide covers setup for the ROS 2 Agent Workspace, developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH).
 
 ## Prerequisites
 
@@ -222,4 +222,4 @@ You should now have:
 - ✅ Core workspace set up and built
 - ✅ Environment sourced and ready to use
 
-Happy coding! 🚀
+The workspace is ready for development.
