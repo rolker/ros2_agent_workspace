@@ -186,7 +186,7 @@ echo ""
 # Refuse to proceed if the caller's shell is inside the worktree.
 # This script runs as a subprocess, so it cannot change the caller's cwd.
 # Removing the directory while the caller is inside it leaves their shell broken.
-if [[ "$CALLER_PWD" == "$WORKTREE_DIR"* ]]; then
+if [[ "$CALLER_PWD" == "$WORKTREE_DIR" || "$CALLER_PWD" == "$WORKTREE_DIR/"* ]]; then
     echo "❌ Error: Your shell is currently inside this worktree."
     echo ""
     echo "   Run this first:  cd $ROOT_DIR"
@@ -257,7 +257,7 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                     if [ -L "$pkg_dir" ]; then
                         rm "$pkg_dir"
                     elif [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
-                        git worktree remove "$pkg_dir" --force 2>/dev/null || rm -rf "$pkg_dir"
+                        rm -rf "$pkg_dir"
                     fi
                 done
             fi
@@ -288,7 +288,11 @@ fi
 
 # Remove the worktree
 echo "Removing worktree..."
-git worktree remove "$WORKTREE_DIR" ${FORCE:+--force}
+if [ "$FORCE" = true ]; then
+    git worktree remove --force "$WORKTREE_DIR"
+else
+    git worktree remove "$WORKTREE_DIR"
+fi
 
 # Prune worktree references (workspace repo + inner package repos)
 git worktree prune
