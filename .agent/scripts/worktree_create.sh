@@ -163,10 +163,11 @@ if [ -z "$REPO_SLUG" ]; then
         fi
     fi
 
-    # Fallback: detect from workspace repo remote
+    # Fallback: detect from workspace repo remote (use -C to ensure we
+    # always query the workspace repo, regardless of the caller's cwd)
     if [ -z "$REMOTE_URL" ]; then
-        if git remote get-url origin &>/dev/null; then
-            REMOTE_URL=$(git remote get-url origin)
+        if git -C "$ROOT_DIR" remote get-url origin &>/dev/null; then
+            REMOTE_URL=$(git -C "$ROOT_DIR" remote get-url origin)
         fi
     fi
 
