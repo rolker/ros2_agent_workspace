@@ -194,15 +194,16 @@ if [[ "$CALLER_PWD" == "$WORKTREE_DIR" || "$CALLER_PWD" == "$WORKTREE_DIR/"* ]];
     exit 1
 fi
 
-# For layer worktrees, check inner package worktrees for uncommitted changes,
-# then clean up layer infrastructure (symlinks, .scratchpad) so that the
-# workspace-level git status only reports genuine uncommitted files.
+# For layer worktrees, perform all safety checks first (inner packages,
+# unrecognized content, workspace-level), then clean up layer infrastructure
+# only after every check has passed.  This avoids leaving the worktree in a
+# partially-destroyed state if a check causes an early exit.
 INNER_WORKTREE_REPOS=()  # Parent repos of inner worktrees (for pruning later)
 
 if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
-    HAS_INNER_UNCOMMITTED=false
+    HAS_ISSUES=false
 
-    # Find inner package git worktrees (directories in *_ws/src/ that are NOT symlinks)
+    # --- Phase 1: Check inner package worktrees and detect unrecognized content ---
     for ws_dir in "$WORKTREE_DIR"/*_ws; do
         [ -d "$ws_dir" ] || continue
         [ -L "$ws_dir" ] && continue  # skip symlinked layers
@@ -210,21 +211,19 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
         [ -d "$SRC_DIR" ] || continue
 
         for pkg_dir in "$SRC_DIR"/*; do
-            [ -d "$pkg_dir" ] || continue
+            [ -e "$pkg_dir" ] || continue
             [ -L "$pkg_dir" ] && continue  # skip symlinked packages
 
-            # Check if this is a git worktree with uncommitted changes
-            if git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+            if [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                # Known inner git worktree — check for uncommitted changes
                 PKG_NAME=$(basename "$pkg_dir")
                 PKG_STATUS=$(git -C "$pkg_dir" status --porcelain 2>/dev/null)
-                if [ -n "$PKG_STATUS" ]; then
-                    if [ "$FORCE" != true ]; then
-                        echo "⚠️  Warning: Package '$PKG_NAME' has uncommitted changes:"
-                        echo ""
-                        git -C "$pkg_dir" status --short
-                        echo ""
-                        HAS_INNER_UNCOMMITTED=true
-                    fi
+                if [ -n "$PKG_STATUS" ] && [ "$FORCE" != true ]; then
+                    echo "⚠️  Warning: Package '$PKG_NAME' has uncommitted changes:"
+                    echo ""
+                    git -C "$pkg_dir" status --short
+                    echo ""
+                    HAS_ISSUES=true
                 fi
 
                 # Track the parent repo for pruning later
@@ -232,24 +231,42 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                 if [ -n "$MAIN_REPO" ] && [ -d "$MAIN_REPO" ]; then
                     INNER_WORKTREE_REPOS+=("$MAIN_REPO")
                 fi
+            else
+                # Not a symlink and not a git repo — unrecognized user content
+                if [ "$FORCE" != true ]; then
+                    echo "⚠️  Warning: Unrecognized content in $(basename "$ws_dir")/src/: $(basename "$pkg_dir")"
+                    HAS_ISSUES=true
+                fi
             fi
         done
     done
 
-    if [ "$HAS_INNER_UNCOMMITTED" = true ]; then
+    # --- Phase 2: Check workspace-level uncommitted changes ---
+    # Filter out known layer infrastructure so only genuine changes are flagged.
+    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|[a-zA-Z_]+_ws(/|$))'
+    cd "$WORKTREE_DIR"
+    WORKSPACE_UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -v -E "$INFRA_PATTERN" || true)
+    cd "$ROOT_DIR"
+
+    if [ -n "$WORKSPACE_UNCOMMITTED" ] && [ "$FORCE" != true ]; then
+        echo "⚠️  Warning: Worktree has uncommitted changes:"
+        echo ""
+        echo "$WORKSPACE_UNCOMMITTED"
+        echo ""
+        HAS_ISSUES=true
+    fi
+
+    if [ "$HAS_ISSUES" = true ]; then
         echo "Use --force to remove anyway, or commit/stash your changes first."
         exit 1
     fi
 
-    # Clean up layer infrastructure before checking workspace git status.
-    # This removes symlinks and generated directories so git status is clean.
+    # --- Phase 3: All checks passed — perform destructive cleanup ---
     for ws_dir in "$WORKTREE_DIR"/*_ws; do
         [ -e "$ws_dir" ] || continue
         if [ -L "$ws_dir" ]; then
-            # Remove symlinked layers (e.g., underlay_ws, platforms_ws)
             rm "$ws_dir"
         elif [ -d "$ws_dir" ]; then
-            # Target layer directory - remove inner symlinks and git worktrees
             SRC_DIR="$ws_dir/src"
             if [ -d "$SRC_DIR" ]; then
                 for pkg_dir in "$SRC_DIR"/*; do
@@ -264,13 +281,10 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
             rm -rf "$ws_dir"
         fi
     done
-
-    # Remove .scratchpad
     rm -rf "$WORKTREE_DIR/.scratchpad"
-fi
 
-# Check for uncommitted changes in the workspace worktree itself
-if [ -d "$WORKTREE_DIR" ]; then
+# Non-layer worktrees: simple uncommitted changes check
+elif [ -d "$WORKTREE_DIR" ]; then
     cd "$WORKTREE_DIR"
     UNCOMMITTED=$(git status --porcelain 2>/dev/null)
 
