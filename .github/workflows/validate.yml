@@ -1,10 +1,10 @@
 name: Workspace Validation
 
-on:
+"on":
   push:
-    branches: [ main, jazzy, 'feature/**', 'fix/**' ]
+    branches: [main, jazzy, 'feature/**', 'fix/**']
   pull_request:
-    branches: [ main, jazzy ]
+    branches: [main, jazzy]
 
 jobs:
   validate-scripts:
@@ -20,6 +20,8 @@ jobs:
           python-version: '3.10'
 
       - name: Lint
+        env:
+          SKIP: check-commit-identity,no-commit-to-branch,check-branch-updates
         run: make lint
 
   validate-documentation:
