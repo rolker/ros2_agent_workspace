@@ -11,11 +11,11 @@ This workflow prevents that class of error.
 
 ## Cardinal Rule
 
-> **No fact without a `file:line` reference.**
+> **No fact without reading the source.**
 >
 > Every parameter name, topic name, message type, service type, action type, default
-> value, and API signature in documentation must trace back to a specific line in the
-> source code. If you cannot point to the line, do not write the claim.
+> value, and API signature in documentation must be verified against the actual source
+> code. If you cannot find it in the source, do not write the claim.
 
 ## Step-by-Step Process
 
@@ -55,7 +55,6 @@ Before submitting documentation, verify each row in every table:
 - [ ] Topic name matches `create_publisher` / `create_subscription` call exactly
 - [ ] Message type matches the template argument or string, including the package prefix
 - [ ] Service/action types match their definition files
-- [ ] Every row has a `Source` column with `file:line`
 - [ ] No section is present for a category the package does not use (omit, don't leave empty)
 
 ## Command Cookbook
@@ -108,10 +107,10 @@ grep -rn 'create_client' <package_path>/src/ <package_path>/include/ <package_pa
 
 ```bash
 # Action servers
-grep -rn 'create_server\|rclcpp_action::create_server' <package_path>/src/ <package_path>/include/
+grep -rn 'rclcpp_action::create_server' <package_path>/src/ <package_path>/include/
 
 # Action clients
-grep -rn 'create_client\|rclcpp_action::create_client' <package_path>/src/ <package_path>/include/
+grep -rn 'rclcpp_action::create_client' <package_path>/src/ <package_path>/include/
 ```
 
 ### Message / Service / Action Definitions
@@ -139,8 +138,9 @@ These are the mistakes agents make most often. Check your documentation against 
 
 ## Workspace-Specific Notes
 
-- **`layers/` is gitignored** -- standard glob/find from the workspace root will not
-  find source files. Use `ls` to explore layer directories, or search within a specific
-  layer path (e.g., `layers/main/core_ws/src/<package>/`).
+- **`layers/` is gitignored** -- Git-aware tools (`git grep`, `rg`) will skip it by
+  default when searching from the workspace root. Shell `find` and globbing will still
+  traverse it. Use `rg --no-ignore` or search within a specific layer path
+  (e.g., `layers/main/core_ws/src/<package>/`).
 - **Interface packages** may live in a different layer than the node package. Check
   `package.xml` dependencies to find where message/service/action types are defined.
