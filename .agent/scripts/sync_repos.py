@@ -73,14 +73,14 @@ def sync_repo(repo_path, repo_name, dry_run=False):
     # 1. Check for local modifications
     if is_dirty(repo_path, dry_run):
         if dry_run:
-            print(f"  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
+            print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
-            print(f"  ⚠️  Skipping: Uncommitted changes detected.")
+            print("  ⚠️  Skipping: Uncommitted changes detected.")
         return
 
     branch = get_current_branch(repo_path, dry_run)
     if not branch:
-        print(f"  ❌ Skipping: Detached HEAD or invalid git state.")
+        print("  ❌ Skipping: Detached HEAD or invalid git state.")
         return
 
     # 2. Sync Logic
@@ -110,7 +110,8 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 s_success, s_msg = run_git_cmd(repo_path, ["status", "-sb"], dry_run)
                 if s_success and "behind" in s_msg:
                     print(
-                        f"     ⚠️  Branch is behind remote. Run 'git merge' or 'git rebase' manually."
+                        "     ⚠️  Branch is behind remote."
+                        " Run 'git merge' or 'git rebase' manually."
                     )
                 else:
                     print("     ✅ Fetched.")

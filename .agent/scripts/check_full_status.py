@@ -253,7 +253,7 @@ def get_remote_status(batch_size=10):
             number = issue.get("number", "")
             url = issue.get("url", "")
             labels = issue.get("labels", [])
-            label_names = ", ".join([l.get("name", "") for l in labels[:3]])  # Max 3 labels
+            label_names = ", ".join([label.get("name", "") for label in labels[:3]])  # Max 3 labels
 
             # Truncate long titles
             if len(title) > 50:

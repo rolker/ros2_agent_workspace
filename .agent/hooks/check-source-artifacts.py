@@ -4,7 +4,6 @@ Pre-commit hook to warn about untracked files in source directories.
 This prevents accidental commits of temporary artifacts left by agents.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path

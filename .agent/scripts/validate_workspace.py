@@ -53,7 +53,7 @@ def get_actual_repos(workspace_root):
     for search_dir in search_dirs:
         # Walk through the directory structure (limit depth for performance)
         # Repos are typically at: layers/<layer>/<ws>/src/<repo>
-        for root, dirs, files in os.walk(search_dir):
+        for root, dirs, _files in os.walk(search_dir):
             root_path_obj = Path(root)
 
             # Performance optimization: limit depth
@@ -123,11 +123,10 @@ def get_git_branch(repo_path):
         branch = result.stdout.strip()
         return branch if branch else None  # None indicates detached HEAD or error
     except subprocess.CalledProcessError as e:
-        if verbose:
-            print(f"Warning: git command failed for {repo_path}: {e}", file=sys.stderr)
+        print(f"Warning: git command failed for {repo_path}: {e}", file=sys.stderr)
         return None
     except FileNotFoundError:
-        print(f"Error: git command not found. Please ensure git is installed.", file=sys.stderr)
+        print("Error: git command not found. Please ensure git is installed.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Error: Unexpected error getting branch for {repo_path}: {e}", file=sys.stderr)
@@ -298,7 +297,7 @@ def fix_workspace(missing_repos, verbose=False):
 
     success = True
 
-    for src_file, items in by_config.items():
+    for src_file, _items in by_config.items():
         # Determine target workspace based on filename (heuristic)
         # e.g. core.repos -> layers/main/core_ws/src
         # e.g. platforms.repos -> layers/main/platforms_ws/src

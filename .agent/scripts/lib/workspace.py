@@ -5,11 +5,12 @@ Provides common functions for discovering and managing repositories in the
 ROS2 Agent Workspace.
 """
 
+import glob
 import os
 import sys
-import yaml
-import glob
 from pathlib import Path
+
+import yaml
 
 
 def get_workspace_root():

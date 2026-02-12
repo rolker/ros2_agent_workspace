@@ -123,8 +123,9 @@ def analyze_package(pkg_path):
             header_score = min(WEIGHT_HEADERS, len(details["headers_found"]) * 5)
             score += header_score
             if header_score < WEIGHT_HEADERS:
+                found = len(details['headers_found'])
                 details["issues"].append(
-                    f"Missing key sections (Found {len(details['headers_found'])}/4+ needed for max score)"
+                    f"Missing key sections (Found {found}/4+ needed for max score)"
                 )
 
         except Exception as e:
@@ -142,7 +143,7 @@ def generate_report(results):
     sorted_results = sorted(results, key=lambda x: x["score"])
 
     lines = []
-    lines.append(f"# Documentation Quality Report")
+    lines.append("# Documentation Quality Report")
     lines.append(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"Total Packages Analyzed: {len(results)}")
     lines.append("")
@@ -164,8 +165,9 @@ def generate_report(results):
     for res in sorted_results:
         lines.append(f"### {res['name']} (Score: {res['score']})")
         lines.append(f"- **Path**: `{res['path']}`")
+        license_icon = '✅' if res['license_found'] else '❌'
         lines.append(
-            f"- **package.xml**: Description len: {res['pkg_desc_len']}, License: {'✅' if res['license_found'] else '❌'}"
+            f"- **package.xml**: Description len: {res['pkg_desc_len']}, License: {license_icon}"
         )
         lines.append(
             f"- **README**: {'✅' if res['readme_exists'] else '❌'} ({res['readme_lines']} lines)"
@@ -175,7 +177,7 @@ def generate_report(results):
             lines.append(f"    - **Sections Found**: {headers}")
 
         if res["issues"]:
-            lines.append(f"- **Issues**:")
+            lines.append("- **Issues**:")
             for issue in res["issues"]:
                 lines.append(f"    - {issue}")
         lines.append("")
