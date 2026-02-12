@@ -24,12 +24,6 @@ COLCON_IGNORE
 # The .agent/.identity file is generated at runtime and should not be committed
 .agent/.identity
 
-# Generated Knowledge (Keep README and permanent knowledge files)
-.agent/knowledge/*
-!.agent/knowledge/README.md
-!.agent/knowledge/ros2_cli_best_practices.md
-!.agent/knowledge/ros2_development_patterns.md
-!.agent/knowledge/documentation_verification.md
 .env
 
 # Python cache files
