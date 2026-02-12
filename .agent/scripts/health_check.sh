@@ -108,14 +108,14 @@ echo "4. Checking Workspace Structure..."
 if [ -d "$ROOT_DIR/configs" ]; then
     REPOS_COUNT=$(ls -1 "$ROOT_DIR/configs"/*.repos 2>/dev/null | wc -l)
 
-    # Check for migrated repos
-    MIGRATED_DIR="$ROOT_DIR/layers/main/core_ws/src/unh_marine_autonomy/config/repos"
-    if [ -d "$MIGRATED_DIR" ]; then
-        MIGRATED_COUNT=$(ls -1 "$MIGRATED_DIR"/*.repos 2>/dev/null | wc -l)
-        REPOS_COUNT=$((REPOS_COUNT + MIGRATED_COUNT))
+    # Check for manifest repo .repos files via symlink
+    MANIFEST_REPOS_DIR="$ROOT_DIR/configs/manifest/repos"
+    if [ -d "$MANIFEST_REPOS_DIR" ]; then
+        MANIFEST_COUNT=$(ls -1 "$MANIFEST_REPOS_DIR"/*.repos 2>/dev/null | wc -l)
+        REPOS_COUNT=$((REPOS_COUNT + MANIFEST_COUNT))
     fi
 
-    check_pass "configs/ (and migrated) directories exist with $REPOS_COUNT .repos files"
+    check_pass "configs/ directory exists with $REPOS_COUNT .repos files"
 else
     check_fail "configs/ directory not found"
     ((FAILED_CHECKS++))
@@ -150,12 +150,12 @@ if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
         fi
     fi
 
-    # Validate migrated repos (if exist)
-    MIGRATED_DIR="$ROOT_DIR/layers/core_ws/src/unh_marine_autonomy/config/repos"
-    if [ -d "$MIGRATED_DIR" ]; then
-        if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$MIGRATED_DIR" --strict &>/dev/null; then
+    # Validate manifest repos (if symlink exists)
+    MANIFEST_REPOS_DIR="$ROOT_DIR/configs/manifest/repos"
+    if [ -d "$MANIFEST_REPOS_DIR" ]; then
+        if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$MANIFEST_REPOS_DIR" --strict &>/dev/null; then
              VALIDATION_PASSED=false
-             check_fail "Validation failed for $MIGRATED_DIR"
+             check_fail "Validation failed for $MANIFEST_REPOS_DIR"
         fi
     fi
 

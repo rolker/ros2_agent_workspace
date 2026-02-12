@@ -47,12 +47,20 @@ export ROS2_LAYERS_BASE="$LAYERS_BASE"
 
 # 2. Workspace Layers
 # Define the order of layers to source. Order determines overlay priority (last one is top).
-LAYERS_CONFIG="$LAYERS_BASE/core_ws/src/unh_marine_autonomy/config/layers.txt"
+# Primary: use the configs/manifest symlink (created by setup.sh)
+LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
 
-# For layer worktrees, check main's config if not found locally
-if [ ! -f "$LAYERS_CONFIG" ] && [ "$WORKTREE_CONTEXT" = "layer" ]; then
-    MAIN_LAYERS_BASE="$(dirname "$ROOT_DIR")/main"
-    LAYERS_CONFIG="$MAIN_LAYERS_BASE/core_ws/src/unh_marine_autonomy/config/layers.txt"
+# For worktrees, the configs/manifest symlink may not exist (gitignored).
+# Derive the main workspace root and check there.
+if [ ! -f "$LAYERS_CONFIG" ] && [ -n "$WORKTREE_CONTEXT" ]; then
+    if [ "$WORKTREE_CONTEXT" = "workspace" ]; then
+        # Workspace worktrees: .workspace-worktrees/issue-N -> main root is two levels up
+        MAIN_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
+    else
+        # Layer worktrees: layers/worktrees/issue-N -> main root is three levels up
+        MAIN_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
+    fi
+    LAYERS_CONFIG="$MAIN_ROOT/configs/manifest/layers.txt"
 fi
 
 if [ -f "$LAYERS_CONFIG" ]; then

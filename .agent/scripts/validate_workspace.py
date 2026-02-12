@@ -350,8 +350,8 @@ def fix_workspace(missing_repos, verbose=False):
         # Re-find the config file
         config_path = None
         for path_candidate in [
+            root / "configs" / "manifest" / "repos" / src_file,
             root / "configs" / src_file,
-            root / "layers/main/core_ws/src/unh_marine_autonomy/config/repos" / src_file,
         ]:
             if path_candidate.exists():
                 config_path = path_candidate
