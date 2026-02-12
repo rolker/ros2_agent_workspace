@@ -124,7 +124,8 @@ find_worktree() {
         echo "" >&2
         echo "Use --repo-slug to specify which one:" >&2
         for path in "${matches[@]}"; do
-            local slug=$(basename "$path" | sed -E 's/^issue-(.+)-[0-9]+$/\1/')
+            local slug
+            slug=$(basename "$path" | sed -E 's/^issue-(.+)-[0-9]+$/\1/')
             echo "  source ${BASH_SOURCE[0]} --issue ${issue_num} --repo-slug ${slug}" >&2
         done
         return 1

@@ -26,7 +26,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_ROOT="$(dirname "$SCRIPT_DIR")"
 IDENTITY_FILE="$AGENT_ROOT/.identity"
-IDENTITY_TEMPLATE="$AGENT_ROOT/.identity.template"
+export IDENTITY_TEMPLATE="$AGENT_ROOT/.identity.template"
 
 # Load framework configuration
 if [ -f "$SCRIPT_DIR/framework_config.sh" ]; then
@@ -78,12 +78,12 @@ detect_actual_model() {
     local detected_model=""
 
     case "$AGENT_FRAMEWORK" in
-        copilot*|copilot-cli)
+        copilot*)
             # GitHub Copilot doesn't expose model info easily
             # Use default from config
             detected_model="${FRAMEWORK_MODELS[copilot]}"
             ;;
-        gemini*|gemini-cli)
+        gemini*)
             # Gemini CLI might have model info in env or config
             # Check common environment variables
             if [ -n "$GEMINI_MODEL" ]; then
@@ -100,7 +100,7 @@ detect_actual_model() {
                 detected_model="${FRAMEWORK_MODELS[antigravity]}"
             fi
             ;;
-        claude*|claude-cli)
+        claude*)
             # Claude CLI model detection
             if [ -n "$CLAUDE_MODEL" ]; then
                 detected_model="$CLAUDE_MODEL"

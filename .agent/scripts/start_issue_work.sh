@@ -101,6 +101,7 @@ fi
 
 ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json title,body,number,repository)
 ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+export ISSUE_BODY
 ISSUE_BODY=$(echo "$ISSUE_JSON" | jq -r '.body // ""')
 ISSUE_REPO=$(echo "$ISSUE_JSON" | jq -r '.repository.name // "ros2_agent_workspace"')
 
@@ -175,7 +176,16 @@ else
     echo "   1. Edit $PLAN_FILE with your approach and tasks"
     echo "   2. Commit the plan: git add $PLAN_FILE && git commit -m 'docs: Add work plan for Issue #$ISSUE_NUMBER'"
     echo "   3. Push the branch: git push -u origin $BRANCH_NAME"
-    echo "   4. Create draft PR: gh pr create --draft --title 'feat: <description>' --body \$'See .agent/work-plans/PLAN_ISSUE-${ISSUE_NUMBER}.md\\n\\nCloses #${ISSUE_NUMBER}\\n\\n---\\n**🤖 Authored-By**: \\`$AGENT_NAME\\`'"
+    cat <<PREOF
+   4. Create draft PR: gh pr create --draft --title 'feat: <description>' --body-file <body.md>
+      Where body.md contains:
+        See .agent/work-plans/PLAN_ISSUE-${ISSUE_NUMBER}.md
+
+        Closes #${ISSUE_NUMBER}
+
+        ---
+        **Authored-By**: \`${AGENT_NAME}\`
+PREOF
     echo ""
     echo "💡 Or use the combined helper: .agent/scripts/update_issue_plan.sh $ISSUE_NUMBER"
 fi

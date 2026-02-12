@@ -18,7 +18,9 @@ set -euo pipefail
 # $1 = ref of previous HEAD
 # $2 = ref of new HEAD
 # $3 = flag indicating whether checkout was a branch checkout (1) or file checkout (0)
+# shellcheck disable=SC2034
 PREV_HEAD="${1:-}"
+# shellcheck disable=SC2034
 NEW_HEAD="${2:-}"
 BRANCH_CHECKOUT="${3:-0}"
 

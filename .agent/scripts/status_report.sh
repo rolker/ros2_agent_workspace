@@ -41,7 +41,7 @@ echo ""
 
 # 1. Root Repository Status
 echo "## Root Repository"
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit
 if command -v git &> /dev/null; then
     # Check for modifications
     if ! git fetch -q 2>/dev/null; then
@@ -81,7 +81,7 @@ else
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
 
-            cd "$ws_dir/src"
+            cd "$ws_dir/src" || exit
 
             # Fetch updates quietly (suppress warnings)
             vcs custom --git --args fetch -q >/dev/null 2>&1

@@ -13,7 +13,7 @@ TEST_SKIP=0
 # Setup test repository in temp directory
 setup_test_repo() {
     TEST_REPO=$(mktemp -d)
-    cd "$TEST_REPO"
+    cd "$TEST_REPO" || exit
     git init -q
     git config user.email "test@example.com"
     git config user.name "Test User"
@@ -105,13 +105,15 @@ test_dry_run_mode() {
 
 Fixes #123"
 
-    local before_commit=$(git rev-parse HEAD)
+    local before_commit
+    before_commit=$(git rev-parse HEAD)
 
     # Run dry-run
     local output
     output=$("$REVERT_SCRIPT" --issue 123 --dry-run 2>&1)
 
-    local after_commit=$(git rev-parse HEAD)
+    local after_commit
+    after_commit=$(git rev-parse HEAD)
 
     cleanup_test_repo
 
@@ -144,7 +146,8 @@ Implements #456"
     local result=$?
 
     # Check that we have a revert commit
-    local last_msg=$(git log -1 --format=%s)
+    local last_msg
+    last_msg=$(git log -1 --format=%s)
 
     cleanup_test_repo
 
@@ -182,7 +185,7 @@ test_multiple_commits_order() {
     # Verify success message shows correct count
     cleanup_test_repo
 
-    [[ "$output" =~ "Successfully reverted 3 commit(s)" ]]
+    [[ "$output" =~ Successfully\ reverted\ 3\ commit\(s\) ]]
 }
 run_test "Multiple commits reverted with correct count" test_multiple_commits_order
 
@@ -211,7 +214,8 @@ Fixes #111"
     local output
     output=$("$REVERT_SCRIPT" --issue 111 --dry-run 2>&1)
 
-    local found_count=$(echo "$output" | grep -c "Found 3 commit(s)")
+    local found_count
+    found_count=$(echo "$output" | grep -c "Found 3 commit(s)")
 
     cleanup_test_repo
 
@@ -243,7 +247,7 @@ test_no_subshell_issues() {
     cleanup_test_repo
 
     # Should show "Successfully reverted 1 commit(s)" - proves counter works
-    [[ "$output" =~ "Successfully reverted 1 commit(s)" ]]
+    [[ "$output" =~ Successfully\ reverted\ 1\ commit\(s\) ]]
 }
 run_test "Revert counter works correctly (no subshell issues)" test_no_subshell_issues
 

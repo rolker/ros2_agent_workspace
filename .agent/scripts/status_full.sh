@@ -133,7 +133,7 @@ echo ""
 
 # Root Repository Status
 echo "### Root Repository"
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit
 if command -v git &> /dev/null; then
     if [ -n "$(git status --porcelain)" ]; then
         echo "- **Status**: ⚠️ Modified"
@@ -167,7 +167,7 @@ else
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
 
-            cd "$ws_dir/src"
+            cd "$ws_dir/src" || exit
 
             # Get status with branch info
             raw_output=$(vcs custom --git --args status --porcelain -b 2>/dev/null || echo "")

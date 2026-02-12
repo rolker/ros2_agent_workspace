@@ -5,6 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export REPO_ROOT
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Colors
@@ -61,16 +62,22 @@ classify_comment() {
 # Function to analyze PR status
 analyze_pr() {
     local pr_json=$1
-    local number=$(echo "$pr_json" | jq -r '.number')
-    local title=$(echo "$pr_json" | jq -r '.title')
-    local updated=$(echo "$pr_json" | jq -r '.updatedAt')
-    local review_decision=$(echo "$pr_json" | jq -r '.reviewDecision // "PENDING"')
+    local number
+    number=$(echo "$pr_json" | jq -r '.number')
+    local title
+    title=$(echo "$pr_json" | jq -r '.title')
+    local updated
+    updated=$(echo "$pr_json" | jq -r '.updatedAt')
+    local review_decision
+    review_decision=$(echo "$pr_json" | jq -r '.reviewDecision // "PENDING"')
 
     # Get review info separately
-    local reviews_count=$(gh api "/repos/{owner}/{repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
+    local reviews_count
+    reviews_count=$(gh api "/repos/{owner}/{repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
 
     # Get review comments
-    local comments=$(get_review_comments "$number")
+    local comments
+    comments=$(get_review_comments "$number")
     local comment_count=0
 
     # Classify comments
@@ -83,8 +90,10 @@ analyze_pr() {
                 continue
             fi
             comment_count=$((comment_count + 1))
-            local body=$(echo "$comment" | jq -r '.body // ""')
-            local severity=$(classify_comment "$body")
+            local body
+            body=$(echo "$comment" | jq -r '.body // ""')
+            local severity
+            severity=$(classify_comment "$body")
 
             if [ "$severity" = "critical" ]; then
                 critical_count=$((critical_count + 1))
@@ -120,7 +129,8 @@ analyze_pr() {
         # Fallback for BSD/macOS date; assumes ISO-8601 like 2024-02-03T12:34:56Z
         time_ago=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$updated" "+%s" 2>/dev/null || echo "0")
     fi
-    local now=$(date +%s)
+    local now
+    now=$(date +%s)
     local diff=$((now - time_ago))
     local hours=$((diff / 3600))
     local days=$((diff / 86400))
@@ -161,8 +171,10 @@ display_dashboard() {
     local ready=()
 
     while IFS= read -r pr; do
-        local analyzed=$(analyze_pr "$pr")
-        local category=$(echo "$analyzed" | jq -r '.category')
+        local analyzed
+        analyzed=$(analyze_pr "$pr")
+        local category
+        category=$(echo "$analyzed" | jq -r '.category')
 
         case "$category" in
             needs_review)
@@ -207,19 +219,24 @@ display_category() {
 
     echo -e "${color}${emoji} ${label} (${#items[@]})${NC}"
     for item in "${items[@]}"; do
-        local number=$(echo "$item" | jq -r '.number')
-        local title=$(echo "$item" | jq -r '.title' | cut -c1-50)
-        local time=$(echo "$item" | jq -r '.time')
-        local critical=$(echo "$item" | jq -r '.critical')
-        local minor=$(echo "$item" | jq -r '.minor')
+        local number
+        number=$(echo "$item" | jq -r '.number')
+        local title
+        title=$(echo "$item" | jq -r '.title' | cut -c1-50)
+        local time
+        time=$(echo "$item" | jq -r '.time')
+        local critical_count
+        critical_count=$(echo "$item" | jq -r '.critical')
+        local minor_count
+        minor_count=$(echo "$item" | jq -r '.minor')
 
         printf "  #%-4s %-50s (last: %s)\n" "$number" "$title" "$time"
 
-        if [ "$critical" -gt 0 ]; then
-            echo "        → $critical critical comment(s)"
+        if [ "$critical_count" -gt 0 ]; then
+            echo "        → $critical_count critical comment(s)"
         fi
-        if [ "$minor" -gt 0 ]; then
-            echo "        → $minor minor comment(s)"
+        if [ "$minor_count" -gt 0 ]; then
+            echo "        → $minor_count minor comment(s)"
         fi
     done
     echo ""
@@ -231,7 +248,8 @@ output_json() {
     local all_prs=[]
 
     while IFS= read -r pr; do
-        local analyzed=$(analyze_pr "$pr")
+        local analyzed
+        analyzed=$(analyze_pr "$pr")
         all_prs=$(echo "$all_prs" | jq --argjson item "$analyzed" '. + [$item]')
     done < <(echo "$prs_json" | jq -c '.[]')
 
@@ -253,8 +271,10 @@ get_next_pr() {
     local category=${2:-"critical"}
 
     while IFS= read -r pr; do
-        local analyzed=$(analyze_pr "$pr")
-        local pr_category=$(echo "$analyzed" | jq -r '.category')
+        local analyzed
+        analyzed=$(analyze_pr "$pr")
+        local pr_category
+        pr_category=$(echo "$analyzed" | jq -r '.category')
 
         if [ "$pr_category" = "$category" ]; then
             echo "$analyzed"
@@ -276,8 +296,10 @@ output_simple() {
     local ready=()
 
     while IFS= read -r pr; do
-        local analyzed=$(analyze_pr "$pr")
-        local category=$(echo "$analyzed" | jq -r '.category')
+        local analyzed
+        analyzed=$(analyze_pr "$pr")
+        local category
+        category=$(echo "$analyzed" | jq -r '.category')
 
         case "$category" in
             needs_review) needs_review+=("$analyzed") ;;
@@ -293,10 +315,14 @@ output_simple() {
         echo ""
         echo "CRITICAL ISSUES:"
         for item in "${critical[@]}"; do
-            local number=$(echo "$item" | jq -r '.number')
-            local title=$(echo "$item" | jq -r '.title')
-            local crit=$(echo "$item" | jq -r '.critical')
-            local min=$(echo "$item" | jq -r '.minor')
+            local number
+            number=$(echo "$item" | jq -r '.number')
+            local title
+            title=$(echo "$item" | jq -r '.title')
+            local crit
+            crit=$(echo "$item" | jq -r '.critical')
+            local min
+            min=$(echo "$item" | jq -r '.minor')
             echo "  #$number: $title ($crit critical, $min minor)"
         done
     fi
@@ -305,8 +331,10 @@ output_simple() {
         echo ""
         echo "NEEDS REVIEW:"
         for item in "${needs_review[@]}"; do
-            local number=$(echo "$item" | jq -r '.number')
-            local title=$(echo "$item" | jq -r '.title')
+            local number
+            number=$(echo "$item" | jq -r '.number')
+            local title
+            title=$(echo "$item" | jq -r '.title')
             echo "  #$number: $title"
         done
     fi
@@ -315,8 +343,10 @@ output_simple() {
         echo ""
         echo "READY TO MERGE:"
         for item in "${ready[@]}"; do
-            local number=$(echo "$item" | jq -r '.number')
-            local title=$(echo "$item" | jq -r '.title')
+            local number
+            number=$(echo "$item" | jq -r '.number')
+            local title
+            title=$(echo "$item" | jq -r '.title')
             echo "  #$number: $title"
         done
     fi
@@ -326,7 +356,8 @@ output_simple() {
 run_interactive() {
     while true; do
         clear
-        local prs=$(fetch_prs)
+        local prs
+        prs=$(fetch_prs)
         display_dashboard "$prs" true
 
         echo "What would you like to do?"
@@ -432,7 +463,8 @@ main() {
     done
 
     # Fetch PRs
-    local prs=$(fetch_prs)
+    local prs
+    prs=$(fetch_prs)
 
     # Execute based on mode
     if [ "$interactive" = true ]; then

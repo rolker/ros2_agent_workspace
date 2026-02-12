@@ -67,7 +67,8 @@ print_worktree() {
 
     if [[ "$path" == *"/layers/worktrees/"* ]]; then
         type="layer"
-        local basename=$(basename "$path")
+        local basename
+        basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
@@ -81,7 +82,8 @@ print_worktree() {
         ((LAYER_COUNT++)) || true
     elif [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
-        local basename=$(basename "$path")
+        local basename
+        basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then

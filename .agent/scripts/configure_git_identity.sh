@@ -86,7 +86,7 @@ if [ "$1" == "--agent" ]; then
 
     if [ -z "$AGENT_NAME" ]; then
         echo "Error: Unknown framework '$2'"
-        echo "Supported frameworks: ${!FRAMEWORK_NAMES[@]}"
+        echo "Supported frameworks: ${!FRAMEWORK_NAMES[*]}"
         exit 1
     fi
 

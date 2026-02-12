@@ -70,6 +70,7 @@ for layer in "${LAYERS[@]}"; do
     SETUP_FILE="$LAYERS_BASE/${layer}_ws/install/setup.bash"
     if [ -f "$SETUP_FILE" ]; then
         echo "  - Sourcing $layer..."
+        # shellcheck disable=SC1090
         source "$SETUP_FILE"
     else
         if [ -d "$LAYERS_BASE/${layer}_ws/src" ]; then

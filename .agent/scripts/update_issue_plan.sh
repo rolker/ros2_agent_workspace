@@ -39,6 +39,7 @@ if [[ -n "$(git status --porcelain -- "$PLAN_FILE")" ]]; then
     echo ""
 
     # Normalize commit message: only prepend 'docs:' if no conventional prefix is present
+    # shellcheck disable=SC1073,SC1072
     if [[ "$COMMIT_MSG" =~ ^[A-Za-z]+(\([^)]*\))?:[[:space:]] ]]; then
         NORMALIZED_COMMIT_MSG="$COMMIT_MSG"
     else

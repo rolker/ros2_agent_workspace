@@ -111,6 +111,7 @@ if [ -z "$LAYER_NAME" ]; then
         echo "Falling back to default layer: core"
         echo ""
         echo "Available layers:"
+        # shellcheck disable=SC2011
         ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
         echo ""
         echo "========================================="
@@ -140,6 +141,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Configuration file not found: $CONFIG_FILE"
     echo ""
     echo "Available layers:"
+    # shellcheck disable=SC2011
     ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
     exit 1
 fi
