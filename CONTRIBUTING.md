@@ -144,7 +144,9 @@ git checkout -b feature/TASK-123-add-new-layer
 │   ├── knowledge/      # ROS 2 patterns and CLI best practices
 │   ├── templates/      # Issue and test templates
 │   └── hooks/          # Git hooks (pre-commit)
-├── configs/            # .repos files defining layers
+├── configs/            # Bootstrap URL, manifest symlink, optional manifest_repo/
+│   ├── manifest        # -> manifest repo's config dir (symlink, gitignored)
+│   └── manifest_repo/  # Manifest repo clone for Pattern A (gitignored)
 └── layers/             # ROS 2 layers (gitignored, generated)
 ```
 
@@ -152,8 +154,8 @@ git checkout -b feature/TASK-123-add-new-layer
 
 To add a new workspace layer:
 
-1. Create `configs/<layer-name>.repos` with repository definitions
-2. Update `config/layers.txt` in the key repository if the layer should be auto-sourced
+1. Add a `<layer-name>.repos` file to the manifest repo's `config/repos/` directory
+2. Add the layer name to `config/layers.txt` in the manifest repo
 3. Document the layer in README.md
 4. Test setup: `./.agent/scripts/setup.sh <layer-name>`
 

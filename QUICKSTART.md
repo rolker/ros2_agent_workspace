@@ -72,10 +72,10 @@ make setup-all
 ```
 
 This will:
-- Bootstrap the project repository
-- Read `config/layers.txt` to determine which layers to set up
+- Bootstrap the manifest repository and create `configs/manifest` symlink
+- Read `configs/manifest/layers.txt` to determine which layers to set up
 - Create workspace directories (`layers/main/underlay_ws`, `layers/main/core_ws`, etc.)
-- Import all repositories from project's `.repos` files
+- Import all repositories from manifest's `.repos` files
 - Clone Project11, Marine AIS, Navigation packages, geodesy dependencies, etc.
 
 **Note:** This requires SSH access to the repositories. Make sure your SSH key is configured on GitHub.
