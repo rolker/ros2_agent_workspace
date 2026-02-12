@@ -17,6 +17,9 @@ This directory contains symbolic links to key documentation found throughout the
 ## Simulation
 - **[Marine Simulation](component__simulation.md)**: VRX and Gazebo simulation environments.
 
+## Agent Workflows
+- **[Documentation Verification](documentation_verification.md)**: Mandatory verification workflow for writing accurate ROS 2 package documentation. Includes command cookbook and hallucination anti-patterns.
+
 ---
 *Note: This index is manually maintained. If you add new major components, please update this file and create the corresponding symlinks.*
 
