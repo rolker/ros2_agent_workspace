@@ -1,4 +1,8 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint health-check sync validate revert-feature
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint setup-dev health-check sync validate revert-feature
+
+VENV_DIR := .venv
+VENV_BIN := $(VENV_DIR)/bin
+PRE_COMMIT := $(VENV_BIN)/pre-commit
 
 # Default target
 help:
@@ -20,8 +24,9 @@ help:
 	@echo "  unlock        - Unlock workspace"
 	@echo "  sync          - Safely sync all workspace repositories"
 	@echo "  validate      - Validate workspace configuration"
+	@echo "  setup-dev     - Create dev-tools venv and install pre-commit"
 	@echo "  format        - Format Python code with black"
-	@echo "  lint          - Run linters on all code"
+	@echo "  lint          - Run pre-commit hooks on all files"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo ""
 
@@ -100,16 +105,14 @@ format:
 	@black --line-length 100 .agent/scripts/*.py
 	@echo "Done."
 
-lint: lint-shell lint-python
+$(PRE_COMMIT):
+	@echo "Creating dev-tools venv..."
+	@python3 -m venv $(VENV_DIR)
+	@$(VENV_BIN)/pip install --upgrade pip pre-commit
+	@echo "Dev-tools venv ready at $(VENV_DIR)/"
 
-lint-shell:
-	@echo "Running shellcheck on shell scripts..."
-	@shellcheck .agent/scripts/*.sh || true
-	@echo "Done."
+setup-dev: $(PRE_COMMIT)
+	@echo "Dev-tools venv is ready. pre-commit: $(PRE_COMMIT)"
 
-lint-python:
-	@echo "Running flake8 on Python scripts..."
-	@flake8 --max-line-length=100 --extend-ignore=E203,W503 .agent/scripts/*.py || true
-	@echo "Running pylint on Python scripts..."
-	@pylint --max-line-length=100 --disable=C0114,C0115,C0116 .agent/scripts/*.py || true
-	@echo "Done."
+lint: $(PRE_COMMIT)
+	@$(PRE_COMMIT) run --all-files
