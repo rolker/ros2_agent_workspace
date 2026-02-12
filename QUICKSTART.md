@@ -41,6 +41,8 @@ make setup-dev
 
 This creates a Python venv, installs pre-commit, and activates git hooks.
 
+**Note:** Requires `python3-venv` (`sudo apt install python3-venv` if not already present).
+
 ## Step 4: Run Health Check
 
 Verify your setup:

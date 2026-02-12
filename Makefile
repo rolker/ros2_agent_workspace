@@ -100,8 +100,9 @@ format: $(PRE_COMMIT)
 	@echo "Done."
 
 $(PRE_COMMIT):
-	@echo "Creating dev-tools venv..."
-	@python3 -m venv $(VENV_DIR)
+	@python3 -m venv $(VENV_DIR) \
+		|| { echo "Error: python3-venv is required.  Install it with:"; \
+		     echo "  sudo apt install python3-venv"; exit 1; }
 	@$(VENV_BIN)/pip install --upgrade pip pre-commit
 	@echo "Dev-tools venv ready at $(VENV_DIR)/"
 
