@@ -123,7 +123,7 @@ def analyze_package(pkg_path):
             header_score = min(WEIGHT_HEADERS, len(details["headers_found"]) * 5)
             score += header_score
             if header_score < WEIGHT_HEADERS:
-                found = len(details['headers_found'])
+                found = len(details["headers_found"])
                 details["issues"].append(
                     f"Missing key sections (Found {found}/4+ needed for max score)"
                 )
@@ -165,7 +165,7 @@ def generate_report(results):
     for res in sorted_results:
         lines.append(f"### {res['name']} (Score: {res['score']})")
         lines.append(f"- **Path**: `{res['path']}`")
-        license_icon = '✅' if res['license_found'] else '❌'
+        license_icon = "✅" if res["license_found"] else "❌"
         lines.append(
             f"- **package.xml**: Description len: {res['pkg_desc_len']}, License: {license_icon}"
         )
