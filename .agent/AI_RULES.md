@@ -51,3 +51,4 @@ rules plus framework-specific guidance.
 - [`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`WORKTREE_GUIDE.md`](WORKTREE_GUIDE.md) — Detailed worktree patterns
 - [`.agent/knowledge/`](knowledge/) — ROS 2 patterns and CLI best practices
+- [`.agent/project_knowledge/`](project_knowledge/) — Project-specific conventions and architecture (symlink, may not exist)

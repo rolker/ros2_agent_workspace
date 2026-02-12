@@ -11,5 +11,12 @@ checked out in `layers/`.
 ## Agent Workflows
 - **[Documentation Verification](documentation_verification.md)**: Mandatory verification workflow for writing accurate ROS 2 package documentation. Includes command cookbook and hallucination anti-patterns.
 
+## Project-Specific Knowledge
+
+Project-specific conventions and architecture docs are available via
+`.agent/project_knowledge/` (a symlink to the manifest repo's `agent_context/`
+directory, created by `setup.sh`). This symlink may not exist if the manifest
+repo does not provide an `agent_context/` directory.
+
 ---
 *Note: This index is manually maintained. Update it when adding new knowledge files.*
