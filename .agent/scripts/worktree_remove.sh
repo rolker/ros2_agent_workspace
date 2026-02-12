@@ -302,6 +302,18 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
     done
     rm -rf "$WORKTREE_DIR/.scratchpad"
 
+    # Prune inner package repo worktree references early, so they are cleaned
+    # up even if the main `git worktree remove` call later in the script fails.
+    if [ "${#INNER_WORKTREE_REPOS[@]}" -gt 0 ]; then
+        declare -A SEEN_REPOS=()
+        for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
+            if [ -n "$repo_path" ] && [ -z "${SEEN_REPOS[$repo_path]+_}" ]; then
+                SEEN_REPOS["$repo_path"]=1
+                git -C "$repo_path" worktree prune 2>/dev/null || true
+            fi
+        done
+    fi
+
 # Non-layer worktrees: simple uncommitted changes check
 elif [ -d "$WORKTREE_DIR" ]; then
     cd "$WORKTREE_DIR"
@@ -327,17 +339,8 @@ else
     git worktree remove "$WORKTREE_DIR"
 fi
 
-# Prune worktree references (workspace repo + inner package repos)
+# Prune worktree references for the workspace repo
 git worktree prune
-if [ "${#INNER_WORKTREE_REPOS[@]}" -gt 0 ]; then
-    declare -A SEEN_REPOS=()
-    for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
-        if [ -n "$repo_path" ] && [ -z "${SEEN_REPOS[$repo_path]+_}" ]; then
-            SEEN_REPOS["$repo_path"]=1
-            git -C "$repo_path" worktree prune 2>/dev/null || true
-        fi
-    done
-fi
 
 echo ""
 echo "✅ Worktree removed successfully"
