@@ -18,11 +18,12 @@
 
 set -e
 
-# Capture caller's working directory before any cd operations.
+# Capture caller's physical working directory before any cd operations.
 # We need this to detect if the caller is inside the worktree being removed.
 # Since this script is executed (not sourced), we cannot change the caller's
 # cwd — so we must refuse to proceed if they're inside the target worktree.
-CALLER_PWD="$(pwd)"
+# Use pwd -P to resolve symlinks so the comparison is reliable.
+CALLER_PWD="$(pwd -P)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
@@ -186,6 +187,8 @@ echo ""
 # Refuse to proceed if the caller's shell is inside the worktree.
 # This script runs as a subprocess, so it cannot change the caller's cwd.
 # Removing the directory while the caller is inside it leaves their shell broken.
+# Canonicalize WORKTREE_DIR so it matches the physical CALLER_PWD.
+WORKTREE_DIR=$(cd "$WORKTREE_DIR" && pwd -P)
 if [[ "$CALLER_PWD" == "$WORKTREE_DIR" || "$CALLER_PWD" == "$WORKTREE_DIR/"* ]]; then
     echo "❌ Error: Your shell is currently inside this worktree."
     echo ""
@@ -263,7 +266,7 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
 
     # --- Phase 2: Check workspace-level uncommitted changes ---
     # Filter out known layer infrastructure so only genuine changes are flagged.
-    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|[a-zA-Z_]+_ws(/|$))'
+    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|(underlay|core|platforms|sensors|simulation|ui)_ws(/|$))'
     cd "$WORKTREE_DIR"
     WORKSPACE_UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -v -E "$INFRA_PATTERN" || true)
     cd "$ROOT_DIR"
@@ -330,9 +333,15 @@ fi
 
 # Prune worktree references (workspace repo + inner package repos)
 git worktree prune
-for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
-    git -C "$repo_path" worktree prune 2>/dev/null || true
-done
+if [ "${#INNER_WORKTREE_REPOS[@]}" -gt 0 ]; then
+    declare -A SEEN_REPOS=()
+    for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
+        if [ -n "$repo_path" ] && [ -z "${SEEN_REPOS[$repo_path]+_}" ]; then
+            SEEN_REPOS["$repo_path"]=1
+            git -C "$repo_path" worktree prune 2>/dev/null || true
+        fi
+    done
+fi
 
 echo ""
 echo "✅ Worktree removed successfully"
