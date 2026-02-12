@@ -1,12 +1,12 @@
 #!/bin/bash
-# scripts/setup.sh
+# .agent/scripts/setup.sh
 # Sets up a ROS2 layer by importing repositories from a .repos file
 #
 # Usage:
-#   ./scripts/setup.sh              # Auto-setup all layers from manifest repo
-#   ./scripts/setup.sh <layer_name> # Setup a specific layer
+#   ./.agent/scripts/setup.sh              # Auto-setup all layers from manifest repo
+#   ./.agent/scripts/setup.sh <layer_name> # Setup a specific layer
 #
-# Example: ./scripts/setup.sh core
+# Example: ./.agent/scripts/setup.sh core
 #
 # This script will:
 # 1. Bootstrap the manifest repository (if needed)
@@ -127,14 +127,26 @@ bootstrap_manifest_repo() {
         exit 1
     fi
 
-    # Use relative symlink for relocatability
-    SYMLINK_TARGET=$(realpath --relative-to="configs" "$MANIFEST_CONFIG_DIR")
+    # Compute a relative symlink target for relocatability.
+    # realpath --relative-to is GNU-specific; fall back to python3 or absolute path.
+    relative_path() {
+        local target="$1" base="$2"
+        if realpath --relative-to="$base" "$target" 2>/dev/null; then
+            return
+        elif command -v python3 >/dev/null 2>&1; then
+            python3 -c "import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$target" "$base"
+        else
+            echo "$target"
+        fi
+    }
+
+    SYMLINK_TARGET=$(relative_path "$MANIFEST_CONFIG_DIR" "configs")
     ln -sfn "$SYMLINK_TARGET" "$MANIFEST_SYMLINK"
     echo "Created symlink: $MANIFEST_SYMLINK -> $SYMLINK_TARGET"
 
     # Create .agent/project_knowledge symlink if agent_context/ exists in config
     if [ -d "${MANIFEST_CONFIG_DIR}/agent_context" ]; then
-        KNOWLEDGE_TARGET=$(realpath --relative-to=".agent" "${MANIFEST_CONFIG_DIR}/agent_context")
+        KNOWLEDGE_TARGET=$(relative_path "${MANIFEST_CONFIG_DIR}/agent_context" ".agent")
         ln -sfn "$KNOWLEDGE_TARGET" ".agent/project_knowledge"
         echo "Created symlink: .agent/project_knowledge -> $KNOWLEDGE_TARGET"
     fi

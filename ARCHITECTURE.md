@@ -198,8 +198,8 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 
 ### Adding a New Layer
 
-1. Add a `new_layer.repos` file to the manifest repo's `repos/` directory
-2. Add the layer name to `layers.txt` in the manifest repo
+1. Add a `new_layer.repos` file to the manifest repo's config directory (default: `config/repos/`)
+2. Add the layer name to `config/layers.txt` in the manifest repo
 3. Run `./.agent/scripts/setup.sh new_layer`
 4. The layer will be automatically sourced by `env.sh`
 
