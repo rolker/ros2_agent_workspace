@@ -98,7 +98,7 @@ if python3 -c "import yaml" 2>/dev/null; then
         check_warn "validate_repos.py may have issues"
     fi
 else
-    check_warn "PyYAML not found. Install: pip install -r requirements.txt"
+    check_warn "PyYAML not found. Install: sudo apt install python3-yaml"
 fi
 echo ""
 

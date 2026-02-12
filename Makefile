@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint setup-dev health-check sync validate revert-feature
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature
 
 VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
@@ -12,7 +12,6 @@ help:
 	@echo "  help          - Show this help message"
 	@echo "  health-check  - Run comprehensive workspace health check"
 	@echo "  bootstrap     - Install ROS2 and dependencies"
-	@echo "  install-deps  - Install Python dependencies"
 	@echo "  setup-core    - Setup core workspace layer"
 	@echo "  setup-all     - Setup all workspace layers"
 	@echo "  build         - Build all workspace layers"
@@ -35,11 +34,6 @@ health-check:
 
 bootstrap:
 	@./.agent/scripts/bootstrap.sh
-
-install-deps:
-	@echo "Installing Python dependencies..."
-	@pip3 install -r requirements.txt
-	@echo "Done."
 
 setup-core:
 	@./.agent/scripts/setup.sh core

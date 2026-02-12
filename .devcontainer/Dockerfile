@@ -25,16 +25,8 @@ RUN apt-get update && apt-get install -y \
     nano \
     # VCSTool for repo management
     python3-vcstool \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-install python deps.
-# NOTE: This assumes a requirements.txt file exists at the repository root.
-# If it is missing, the devcontainer build will fail at this COPY/RUN step.
-COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt --break-system-packages
-
 USER $USERNAME
-COPY --chown=$USERNAME:$USERNAME requirements.txt /home/$USERNAME/requirements.txt
-RUN pip3 install --user --break-system-packages -r /home/$USERNAME/requirements.txt \
-    && rm /home/$USERNAME/requirements.txt
 CMD ["/bin/bash"]
