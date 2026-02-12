@@ -193,10 +193,10 @@ make lint          # Run linters
 - `status_report.sh`: Comprehensive workspace status with test history.
 
 ### Pre-commit Hooks
-Install pre-commit hooks for automatic validation:
+Set up pre-commit hooks for automatic validation:
 ```bash
-pip install pre-commit
-pre-commit install
+make setup-dev    # creates venv, installs pre-commit, activates git hooks
+make lint         # run all hooks manually
 ```
 
 ### Validation

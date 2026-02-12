@@ -1,7 +1,6 @@
 # Pre-commit hooks for ROS2 Agent Workspace
-# Install: pip install pre-commit
-# Setup: pre-commit install
-# Run manually: pre-commit run --all-files
+# Setup: make setup-dev
+# Run manually: make lint
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
