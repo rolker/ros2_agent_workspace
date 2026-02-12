@@ -24,7 +24,7 @@ else
     # Try querying remote (slow)
     echo "🔎 origin/HEAD not found locally. Querying remote..."
     DEFAULT_BRANCH=$(git remote show origin | grep "HEAD branch" | cut -d: -f2 | xargs)
-    
+
     if [ -z "$DEFAULT_BRANCH" ]; then
          echo -e "${YELLOW}⚠️  Could not determine origin/HEAD. Falling back to 'main'.${NC}"
          DEFAULT_BRANCH="main"

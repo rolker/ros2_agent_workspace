@@ -28,24 +28,22 @@ except ImportError:
     print(f"Error: Could not import list_overlay_repos from {SCRIPT_DIR}", file=sys.stderr)
     sys.exit(1)
 
+
 def run_git_cmd(repo_path, cmd_args, dry_run=False):
     """Run a git command in the given repo path."""
     full_cmd = ["git"] + cmd_args
     if dry_run:
         print(f"[DRY-RUN] {repo_path.name}: {' '.join(full_cmd)}")
         return True, ""
-    
+
     try:
         result = subprocess.run(
-            full_cmd,
-            cwd=str(repo_path),
-            capture_output=True,
-            text=True,
-            check=True
+            full_cmd, cwd=str(repo_path), capture_output=True, text=True, check=True
         )
         return True, result.stdout.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stderr.strip()
+
 
 def is_dirty(repo_path, dry_run=False):
     """Check if repo has uncommitted changes."""
@@ -53,6 +51,7 @@ def is_dirty(repo_path, dry_run=False):
     # but we need to call run_git_cmd without dry_run flag to actually execute
     success, output = run_git_cmd(repo_path, ["status", "--porcelain"], dry_run=False)
     return success and bool(output)
+
 
 def get_current_branch(repo_path, dry_run=False):
     """Get the current checked out branch."""
@@ -62,10 +61,11 @@ def get_current_branch(repo_path, dry_run=False):
         return output
     return None
 
+
 def sync_repo(repo_path, repo_name, dry_run=False):
     """Synchronize a single repository."""
     print(f"Checking {repo_name}...")
-    
+
     if not repo_path.exists():
         print(f"  ❌ Path does not exist: {repo_path}")
         return
@@ -73,18 +73,18 @@ def sync_repo(repo_path, repo_name, dry_run=False):
     # 1. Check for local modifications
     if is_dirty(repo_path, dry_run):
         if dry_run:
-            print(f"  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
+            print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
-            print(f"  ⚠️  Skipping: Uncommitted changes detected.")
+            print("  ⚠️  Skipping: Uncommitted changes detected.")
         return
 
     branch = get_current_branch(repo_path, dry_run)
     if not branch:
-        print(f"  ❌ Skipping: Detached HEAD or invalid git state.")
+        print("  ❌ Skipping: Detached HEAD or invalid git state.")
         return
 
     # 2. Sync Logic
-    if branch in ['main', 'jazzy', 'rolling']:
+    if branch in ["main", "jazzy", "rolling"]:
         print(f"  🚀 On default branch '{branch}'. Pulling updates...")
         success, output = run_git_cmd(repo_path, ["pull", "--rebase"], dry_run)
         if success:
@@ -96,11 +96,11 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 print(f"     ✅ Updated:\n{output}")
         else:
             print(f"     ❌ Update failed: {output}")
-            
+
     else:
         print(f"  🌿 On feature branch '{branch}'. Fetching only...")
         success, output = run_git_cmd(repo_path, ["fetch"], dry_run)
-        
+
         if success:
             if dry_run:
                 print("     (Dry run successful)")
@@ -109,29 +109,35 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 # Assuming upstream is 'origin'
                 s_success, s_msg = run_git_cmd(repo_path, ["status", "-sb"], dry_run)
                 if s_success and "behind" in s_msg:
-                    print(f"     ⚠️  Branch is behind remote. Run 'git merge' or 'git rebase' manually.")
+                    print(
+                        "     ⚠️  Branch is behind remote."
+                        " Run 'git merge' or 'git rebase' manually."
+                    )
                 else:
                     print("     ✅ Fetched.")
         else:
             print(f"     ❌ Fetch failed: {output}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Safely sync workspace repositories.")
-    parser.add_argument("--dry-run", action="store_true", help="Simulate actions without executing.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Simulate actions without executing."
+    )
     args = parser.parse_args()
 
     root_dir = SCRIPT_DIR.parent.parent
-    
+
     # Get repos list using the existing tool
     repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
-    
+
     # Also include the root repo itself
     sync_repo(root_dir, "ros2_agent_workspace", args.dry_run)
-    
+
     for repo in repos:
         # Determine workspace directory from source file (e.g. core.repos -> core_ws)
-        ws_name = repo['source_file'].replace('.repos', '_ws')
-        candidate_path = root_dir / "layers" / "main" / ws_name / "src" / repo['name']
+        ws_name = repo["source_file"].replace(".repos", "_ws")
+        candidate_path = root_dir / "layers" / "main" / ws_name / "src" / repo["name"]
 
         repo_path = None
         tried_paths = [str(candidate_path)]
@@ -149,15 +155,18 @@ def main():
                 tried_paths.append(str(explicit_path))
                 if explicit_path.exists():
                     repo_path = explicit_path
-        
+
         if repo_path is None:
             paths_str = ", ".join(tried_paths)
-            print(f"Skipping {repo['name']}: could not resolve repository path (tried {paths_str}).")
+            print(
+                f"Skipping {repo['name']}: could not resolve repository path (tried {paths_str})."
+            )
             continue
 
-        sync_repo(repo_path, repo['name'], args.dry_run)
-        
+        sync_repo(repo_path, repo["name"], args.dry_run)
+
     print("\n✅ Sync complete.")
+
 
 if __name__ == "__main__":
     main()

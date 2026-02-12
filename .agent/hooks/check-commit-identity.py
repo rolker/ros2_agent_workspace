@@ -71,8 +71,8 @@ def main():
     print(f"  Accepted patterns: {', '.join(ACCEPTED_PATTERNS)}")
     print()
     print("  To fix, run one of:")
-    print('    source .agent/scripts/set_git_identity_env.sh --detect')
-    print('    source .agent/scripts/set_git_identity_env.sh --agent <framework>')
+    print("    source .agent/scripts/set_git_identity_env.sh --detect")
+    print("    source .agent/scripts/set_git_identity_env.sh --agent <framework>")
     print()
     return 1
 

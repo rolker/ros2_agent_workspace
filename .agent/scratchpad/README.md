@@ -85,4 +85,3 @@ find .agent/scratchpad -type f -mtime +1 -delete
 
 ## Alternative: `/tmp`
 For truly ephemeral files (cleaned up within the same command), use `/tmp` instead.
-

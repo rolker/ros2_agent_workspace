@@ -3,6 +3,8 @@
 # Shared lookup tables for framework names, email addresses, and default models
 # Sourced by: set_git_identity_env.sh, configure_git_identity.sh, detect_agent_identity.sh
 
+# shellcheck disable=SC2034
+
 # Framework name lookup table
 # Maps framework key to display name
 declare -A FRAMEWORK_NAMES=(

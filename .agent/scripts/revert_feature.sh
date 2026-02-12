@@ -132,7 +132,7 @@ for commit in "${COMMIT_HASHES[@]}"; do
     echo ""
     echo "Reverting: $commit"
     echo "  Message: $COMMIT_MSG"
-    
+
     if git revert --no-edit "$commit" > /dev/null 2>&1; then
         echo "  ✅ Reverted successfully"
         REVERTED=$((REVERTED + 1))

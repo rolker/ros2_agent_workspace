@@ -80,7 +80,7 @@ echo ""
 if [ "$SKIP_SYNC" = false ]; then
     echo "## Step 1: Syncing Repositories"
     echo ""
-    
+
     # Sync root repository (use subshell to avoid changing working directory)
     (
         cd "$ROOT_DIR" || exit 0
@@ -91,14 +91,14 @@ if [ "$SKIP_SYNC" = false ]; then
             echo "⚠️ (fetch failed or skipped)"
         fi
     )
-    
+
     # Sync layer repositories
     if command -v vcs &> /dev/null; then
         for ws_dir in "$LAYERS_DIR"/*; do
             if [ -d "$ws_dir/src" ]; then
                 ws_name=$(basename "$ws_dir" | sed 's/_ws//')
                 echo -n "Syncing $ws_name workspace... "
-                
+
                 # Use subshell to avoid changing working directory
                 (
                     cd "$ws_dir/src" || exit 0
@@ -113,7 +113,7 @@ if [ "$SKIP_SYNC" = false ]; then
     else
         echo "⚠️ vcs command not found - skipping layer sync"
     fi
-    
+
     echo ""
     echo "---"
     echo ""
@@ -133,7 +133,7 @@ echo ""
 
 # Root Repository Status
 echo "### Root Repository"
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit
 if command -v git &> /dev/null; then
     if [ -n "$(git status --porcelain)" ]; then
         echo "- **Status**: ⚠️ Modified"
@@ -166,40 +166,43 @@ else
     for ws_dir in "$LAYERS_DIR"/*; do
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
-            
-            cd "$ws_dir/src"
-            
+
+            if ! cd "$ws_dir/src"; then
+                echo "Warning: could not enter workspace directory '$ws_dir/src'; skipping."
+                continue
+            fi
+
             # Get status with branch info
             raw_output=$(vcs custom --git --args status --porcelain -b 2>/dev/null || echo "")
-            
+
             clean_count=0
             modified_count=0
             modified_repos=()
-            
+
             # Process the output
             current_repo=""
             is_dirty=false
             sync_status=""
             branch=""
-            
+
             process_repo() {
                 if [ "$current_repo" != "" ]; then
                     local status_str=""
                     if [ "$is_dirty" = true ]; then
                         status_str="⚠️ Modified"
                     fi
-                    
+
                     if [ "$sync_status" != "" ]; then
                         status_str="${status_str:+$status_str, }$sync_status"
                     fi
-                    
+
                     # Fetch expected branch from config
                     if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
                         expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null)
                     else
                         expected_branch="unknown"
                     fi
-                    
+
                     if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
                          if [ "$branch" != "$expected_branch" ]; then
                             warning="🔀 $branch (Want: $expected_branch)"
@@ -214,7 +217,7 @@ else
                              status_str="${status_str:+$status_str, }❓ Untracked"
                         fi
                     fi
-                    
+
                     if [ "$status_str" != "" ]; then
                         modified_repos+=("$current_repo|$status_str|$branch")
                         modified_count=$((modified_count + 1))
@@ -223,12 +226,12 @@ else
                     fi
                 fi
             }
-            
+
             while IFS= read -r line; do
                 if [[ "$line" == "="* ]]; then
                     # Process previous repo
                     process_repo
-                    
+
                     # Start new repo
                     current_repo=$(echo "$line" | sed 's/^=== \(.*\) (git) ===$/\1/')
                     is_dirty=false
@@ -250,14 +253,14 @@ else
                     is_dirty=true
                 fi
             done <<< "$raw_output"
-            
+
             # Handle last repo
             process_repo
-            
+
             total=$((clean_count + modified_count))
-            
+
             echo "### Workspace: $ws_name (Total: $total, Clean: $clean_count, Attention: $modified_count)"
-            
+
             if [ $modified_count -gt 0 ]; then
                 echo ""
                 echo "| Repository | Status | Branch |"
@@ -293,18 +296,18 @@ if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null && command -v jq &> 
     # The sed filters are applied sequentially to normalize URLs to "owner/repo":
     # - For overlay repos we expect HTTPS URLs; we strip the https:// prefix and trailing ".git".
     REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-    
+
     # Add root repository, normalizing both SSH and HTTPS origin URLs to "owner/repo":
     # - first sed removes SSH prefix "git@github.com:" if present
     # - second sed removes HTTPS prefix "https://github.com/" if present
     #   (for any given URL, only one of these prefixes will match)
     # - third sed removes the trailing ".git"
     ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-    
+
     if [ -n "$ROOT_REPO" ]; then
         REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
     fi
-    
+
     # Remove duplicates and sort
     REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
 fi
@@ -313,7 +316,7 @@ if [ "$SKIP_GITHUB" = false ]; then
     STEP_NUM=$((STEP_NUM + 1))
     echo "## Step $STEP_NUM: GitHub Pull Requests"
     echo ""
-    
+
     if ! command -v gh &> /dev/null; then
         echo "⚠️ **GitHub CLI (\`gh\`) not found**"
         echo ""
@@ -328,35 +331,35 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo ""
     else
         # Repository list already generated above
-        
+
         # Query PRs for each repository
         PR_COUNT=0
         PR_OUTPUT=""
-        
+
         for repo in $REPOS; do
             if [ -z "$repo" ]; then
                 continue
             fi
-            
+
             # Query GitHub API for open PRs
             prs=$(gh pr list --repo "$repo" --json number,title,url --limit 100 2>/dev/null || echo "[]")
-            
+
             if [ -n "$prs" ] && [ "$prs" != "[]" ]; then
                 # Process each PR
                 while read -r pr_line; do
                     if [ -z "$pr_line" ]; then
                         continue
                     fi
-                    
+
                     number=$(echo "$pr_line" | jq -r '.number')
                     title=$(echo "$pr_line" | jq -r '.title')
                     url=$(echo "$pr_line" | jq -r '.url')
-                    
+
                     # Truncate title if too long
                     if [ ${#title} -gt 60 ]; then
                         title="${title:0:57}..."
                     fi
-                    
+
                     # Format as table row
                     repo_name=$(basename "$repo")
                     PR_OUTPUT+="| $repo_name | [#$number]($url) | $title |"$'\n'
@@ -364,7 +367,7 @@ if [ "$SKIP_GITHUB" = false ]; then
                 done < <(echo "$prs" | jq -c '.[]' 2>/dev/null)
             fi
         done
-        
+
         if [ $PR_COUNT -gt 0 ]; then
             echo "| Repository | PR | Title |"
             echo "|------------|-----|-------|"
@@ -375,7 +378,7 @@ if [ "$SKIP_GITHUB" = false ]; then
         fi
         echo ""
     fi
-    
+
     echo "---"
     echo ""
 fi
@@ -388,7 +391,7 @@ if [ "$SKIP_GITHUB" = false ]; then
     STEP_NUM=$((STEP_NUM + 1))
     echo "## Step $STEP_NUM: GitHub Issues"
     echo ""
-    
+
     if ! command -v gh &> /dev/null; then
         echo "⚠️ **GitHub CLI (\`gh\`) not found** (same as above)"
         echo ""
@@ -405,20 +408,20 @@ if [ "$SKIP_GITHUB" = false ]; then
             # Query issues for each repository
             ISSUE_COUNT=0
             ISSUE_OUTPUT=""
-            
+
             for repo in $REPOS; do
                 if [ -z "$repo" ]; then
                     continue
                 fi
-                
+
                 # Query GitHub API for open issue count using search API (accurate total_count)
                 count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
-                
+
                 # Ensure count is a valid integer
                 if ! [[ "$count" =~ ^[0-9]+$ ]]; then
                     count=0
                 fi
-                
+
                 if [ "$count" -gt 0 ]; then
                     repo_name=$(basename "$repo")
                     issue_url="https://github.com/$repo/issues"
@@ -426,7 +429,7 @@ if [ "$SKIP_GITHUB" = false ]; then
                     ISSUE_COUNT=$((ISSUE_COUNT + count))
                 fi
             done
-            
+
             if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
                 echo "| Repository | Open Issues |"
                 echo "|------------|-------------|"
@@ -438,7 +441,7 @@ if [ "$SKIP_GITHUB" = false ]; then
         fi
         echo ""
     fi
-    
+
     echo "---"
     echo ""
 fi

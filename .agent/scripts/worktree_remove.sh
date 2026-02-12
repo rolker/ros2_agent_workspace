@@ -96,7 +96,7 @@ find_worktree() {
     local base_dir="$1"
     local issue_num="$2"
     local repo_slug="$3"
-    
+
     # If repo slug is specified, check exact path
     if [ -n "$repo_slug" ]; then
         local exact_path="$base_dir/issue-${repo_slug}-${issue_num}"
@@ -106,7 +106,7 @@ find_worktree() {
         fi
         return 1
     fi
-    
+
     # Otherwise, search for matching worktrees (new format and legacy)
     local matches=()
     for path in "$base_dir"/issue-*-"${issue_num}"; do
@@ -132,7 +132,8 @@ find_worktree() {
         echo "" >&2
         echo "Use --repo-slug to specify which one:" >&2
         for path in "${matches[@]}"; do
-            local slug=$(basename "$path" | sed -E 's/^issue-(.+)-[0-9]+$/\1/')
+            local slug
+            slug=$(basename "$path" | sed -E 's/^issue-(.+)-[0-9]+$/\1/')
             echo "  $0 --issue ${issue_num} --repo-slug ${slug}" >&2
         done
         return 1
@@ -186,7 +187,7 @@ echo ""
 if [ -d "$WORKTREE_DIR" ]; then
     cd "$WORKTREE_DIR"
     UNCOMMITTED=$(git status --porcelain 2>/dev/null)
-    
+
     if [ -n "$UNCOMMITTED" ] && [ "$FORCE" != true ]; then
         echo "⚠️  Warning: Worktree has uncommitted changes:"
         echo ""
@@ -195,7 +196,7 @@ if [ -d "$WORKTREE_DIR" ]; then
         echo "Use --force to remove anyway, or commit/stash your changes first."
         exit 1
     fi
-    
+
     cd "$ROOT_DIR"
 fi
 

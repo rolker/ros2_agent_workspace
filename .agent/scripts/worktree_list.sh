@@ -59,15 +59,16 @@ print_worktree() {
     local path="$1"
     local branch="$2"
     local head="$3"
-    
+
     # Determine type and extract issue/repo info
     local type="main"
     local issue=""
     local repo=""
-    
+
     if [[ "$path" == *"/layers/worktrees/"* ]]; then
         type="layer"
-        local basename=$(basename "$path")
+        local basename
+        basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
@@ -81,7 +82,8 @@ print_worktree() {
         ((LAYER_COUNT++)) || true
     elif [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
-        local basename=$(basename "$path")
+        local basename
+        basename=$(basename "$path")
         # New format: issue-{REPO_SLUG}-{NUMBER}
         # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
         if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
@@ -94,7 +96,7 @@ print_worktree() {
         fi
         ((WORKSPACE_COUNT++)) || true
     fi
-    
+
     # Check if clean or dirty
     local status="clean"
     if [ -d "$path" ]; then
@@ -102,7 +104,7 @@ print_worktree() {
             status="dirty"
         fi
     fi
-    
+
     # Format output
     if [ "$type" == "main" ]; then
         echo "📁 Main Workspace"
@@ -112,12 +114,12 @@ print_worktree() {
     else
         local icon="📦"
         [ "$type" == "workspace" ] && icon="🔧"
-        
+
         echo "$icon Issue #$issue ($type) - Repository: $repo"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
-        
+
         if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
             echo "   Files changed: $(git -C "$path" status --porcelain 2>/dev/null | wc -l)"
         fi

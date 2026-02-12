@@ -115,17 +115,13 @@ def check_duplicate_repos(configs_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate .repos files in the configs directory"
-    )
+    parser = argparse.ArgumentParser(description="Validate .repos files in the configs directory")
     parser.add_argument(
         "--configs-dir",
         default="configs",
         help="Directory containing .repos files (default: configs)",
     )
-    parser.add_argument(
-        "--strict", action="store_true", help="Exit with error on any warning"
-    )
+    parser.add_argument("--strict", action="store_true", help="Exit with error on any warning")
 
     args = parser.parse_args()
     configs_dir = Path(args.configs_dir)

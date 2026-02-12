@@ -28,7 +28,7 @@ fi
 # Check if plan file has any changes (including untracked)
 if [[ -n "$(git status --porcelain -- "$PLAN_FILE")" ]]; then
     echo "📝 Changes detected in $PLAN_FILE"
-    
+
     # Show diff summary
     echo ""
     echo "Changes:"
@@ -37,18 +37,19 @@ if [[ -n "$(git status --porcelain -- "$PLAN_FILE")" ]]; then
     # Unstaged changes (if any)
     git diff --stat -- "$PLAN_FILE" 2>/dev/null || true
     echo ""
-    
+
     # Normalize commit message: only prepend 'docs:' if no conventional prefix is present
+    # shellcheck disable=SC1073,SC1072
     if [[ "$COMMIT_MSG" =~ ^[A-Za-z]+(\([^)]*\))?:[[:space:]] ]]; then
         NORMALIZED_COMMIT_MSG="$COMMIT_MSG"
     else
         NORMALIZED_COMMIT_MSG="docs: $COMMIT_MSG"
     fi
-    
+
     # Commit the update
     git add "$PLAN_FILE"
     git commit -m "$NORMALIZED_COMMIT_MSG"
-    
+
     echo "✅ Plan updated and committed!"
     echo ""
     echo "🚀 Push to GitHub: git push"

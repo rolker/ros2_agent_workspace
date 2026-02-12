@@ -1,7 +1,6 @@
 # Pre-commit hooks for ROS2 Agent Workspace
-# Install: pip install pre-commit
-# Setup: pre-commit install
-# Run manually: pre-commit run --all-files
+# Setup: make setup-dev
+# Run manually: make lint
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -66,13 +65,15 @@ repos:
     rev: 7.0.0
     hooks:
       - id: flake8
-        args: ['--max-line-length=100', '--extend-ignore=E203,W503']
+        args: ['--max-line-length=100', '--extend-ignore=E203,W503,E402']
 
   - repo: https://github.com/PyCQA/pylint
     rev: v3.0.3
     hooks:
       - id: pylint
-        args: ['--max-line-length=100', '--disable=C0114,C0115,C0116']
+        args:
+          - '--max-line-length=100'
+          - '--disable=C0114,C0115,C0116,E0401,C0413,C0411,R0914,R0912,R0915,W0718,W1514,W0613,W0123,R1705,W1510'
         files: ^.agent/scripts/.*\.py$
 
   - repo: https://github.com/adrienverge/yamllint

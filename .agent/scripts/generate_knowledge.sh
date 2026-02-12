@@ -12,10 +12,10 @@ mkdir -p "$KNOWLEDGE_DIR"
 link_doc() {
     local src_path="$1"
     local link_name="$2"
-    
+
     local full_src="$ROOT_DIR/$src_path"
     local full_link="$KNOWLEDGE_DIR/$link_name"
-    
+
     if [ -e "$full_src" ]; then
         # Create relative path for symlink
         # We know knowledge dir is .agent/knowledge (2 levels deep)

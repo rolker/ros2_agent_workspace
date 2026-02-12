@@ -41,7 +41,7 @@ echo ""
 
 # 1. Root Repository Status
 echo "## Root Repository"
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit
 if command -v git &> /dev/null; then
     # Check for modifications
     if ! git fetch -q 2>/dev/null; then
@@ -80,32 +80,37 @@ else
     for ws_dir in "$LAYERS_DIR"/*; do
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
-            
-            cd "$ws_dir/src"
-            
+
+            if ! cd "$ws_dir/src"; then
+                echo "### Workspace: $ws_name"
+                echo "**Warning**: Unable to enter workspace directory '$ws_dir/src'; skipping."
+                echo ""
+                continue
+            fi
+
             # Fetch updates quietly (suppress warnings)
             vcs custom --git --args fetch -q >/dev/null 2>&1
-            
+
             # Get status; rely on PYTHONWARNINGS to suppress Python deprecation warnings
             raw_output=$(vcs custom --git --args status --porcelain -b)
-            
+
             clean_count=0
             modified_count=0
             modified_repos=()
-            
+
             # Process the output
             current_repo=""
             is_dirty=false
             sync_status=""
             branch=""
-            
+
             process_repo() {
                 if [ "$current_repo" != "" ]; then
                     local status_str=""
                     if [ "$is_dirty" = true ]; then
                         status_str="⚠️ Modified"
                     fi
-                    
+
                     if [ "$sync_status" != "" ]; then
                         if [ "$status_str" != "" ]; then
                             status_str="$status_str, $sync_status"
@@ -113,14 +118,14 @@ else
                             status_str="$sync_status"
                         fi
                     fi
-                    
+
                     # Fetch expected branch from config
                     if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
                         expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo")
                     else
                         expected_branch="unknown"
                     fi
-                    
+
                     if [ "$expected_branch" != "unknown" ]; then
                          if [ "$branch" != "$expected_branch" ]; then
                             warning="🔀 $branch (Want: $expected_branch)"
@@ -133,7 +138,7 @@ else
                     if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
                          status_str="${status_str:+$status_str, }❓ Untracked"
                     fi
-                    
+
                     if [ "$status_str" != "" ]; then
                         modified_repos+=("$current_repo|$status_str|$branch")
                         ((modified_count++))
@@ -161,12 +166,12 @@ else
                     is_dirty=true
                 fi
             done <<< "$raw_output"
-            
+
             process_repo
-            
+
             total_count=$((clean_count + modified_count))
             echo "## Workspace: **$ws_name** (Total: $total_count, Clean: $clean_count, Attention: $modified_count)"
-            
+
             if [ $modified_count -gt 0 ]; then
                  echo ""
                  echo "### ⚠️ Attention Needed"

@@ -12,6 +12,9 @@ install/
 log/
 COLCON_IGNORE
 
+# Dev-tools virtual environment (pre-commit, linters)
+.venv/
+
 # IDE settings
 .vscode/
 

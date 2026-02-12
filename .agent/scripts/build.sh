@@ -21,7 +21,7 @@
 #   0 - All layers built successfully
 #   1 - Build failed in one or more layers
 
-# Exit on any error to prevent cascading failures in strict mode, 
+# Exit on any error to prevent cascading failures in strict mode,
 # though we want to handle build failures gracefully for reporting.
 # set -u removed to allow sourcing upstream setup.bash which has unbound variables
 
@@ -87,7 +87,7 @@ FAILED_LAYERS=""
 
 for layer in "${LAYERS[@]}"; do
     LAYER_DIR="$LAYERS_BASE/${layer}_ws"
-    
+
     if [ ! -d "$LAYER_DIR/src" ]; then
         echo "Skipping layer $layer (no src directory)"
         echo "| $layer | 0 | - | ⏭️ Skipped |" >> "$REPORT_FILE"
@@ -105,14 +105,14 @@ for layer in "${LAYERS[@]}"; do
     # We rely on the log configuration to write to log/latest_build/events.log
     # --symlink-install is standard for dev
     # We allow stdout to flow to the user's terminal
-    
+
     colcon build --symlink-install
 
     BUILD_RC=$?
-    
+
     # Generate Report Row
     LOG_DIR="$LAYER_DIR/log/latest_build"
-    
+
     # Run the generator and append to report
     if [ -d "$LOG_DIR" ]; then
         python3 "$SCRIPT_DIR/build_report_generator.py" --log-dir "$LOG_DIR" --layer-name "$layer" >> "$REPORT_FILE"

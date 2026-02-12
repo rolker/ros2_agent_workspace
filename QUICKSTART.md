@@ -33,16 +33,15 @@ This will:
 
 **Note:** This requires sudo access and will take 5-10 minutes.
 
-## Step 3: Install Python Dependencies
+## Step 3: Set Up Development Tools
 
 ```bash
-pip install -r requirements.txt
+make setup-dev
 ```
 
-Or using make:
-```bash
-make install-deps
-```
+This creates a Python venv, installs pre-commit, and activates git hooks.
+
+**Note:** Requires `python3-venv` (`sudo apt install python3-venv` if not already present).
 
 ## Step 4: Run Health Check
 

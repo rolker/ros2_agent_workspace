@@ -1,4 +1,8 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock install-deps format lint health-check sync validate revert-feature
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature
+
+VENV_DIR := .venv
+VENV_BIN := $(VENV_DIR)/bin
+PRE_COMMIT := $(VENV_BIN)/pre-commit
 
 # Default target
 help:
@@ -8,7 +12,6 @@ help:
 	@echo "  help          - Show this help message"
 	@echo "  health-check  - Run comprehensive workspace health check"
 	@echo "  bootstrap     - Install ROS2 and dependencies"
-	@echo "  install-deps  - Install Python dependencies"
 	@echo "  setup-core    - Setup core workspace layer"
 	@echo "  setup-all     - Setup all workspace layers"
 	@echo "  build         - Build all workspace layers"
@@ -20,8 +23,9 @@ help:
 	@echo "  unlock        - Unlock workspace"
 	@echo "  sync          - Safely sync all workspace repositories"
 	@echo "  validate      - Validate workspace configuration"
+	@echo "  setup-dev     - Create dev-tools venv and install pre-commit"
 	@echo "  format        - Format Python code with black"
-	@echo "  lint          - Run linters on all code"
+	@echo "  lint          - Run pre-commit hooks on all files"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo ""
 
@@ -30,11 +34,6 @@ health-check:
 
 bootstrap:
 	@./.agent/scripts/bootstrap.sh
-
-install-deps:
-	@echo "Installing Python dependencies..."
-	@pip3 install -r requirements.txt
-	@echo "Done."
 
 setup-core:
 	@./.agent/scripts/setup.sh core
@@ -95,21 +94,21 @@ revert-feature:
 	fi
 	@./.agent/scripts/revert_feature.sh --issue $(ISSUE)
 
-format:
+format: $(PRE_COMMIT)
 	@echo "Formatting Python code with black..."
-	@black --line-length 100 .agent/scripts/*.py
+	@$(PRE_COMMIT) run black --all-files
 	@echo "Done."
 
-lint: lint-shell lint-python
+$(PRE_COMMIT):
+	@python3 -m venv $(VENV_DIR) \
+		|| { echo "Error: python3-venv is required.  Install it with:"; \
+		     echo "  sudo apt install python3-venv"; exit 1; }
+	@$(VENV_BIN)/pip install --upgrade pip pre-commit
+	@echo "Dev-tools venv ready at $(VENV_DIR)/"
 
-lint-shell:
-	@echo "Running shellcheck on shell scripts..."
-	@shellcheck .agent/scripts/*.sh || true
-	@echo "Done."
+setup-dev: $(PRE_COMMIT)
+	@$(PRE_COMMIT) install
+	@echo "Dev-tools venv is ready. Git hooks installed."
 
-lint-python:
-	@echo "Running flake8 on Python scripts..."
-	@flake8 --max-line-length=100 --extend-ignore=E203,W503 .agent/scripts/*.py || true
-	@echo "Running pylint on Python scripts..."
-	@pylint --max-line-length=100 --disable=C0114,C0115,C0116 .agent/scripts/*.py || true
-	@echo "Done."
+lint: $(PRE_COMMIT)
+	@$(PRE_COMMIT) run --all-files

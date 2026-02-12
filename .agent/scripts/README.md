@@ -386,7 +386,7 @@ $ ./.agent/scripts/check_branch_updates.sh
 ```
 
 **Integration:**
-- Runs automatically via pre-commit hook (when `pre-commit install` is configured)
+- Runs automatically via pre-commit hook (when `make setup-dev` has been run)
 - Recommended before creating a pull request
 
 **See also:**
