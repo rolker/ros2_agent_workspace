@@ -56,35 +56,28 @@ ros2_agent_workspace/
 │   ├── templates/            # Templates for issues and tests
 │   ├── knowledge/            # ROS 2 patterns and CLI best practices
 │   ├── hooks/                # Git hooks (pre-commit)
-│   └── instructions/         # Framework-specific instruction files
+│   ├── instructions/         # Framework-specific instruction files
+│   └── project_knowledge     # -> manifest repo's agent_context/ (symlink, gitignored)
 │
-├── configs/                   # Bootstrap configuration
-│   └── project_bootstrap.url # Key repository URL for layer definitions
+├── configs/                   # Configuration and bootstrap
+│   ├── project_bootstrap.url # URL to the manifest repo's bootstrap.yaml
+│   ├── manifest              # -> manifest repo's config dir (symlink, gitignored)
+│   │   ├── layers.txt        #   Layer ordering
+│   │   └── repos/            #   .repos files per layer
+│   └── manifest_repo/        # Manifest repo clone for Pattern A (gitignored)
 │
 ├── layers/                    # Generated layer directories (gitignored)
-│   ├── main/
-│   │   ├── underlay_ws/      # ROS dependencies overlay
-│   │   ├── core_ws/          # Core autonomy packages
-│   │   │   └── src/
-│   │   │       └── unh_marine_autonomy/  # Key repository
-│   │   │           └── config/repos/     # Layer .repos definitions
-│   │   │               ├── underlay.repos
-│   │   │               ├── core.repos
-│   │   │               ├── platforms.repos
-│   │   │               ├── sensors.repos
-│   │   │               ├── simulation.repos
-│   │   │               └── ui.repos
-│   │   ├── platforms_ws/    # Platform-specific code
-│   │   ├── sensors_ws/      # Sensor packages
-│   │   ├── simulation_ws/   # Simulation tools
-│   │   └── ui_ws/           # Visualization & user interfaces
-│   ├── sensors_ws/
-│   ├── simulation_ws/
-│   └── ui_ws/
-│       ├── src/              # Source repositories (from vcs import)
-│       ├── build/            # Build artifacts
-│       ├── install/          # Install space
-│       └── log/              # Build/test logs
+│   └── main/
+│       ├── underlay_ws/      # ROS dependencies overlay
+│       ├── core_ws/          # Core autonomy packages
+│       ├── platforms_ws/     # Platform-specific code
+│       ├── sensors_ws/       # Sensor packages
+│       ├── simulation_ws/    # Simulation tools
+│       └── ui_ws/            # Visualization & user interfaces
+│           ├── src/          # Source repositories (from vcs import)
+│           ├── build/        # Build artifacts
+│           ├── install/      # Install space
+│           └── log/          # Build/test logs
 │
 └── .agent/scratchpad/         # Agent working directory (gitignored)
     ├── build_report.md        # Latest build status
@@ -92,6 +85,15 @@ ros2_agent_workspace/
     ├── workspace.lock         # Multi-agent coordination lock
     └── *.md                   # Other generated reports
 ```
+
+### Manifest Repo
+
+The **manifest repo** is the repository that provides layer definitions (`.repos` files) and `layers.txt`. It is referenced via `configs/project_bootstrap.url` and cloned during `setup.sh`. The workspace supports two patterns:
+
+- **Pattern A (standalone manifest)**: The manifest repo contains only configuration (no ROS packages). It is cloned to `configs/manifest_repo/<name>/` and `configs/manifest` symlinks to its config directory.
+- **Pattern B (manifest with ROS packages)**: The manifest repo also contains ROS packages (e.g., `unh_marine_autonomy`). It is cloned into a layer's `src/` directory (e.g., `layers/main/core_ws/src/`) so colcon discovers the packages. `configs/manifest` symlinks to the config subdirectory within that clone.
+
+The `layer` field in `bootstrap.yaml` controls the pattern: present for Pattern B, absent for Pattern A.
 
 ## Agent System
 
@@ -125,21 +127,13 @@ This is parsed from colcon's `events.log` by `build_report_generator.py`.
 
 ## Knowledge Management
 
-### Auto-Generated Knowledge
+### Two-Tier Knowledge Model
 
-The `.agent/scripts/generate_knowledge.sh` creates symbolic links in `.agent/knowledge/` pointing to important documentation across all workspace layers:
+Agent knowledge is split into workspace-level and project-level tiers:
 
-- System overviews
-- Component documentation
-- Architecture docs from individual packages
+1. **Workspace knowledge** (`.agent/knowledge/`): Version-controlled files that apply to all projects using this workspace. Contains ROS 2 development patterns, CLI best practices, and documentation verification workflows.
 
-This allows agents to quickly access relevant documentation without traversing all repositories.
-
-### Knowledge Categories
-
-- `system__*.md`: High-level system documentation
-- `component__*.md`: Individual component documentation
-- `architecture__*/`: Architectural deep-dives
+2. **Project knowledge** (`.agent/project_knowledge`): A symlink (gitignored) pointing to the manifest repo's `agent_context/` directory, if it exists. Contains project-specific conventions, architecture documentation, and component guides. This is created automatically by `setup.sh` during bootstrap.
 
 ## Coordination & Locking
 
@@ -204,11 +198,22 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 
 ### Adding a New Layer
 
-1. Create `configs/new_layer.repos`
-2. Define repositories in YAML format
+1. Add a `new_layer.repos` file to the manifest repo's config directory (default: `config/repos/`)
+2. Add the layer name to `config/layers.txt` in the manifest repo
 3. Run `./.agent/scripts/setup.sh new_layer`
-4. The layer will be automatically configured when you run setup
-5. Update knowledge links in `generate_knowledge.sh` if needed
+4. The layer will be automatically sourced by `env.sh`
+
+### Bootstrapping from a Custom Project
+
+1. Create a `bootstrap.yaml` in your project repo:
+   ```yaml
+   git_url: https://github.com/your-org/your-repo.git
+   branch: main
+   # layer: core          # Include if repo has ROS packages (Pattern B)
+   # config_path: config  # Defaults to "config" if omitted
+   ```
+2. Update `configs/project_bootstrap.url` to point to your `bootstrap.yaml`
+3. Run `./.agent/scripts/setup.sh`
 
 ### Adding New Scripts
 

@@ -1,49 +1,32 @@
 #!/bin/bash
 # scripts/generate_knowledge.sh
+#
+# Previously this script created symlinks from .agent/knowledge/ to
+# project-specific documentation inside cloned layer repos. That pattern
+# was abandoned in favor of fully version-controlled knowledge files
+# (see commit 89bcd1f).
+#
+# Project-specific agent context is now accessed via the
+# .agent/project_knowledge symlink, which setup.sh creates pointing to
+# the manifest repo's agent_context/ directory (if it exists).
+#
+# This script is retained as a no-op for backward compatibility with
+# any automation that calls it.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-KNOWLEDGE_DIR="$ROOT_DIR/.agent/knowledge"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-# Ensure directory exists
-mkdir -p "$KNOWLEDGE_DIR"
+echo "Workspace knowledge is version-controlled in .agent/knowledge/."
 
-# Helper function to link
-link_doc() {
-    local src_path="$1"
-    local link_name="$2"
-
-    local full_src="$ROOT_DIR/$src_path"
-    local full_link="$KNOWLEDGE_DIR/$link_name"
-
-    if [ -e "$full_src" ]; then
-        # Create relative path for symlink
-        # We know knowledge dir is .agent/knowledge (2 levels deep)
-        # So we need ../../$src_path
-        ln -sf "../../$src_path" "$full_link"
-        echo "Linked: $link_name -> $src_path"
-    else
-        echo "Skipped: $src_path (Not found)"
-    fi
-}
-
-echo "Generating workspace knowledge links..."
-
-# --- Definition of Knowledge Links ---
-
-# System
-link_doc "layers/main/core_ws/src/unh_marine_autonomy/marine_autonomy/README.md" "system__autonomy_overview.md"
-
-# Components
-link_doc "layers/main/core_ws/src/unh_marine_autonomy/mission_manager/mission_manager/README.md" "component__mission_manager.md"
-link_doc "layers/main/core_ws/src/unh_marine_autonomy/helm_manager/README.md" "component__helm_manager.md"
-link_doc "layers/main/core_ws/src/marine_ais/marine_ais_msgs/README.md" "component__marine_ais.md"
-
-# UI
-link_doc "layers/ui_ws/src/camp/README.md" "component__camp_ui.md"
-link_doc "layers/ui_ws/src/camp/docs" "architecture__camp_docs"
-
-# Simulation
-link_doc "layers/simulation_ws/src/unh_marine_simulation/README.md" "component__simulation.md"
+if [ -L "$ROOT_DIR/.agent/project_knowledge" ]; then
+    echo "Project-specific knowledge available at .agent/project_knowledge/"
+    echo "  -> $(readlink "$ROOT_DIR/.agent/project_knowledge")"
+elif [ -d "$ROOT_DIR/.agent/project_knowledge" ]; then
+    echo "Project-specific knowledge available at .agent/project_knowledge/"
+else
+    echo "No project-specific knowledge found (.agent/project_knowledge does not exist)."
+    echo "The manifest repo can provide project knowledge by creating an agent_context/"
+    echo "directory inside its config path."
+fi
 
 echo "Done."

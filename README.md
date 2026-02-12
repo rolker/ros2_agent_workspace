@@ -4,7 +4,7 @@ This repository provides management of multiple layered ROS 2 workspaces, config
 
 **The workspace is pre-configured to host the UNH Marine Autonomy Framework.**
 
-The workspace automatically imports repositories from the project's configuration files located in the `unh_marine_autonomy` repository:
+The workspace automatically imports repositories from the project's manifest repository (`unh_marine_autonomy`):
 - **Project11**: Main autonomy system.
 - **Marine AIS**: AIS message decoding and handling.
 - **UNH Marine Navigation**: Navigation tools and utilities.
@@ -54,7 +54,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Structure
 
 - **`.agent/`**: Agent infrastructure (scripts, hooks, knowledge, templates, identity).
-- **`configs/`**: Contains `project_bootstrap.url` linking to project configuration.
+- **`configs/`**: Bootstrap URL, `manifest` symlink to project config, optional `manifest_repo/` clone.
 - **`.agent/scripts/`**: Helper scripts for setup and environment sourcing.
 - **`layers/`**: The ROS 2 workspace layers (source code and build artifacts).
 
@@ -72,9 +72,9 @@ To initialize workspace layers:
 ```
 
 This will:
-1. Bootstrap the project repository (if needed)
-2. Read layer definitions from project's `config/layers.txt`
-3. Import repositories from project's `config/repos/<layer>.repos` files
+1. Bootstrap the manifest repository (if needed) and create `configs/manifest` symlink
+2. Read layer definitions from `configs/manifest/layers.txt`
+3. Import repositories from `configs/manifest/repos/<layer>.repos` files
 
 ### 2. Sourcing the Environment
 To source the layers in the correct order (Underlay -> ... -> Overlay):
@@ -89,11 +89,11 @@ This workspace is designed to be used with an AI Agent. If you are new to agenti
 
 1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
 2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`.agent/scripts/status_report.sh`).
-3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, key repository configs in `layers/main/core_ws/src/unh_marine_autonomy/config/repos/`). Trust it to place files in the correct location.
+3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, manifest config at `configs/manifest/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
 
-This workspace can be configured to bootstrap from a "Key Repository" of your choice (e.g., your project's main repo).
+This workspace can be configured to bootstrap from a **manifest repository** of your choice. The manifest repo provides layer definitions (`.repos` files) and optionally project-specific agent context.
 
 1. Create a `configs/project_bootstrap.url` file containing the raw URL to your bootstrap configuration:
    ```text
@@ -102,19 +102,25 @@ This workspace can be configured to bootstrap from a "Key Repository" of your ch
    > [!CAUTION]
    > **Security Warning**: executes code (via `vcs import`) based on the configuration downloaded from this URL. Ensure you trust the source URL and that it is not compromised. Always use HTTPS.
 
-2. Ensure your Key Repo has the following structure:
+2. Ensure your manifest repo has the following structure:
    - `config/bootstrap.yaml`:
      ```yaml
      git_url: https://github.com/your-org/your-repo.git
      branch: main
+     # layer: core          # If your repo also contains ROS packages (Pattern B)
+     # config_path: config  # Defaults to "config" if omitted
      ```
    - `config/repos/`: Directory containing `.repos` files (e.g., `core.repos`, `ui.repos`).
+   - `config/layers.txt`: Layer names in source order (one per line).
+   - `config/agent_context/` (optional): Project-specific AI agent knowledge.
 
-3. Run `./.agent/scripts/setup.sh` to import all repositories defined in your Key Repo.
+3. Run `./.agent/scripts/setup.sh` to import all repositories defined in your manifest repo.
+
+**Pattern A vs Pattern B**: If your manifest repo is config-only (no ROS packages), omit the `layer` field. It will be cloned to `configs/manifest_repo/`. If it also contains ROS packages, set `layer` to the target layer (e.g., `core`) and it will be cloned into that layer's `src/` directory.
 
 ## Adding New Layers
-1. Create a `<new_layer>.repos` file in the key repository's `config/repos/` directory (e.g., `unh_marine_autonomy/config/repos/my_layer.repos`).
-2. Add the layer name to `config/layers.txt` in the key repository.
+1. Create a `<new_layer>.repos` file in the manifest repo's `config/repos/` directory.
+2. Add the layer name to `config/layers.txt` in the manifest repo.
 3. Run `./.agent/scripts/setup.sh` to set up all layers (including the new one).
 
 ## Troubleshooting

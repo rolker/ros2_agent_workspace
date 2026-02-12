@@ -6,6 +6,11 @@ layers/
 # Ignore workspace worktrees (for infrastructure work)
 .workspace-worktrees/
 
+# Manifest repo clone directory and symlinks (created by setup.sh)
+configs/manifest_repo/
+configs/manifest
+.agent/project_knowledge
+
 # Ignore colcon/ROS artifacts in root if any
 build/
 install/
