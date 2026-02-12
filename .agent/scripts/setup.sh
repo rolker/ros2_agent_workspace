@@ -3,23 +3,25 @@
 # Sets up a ROS2 layer by importing repositories from a .repos file
 #
 # Usage:
-#   ./scripts/setup.sh              # Auto-setup all layers from project's layers.txt
+#   ./scripts/setup.sh              # Auto-setup all layers from manifest repo
 #   ./scripts/setup.sh <layer_name> # Setup a specific layer
 #
 # Example: ./scripts/setup.sh core
 #
 # This script will:
-# 1. Bootstrap the project's key repository (if needed)
-# 2. Create layers/main/<layer_name>_ws/src directory
-# 3. Import repositories from the project's config/repos/<layer_name>.repos file
+# 1. Bootstrap the manifest repository (if needed)
+# 2. Create configs/manifest symlink to the manifest repo's config directory
+# 3. Create layers/main/<layer_name>_ws/src directory
+# 4. Import repositories from the manifest's repos/<layer_name>.repos file
 #
-# Available layers are defined in the project repository (unh_marine_autonomy):
-#   - underlay: Additional dependencies (geodesy, audio_common, etc.)
-#   - core: Main autonomy framework (Project11, AIS, Navigation)
-#   - platforms: Platform-specific packages
-#   - sensors: Sensor drivers and perception
-#   - simulation: Simulation tools
-#   - ui: Visualization and user interfaces
+# The manifest repo is the repository that provides layer definitions and .repos
+# files. It supports two patterns:
+#
+#   Pattern A (standalone manifest): layer field absent in bootstrap.yaml
+#     -> cloned to configs/manifest_repo/<repo_name>/
+#
+#   Pattern B (manifest with ROS packages): layer field present in bootstrap.yaml
+#     -> cloned into layers/main/<layer>_ws/src/<repo_name>/ so colcon finds packages
 
 set -e
 
@@ -27,12 +29,13 @@ LAYER_NAME=$1
 
 # Bootstrapping Configuration
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
-KEY_REPO_TARGET_DIR="layers/main/core_ws/src/unh_marine_autonomy"
+MANIFEST_SYMLINK="configs/manifest"
 
-# Function to bootstrap the key repository if needed
-bootstrap_key_repo() {
-    if [ -d "$KEY_REPO_TARGET_DIR" ]; then
-        return 0  # Already bootstrapped
+# Function to bootstrap the manifest repository if needed
+bootstrap_manifest_repo() {
+    # If the symlink already exists and resolves, we're bootstrapped
+    if [ -d "$MANIFEST_SYMLINK" ]; then
+        return 0
     fi
 
     if [ ! -f "$BOOTSTRAP_URL_FILE" ]; then
@@ -46,10 +49,11 @@ bootstrap_key_repo() {
 
     # Note: The bootstrap config URL is controlled by this project's own
     # configs/project_bootstrap.url file. The downloaded YAML provides
-    # git_url and branch values used in git clone. This is trusted because
-    # the URL file is committed to this repository and points to a known
-    # project-controlled location. If stronger integrity guarantees are
-    # needed in the future, consider pinning to a specific commit hash.
+    # git_url, branch, layer, and config_path values used to clone and
+    # configure the manifest repo. This is trusted because the URL file is
+    # committed to this repository and points to a known project-controlled
+    # location. If stronger integrity guarantees are needed in the future,
+    # consider pinning to a specific commit hash.
     echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
     TEMP_CONFIG=$(mktemp)
     trap 'rm -f "$TEMP_CONFIG"' EXIT
@@ -60,26 +64,68 @@ bootstrap_key_repo() {
         exit 1
     fi
 
-    KEY_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
-    KEY_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+    MANIFEST_REPO_URL=$(grep "^git_url:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+    MANIFEST_REPO_BRANCH=$(grep "^branch:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+    MANIFEST_REPO_LAYER=$(grep "^layer:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
+    MANIFEST_REPO_CONFIG_PATH=$(grep "^config_path:" "$TEMP_CONFIG" | cut -d '#' -f 1 | awk '{print $2}')
 
-    if [ -z "$KEY_REPO_URL" ] || [ -z "$KEY_REPO_BRANCH" ]; then
+    if [ -z "$MANIFEST_REPO_URL" ] || [ -z "$MANIFEST_REPO_BRANCH" ]; then
         echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
         exit 1
     fi
 
-    echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
-    mkdir -p layers/main/core_ws/src
-    git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
+    # Default config_path to "config" if not specified
+    MANIFEST_REPO_CONFIG_PATH="${MANIFEST_REPO_CONFIG_PATH:-config}"
+
+    # Derive repo name from URL
+    MANIFEST_REPO_NAME=$(basename "$MANIFEST_REPO_URL" .git)
+
+    # Determine clone target based on whether layer is specified
+    if [ -n "$MANIFEST_REPO_LAYER" ]; then
+        # Pattern B: manifest repo contains ROS packages, clone into a layer's src/
+        MANIFEST_CLONE_DIR="layers/main/${MANIFEST_REPO_LAYER}_ws/src/${MANIFEST_REPO_NAME}"
+        echo "Cloning manifest repo (Pattern B: layer=$MANIFEST_REPO_LAYER)..."
+        mkdir -p "layers/main/${MANIFEST_REPO_LAYER}_ws/src"
+    else
+        # Pattern A: standalone manifest repo (config only)
+        MANIFEST_CLONE_DIR="configs/manifest_repo/${MANIFEST_REPO_NAME}"
+        echo "Cloning manifest repo (Pattern A: standalone config)..."
+        mkdir -p "configs/manifest_repo"
+    fi
+
+    echo "  From: $MANIFEST_REPO_URL (branch: $MANIFEST_REPO_BRANCH)"
+    echo "  To:   $MANIFEST_CLONE_DIR"
+    git clone -b "$MANIFEST_REPO_BRANCH" "$MANIFEST_REPO_URL" "$MANIFEST_CLONE_DIR"
+
+    # Create configs/manifest symlink pointing to the config directory
+    mkdir -p configs
+    MANIFEST_CONFIG_DIR="${MANIFEST_CLONE_DIR}/${MANIFEST_REPO_CONFIG_PATH}"
+    if [ ! -d "$MANIFEST_CONFIG_DIR" ]; then
+        echo "Error: Config directory not found at $MANIFEST_CONFIG_DIR"
+        echo "Check the 'config_path' value in bootstrap.yaml (current: $MANIFEST_REPO_CONFIG_PATH)"
+        exit 1
+    fi
+
+    # Use relative symlink for relocatability
+    SYMLINK_TARGET=$(realpath --relative-to="configs" "$MANIFEST_CONFIG_DIR")
+    ln -sfn "$SYMLINK_TARGET" "$MANIFEST_SYMLINK"
+    echo "Created symlink: $MANIFEST_SYMLINK -> $SYMLINK_TARGET"
+
+    # Create .agent/project_knowledge symlink if agent_context/ exists in config
+    if [ -d "${MANIFEST_CONFIG_DIR}/agent_context" ]; then
+        KNOWLEDGE_TARGET=$(realpath --relative-to=".agent" "${MANIFEST_CONFIG_DIR}/agent_context")
+        ln -sfn "$KNOWLEDGE_TARGET" ".agent/project_knowledge"
+        echo "Created symlink: .agent/project_knowledge -> $KNOWLEDGE_TARGET"
+    fi
 }
 
 # If no layer specified, auto-setup all layers from project config
 if [ -z "$LAYER_NAME" ]; then
-    # Ensure the key repo is bootstrapped
-    bootstrap_key_repo
+    # Ensure the manifest repo is bootstrapped
+    bootstrap_manifest_repo
 
     # Check for layers.txt
-    LAYERS_FILE="$KEY_REPO_TARGET_DIR/config/layers.txt"
+    LAYERS_FILE="$MANIFEST_SYMLINK/layers.txt"
     if [ -f "$LAYERS_FILE" ]; then
         echo "Auto-setup: Reading layers from $LAYERS_FILE..."
         while IFS= read -r layer || [ -n "$layer" ]; do
@@ -99,7 +145,7 @@ if [ -z "$LAYER_NAME" ]; then
         done < "$LAYERS_FILE"
         echo ""
         echo "========================================="
-        echo "✅ All layers set up successfully!"
+        echo "All layers set up successfully!"
         echo "========================================="
         echo ""
         echo "Next steps:"
@@ -107,12 +153,12 @@ if [ -z "$LAYER_NAME" ]; then
         echo "  2. Build all layers:   .agent/scripts/build.sh"
         exit 0
     else
-        echo "Warning: $LAYERS_FILE not found in project repository."
+        echo "Warning: $LAYERS_FILE not found in manifest repository."
         echo "Falling back to default layer: core"
         echo ""
         echo "Available layers:"
         # shellcheck disable=SC2011
-        ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
+        ls "$MANIFEST_SYMLINK/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
         echo ""
         echo "========================================="
         echo "Setting up default layer: core"
@@ -132,17 +178,17 @@ fi
 LAYER_DIR="layers/main/${LAYER_NAME}_ws"
 
 # Bootstrap if necessary (for individual layer setup)
-bootstrap_key_repo
+bootstrap_manifest_repo
 
-# Locate the configuration file in the project repository
-CONFIG_FILE="$KEY_REPO_TARGET_DIR/config/repos/${LAYER_NAME}.repos"
+# Locate the configuration file via the manifest symlink
+CONFIG_FILE="$MANIFEST_SYMLINK/repos/${LAYER_NAME}.repos"
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Configuration file not found: $CONFIG_FILE"
     echo ""
     echo "Available layers:"
     # shellcheck disable=SC2011
-    ls "$KEY_REPO_TARGET_DIR/config/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
+    ls "$MANIFEST_SYMLINK/repos/"*.repos 2>/dev/null | xargs -n 1 basename | sed 's/.repos//' | sort || echo "  (none found)"
     exit 1
 fi
 
