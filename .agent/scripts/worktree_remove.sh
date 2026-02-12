@@ -188,7 +188,16 @@ echo ""
 # This script runs as a subprocess, so it cannot change the caller's cwd.
 # Removing the directory while the caller is inside it leaves their shell broken.
 # Canonicalize WORKTREE_DIR so it matches the physical CALLER_PWD.
-WORKTREE_DIR=$(cd "$WORKTREE_DIR" && pwd -P)
+if [[ ! -d "$WORKTREE_DIR" ]]; then
+    echo "❌ Error: Worktree directory '$WORKTREE_DIR' does not exist or is not accessible."
+    echo ""
+    echo "   It may have already been removed or moved."
+    exit 1
+fi
+if ! WORKTREE_DIR="$(cd "$WORKTREE_DIR" && pwd -P)"; then
+    echo "❌ Error: Failed to access worktree directory '$WORKTREE_DIR'."
+    exit 1
+fi
 if [[ "$CALLER_PWD" == "$WORKTREE_DIR" || "$CALLER_PWD" == "$WORKTREE_DIR/"* ]]; then
     echo "❌ Error: Your shell is currently inside this worktree."
     echo ""
@@ -305,12 +314,9 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
     # Prune inner package repo worktree references early, so they are cleaned
     # up even if the main `git worktree remove` call later in the script fails.
     if [ "${#INNER_WORKTREE_REPOS[@]}" -gt 0 ]; then
-        declare -A SEEN_REPOS=()
-        for repo_path in "${INNER_WORKTREE_REPOS[@]}"; do
-            if [ -n "$repo_path" ] && [ -z "${SEEN_REPOS[$repo_path]+_}" ]; then
-                SEEN_REPOS["$repo_path"]=1
-                git -C "$repo_path" worktree prune 2>/dev/null || true
-            fi
+        printf '%s\n' "${INNER_WORKTREE_REPOS[@]}" | awk 'NF' | sort -u |
+        while IFS= read -r repo_path; do
+            git -C "$repo_path" worktree prune 2>/dev/null || true
         done
     fi
 
