@@ -18,6 +18,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+source "$SCRIPT_DIR/_worktree_helpers.sh"
+
 ISSUE_NUM=""
 REPO_SLUG=""
 
@@ -188,7 +190,11 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
 fi
 
 # Show current branch
-CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    CURRENT_BRANCH=$(wt_layer_branch "$WORKTREE_DIR" 2>/dev/null || echo "")
+else
+    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
+fi
 echo ""
 echo "✅ Now in worktree for issue #$ISSUE_NUM"
 echo "   Branch: $CURRENT_BRANCH"
