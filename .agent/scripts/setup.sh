@@ -33,9 +33,16 @@ MANIFEST_SYMLINK="configs/manifest"
 
 # Function to bootstrap the manifest repository if needed
 bootstrap_manifest_repo() {
-    # If the symlink already exists and resolves, we're bootstrapped
-    if [ -d "$MANIFEST_SYMLINK" ]; then
+    # If the manifest symlink already exists and resolves, we're bootstrapped
+    if [ -L "$MANIFEST_SYMLINK" ] && [ -e "$MANIFEST_SYMLINK" ]; then
         return 0
+    fi
+
+    # If a non-symlink exists at the manifest path, refuse to proceed
+    if [ -e "$MANIFEST_SYMLINK" ] && [ ! -L "$MANIFEST_SYMLINK" ]; then
+        echo "Error: $MANIFEST_SYMLINK exists but is not a symlink."
+        echo "Please remove or replace it so the manifest symlink can be created."
+        exit 1
     fi
 
     if [ ! -f "$BOOTSTRAP_URL_FILE" ]; then
@@ -76,6 +83,20 @@ bootstrap_manifest_repo() {
 
     # Default config_path to "config" if not specified
     MANIFEST_REPO_CONFIG_PATH="${MANIFEST_REPO_CONFIG_PATH:-config}"
+
+    # Validate layer and config_path to prevent path traversal
+    if [ -n "$MANIFEST_REPO_LAYER" ]; then
+        if [[ ! "$MANIFEST_REPO_LAYER" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "Error: Invalid 'layer' value in bootstrap config: $MANIFEST_REPO_LAYER"
+            echo "Layer names must contain only letters, numbers, hyphens, and underscores."
+            exit 1
+        fi
+    fi
+    if [[ "$MANIFEST_REPO_CONFIG_PATH" == /* || "$MANIFEST_REPO_CONFIG_PATH" == *..* ]]; then
+        echo "Error: Invalid 'config_path' value in bootstrap config: $MANIFEST_REPO_CONFIG_PATH"
+        echo "config_path must be a relative path without '..' components."
+        exit 1
+    fi
 
     # Derive repo name from URL
     MANIFEST_REPO_NAME=$(basename "$MANIFEST_REPO_URL" .git)

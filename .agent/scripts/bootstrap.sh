@@ -83,7 +83,7 @@ if [ "${CODESPACES}" = "true" ]; then
         fi
         # Remove backup file after successful conversion
         rm -f "${repos_file}.bak"
-    done < <(find configs -name "*.repos" -print0)
+    done < <(find -L configs -name "*.repos" -print0)
     echo "URL conversion complete."
 fi
 
