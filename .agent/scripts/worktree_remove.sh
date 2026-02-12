@@ -237,7 +237,12 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                 fi
 
                 # Track the parent repo for pruning later
-                MAIN_REPO=$(cd "$pkg_dir" && cd "$(git rev-parse --git-common-dir)" && pwd -P | sed 's|/\.git$||') 2>/dev/null
+                MAIN_REPO=$(
+                    cd "$pkg_dir" && {
+                        cd "$(git rev-parse --git-common-dir)" &&
+                        pwd -P | sed 's|/\.git$||'
+                    } 2>/dev/null
+                )
                 if [ -n "$MAIN_REPO" ] && [ -d "$MAIN_REPO" ]; then
                     INNER_WORKTREE_REPOS+=("$MAIN_REPO")
                 fi
@@ -266,7 +271,9 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
 
     # --- Phase 2: Check workspace-level uncommitted changes ---
     # Filter out known layer infrastructure so only genuine changes are flagged.
-    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|(underlay|core|platforms|sensors|simulation|ui)_ws(/|$))'
+    LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+    LAYERS_REGEX=$(IFS='|'; echo "${LAYERS[*]}")
+    INFRA_PATTERN="^(\\?\\? |.. )(\\.scratchpad/|(${LAYERS_REGEX})_ws(/|$))"
     cd "$WORKTREE_DIR"
     WORKSPACE_UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -v -E "$INFRA_PATTERN" || true)
     cd "$ROOT_DIR"
