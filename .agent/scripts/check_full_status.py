@@ -45,7 +45,7 @@ def run_command(cmd, shell=False):
 
 def check_gh_auth():
     """Check if GitHub CLI is authenticated."""
-    returncode, stdout, stderr = run_command(["gh", "auth", "status"])
+    returncode, _stdout, _stderr = run_command(["gh", "auth", "status"])
     return returncode == 0
 
 
