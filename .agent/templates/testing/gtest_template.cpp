@@ -1,7 +1,7 @@
 /**
  * @file test_<component_name>.cpp
  * @brief Unit tests for <ComponentName> using Google Test
- * 
+ *
  * This file contains unit tests for the <ComponentName> class/functions.
  * Replace placeholders with actual component names and test logic.
  */
@@ -14,7 +14,7 @@
 
 /**
  * @brief Test fixture for <ComponentName> tests
- * 
+ *
  * This fixture sets up common resources needed for all tests.
  * It initializes ROS 2 if needed for the component under test.
  */
@@ -55,32 +55,32 @@ protected:
 
 /**
  * @brief Test basic initialization
- * 
+ *
  * Verify that the component initializes correctly.
  */
 TEST_F(ComponentNameTest, TestInitialization)
 {
   // Arrange: Set up test preconditions
-  
+
   // Act: Perform the action being tested
-  
+
   // Assert: Verify the expected outcome
   EXPECT_TRUE(true);  // Replace with actual assertion
 }
 
 /**
  * @brief Test normal operation with valid input
- * 
+ *
  * Verify the component behaves correctly with expected input.
  */
 TEST_F(ComponentNameTest, TestValidInput)
 {
   // Arrange
   // Example: int input_value = 42;
-  
+
   // Act
   // Example: int result = component_->process(input_value);
-  
+
   // Assert
   // Example: EXPECT_EQ(result, expected_value);
   EXPECT_TRUE(true);  // Replace with actual assertion
@@ -88,7 +88,7 @@ TEST_F(ComponentNameTest, TestValidInput)
 
 /**
  * @brief Test edge case handling
- * 
+ *
  * Verify the component handles edge cases correctly.
  */
 TEST_F(ComponentNameTest, TestEdgeCase)
@@ -100,7 +100,7 @@ TEST_F(ComponentNameTest, TestEdgeCase)
 
 /**
  * @brief Test error handling
- * 
+ *
  * Verify the component handles error conditions gracefully.
  */
 TEST_F(ComponentNameTest, TestErrorHandling)

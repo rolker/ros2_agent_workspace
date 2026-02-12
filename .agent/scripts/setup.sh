@@ -2,7 +2,7 @@
 # scripts/setup.sh
 # Sets up a ROS2 layer by importing repositories from a .repos file
 #
-# Usage: 
+# Usage:
 #   ./scripts/setup.sh              # Auto-setup all layers from project's layers.txt
 #   ./scripts/setup.sh <layer_name> # Setup a specific layer
 #
@@ -34,16 +34,16 @@ bootstrap_key_repo() {
     if [ -d "$KEY_REPO_TARGET_DIR" ]; then
         return 0  # Already bootstrapped
     fi
-    
+
     if [ ! -f "$BOOTSTRAP_URL_FILE" ]; then
         echo "Error: Bootstrap configuration not found: $BOOTSTRAP_URL_FILE"
         echo "This file should contain a URL to the project's bootstrap.yaml"
         exit 1
     fi
-    
+
     echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
     REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
-    
+
     # Note: The bootstrap config URL is controlled by this project's own
     # configs/project_bootstrap.url file. The downloaded YAML provides
     # git_url and branch values used in git clone. This is trusted because
@@ -67,7 +67,7 @@ bootstrap_key_repo() {
         echo "Error: Failed to parse 'git_url' or 'branch' from bootstrap config."
         exit 1
     fi
-    
+
     echo "Cloning Key Repo from $KEY_REPO_URL (branch: $KEY_REPO_BRANCH)..."
     mkdir -p layers/main/core_ws/src
     git clone -b "$KEY_REPO_BRANCH" "$KEY_REPO_URL" "$KEY_REPO_TARGET_DIR"
@@ -77,7 +77,7 @@ bootstrap_key_repo() {
 if [ -z "$LAYER_NAME" ]; then
     # Ensure the key repo is bootstrapped
     bootstrap_key_repo
-    
+
     # Check for layers.txt
     LAYERS_FILE="$KEY_REPO_TARGET_DIR/config/layers.txt"
     if [ -f "$LAYERS_FILE" ]; then
@@ -163,4 +163,3 @@ echo "  colcon build --symlink-install"
 echo ""
 echo "Or use the unified build script:"
 echo "  ./.agent/scripts/build.sh"
-

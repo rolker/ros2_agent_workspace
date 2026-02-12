@@ -90,7 +90,7 @@ echo ""
 echo "3. Checking Python Dependencies..."
 if python3 -c "import yaml" 2>/dev/null; then
     check_pass "PyYAML installed"
-    
+
     # Verify validate_repos.py can run
     if python3 "$SCRIPT_DIR/validate_repos.py" --help &>/dev/null; then
         check_pass "validate_repos.py is functional"
@@ -107,7 +107,7 @@ echo "4. Checking Workspace Structure..."
 
 if [ -d "$ROOT_DIR/configs" ]; then
     REPOS_COUNT=$(ls -1 "$ROOT_DIR/configs"/*.repos 2>/dev/null | wc -l)
-    
+
     # Check for migrated repos
     MIGRATED_DIR="$ROOT_DIR/layers/main/core_ws/src/unh_marine_autonomy/config/repos"
     if [ -d "$MIGRATED_DIR" ]; then
@@ -141,7 +141,7 @@ echo ""
 echo "5. Validating Configuration Files..."
 if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     VALIDATION_PASSED=true
-    
+
     # Validate configs/ (bootstrap)
     if [ -d "$ROOT_DIR/configs" ] && ls "$ROOT_DIR/configs"/*.repos &>/dev/null; then
         if ! python3 "$SCRIPT_DIR/validate_repos.py" --configs-dir "$ROOT_DIR/configs" --strict &>/dev/null; then
@@ -188,12 +188,12 @@ echo "7. Checking Git Repository..."
 cd "$ROOT_DIR"
 if git rev-parse --git-dir > /dev/null 2>&1; then
     check_pass "Git repository initialized"
-    
+
     BRANCH=$(git branch --show-current)
     if [ -n "$BRANCH" ]; then
         check_pass "Current branch: $BRANCH"
     fi
-    
+
     if [ -n "$(git status --porcelain)" ]; then
         check_warn "Working directory has uncommitted changes"
     else
@@ -211,14 +211,14 @@ if [ -d "$ROOT_DIR/layers/main" ]; then
     LAYER_COUNT=$(ls -d "$ROOT_DIR/layers/main"/*_ws 2>/dev/null | wc -l)
     if [ "$LAYER_COUNT" -gt 0 ]; then
         check_pass "Found $LAYER_COUNT layer(s)"
-        
+
         for layer_dir in "$ROOT_DIR/layers/main"/*_ws; do
             if [ -d "$layer_dir" ]; then
                 layer_name=$(basename "$layer_dir")
                 if [ -d "$layer_dir/src" ]; then
                     repo_count=$(find "$layer_dir/src" -mindepth 1 -maxdepth 1 -type d | wc -l)
                     echo "  - $layer_name: $repo_count repositories"
-                    
+
                     if [ -f "$layer_dir/install/setup.bash" ]; then
                         echo "    ✓ Built"
                     else

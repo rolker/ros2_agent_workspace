@@ -2,7 +2,7 @@
 # .agent/scripts/configure_git_identity.sh
 # Configures git identity for AI agents across workspace and all cloned repositories
 #
-# Usage: 
+# Usage:
 #   ./configure_git_identity.sh "<Agent Name>" "<email>"
 #   ./configure_git_identity.sh --agent <framework>
 #   ./configure_git_identity.sh --detect
@@ -79,30 +79,30 @@ if [ "$1" == "--agent" ]; then
         show_usage
         exit 1
     fi
-    
+
     FRAMEWORK="${2,,}"  # Convert to lowercase
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK]}"
-    
+
     if [ -z "$AGENT_NAME" ]; then
         echo "Error: Unknown framework '$2'"
         echo "Supported frameworks: ${!FRAMEWORK_NAMES[@]}"
         exit 1
     fi
-    
+
 elif [ "$1" == "--detect" ]; then
     DETECTED=$(detect_framework)
-    
+
     if [ "$DETECTED" == "unknown" ]; then
         echo "Error: Could not auto-detect framework"
         echo "Please use --agent <framework> or provide name/email manually"
         exit 1
     fi
-    
+
     AGENT_NAME="${FRAMEWORK_NAMES[$DETECTED]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$DETECTED]}"
     echo "Detected framework: $DETECTED"
-    
+
 elif [ $# -eq 2 ]; then
     # Manual name and email
     AGENT_NAME="$1"
@@ -131,18 +131,18 @@ if [ -d "layers" ]; then
     while IFS= read -r git_dir; do
         repo_dir="$(dirname "$git_dir")"
         echo "Configuring $repo_dir..."
-        
+
         # Capture failure but don't crash whole script immediately if one fails
         if ! git -C "$repo_dir" config user.name "$AGENT_NAME" || \
            ! git -C "$repo_dir" config user.email "$AGENT_EMAIL"; then
             echo "  ✗ Failed to configure $repo_dir" >&2
-            # Decide if we want to fail hard or continue. 
+            # Decide if we want to fail hard or continue.
             # Continuing sees more errors.
             continue
         fi
         ((REPO_COUNT++))
     done < <(find layers -type d -name ".git")
-    
+
     if [ $REPO_COUNT -gt 0 ]; then
         echo "  ✓ Configured $REPO_COUNT repositories in layers/"
     else

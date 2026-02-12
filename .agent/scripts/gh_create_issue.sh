@@ -1,7 +1,7 @@
 #!/bin/bash
 # Helper script for creating GitHub issues with label validation
 # Usage: gh_create_issue.sh [gh issue create options]
-# 
+#
 # This script wraps 'gh issue create' and validates labels against .agent/github_metadata.json
 # before calling the GitHub CLI. This prevents failures from invalid label names.
 #

@@ -52,7 +52,7 @@ fi
 if [ -n "$FOUND_LAYER" ]; then
     echo "📂 Located package in: $FOUND_LAYER"
     cd "$FOUND_LAYER" || exit 1
-    
+
     # Source install if available to ensure environment is ready
     if [ -f "install/setup.bash" ]; then
         source "install/setup.bash"
@@ -70,7 +70,7 @@ if [ "$(pwd)" == "$ROOT_DIR" ]; then
     exit 1
 fi
 
-# Not forcing build before test, assuming agent handles build separately 
+# Not forcing build before test, assuming agent handles build separately
 # or colcon test builds if needed (it usually doesn't, test depends on build).
 # Ideally user should run ./scripts/build.sh first or agent does it.
 

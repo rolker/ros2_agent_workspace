@@ -123,9 +123,9 @@ BRANCH_NAME="feature/ISSUE-${ISSUE_NUMBER}-${SLUG}"
 if [ -n "$WORKTREE_TYPE" ]; then
     # Create worktree using worktree_create.sh
     echo "🌲 Creating $WORKTREE_TYPE worktree for issue #$ISSUE_NUMBER..."
-    
+
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
+
     # Build worktree_create arguments safely to avoid command injection
     WORKTREE_ARGS=(--issue "$ISSUE_NUMBER" --type "$WORKTREE_TYPE" --branch "$BRANCH_NAME" --repo-slug "$REPO_SLUG")
     if [ "$WORKTREE_TYPE" = "layer" ]; then
@@ -141,9 +141,9 @@ if [ -n "$WORKTREE_TYPE" ]; then
         fi
         WORKTREE_ARGS+=(--layer "$TARGET_LAYER" --packages "$TARGET_PACKAGES")
     fi
-    
+
     "$SCRIPT_DIR/worktree_create.sh" "${WORKTREE_ARGS[@]}"
-    
+
     echo ""
     echo "✅ Worktree created! Next steps:"
     echo "   1. Enter the worktree: source .agent/scripts/worktree_enter.sh --issue $ISSUE_NUMBER --repo-slug $REPO_SLUG"
@@ -156,20 +156,20 @@ else
     # Traditional branch workflow
     echo "🌿 Creating branch: $BRANCH_NAME"
     git checkout -b "$BRANCH_NAME"
-    
+
     # Create work plan from template
     PLAN_FILE=".agent/work-plans/PLAN_ISSUE-${ISSUE_NUMBER}.md"
     START_DATE=$(date +%Y-%m-%d)
-    
+
     echo "📝 Generating work plan: $PLAN_FILE"
-    
+
     # Copy template and replace placeholders
     cp .agent/templates/ISSUE_PLAN.md "$PLAN_FILE"
     sed -i "s/{ISSUE_NUMBER}/$ISSUE_NUMBER/g" "$PLAN_FILE"
     sed -i "s/{ISSUE_TITLE}/$ISSUE_TITLE/g" "$PLAN_FILE"
     sed -i "s/{AGENT_NAME}/$AGENT_NAME/g" "$PLAN_FILE"
     sed -i "s/{START_DATE}/$START_DATE/g" "$PLAN_FILE"
-    
+
     echo ""
     echo "✅ Plan created! Next steps:"
     echo "   1. Edit $PLAN_FILE with your approach and tasks"

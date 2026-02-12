@@ -12,14 +12,14 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      
+
       # Example using a hypothetial AI Review Action or script
       # Replace this with your preferred provider (e.g., Copilot, weighted-ai, etc.)
       # - name: Run Copilot Review
       #   uses: github/copilot-code-review-action@v1
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       # For now, we will just post a comment acknowledging the workflow
       - name: Post Review Comment
         uses: actions/github-script@v7

@@ -105,38 +105,38 @@ if [ "$1" == "--agent" ]; then
         show_usage
         return 1
     fi
-    
+
     FRAMEWORK="${2,,}"  # Convert to lowercase
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK]}"
     AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK]}"
     AGENT_FRAMEWORK="$FRAMEWORK"
-    
+
     if [ -z "$AGENT_NAME" ]; then
         echo "Error: Unknown framework '$2'"
         echo "Supported frameworks: ${!FRAMEWORK_NAMES[@]}"
         return 1
     fi
-    
+
 elif [ "$1" == "--detect" ]; then
     DETECTED=$(detect_framework)
-    
+
     if [ "$DETECTED" == "unknown" ]; then
         echo "Error: Could not auto-detect framework"
         echo "Please use --agent <framework> or provide name/email manually"
         return 1
     fi
-    
+
     # Normalize framework name for lookup (remove -cli suffix from end only)
     FRAMEWORK_KEY="${DETECTED%-cli}"
     FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"
-    
+
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK_KEY]}"
     AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK_KEY]}"
     AGENT_FRAMEWORK="$DETECTED"
     echo "Detected framework: $DETECTED"
-    
+
 elif [ $# -eq 2 ]; then
     # Manual name and email (without model)
     AGENT_NAME="$1"

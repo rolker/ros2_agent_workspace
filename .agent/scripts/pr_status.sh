@@ -41,19 +41,19 @@ get_review_comments() {
 # Returns: critical, minor, or empty
 classify_comment() {
     local comment_body=$1
-    
+
     # Critical keywords
     if echo "$comment_body" | grep -iE "(security|vulnerability|bug|error|critical|dangerous|unsafe|leak)" > /dev/null; then
         echo "critical"
         return
     fi
-    
+
     # Style/minor keywords
     if echo "$comment_body" | grep -iE "(style|formatting|typo|naming|convention|prefer|consider|suggestion)" > /dev/null; then
         echo "minor"
         return
     fi
-    
+
     # Default to minor
     echo "minor"
 }
@@ -65,18 +65,18 @@ analyze_pr() {
     local title=$(echo "$pr_json" | jq -r '.title')
     local updated=$(echo "$pr_json" | jq -r '.updatedAt')
     local review_decision=$(echo "$pr_json" | jq -r '.reviewDecision // "PENDING"')
-    
+
     # Get review info separately
     local reviews_count=$(gh api "/repos/{owner}/{repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
-    
+
     # Get review comments
     local comments=$(get_review_comments "$number")
     local comment_count=0
-    
+
     # Classify comments
     local critical_count=0
     local minor_count=0
-    
+
     if [ -n "$comments" ]; then
         while IFS= read -r comment; do
             if [ -z "$comment" ]; then
@@ -85,7 +85,7 @@ analyze_pr() {
             comment_count=$((comment_count + 1))
             local body=$(echo "$comment" | jq -r '.body // ""')
             local severity=$(classify_comment "$body")
-            
+
             if [ "$severity" = "critical" ]; then
                 critical_count=$((critical_count + 1))
             else
@@ -93,7 +93,7 @@ analyze_pr() {
             fi
         done <<< "$comments"
     fi
-    
+
     # Determine category
     local category=""
     if [ "$reviews_count" -eq 0 ]; then
@@ -107,7 +107,7 @@ analyze_pr() {
     else
         category="needs_review"
     fi
-    
+
     # Calculate time since update
     local time_ago
     if command -v gdate >/dev/null 2>&1; then
@@ -124,7 +124,7 @@ analyze_pr() {
     local diff=$((now - time_ago))
     local hours=$((diff / 3600))
     local days=$((diff / 86400))
-    
+
     local time_str=""
     if [ "$days" -gt 0 ]; then
         time_str="${days}d ago"
@@ -133,7 +133,7 @@ analyze_pr() {
     else
         time_str="recently"
     fi
-    
+
     # Output JSON for aggregation
     jq -n \
         --arg category "$category" \
@@ -149,21 +149,21 @@ analyze_pr() {
 display_dashboard() {
     local prs_json=$1
     local interactive=${2:-false}
-    
+
     echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${NC}"
     echo "===================="
     echo ""
-    
+
     # Categorize PRs
     local needs_review=()
     local critical=()
     local minor=()
     local ready=()
-    
+
     while IFS= read -r pr; do
         local analyzed=$(analyze_pr "$pr")
         local category=$(echo "$analyzed" | jq -r '.category')
-        
+
         case "$category" in
             needs_review)
                 needs_review+=("$analyzed")
@@ -179,13 +179,13 @@ display_dashboard() {
                 ;;
         esac
     done < <(echo "$prs_json" | jq -c '.[]')
-    
+
     # Display categories
     display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
     display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
     display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
     display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
-    
+
     # Summary
     local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
     echo ""
@@ -200,11 +200,11 @@ display_category() {
     local color=$3
     shift 3
     local items=("$@")
-    
+
     if [ ${#items[@]} -eq 0 ]; then
         return
     fi
-    
+
     echo -e "${color}${emoji} ${label} (${#items[@]})${NC}"
     for item in "${items[@]}"; do
         local number=$(echo "$item" | jq -r '.number')
@@ -212,9 +212,9 @@ display_category() {
         local time=$(echo "$item" | jq -r '.time')
         local critical=$(echo "$item" | jq -r '.critical')
         local minor=$(echo "$item" | jq -r '.minor')
-        
+
         printf "  #%-4s %-50s (last: %s)\n" "$number" "$title" "$time"
-        
+
         if [ "$critical" -gt 0 ]; then
             echo "        → $critical critical comment(s)"
         fi
@@ -229,12 +229,12 @@ display_category() {
 output_json() {
     local prs_json=$1
     local all_prs=[]
-    
+
     while IFS= read -r pr; do
         local analyzed=$(analyze_pr "$pr")
         all_prs=$(echo "$all_prs" | jq --argjson item "$analyzed" '. + [$item]')
     done < <(echo "$prs_json" | jq -c '.[]')
-    
+
     echo "$all_prs" | jq '{
         summary: {
             total: (. | length),
@@ -251,17 +251,17 @@ output_json() {
 get_next_pr() {
     local prs_json=$1
     local category=${2:-"critical"}
-    
+
     while IFS= read -r pr; do
         local analyzed=$(analyze_pr "$pr")
         local pr_category=$(echo "$analyzed" | jq -r '.category')
-        
+
         if [ "$pr_category" = "$category" ]; then
             echo "$analyzed"
             return 0
         fi
     done < <(echo "$prs_json" | jq -c '.[]')
-    
+
     # No PR found in requested category
     return 1
 }
@@ -269,16 +269,16 @@ get_next_pr() {
 # Function to output simple text summary (for agents)
 output_simple() {
     local prs_json=$1
-    
+
     local needs_review=()
     local critical=()
     local minor=()
     local ready=()
-    
+
     while IFS= read -r pr; do
         local analyzed=$(analyze_pr "$pr")
         local category=$(echo "$analyzed" | jq -r '.category')
-        
+
         case "$category" in
             needs_review) needs_review+=("$analyzed") ;;
             critical) critical+=("$analyzed") ;;
@@ -286,9 +286,9 @@ output_simple() {
             ready) ready+=("$analyzed") ;;
         esac
     done < <(echo "$prs_json" | jq -c '.[]')
-    
+
     echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
-    
+
     if [ ${#critical[@]} -gt 0 ]; then
         echo ""
         echo "CRITICAL ISSUES:"
@@ -300,7 +300,7 @@ output_simple() {
             echo "  #$number: $title ($crit critical, $min minor)"
         done
     fi
-    
+
     if [ ${#needs_review[@]} -gt 0 ]; then
         echo ""
         echo "NEEDS REVIEW:"
@@ -310,7 +310,7 @@ output_simple() {
             echo "  #$number: $title"
         done
     fi
-    
+
     if [ ${#ready[@]} -gt 0 ]; then
         echo ""
         echo "READY TO MERGE:"
@@ -328,7 +328,7 @@ run_interactive() {
         clear
         local prs=$(fetch_prs)
         display_dashboard "$prs" true
-        
+
         echo "What would you like to do?"
         echo "1) Review a PR (launch Copilot review)"
         echo "2) Fix issues on a PR (launch agent)"
@@ -337,7 +337,7 @@ run_interactive() {
         echo "q) Quit"
         echo ""
         read -p "> " choice
-        
+
         case "$choice" in
             1)
                 read -p "Enter PR number: " pr_num
@@ -376,7 +376,7 @@ run_interactive() {
 main() {
     local interactive=false
     local mode="dashboard"  # dashboard, json, simple, next-critical, next-minor
-    
+
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -430,10 +430,10 @@ main() {
                 ;;
         esac
     done
-    
+
     # Fetch PRs
     local prs=$(fetch_prs)
-    
+
     # Execute based on mode
     if [ "$interactive" = true ]; then
         run_interactive

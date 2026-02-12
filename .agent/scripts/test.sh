@@ -61,7 +61,7 @@ if [ -f "$SCRIPT_DIR/env.sh" ]; then
     source "$SCRIPT_DIR/env.sh" > /dev/null
 else
     # Fallback if env.sh missing
-    LAYERS=("core") 
+    LAYERS=("core")
 fi
 
 echo "========================================"
@@ -79,11 +79,11 @@ for layer in "${LAYERS[@]}"; do
     LAYER_DIR="$LAYERS_BASE/${layer}_ws"
     LAYER_RESULT="skipped"
     LAYER_SUMMARY="No source"
-    
+
     if [ -d "$LAYER_DIR/src" ]; then
         echo "----------------------------------------"
         echo "Testing Layer: $layer"
-        
+
 
         # Safety Check: Never run in root
         if [ "$LAYER_DIR" == "$ROOT_DIR" ]; then
@@ -92,7 +92,7 @@ for layer in "${LAYERS[@]}"; do
         fi
 
         cd "$LAYER_DIR" || continue
-        
+
         # Source existing install if available
         if [ -f "install/setup.bash" ]; then
             source "install/setup.bash"
@@ -101,7 +101,7 @@ for layer in "${LAYERS[@]}"; do
         # Run Tests
         colcon test --event-handlers console_direct+ --return-code-on-test-failure
         TEST_RC=$?
-        
+
         # Summary
         RESULT_SUMMARY=$(colcon test-result --verbose | grep -E "Total|Errors|Failures" | paste -sd " " -)
         [ -z "$RESULT_SUMMARY" ] && RESULT_SUMMARY="No tests run"

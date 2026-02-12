@@ -227,7 +227,7 @@ fi
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo ""
     echo "Setting up layer worktree structure..."
-    
+
     # Create scratchpad for this worktree
     mkdir -p "$WORKTREE_DIR/.scratchpad"
     cat > "$WORKTREE_DIR/.scratchpad/README.md" << EOF
@@ -238,7 +238,7 @@ Files here are gitignored and isolated from other worktrees.
 
 **Working layer**: ${TARGET_LAYER}_ws
 EOF
-    
+
     # Create symlinks to main for all layers except target
     echo "Creating symlinks to main layers..."
     for layer in "${AVAILABLE_LAYERS[@]}"; do
@@ -247,7 +247,7 @@ EOF
             # Target layer - create hybrid structure: git worktrees for modified packages, symlinks for others
             echo "  - $LAYER_WS: creating hybrid structure (git worktrees + symlinks)"
             mkdir -p "$WORKTREE_DIR/${LAYER_WS}/src"
-            
+
             # Convert comma-separated packages to array without permanently changing IFS
             OLD_IFS=$IFS
             IFS=','
@@ -265,22 +265,22 @@ EOF
                     PACKAGE_ARRAY+=("$pkg")
                 fi
             done
-            
+
             # Get list of all packages in main layer
             MAIN_SRC_DIR="$ROOT_DIR/layers/main/${LAYER_WS}/src"
             if [ ! -d "$MAIN_SRC_DIR" ]; then
                 echo "    Error: Layer directory not found: $MAIN_SRC_DIR"
                 exit 1
             fi
-            
+
             # Process each package in main
             for pkg_path in "$MAIN_SRC_DIR"/*; do
                 if [ ! -d "$pkg_path" ]; then
                     continue
                 fi
-                
+
                 pkg_name=$(basename "$pkg_path")
-                
+
                 # Check if this package should have a worktree
                 CREATE_WORKTREE=false
                 for target_pkg in "${PACKAGE_ARRAY[@]}"; do
@@ -289,17 +289,17 @@ EOF
                         break
                     fi
                 done
-                
+
                 if [ "$CREATE_WORKTREE" = true ]; then
                     # Create git worktree for this package
                     echo "    - $pkg_name: creating git worktree (modified)"
-                    
+
                     # Check if package is a git repository
                     if [ -d "$pkg_path/.git" ]; then
                         # Create worktree from this package's git repo
                         cd "$pkg_path"
                         WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
-                        
+
                         # Prefer the issue branch for this package: create it if needed, or reuse if it exists
                         if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
@@ -328,7 +328,7 @@ EOF
                     ln -s "$pkg_path" "$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
                 fi
             done
-            
+
             # Verify all requested packages were found
             for target_pkg in "${PACKAGE_ARRAY[@]}"; do
                 if [ ! -e "$WORKTREE_DIR/${LAYER_WS}/src/$target_pkg" ]; then
@@ -349,7 +349,7 @@ fi
 if [ "$WORKTREE_TYPE" == "workspace" ]; then
     echo ""
     echo "Setting up workspace worktree..."
-    
+
     # Create symlink to main layers (using relative path for portability)
     # From: .workspace-worktrees/issue-N/layers/main
     # To:   layers/main (at root)
@@ -357,7 +357,7 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
     echo "Creating symlink to main layers..."
     mkdir -p "$WORKTREE_DIR/layers"
     ln -s "../../../layers/main" "$WORKTREE_DIR/layers/main"
-    
+
     # Ensure scratchpad exists
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"
 fi

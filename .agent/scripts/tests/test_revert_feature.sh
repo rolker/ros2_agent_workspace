@@ -17,7 +17,7 @@ setup_test_repo() {
     git init -q
     git config user.email "test@example.com"
     git config user.name "Test User"
-    
+
     # Create initial commit
     echo "initial" > file.txt
     git add file.txt
@@ -36,9 +36,9 @@ cleanup_test_repo() {
 run_test() {
     local test_name="$1"
     local test_func="$2"
-    
+
     echo "Test: $test_name"
-    
+
     if $test_func; then
         echo "✅ PASS: $test_name"
         ((TEST_PASS++))
@@ -97,24 +97,24 @@ run_test "Non-existent issue exits with error" test_no_commits_found
 # Test 5: Dry-run mode doesn't make changes
 test_dry_run_mode() {
     setup_test_repo
-    
+
     # Create a commit referencing issue #123
     echo "change1" > file.txt
     git add file.txt
     git commit -q -m "Fix something
 
 Fixes #123"
-    
+
     local before_commit=$(git rev-parse HEAD)
-    
+
     # Run dry-run
     local output
     output=$("$REVERT_SCRIPT" --issue 123 --dry-run 2>&1)
-    
+
     local after_commit=$(git rev-parse HEAD)
-    
+
     cleanup_test_repo
-    
+
     # Verify no changes and correct output
     [[ "$before_commit" == "$after_commit" ]] && \
     [[ "$output" =~ "DRY RUN" ]] && \
@@ -129,25 +129,25 @@ test_single_commit_revert() {
         ((TEST_SKIP++))
         return 0
     fi
-    
+
     setup_test_repo
-    
+
     # Create commit with issue reference
     echo "change1" > file.txt
     git add file.txt
     git commit -q -m "Add feature
 
 Implements #456"
-    
+
     # Auto-confirm with 'y'
     echo "y" | "$REVERT_SCRIPT" --issue 456 > /dev/null 2>&1
     local result=$?
-    
+
     # Check that we have a revert commit
     local last_msg=$(git log -1 --format=%s)
-    
+
     cleanup_test_repo
-    
+
     [[ $result -eq 0 ]] && [[ "$last_msg" =~ "Revert" ]]
 }
 run_test "Single commit successfully reverted" test_single_commit_revert
@@ -159,29 +159,29 @@ test_multiple_commits_order() {
         ((TEST_SKIP++))
         return 0
     fi
-    
+
     setup_test_repo
-    
+
     # Create multiple commits for same issue
     echo "change1" > file.txt
     git add file.txt
     git commit -q -m "Part 1 of feature #789"
-    
+
     echo "change2" > file.txt
     git add file.txt
     git commit -q -m "Part 2 of feature #789"
-    
+
     echo "change3" > file.txt
     git add file.txt
     git commit -q -m "Part 3 of feature #789"
-    
+
     # Auto-confirm with 'y'
     local output
     output=$(echo "y" | "$REVERT_SCRIPT" --issue 789 2>&1)
-    
+
     # Verify success message shows correct count
     cleanup_test_repo
-    
+
     [[ "$output" =~ "Successfully reverted 3 commit(s)" ]]
 }
 run_test "Multiple commits reverted with correct count" test_multiple_commits_order
@@ -189,32 +189,32 @@ run_test "Multiple commits reverted with correct count" test_multiple_commits_or
 # Test 8: Script finds commits with various reference formats
 test_commit_reference_formats() {
     setup_test_repo
-    
+
     # Create commits with different reference formats
     echo "change1" > file1.txt
     git add file1.txt
     git commit -q -m "Fix bug #111"
-    
+
     echo "change2" > file2.txt
     git add file2.txt
     git commit -q -m "Update docs
-    
+
 Closes #111"
-    
+
     echo "change3" > file3.txt
     git add file3.txt
     git commit -q -m "Add test
-    
+
 Fixes #111"
-    
+
     # Check dry-run finds all 3 commits
     local output
     output=$("$REVERT_SCRIPT" --issue 111 --dry-run 2>&1)
-    
+
     local found_count=$(echo "$output" | grep -c "Found 3 commit(s)")
-    
+
     cleanup_test_repo
-    
+
     [[ $found_count -eq 1 ]]
 }
 run_test "Finds commits with various reference formats" test_commit_reference_formats
@@ -230,18 +230,18 @@ run_test "Unknown option shows error" test_unknown_option
 # Test 10: Verify mapfile usage (no subshell issues)
 test_no_subshell_issues() {
     setup_test_repo
-    
+
     # Create commit
     echo "change" > file.txt
     git add file.txt
     git commit -q -m "Feature #222"
-    
+
     # Run with auto-confirm and check the counter in output
     local output
     output=$(echo "y" | "$REVERT_SCRIPT" --issue 222 2>&1)
-    
+
     cleanup_test_repo
-    
+
     # Should show "Successfully reverted 1 commit(s)" - proves counter works
     [[ "$output" =~ "Successfully reverted 1 commit(s)" ]]
 }

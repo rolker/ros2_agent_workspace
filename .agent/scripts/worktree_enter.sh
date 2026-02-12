@@ -88,7 +88,7 @@ find_worktree() {
     local base_dir="$1"
     local issue_num="$2"
     local repo_slug="$3"
-    
+
     # If repo slug is specified, check exact path
     if [ -n "$repo_slug" ]; then
         local exact_path="$base_dir/issue-${repo_slug}-${issue_num}"
@@ -98,7 +98,7 @@ find_worktree() {
         fi
         return 1
     fi
-    
+
     # Otherwise, search for matching worktrees (new format and legacy)
     local matches=()
     for path in "$base_dir"/issue-*-"${issue_num}"; do
@@ -177,7 +177,7 @@ export WORKTREE_ROOT="$WORKTREE_DIR"
 # For layer worktrees, also set up scratchpad path
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
-    
+
     # Source ROS 2 environment
     # Layer worktrees share .agent/ via git worktree, so env.sh is in the root repo
     if [ -f "$ROOT_DIR/.agent/scripts/env.sh" ]; then

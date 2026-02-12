@@ -11,11 +11,20 @@ from pathlib import Path
 
 # Common temp file patterns that should not be in source directories
 SUSPICIOUS_PATTERNS = {
-    ".tmp", ".temp", ".bak", ".backup",
-    "_temp", "_backup",
-    ".analysis", ".report", ".debug",
-    ".log", ".out", ".err",
-    ".swp", ".swo",  # Editor artifacts
+    ".tmp",
+    ".temp",
+    ".bak",
+    ".backup",
+    "_temp",
+    "_backup",
+    ".analysis",
+    ".report",
+    ".debug",
+    ".log",
+    ".out",
+    ".err",
+    ".swp",
+    ".swo",  # Editor artifacts
 }
 
 WORKSPACES_DIR = "workspaces"
@@ -60,9 +69,7 @@ def main():
 
     if suspicious:
         print("\n⚠️  WARNING: Suspicious untracked files found in source directories!")
-        print(
-            "   These may be temporary artifacts that should not be committed:\n"
-        )
+        print("   These may be temporary artifacts that should not be committed:\n")
         for filepath in suspicious:
             print(f"   - {filepath}")
         print("\n   Options:")

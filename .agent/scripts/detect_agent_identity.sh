@@ -49,11 +49,11 @@ if [ "$AGENT_FRAMEWORK" != "unknown" ]; then
     # Normalize framework name (remove -cli suffix from end only)
     FRAMEWORK_KEY="${AGENT_FRAMEWORK%-cli}"
     FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"  # lowercase
-    
+
     AGENT_NAME="${FRAMEWORK_NAMES[$FRAMEWORK_KEY]}"
     AGENT_EMAIL="${FRAMEWORK_EMAILS[$FRAMEWORK_KEY]}"
     AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK_KEY]}"
-    
+
     # If lookups failed, use defaults
     if [ -z "$AGENT_NAME" ]; then
         AGENT_NAME="AI Agent"
@@ -76,7 +76,7 @@ fi
 # This is framework-specific and may not always be available
 detect_actual_model() {
     local detected_model=""
-    
+
     case "$AGENT_FRAMEWORK" in
         copilot*|copilot-cli)
             # GitHub Copilot doesn't expose model info easily
@@ -115,7 +115,7 @@ detect_actual_model() {
             fi
             ;;
     esac
-    
+
     echo "$detected_model"
 }
 
