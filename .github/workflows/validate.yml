@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate-scripts:
-    name: Validate Scripts
+    name: Lint (pre-commit)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -19,27 +19,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Run shellcheck
-        run: |
-          shellcheck .agent/scripts/*.sh || exit 0
-
-      - name: Validate Python syntax
-        run: |
-          python3 -m py_compile .agent/scripts/*.py
-
-      - name: Check Python formatting
-        run: |
-          black --check --line-length 100 .agent/scripts/*.py || exit 0
-
-      - name: Run flake8
-        run: |
-          flake8 --max-line-length=100 --extend-ignore=E203,W503 .agent/scripts/*.py || exit 0
+      - name: Lint
+        run: make lint
 
   validate-documentation:
     name: Validate Documentation
