@@ -146,9 +146,32 @@ fi
 
 # Auto-detect repo slug if not provided
 if [ -z "$REPO_SLUG" ]; then
-    # Try to detect from git remote URL
-    if git remote get-url origin &>/dev/null; then
-        REMOTE_URL=$(git remote get-url origin)
+    REMOTE_URL=""
+
+    # For layer worktrees, detect slug from the first package's git remote
+    # (the issue typically lives in the same repo as the package being modified)
+    if [ "$WORKTREE_TYPE" == "layer" ] && [ -n "$TARGET_PACKAGES" ]; then
+        # Extract first package name from comma-separated list
+        FIRST_PKG="${TARGET_PACKAGES%%,*}"
+        # Trim whitespace
+        FIRST_PKG="${FIRST_PKG#"${FIRST_PKG%%[![:space:]]*}"}"
+        FIRST_PKG="${FIRST_PKG%"${FIRST_PKG##*[![:space:]]}"}"
+
+        PKG_PATH="$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/$FIRST_PKG"
+        if [ -d "$PKG_PATH" ] && git -C "$PKG_PATH" remote get-url origin &>/dev/null; then
+            REMOTE_URL=$(git -C "$PKG_PATH" remote get-url origin)
+        fi
+    fi
+
+    # Fallback: detect from workspace repo remote (use -C to ensure we
+    # always query the workspace repo, regardless of the caller's cwd)
+    if [ -z "$REMOTE_URL" ]; then
+        if git -C "$ROOT_DIR" remote get-url origin &>/dev/null; then
+            REMOTE_URL=$(git -C "$ROOT_DIR" remote get-url origin)
+        fi
+    fi
+
+    if [ -n "$REMOTE_URL" ]; then
         # Extract repo name from URL (works for both HTTPS and SSH)
         # e.g., https://github.com/org/repo.git -> repo
         # e.g., git@github.com:org/repo.git -> repo
@@ -162,7 +185,7 @@ if [ -z "$REPO_SLUG" ]; then
         # Sanitize repo slug: replace hyphens and other invalid characters with underscores
         REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
     else
-        # Fallback to "workspace" if no remote
+        # Fallback to "workspace" if no remote detected
         REPO_SLUG="workspace"
     fi
     echo "Auto-detected repository slug: $REPO_SLUG"
