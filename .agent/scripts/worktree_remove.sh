@@ -271,9 +271,9 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
 
     # --- Phase 2: Check workspace-level uncommitted changes ---
     # Filter out known layer infrastructure so only genuine changes are flagged.
-    LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
-    LAYERS_REGEX=$(IFS='|'; echo "${LAYERS[*]}")
-    INFRA_PATTERN="^(\\?\\? |.. )(\\.scratchpad/|(${LAYERS_REGEX})_ws(/|$))"
+    # Treat any top-level *_ws directory as infrastructure (Phase 1 already
+    # validated each workspace dir individually for unexpected content).
+    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|[^/]*_ws(/|$))'
     cd "$WORKTREE_DIR"
     WORKSPACE_UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -v -E "$INFRA_PATTERN" || true)
     cd "$ROOT_DIR"
@@ -297,17 +297,6 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
         if [ -L "$ws_dir" ]; then
             rm "$ws_dir"
         elif [ -d "$ws_dir" ]; then
-            SRC_DIR="$ws_dir/src"
-            if [ -d "$SRC_DIR" ]; then
-                for pkg_dir in "$SRC_DIR"/*; do
-                    [ -e "$pkg_dir" ] || continue
-                    if [ -L "$pkg_dir" ]; then
-                        rm "$pkg_dir"
-                    elif [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
-                        rm -rf "$pkg_dir"
-                    fi
-                done
-            fi
             rm -rf "$ws_dir"
         fi
     done
