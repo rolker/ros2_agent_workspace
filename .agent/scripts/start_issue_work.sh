@@ -185,6 +185,7 @@ else
 
         ---
         **Authored-By**: \`${AGENT_NAME}\`
+        **Model**: \`${AGENT_MODEL}\`
 PREOF
     echo ""
     echo "💡 Or use the combined helper: .agent/scripts/update_issue_plan.sh $ISSUE_NUMBER"

@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     # VCSTool for repo management
     python3-vcstool \
     python3-venv \
+    python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
