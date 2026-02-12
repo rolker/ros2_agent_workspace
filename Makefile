@@ -94,9 +94,9 @@ revert-feature:
 	fi
 	@./.agent/scripts/revert_feature.sh --issue $(ISSUE)
 
-format:
+format: $(PRE_COMMIT)
 	@echo "Formatting Python code with black..."
-	@black --line-length 100 .agent/scripts/*.py
+	@$(PRE_COMMIT) run black --all-files
 	@echo "Done."
 
 $(PRE_COMMIT):
@@ -106,7 +106,8 @@ $(PRE_COMMIT):
 	@echo "Dev-tools venv ready at $(VENV_DIR)/"
 
 setup-dev: $(PRE_COMMIT)
-	@echo "Dev-tools venv is ready. pre-commit: $(PRE_COMMIT)"
+	@$(PRE_COMMIT) install
+	@echo "Dev-tools venv is ready. Git hooks installed."
 
 lint: $(PRE_COMMIT)
 	@$(PRE_COMMIT) run --all-files
