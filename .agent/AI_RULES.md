@@ -30,6 +30,7 @@ rules plus framework-specific guidance.
    Use `$AGENT_NAME` / `$AGENT_MODEL` env vars — never copy example names.
 8. **Use `--body-file`** for `gh` CLI, not inline `--body` (newlines break).
 9. **Build in layer directories only** — never `colcon build` from workspace root.
+10. **Never document from assumptions** — verify every parameter, topic, service, and message type by reading source code. See [`knowledge/documentation_verification.md`](knowledge/documentation_verification.md).
 
 ## Key Scripts
 

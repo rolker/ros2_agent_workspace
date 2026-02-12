@@ -84,6 +84,15 @@ pre-commit run --all-files                       # Lint + hooks
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
 
+## Documentation Accuracy
+
+- **Never document from assumptions** — every claim about parameters, topics, services,
+  message types, or API signatures must be verified by reading the actual source code.
+- Before writing or updating package documentation, read `package.xml`, all source files
+  that declare parameters/publishers/subscribers, and any `.msg`/`.srv`/`.action` files.
+- Use the verification workflow in [`../knowledge/documentation_verification.md`](../knowledge/documentation_verification.md).
+- Use the documentation template in [`../templates/package_documentation.md`](../templates/package_documentation.md).
+
 ## Workspace Cleanliness
 
 - Keep repo root and `layers/*/src/` clean — no temp files, build artifacts, or logs.
