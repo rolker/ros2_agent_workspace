@@ -167,7 +167,10 @@ else
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
 
-            cd "$ws_dir/src" || exit
+            if ! cd "$ws_dir/src"; then
+                echo "Warning: could not enter workspace directory '$ws_dir/src'; skipping."
+                continue
+            fi
 
             # Get status with branch info
             raw_output=$(vcs custom --git --args status --porcelain -b 2>/dev/null || echo "")

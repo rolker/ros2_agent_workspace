@@ -81,7 +81,12 @@ else
         if [ -d "$ws_dir/src" ]; then
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
 
-            cd "$ws_dir/src" || exit
+            if ! cd "$ws_dir/src"; then
+                echo "### Workspace: $ws_name"
+                echo "**Warning**: Unable to enter workspace directory '$ws_dir/src'; skipping."
+                echo ""
+                continue
+            fi
 
             # Fetch updates quietly (suppress warnings)
             vcs custom --git --args fetch -q >/dev/null 2>&1
