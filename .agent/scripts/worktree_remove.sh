@@ -234,7 +234,7 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                 fi
 
                 # Track the parent repo for pruning later
-                MAIN_REPO=$(cd "$pkg_dir" && realpath "$(git rev-parse --git-common-dir)" 2>/dev/null | sed 's|/\.git$||')
+                MAIN_REPO=$(cd "$pkg_dir" && cd "$(git rev-parse --git-common-dir)" && pwd -P | sed 's|/\.git$||') 2>/dev/null
                 if [ -n "$MAIN_REPO" ] && [ -d "$MAIN_REPO" ]; then
                     INNER_WORKTREE_REPOS+=("$MAIN_REPO")
                 fi
@@ -242,6 +242,19 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                 # Not a symlink and not a git repo — unrecognized user content
                 if [ "$FORCE" != true ]; then
                     echo "⚠️  Warning: Unrecognized content in $(basename "$ws_dir")/src/: $(basename "$pkg_dir")"
+                    HAS_ISSUES=true
+                fi
+            fi
+        done
+
+        # Check for unexpected user content outside known infrastructure dirs
+        KNOWN_INFRA="^(src|build|install|log)$"
+        for entry in "$ws_dir"/*; do
+            [ -e "$entry" ] || continue
+            entry_name=$(basename "$entry")
+            if ! echo "$entry_name" | grep -qE "$KNOWN_INFRA"; then
+                if [ "$FORCE" != true ]; then
+                    echo "⚠️  Warning: Unexpected content in $(basename "$ws_dir")/: $entry_name"
                     HAS_ISSUES=true
                 fi
             fi
