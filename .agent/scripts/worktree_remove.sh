@@ -208,7 +208,14 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
         [ -d "$ws_dir" ] || continue
         [ -L "$ws_dir" ] && continue  # skip symlinked layers
         SRC_DIR="$ws_dir/src"
-        [ -d "$SRC_DIR" ] || continue
+        if [ ! -d "$SRC_DIR" ]; then
+            # Non-symlink workspace directory without expected src/ layout
+            if [ "$FORCE" != true ]; then
+                echo "⚠️  Warning: Unrecognized workspace directory '$(basename "$ws_dir")' (no src/ directory)"
+                HAS_ISSUES=true
+            fi
+            continue
+        fi
 
         for pkg_dir in "$SRC_DIR"/*; do
             [ -e "$pkg_dir" ] || continue
@@ -227,7 +234,7 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
                 fi
 
                 # Track the parent repo for pruning later
-                MAIN_REPO=$(git -C "$pkg_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')
+                MAIN_REPO=$(cd "$pkg_dir" && realpath "$(git rev-parse --git-common-dir)" 2>/dev/null | sed 's|/\.git$||')
                 if [ -n "$MAIN_REPO" ] && [ -d "$MAIN_REPO" ]; then
                     INNER_WORKTREE_REPOS+=("$MAIN_REPO")
                 fi
