@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Integration test using launch_testing.
 
