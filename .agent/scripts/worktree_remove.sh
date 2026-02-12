@@ -260,7 +260,7 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
         for entry in "$ws_dir"/*; do
             [ -e "$entry" ] || continue
             entry_name=$(basename "$entry")
-            if ! echo "$entry_name" | grep -qE "$KNOWN_INFRA"; then
+            if [[ ! "$entry_name" =~ $KNOWN_INFRA ]]; then
                 if [ "$FORCE" != true ]; then
                     echo "⚠️  Warning: Unexpected content in $(basename "$ws_dir")/: $entry_name"
                     HAS_ISSUES=true
