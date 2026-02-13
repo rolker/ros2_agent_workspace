@@ -18,7 +18,7 @@ rules plus framework-specific guidance.
 1. **Source environment**: `source .agent/scripts/env.sh`
 2. **Configure identity**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>"` (host agents) or `.agent/scripts/configure_git_identity.sh` (container agents). See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md).
 3. **Never commit to `main`** — branch is protected. Use feature branches via worktrees.
-4. **Never `git checkout <branch>`** — `env.sh` blocks it. Use worktrees: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`
+4. **Never `git checkout <branch>`** — `env.sh` blocks it. Use worktrees: `.agent/scripts/worktree_create.sh --issue <N> --type workspace [--draft-pr]`
 5. **GIT_EDITOR=true** for rebase/amend/merge to avoid hanging on interactive editors.
 6. **Issue-first** — no code without a GitHub issue. Reference with `Closes #<N>` in PRs.
 7. **AI signature required** on all GitHub Issues/PRs/Comments:
@@ -38,7 +38,7 @@ rules plus framework-specific guidance.
 |--------|---------|
 | `.agent/scripts/env.sh` | ROS 2 env + checkout guardrail |
 | `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity |
-| `.agent/scripts/worktree_create.sh` | Create isolated worktree |
+| `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--draft-pr` for immediate visibility) |
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/status_report.sh` | Workspace status (supports `--quick`, `--pr-triage`) |

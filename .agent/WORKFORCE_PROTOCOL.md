@@ -39,16 +39,23 @@ To prevent duplicate work and enable collaboration, agents must make work-in-pro
 
 *   **Before Starting Work on an Issue**:
     *   Check for existing draft PRs (indicates another agent is working)
-    *   Use helper script: `.agent/scripts/start_issue_work.sh <issue_number> "Agent Name"` (branch) or add `--worktree layer` (worktree)
-    *   For branch workflow, this creates:
-        - Feature branch `feature/ISSUE-<number>-<description>`
-        - Work plan in `.agent/work-plans/PLAN_ISSUE-<number>.md`
-    *   For worktree workflow, this creates:
-        - Isolated worktree directory
-        - Feature branch for the worktree
+    *   Use `worktree_create.sh` with `--draft-pr` to automate the draft PR step:
+        ```bash
+        # Workspace work — creates worktree, generates work plan, pushes, and opens draft PR
+        .agent/scripts/worktree_create.sh --issue <N> --type workspace --draft-pr
+
+        # Layer work — creates worktree, pushes empty commit, and opens draft PR in each package repo
+        .agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <pkg> --draft-pr
+        ```
+    *   For workspace worktrees, `--draft-pr` creates:
+        - Feature branch `feature/issue-<N>`
+        - Work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`
+        - Draft PR with the work plan committed
+    *   For layer worktrees, `--draft-pr` creates:
+        - Feature branch in each package repo
+        - Draft PR in each package repo with cross-repo issue reference
     *   Edit the plan to document your approach
-    *   Commit and push the plan
-    *   Create a **draft PR** immediately with the plan
+    *   Commit and push updates as you work
 
 *   **During Work**:
     *   Update the work plan as you progress (check off tasks, document decisions)
