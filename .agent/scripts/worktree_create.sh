@@ -424,6 +424,13 @@ if [ "$DRAFT_PR" = true ]; then
         ISSUE_TITLE="Issue #$ISSUE_NUM"
     fi
 
+    # Escape ISSUE_TITLE for use in sed replacement strings
+    # (handles &, /, \, and other sed-special characters)
+    SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed 's/[&/\]/\\&/g')
+
+    # Agent name for signatures — fall back to generic if unset
+    DRAFT_AGENT_NAME="${AGENT_NAME:-AI Agent}"
+
     if [ "$WORKTREE_TYPE" == "workspace" ]; then
         # --- Workspace draft PR ---
         # Generate work plan from template
@@ -434,8 +441,8 @@ if [ "$DRAFT_PR" = true ]; then
         if [ -f "$TEMPLATE_FILE" ]; then
             mkdir -p "$PLAN_DIR"
             sed -e "s/{ISSUE_NUMBER}/$ISSUE_NUM/g" \
-                -e "s/{ISSUE_TITLE}/$ISSUE_TITLE/g" \
-                -e "s/{AGENT_NAME}/${AGENT_NAME:-Unknown Agent}/g" \
+                -e "s/{ISSUE_TITLE}/$SAFE_ISSUE_TITLE/g" \
+                -e "s/{AGENT_NAME}/${DRAFT_AGENT_NAME}/g" \
                 -e "s/{START_DATE}/$(date +%Y-%m-%d)/g" \
                 "$TEMPLATE_FILE" > "$PLAN_FILE"
             echo "  ✓ Work plan created: .agent/work-plans/PLAN_ISSUE-${ISSUE_NUM}.md"
@@ -451,14 +458,13 @@ if [ "$DRAFT_PR" = true ]; then
         else
             git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
         fi
-        git push -u origin "$BRANCH_NAME" || {
-            echo "  ⚠️  Push failed (non-fatal)"
+        if ! git push -u origin "$BRANCH_NAME"; then
+            echo "  ⚠️  Push failed — skipping draft PR (non-fatal)"
             cd "$ROOT_DIR"
-        }
-
-        # Create draft PR
-        BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-        cat << PREOF > "$BODY_FILE"
+        else
+            # Create draft PR (only after successful push)
+            BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+            cat << PREOF > "$BODY_FILE"
 ## Work in Progress
 
 This draft PR tracks ongoing work for issue #$ISSUE_NUM.
@@ -466,15 +472,19 @@ This draft PR tracks ongoing work for issue #$ISSUE_NUM.
 Closes #$ISSUE_NUM
 
 ---
-**Authored-By**: \`${AGENT_NAME:-Claude Code Agent}\`
+**Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${AGENT_MODEL:-Unknown}\`
 PREOF
-        gh pr create --draft \
-            --title "WIP: $ISSUE_TITLE" \
-            --body-file "$BODY_FILE" || echo "  ⚠️  Draft PR creation failed (non-fatal)"
-        rm -f "$BODY_FILE"
-        cd "$ROOT_DIR"
-        echo "  ✓ Draft PR created for workspace repo"
+            if gh pr create --draft \
+                --title "WIP: $ISSUE_TITLE" \
+                --body-file "$BODY_FILE"; then
+                echo "  ✓ Draft PR created for workspace repo"
+            else
+                echo "  ⚠️  Draft PR creation failed (non-fatal)"
+            fi
+            rm -f "$BODY_FILE"
+            cd "$ROOT_DIR"
+        fi
 
     elif [ "$WORKTREE_TYPE" == "layer" ]; then
         # --- Layer draft PR ---
@@ -510,10 +520,10 @@ PREOF
 
             # Empty commit and push
             git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
-            git push -u origin "$BRANCH_NAME" || {
+            if ! git push -u origin "$BRANCH_NAME"; then
                 echo "    ⚠️  Push failed for $pkg_name (non-fatal)"
                 continue
-            }
+            fi
 
             # Build issue reference (cross-repo if different from package repo)
             ISSUE_REF="#$ISSUE_NUM"
@@ -529,21 +539,28 @@ PREOF
 This draft PR tracks ongoing work for $ISSUE_REF.
 
 ---
-**Authored-By**: \`${AGENT_NAME:-Claude Code Agent}\`
+**Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${AGENT_MODEL:-Unknown}\`
 PREOF
             if [ -n "$PKG_REPO_SLUG" ]; then
-                gh pr create --draft \
+                if gh pr create --draft \
                     --repo "$PKG_REPO_SLUG" \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" || echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                    --body-file "$BODY_FILE"; then
+                    echo "    ✓ Draft PR created for $pkg_name"
+                else
+                    echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                fi
             else
-                gh pr create --draft \
+                if gh pr create --draft \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" || echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                    --body-file "$BODY_FILE"; then
+                    echo "    ✓ Draft PR created for $pkg_name"
+                else
+                    echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                fi
             fi
             rm -f "$BODY_FILE"
-            echo "    ✓ Draft PR created for $pkg_name"
         done
         cd "$ROOT_DIR"
     fi
