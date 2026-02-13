@@ -89,5 +89,5 @@ fi
 
 echo ""
 echo "Bootstrap complete! Next steps:"
-echo "  1. ./.agent/scripts/setup.sh <workspace_name>   # Set up workspace layers"
+echo "  1. ./.agent/scripts/setup.sh [<layer_name>]     # Set up one layer or all (default)"
 echo "  2. make setup-dev                                # Install pre-commit hooks"

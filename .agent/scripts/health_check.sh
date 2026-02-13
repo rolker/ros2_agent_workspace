@@ -92,9 +92,8 @@ echo "3. Checking Dev Tools..."
 if [ -x "$ROOT_DIR/.venv/bin/pre-commit" ]; then
     check_pass "pre-commit installed in .venv"
 
-    GIT_DIR=$(git -C "$ROOT_DIR" rev-parse --git-dir 2>/dev/null)
-    HOOK_FILE="$GIT_DIR/hooks/pre-commit"
-    if [ -f "$HOOK_FILE" ]; then
+    HOOK_FILE=$(git -C "$ROOT_DIR" rev-parse --path-format=absolute --git-path hooks/pre-commit 2>/dev/null || true)
+    if [ -n "$HOOK_FILE" ] && [ -f "$HOOK_FILE" ]; then
         # Extract the INSTALL_PYTHON path from the hook and verify it exists
         INSTALL_PYTHON=$(sed -n 's/^INSTALL_PYTHON=//p' "$HOOK_FILE" | tr -d "'" | tr -d '"')
         if [ -n "$INSTALL_PYTHON" ] && [ -x "$INSTALL_PYTHON" ]; then
@@ -102,8 +101,10 @@ if [ -x "$ROOT_DIR/.venv/bin/pre-commit" ]; then
         else
             check_warn "pre-commit hook has invalid INSTALL_PYTHON. Run: make setup-dev"
         fi
-    else
+    elif [ -n "$HOOK_FILE" ]; then
         check_warn "pre-commit hook not installed. Run: make setup-dev"
+    else
+        check_warn "Git repository not detected. Skipping pre-commit hook check."
     fi
 else
     check_warn "pre-commit not found in .venv. Run: make setup-dev"
