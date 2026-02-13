@@ -19,6 +19,10 @@ The Center is committed to providing a welcoming and inclusive environment. All 
    ./.agent/scripts/bootstrap.sh
    ./.agent/scripts/setup.sh core
    ```
+4. **Install development tools** (pre-commit hooks, linters):
+   ```bash
+   make setup-dev
+   ```
 
 ## Agent Rules
 > [!IMPORTANT]

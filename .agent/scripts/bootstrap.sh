@@ -87,4 +87,7 @@ if [ "${CODESPACES}" = "true" ]; then
     echo "URL conversion complete."
 fi
 
-echo "Bootstrap complete! You can now run './.agent/scripts/setup.sh <workspace_name>'."
+echo ""
+echo "Bootstrap complete! Next steps:"
+echo "  1. ./.agent/scripts/setup.sh [<layer_name>]     # Set up one layer or all (default)"
+echo "  2. make setup-dev                                # Install pre-commit hooks"

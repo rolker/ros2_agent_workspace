@@ -9,6 +9,7 @@
 # - Required tools (vcs, colcon, rosdep)
 # - Workspace structure
 # - Git repository status
+# - Dev tools (pre-commit hooks)
 # - Configuration file validity
 
 set -e
@@ -86,8 +87,32 @@ fi
 
 echo ""
 
-# Check 3: Python Dependencies
-echo "3. Checking Python Dependencies..."
+# Check 3: Dev Tools (pre-commit)
+echo "3. Checking Dev Tools..."
+if [ -x "$ROOT_DIR/.venv/bin/pre-commit" ]; then
+    check_pass "pre-commit installed in .venv"
+
+    HOOK_FILE=$(git -C "$ROOT_DIR" rev-parse --path-format=absolute --git-path hooks/pre-commit 2>/dev/null || true)
+    if [ -n "$HOOK_FILE" ] && [ -f "$HOOK_FILE" ]; then
+        # Extract the INSTALL_PYTHON path from the hook and verify it exists
+        INSTALL_PYTHON=$(sed -n 's/^INSTALL_PYTHON=//p' "$HOOK_FILE" | tr -d "'" | tr -d '"')
+        if [ -n "$INSTALL_PYTHON" ] && [ -x "$INSTALL_PYTHON" ]; then
+            check_pass "pre-commit hook installed (python: $INSTALL_PYTHON)"
+        else
+            check_warn "pre-commit hook has invalid INSTALL_PYTHON. Run: make setup-dev"
+        fi
+    elif [ -n "$HOOK_FILE" ]; then
+        check_warn "pre-commit hook not installed. Run: make setup-dev"
+    else
+        check_warn "Git repository not detected. Skipping pre-commit hook check."
+    fi
+else
+    check_warn "pre-commit not found in .venv. Run: make setup-dev"
+fi
+echo ""
+
+# Check 4: Python Dependencies
+echo "4. Checking Python Dependencies..."
 if python3 -c "import yaml" 2>/dev/null; then
     check_pass "PyYAML installed"
 
@@ -102,8 +127,8 @@ else
 fi
 echo ""
 
-# Check 4: Workspace Structure
-echo "4. Checking Workspace Structure..."
+# Check 5: Workspace Structure
+echo "5. Checking Workspace Structure..."
 
 if [ -d "$ROOT_DIR/configs" ]; then
     REPOS_COUNT=$(ls -1 "$ROOT_DIR/configs"/*.repos 2>/dev/null | wc -l)
@@ -137,8 +162,8 @@ fi
 
 echo ""
 
-# Check 5: Validate Configuration Files
-echo "5. Validating Configuration Files..."
+# Check 6: Validate Configuration Files
+echo "6. Validating Configuration Files..."
 if [ -f "$SCRIPT_DIR/validate_repos.py" ]; then
     VALIDATION_PASSED=true
 
@@ -170,8 +195,8 @@ else
 fi
 echo ""
 
-# Check 6: Validate Workspace Matches Configuration
-echo "6. Validating Workspace Matches Configuration..."
+# Check 7: Validate Workspace Matches Configuration
+echo "7. Validating Workspace Matches Configuration..."
 if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
     if python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null; then
         check_pass "Workspace matches .repos configuration"
@@ -183,8 +208,8 @@ else
 fi
 echo ""
 
-# Check 7: Git Status
-echo "7. Checking Git Repository..."
+# Check 8: Git Status
+echo "8. Checking Git Repository..."
 cd "$ROOT_DIR"
 if git rev-parse --git-dir > /dev/null 2>&1; then
     check_pass "Git repository initialized"
@@ -205,8 +230,8 @@ else
 fi
 echo ""
 
-# Check 8: Workspace Layers
-echo "8. Checking Workspace Layers..."
+# Check 9: Workspace Layers
+echo "9. Checking Workspace Layers..."
 if [ -d "$ROOT_DIR/layers/main" ]; then
     LAYER_COUNT=$(ls -d "$ROOT_DIR/layers/main"/*_ws 2>/dev/null | wc -l)
     if [ "$LAYER_COUNT" -gt 0 ]; then
@@ -235,8 +260,8 @@ else
 fi
 echo ""
 
-# Check 9: Lock Status
-echo "9. Checking Workspace Lock..."
+# Check 10: Lock Status
+echo "10. Checking Workspace Lock..."
 LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
 if [ -f "$LOCK_FILE" ]; then
     check_warn "Workspace is LOCKED:"
