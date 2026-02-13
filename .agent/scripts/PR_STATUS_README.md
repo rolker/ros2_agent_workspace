@@ -49,6 +49,14 @@ Clean text output without colors/emojis, easy to parse.
 ```
 Full structured data in JSON format.
 
+**Cross-Repo Triage (All Workspace Repos):**
+```bash
+.agent/scripts/pr_status.sh --all-repos           # Dashboard across all repos
+.agent/scripts/pr_status.sh --all-repos --simple   # Simple text triage
+.agent/scripts/pr_status.sh --all-repos --json     # JSON with repo field
+make pr-triage                                      # Convenience wrapper
+```
+
 **Query Modes:**
 ```bash
 # Get next PR with critical issues
@@ -59,6 +67,9 @@ Full structured data in JSON format.
 
 # Get next PR needing review
 .agent/scripts/pr_status.sh --next-review
+
+# Cross-repo query
+.agent/scripts/pr_status.sh --all-repos --next-critical
 ```
 
 ## Examples
@@ -184,12 +195,40 @@ Designed to streamline the standard PR workflow:
 
 Reduces manual PR scanning time and provides actionable next steps.
 
+## Cross-Repo Triage
+
+The `--all-repos` flag discovers all workspace repos (root + overlay + underlay)
+via `list_overlay_repos.py` and runs the full triage pipeline across them.
+
+Each PR in the output includes a `repo` field showing which repo it belongs to:
+
+```bash
+$ .agent/scripts/pr_status.sh --all-repos --simple
+
+SUMMARY: 3 need review, 2 critical, 1 minor, 1 ready
+
+CRITICAL ISSUES:
+  [rolker/ros2_agent_workspace] #206: feat: add --draft-pr flag (1 critical, 3 minor)
+  [rolker/unh_marine_autonomy] #45: fix: nav stack timeout (2 critical, 0 minor)
+
+NEEDS REVIEW:
+  [rolker/ros2_agent_workspace] #207: feat: cross-repo PR triage
+```
+
+**Makefile target:**
+```bash
+make pr-triage  # Runs: pr_status.sh --all-repos --simple
+```
+
 ## Note
 
-Basic PR comment triage (critical/minor classification) is now available in
-`status_report.sh --pr-triage`, which operates across all workspace repos.
-This standalone `pr_status.sh` is still the right tool for interactive mode,
-JSON output, and `--next-critical`/`--next-minor` agent queries.
+Basic PR comment triage (critical/minor classification) is also available in
+`status_report.sh --pr-triage`, which provides a lighter-weight cross-repo view.
+This standalone `pr_status.sh` with `--all-repos` provides richer features:
+JSON output and `--next-critical`/`--next-minor` agent queries.
+
+**Note:** `--interactive` is not supported with `--all-repos`. Use interactive
+mode for single-repo workflows only.
 
 ## See Also
 
