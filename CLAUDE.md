@@ -23,9 +23,11 @@ source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude
 
 Every task must use an isolated worktree — never work in the main tree or default branches.
 
-**Project repos**: Repos under `layers/main/*_ws/src/` are independent git repos, each
-containing one or more ROS 2 packages. Layer worktrees create git worktrees *inside*
-these project repos — you commit and push to the project repo, not the workspace repo.
+**Project repos**: Directories under `layers/main/*_ws/src/` are independent git repos
+(e.g., `unh_marine_autonomy`), each containing one or more ROS 2 packages. Layer
+worktrees create git worktrees *inside* these project repos — you commit and push to the
+project repo, not the workspace repo. The `--packages` flag takes these directory names
+(not individual ROS package names).
 
 ```bash
 # Workspace infrastructure work (docs, .agent/, configs)
@@ -33,12 +35,13 @@ these project repos — you commit and push to the project repo, not the workspa
 source .agent/scripts/worktree_enter.sh --issue <N>
 
 # ROS package work (requires --layer and --packages)
-.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <package>
+# --packages takes project-repo directory names from layers/main/<layer>_ws/src/
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <project_repo>
 source .agent/scripts/worktree_enter.sh --issue <N>
-cd core_ws/src/<package>   # work here, commit/push here
+cd core_ws/src/<project_repo>   # work here, commit/push here
 
-# Multiple packages in one worktree
-.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <pkg1>,<pkg2>
+# Multiple project repos in one worktree
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <repo1>,<repo2>
 
 # List / remove
 .agent/scripts/worktree_list.sh
