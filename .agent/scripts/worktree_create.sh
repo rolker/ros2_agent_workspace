@@ -30,6 +30,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Try to fetch a specific branch from origin.
+# Returns 0 on successful fetch, non-zero otherwise.
+fetch_remote_branch() {
+    local git_path="$1"
+    local branch="$2"
+    git -C "$git_path" fetch --quiet origin -- "$branch" 2>/dev/null
+}
+
 # Defaults
 ISSUE_NUM=""
 WORKTREE_TYPE="layer"
@@ -234,8 +242,11 @@ mkdir -p "$(dirname "$WORKTREE_DIR")"
 if [ "$WORKTREE_TYPE" == "workspace" ]; then
     # Workspace worktrees are full git worktrees of the workspace repo
     if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
-        echo "Using existing branch '$BRANCH_NAME'..."
+        echo "Using existing local branch '$BRANCH_NAME'..."
         git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
+    elif fetch_remote_branch "$ROOT_DIR" "$BRANCH_NAME"; then
+        echo "Tracking remote branch 'origin/$BRANCH_NAME'..."
+        git worktree add --track -b "$BRANCH_NAME" "$WORKTREE_DIR" "origin/$BRANCH_NAME"
     else
         echo "Creating new branch '$BRANCH_NAME' from current HEAD..."
         git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
@@ -323,11 +334,14 @@ EOF
                         cd "$pkg_path"
                         WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
 
-                        # Prefer the issue branch for this package: create it if needed, or reuse if it exists
-                        if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
+                        # Prefer the issue branch for this package: local first, then remote, then new
+                        if git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
+                            echo "      ✓ Worktree created from existing local branch: $BRANCH_NAME"
+                        elif fetch_remote_branch "$pkg_path" "$BRANCH_NAME" && \
+                             git worktree add --track -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$BRANCH_NAME" 2>/dev/null; then
+                            echo "      ✓ Worktree created tracking remote branch: origin/$BRANCH_NAME"
+                        elif git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
-                        elif git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
-                            echo "      ✓ Worktree created from existing branch: $BRANCH_NAME"
                         else
                             # Fallback: attempt to use the package's current branch, then symlink on failure
                             CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)

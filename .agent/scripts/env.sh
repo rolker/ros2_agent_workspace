@@ -108,10 +108,29 @@ git() {
     command git "$@"
 }
 
-# 4. Prevent interactive editor hangs (safe for both agents and humans)
+# 4. Expose dev tools from .venv without altering the Python environment.
+# A shell function avoids prepending .venv/bin to PATH, which would shadow
+# the system python3 that ROS 2 depends on.
+# .venv lives in the main workspace root (gitignored), so resolve it for worktrees.
+_VENV_ROOT="$ROOT_DIR"
+if [ ! -d "$_VENV_ROOT/.venv" ] && [ -n "$WORKTREE_CONTEXT" ]; then
+    if [ "$WORKTREE_CONTEXT" = "workspace" ]; then
+        _VENV_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
+    else
+        _VENV_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
+    fi
+fi
+if [ -x "$_VENV_ROOT/.venv/bin/pre-commit" ]; then
+    # Capture the resolved path so the function works regardless of cwd
+    _PRECOMMIT_BIN="$_VENV_ROOT/.venv/bin/pre-commit"
+    pre-commit() { "$_PRECOMMIT_BIN" "$@"; }
+fi
+unset _VENV_ROOT
+
+# 5. Prevent interactive editor hangs (safe for both agents and humans)
 export GIT_EDITOR=true
 
-# 5. Auto-configure git identity for agents
+# 6. Auto-configure git identity for agents
 if [ -z "${GIT_AUTHOR_NAME:-}" ]; then
     # No identity set yet — try to detect and configure
     if source "$SCRIPT_DIR/detect_cli_env.sh" 2>/dev/null && [ "$AGENT_FRAMEWORK" != "unknown" ]; then
