@@ -249,7 +249,8 @@ cat .scratchpad/build_report.md
 ### Status Report
 
 ```bash
-.agent/scripts/status_report.sh
+.agent/scripts/status_report.sh          # Full status (sync + GitHub)
+.agent/scripts/status_report.sh --quick  # Fast local-only check
 ```
 
 When run in a worktree, shows context:

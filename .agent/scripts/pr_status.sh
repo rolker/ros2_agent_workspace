@@ -1,6 +1,11 @@
 #!/bin/bash
 # PR Status Dashboard
 # Shows PR pipeline status and provides interactive management
+#
+# NOTE: Basic PR comment triage (critical/minor classification) is now
+# available in status_report.sh --pr-triage, which operates across all
+# workspace repos. This script is still the right tool for interactive mode,
+# JSON output, and --next-critical/--next-minor agent queries.
 
 set -euo pipefail
 

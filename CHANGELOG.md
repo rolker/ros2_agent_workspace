@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Status Script Consolidation** (Issue #203):
+  - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
+  - Added `--quick` flag (alias for `--skip-sync --skip-github`) for fast local-only checks
+  - Added `--pr-triage` flag for PR comment classification (critical/minor) across all workspace repos
+  - Removed `check_full_status.py` (functionality merged into `status_report.sh`)
+  - Updated `Makefile` targets: `make status` and `make status-quick` both use `status_report.sh`
+  - Added deprecation note to `pr_status.sh` pointing to `--pr-triage`
+
 ### Added
 - **PR Status Dashboard** (Issue #164):
   - `.agent/scripts/pr_status.sh` - Interactive PR pipeline visibility tool
