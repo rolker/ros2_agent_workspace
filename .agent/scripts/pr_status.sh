@@ -65,15 +65,11 @@ discover_repos() {
 # Function to fetch all open PRs with detailed info
 # Optional arg: repo slug (owner/repo) for cross-repo queries
 fetch_prs() {
-    local repo_flag=""
+    local args=(--state open --json "number,title,updatedAt,reviewDecision" --limit 100)
     if [ -n "${1:-}" ]; then
-        repo_flag="--repo $1"
+        args+=(--repo "$1")
     fi
-    # shellcheck disable=SC2086
-    gh pr list $repo_flag \
-        --state open \
-        --json number,title,updatedAt,reviewDecision \
-        --limit 100
+    gh pr list "${args[@]}"
 }
 
 # Function to get review comments for a PR
@@ -453,6 +449,134 @@ output_simple() {
     fi
 }
 
+# Function to display from pre-analyzed JSON array
+# Used by --all-repos mode to avoid re-analyzing PRs
+# Args: analyzed_json_array [title_suffix]
+display_analyzed_dashboard() {
+    local analyzed_json=$1
+    local title_suffix=${2:-""}
+
+    echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${title_suffix}${NC}"
+    echo "===================="
+    echo ""
+
+    local needs_review=()
+    local critical=()
+    local minor=()
+    local ready=()
+    while IFS= read -r item; do
+        local cat
+        cat=$(echo "$item" | jq -r '.category')
+        case "$cat" in
+            needs_review) needs_review+=("$item") ;;
+            critical) critical+=("$item") ;;
+            minor) minor+=("$item") ;;
+            ready) ready+=("$item") ;;
+        esac
+    done < <(echo "$analyzed_json" | jq -c '.[]')
+
+    display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
+    display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
+    display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
+    display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
+
+    local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
+    echo ""
+    echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
+    echo ""
+}
+
+# Function to output simple text from pre-analyzed JSON array
+# Args: analyzed_json_array
+output_analyzed_simple() {
+    local analyzed_json=$1
+
+    local needs_review=()
+    local critical=()
+    local minor=()
+    local ready=()
+    while IFS= read -r item; do
+        local cat
+        cat=$(echo "$item" | jq -r '.category')
+        case "$cat" in
+            needs_review) needs_review+=("$item") ;;
+            critical) critical+=("$item") ;;
+            minor) minor+=("$item") ;;
+            ready) ready+=("$item") ;;
+        esac
+    done < <(echo "$analyzed_json" | jq -c '.[]')
+
+    echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
+
+    if [ ${#critical[@]} -gt 0 ]; then
+        echo ""
+        echo "CRITICAL ISSUES:"
+        for item in "${critical[@]}"; do
+            local number title crit min item_repo
+            number=$(echo "$item" | jq -r '.number')
+            title=$(echo "$item" | jq -r '.title')
+            crit=$(echo "$item" | jq -r '.critical')
+            min=$(echo "$item" | jq -r '.minor')
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title ($crit critical, $min minor)"
+            else
+                echo "  #$number: $title ($crit critical, $min minor)"
+            fi
+        done
+    fi
+
+    if [ ${#needs_review[@]} -gt 0 ]; then
+        echo ""
+        echo "NEEDS REVIEW:"
+        for item in "${needs_review[@]}"; do
+            local number title item_repo
+            number=$(echo "$item" | jq -r '.number')
+            title=$(echo "$item" | jq -r '.title')
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title"
+            else
+                echo "  #$number: $title"
+            fi
+        done
+    fi
+
+    if [ ${#ready[@]} -gt 0 ]; then
+        echo ""
+        echo "READY TO MERGE:"
+        for item in "${ready[@]}"; do
+            local number title item_repo
+            number=$(echo "$item" | jq -r '.number')
+            title=$(echo "$item" | jq -r '.title')
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title"
+            else
+                echo "  #$number: $title"
+            fi
+        done
+    fi
+}
+
+# Function to get next actionable PR from pre-analyzed JSON array
+# Args: analyzed_json_array category
+get_next_analyzed_pr() {
+    local analyzed_json=$1
+    local category=${2:-"critical"}
+
+    while IFS= read -r item; do
+        local pr_category
+        pr_category=$(echo "$item" | jq -r '.category')
+        if [ "$pr_category" = "$category" ]; then
+            echo "$item"
+            return 0
+        fi
+    done < <(echo "$analyzed_json" | jq -c '.[]')
+
+    return 1
+}
+
 # Function to run interactive mode
 run_interactive() {
     while true; do
@@ -572,8 +696,14 @@ main() {
         esac
     done
 
+    # Reject unsupported flag combinations
+    if [ "$all_repos" = true ] && [ "$interactive" = true ]; then
+        echo "Error: --interactive is not supported with --all-repos"
+        exit 1
+    fi
+
     if [ "$all_repos" = true ]; then
-        # Multi-repo mode: iterate all workspace repos
+        # Multi-repo mode: iterate all workspace repos, analyze once, reuse output functions
         local repos
         repos=$(discover_repos)
         local merged_prs="[]"
@@ -591,19 +721,19 @@ main() {
             merged_prs=$(echo "$merged_prs $repo_prs" | jq -s '.[0] + .[1]')
         done <<< "$repos"
 
-        # Dispatch to output mode
-        # For multi-repo, we need to analyze PRs with their repo context.
-        # We rebuild the merged array with analysis applied per-repo.
+        # Pre-analyze all PRs with their repo context
+        local all_analyzed="[]"
+        while IFS= read -r pr; do
+            local pr_repo
+            pr_repo=$(echo "$pr" | jq -r '._repo // ""')
+            local analyzed
+            analyzed=$(analyze_pr "$pr" "$pr_repo")
+            all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
+        done < <(echo "$merged_prs" | jq -c '.[]')
+
+        # Dispatch to output mode using shared helpers
         case "$mode" in
             json)
-                local all_analyzed="[]"
-                while IFS= read -r pr; do
-                    local pr_repo
-                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
-                    local analyzed
-                    analyzed=$(analyze_pr "$pr" "$pr_repo")
-                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
-                done < <(echo "$merged_prs" | jq -c '.[]')
                 echo "$all_analyzed" | jq '{
                     summary: {
                         total: (. | length),
@@ -616,146 +746,19 @@ main() {
                 }'
                 ;;
             simple)
-                local all_analyzed="[]"
-                while IFS= read -r pr; do
-                    local pr_repo
-                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
-                    local analyzed
-                    analyzed=$(analyze_pr "$pr" "$pr_repo")
-                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
-                done < <(echo "$merged_prs" | jq -c '.[]')
-                # Feed pre-analyzed JSON to a simple display
-                local needs_review=()
-                local critical=()
-                local minor=()
-                local ready=()
-                while IFS= read -r item; do
-                    local cat
-                    cat=$(echo "$item" | jq -r '.category')
-                    case "$cat" in
-                        needs_review) needs_review+=("$item") ;;
-                        critical) critical+=("$item") ;;
-                        minor) minor+=("$item") ;;
-                        ready) ready+=("$item") ;;
-                    esac
-                done < <(echo "$all_analyzed" | jq -c '.[]')
-
-                echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
-
-                if [ ${#critical[@]} -gt 0 ]; then
-                    echo ""
-                    echo "CRITICAL ISSUES:"
-                    for item in "${critical[@]}"; do
-                        local number title crit min item_repo
-                        number=$(echo "$item" | jq -r '.number')
-                        title=$(echo "$item" | jq -r '.title')
-                        crit=$(echo "$item" | jq -r '.critical')
-                        min=$(echo "$item" | jq -r '.minor')
-                        item_repo=$(echo "$item" | jq -r '.repo // ""')
-                        if [ -n "$item_repo" ]; then
-                            echo "  [$item_repo] #$number: $title ($crit critical, $min minor)"
-                        else
-                            echo "  #$number: $title ($crit critical, $min minor)"
-                        fi
-                    done
-                fi
-
-                if [ ${#needs_review[@]} -gt 0 ]; then
-                    echo ""
-                    echo "NEEDS REVIEW:"
-                    for item in "${needs_review[@]}"; do
-                        local number title item_repo
-                        number=$(echo "$item" | jq -r '.number')
-                        title=$(echo "$item" | jq -r '.title')
-                        item_repo=$(echo "$item" | jq -r '.repo // ""')
-                        if [ -n "$item_repo" ]; then
-                            echo "  [$item_repo] #$number: $title"
-                        else
-                            echo "  #$number: $title"
-                        fi
-                    done
-                fi
-
-                if [ ${#ready[@]} -gt 0 ]; then
-                    echo ""
-                    echo "READY TO MERGE:"
-                    for item in "${ready[@]}"; do
-                        local number title item_repo
-                        number=$(echo "$item" | jq -r '.number')
-                        title=$(echo "$item" | jq -r '.title')
-                        item_repo=$(echo "$item" | jq -r '.repo // ""')
-                        if [ -n "$item_repo" ]; then
-                            echo "  [$item_repo] #$number: $title"
-                        else
-                            echo "  #$number: $title"
-                        fi
-                    done
-                fi
+                output_analyzed_simple "$all_analyzed"
                 ;;
-            next-critical|next-minor|next-review)
-                local target_cat=""
-                case "$mode" in
-                    next-critical) target_cat="critical" ;;
-                    next-minor) target_cat="minor" ;;
-                    next-review) target_cat="needs_review" ;;
-                esac
-                local found=false
-                while IFS= read -r pr; do
-                    local pr_repo
-                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
-                    local analyzed
-                    analyzed=$(analyze_pr "$pr" "$pr_repo")
-                    local pr_category
-                    pr_category=$(echo "$analyzed" | jq -r '.category')
-                    if [ "$pr_category" = "$target_cat" ]; then
-                        echo "$analyzed"
-                        found=true
-                        break
-                    fi
-                done < <(echo "$merged_prs" | jq -c '.[]')
-                if [ "$found" = false ]; then
-                    echo "No PRs with $target_cat issues found"
-                fi
+            next-critical)
+                get_next_analyzed_pr "$all_analyzed" "critical" || echo "No PRs with critical issues found"
+                ;;
+            next-minor)
+                get_next_analyzed_pr "$all_analyzed" "minor" || echo "No PRs with minor issues found"
+                ;;
+            next-review)
+                get_next_analyzed_pr "$all_analyzed" "needs_review" || echo "No PRs needing review found"
                 ;;
             dashboard)
-                # For dashboard, analyze each PR with its repo context and display
-                local all_analyzed="[]"
-                while IFS= read -r pr; do
-                    local pr_repo
-                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
-                    local analyzed
-                    analyzed=$(analyze_pr "$pr" "$pr_repo")
-                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
-                done < <(echo "$merged_prs" | jq -c '.[]')
-
-                echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard (All Repos)${NC}"
-                echo "=================================="
-                echo ""
-
-                local needs_review=()
-                local critical=()
-                local minor=()
-                local ready=()
-                while IFS= read -r item; do
-                    local cat
-                    cat=$(echo "$item" | jq -r '.category')
-                    case "$cat" in
-                        needs_review) needs_review+=("$item") ;;
-                        critical) critical+=("$item") ;;
-                        minor) minor+=("$item") ;;
-                        ready) ready+=("$item") ;;
-                    esac
-                done < <(echo "$all_analyzed" | jq -c '.[]')
-
-                display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
-                display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
-                display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
-                display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
-
-                local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
-                echo ""
-                echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
-                echo ""
+                display_analyzed_dashboard "$all_analyzed" " (All Repos)"
                 ;;
         esac
     else
