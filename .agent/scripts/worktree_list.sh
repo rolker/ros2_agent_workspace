@@ -17,6 +17,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+source "$SCRIPT_DIR/_worktree_helpers.sh"
+
 VERBOSE=false
 
 # Parse arguments
@@ -47,14 +49,32 @@ echo "Git Worktrees"
 echo "========================================"
 echo ""
 
-# Get worktree list from git
+# Get worktree list from git (finds main workspace + workspace worktrees)
 WORKTREES=$(git worktree list --porcelain)
 
 # Count worktrees (excluding main)
 LAYER_COUNT=0
 WORKSPACE_COUNT=0
 
-# Function to print a worktree entry
+# Helper: extract issue/repo from worktree directory basename
+# Sets variables: WT_ISSUE, WT_REPO
+extract_issue_repo() {
+    local basename="$1"
+    WT_ISSUE=""
+    WT_REPO=""
+
+    # New format: issue-{REPO_SLUG}-{NUMBER}
+    if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
+        WT_REPO="${BASH_REMATCH[1]}"
+        WT_ISSUE="${BASH_REMATCH[2]}"
+    # Legacy format: issue-{NUMBER}
+    elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
+        WT_ISSUE="${BASH_REMATCH[1]}"
+        WT_REPO="(legacy)"
+    fi
+}
+
+# Function to print a worktree entry (for main and workspace types from git worktree list)
 print_worktree() {
     local path="$1"
     local branch="$2"
@@ -65,35 +85,11 @@ print_worktree() {
     local issue=""
     local repo=""
 
-    if [[ "$path" == *"/layers/worktrees/"* ]]; then
-        type="layer"
-        local basename
-        basename=$(basename "$path")
-        # New format: issue-{REPO_SLUG}-{NUMBER}
-        # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
-        if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
-            repo="${BASH_REMATCH[1]}"
-            issue="${BASH_REMATCH[2]}"
-        # Legacy format: issue-{NUMBER}
-        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
-            issue="${BASH_REMATCH[1]}"
-            repo="(legacy)"
-        fi
-        ((LAYER_COUNT++)) || true
-    elif [[ "$path" == *"/.workspace-worktrees/"* ]]; then
+    if [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
-        local basename
-        basename=$(basename "$path")
-        # New format: issue-{REPO_SLUG}-{NUMBER}
-        # Note: REPO_SLUG is sanitized to [A-Za-z0-9_] (hyphens replaced with underscores)
-        if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
-            repo="${BASH_REMATCH[1]}"
-            issue="${BASH_REMATCH[2]}"
-        # Legacy format: issue-{NUMBER}
-        elif [[ "$basename" =~ ^issue-([0-9]+)$ ]]; then
-            issue="${BASH_REMATCH[1]}"
-            repo="(legacy)"
-        fi
+        extract_issue_repo "$(basename "$path")"
+        issue="$WT_ISSUE"
+        repo="$WT_REPO"
         ((WORKSPACE_COUNT++)) || true
     fi
 
@@ -112,10 +108,7 @@ print_worktree() {
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
     else
-        local icon="📦"
-        [ "$type" == "workspace" ] && icon="🔧"
-
-        echo "$icon Issue #$issue ($type) - Repository: $repo"
+        echo "🔧 Issue #$issue ($type) - Repository: $repo"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
@@ -127,7 +120,7 @@ print_worktree() {
     echo ""
 }
 
-# Parse and display worktrees
+# Parse and display worktrees from git worktree list (main + workspace types)
 CURRENT_PATH=""
 CURRENT_BRANCH=""
 CURRENT_HEAD=""
@@ -148,13 +141,63 @@ while IFS= read -r line || [ -n "$line" ]; do
     fi
 done <<< "$WORKTREES"
 
-# Print last worktree
+# Print last worktree from git list
 if [ -n "$CURRENT_PATH" ]; then
     print_worktree "$CURRENT_PATH" "$CURRENT_BRANCH" "$CURRENT_HEAD"
 fi
 
-# If no worktrees found, show basic git worktree list
-if [ -z "$WORKTREES" ]; then
+# Discover layer worktrees by scanning the directory
+# Layer worktrees are plain directories (not git worktrees) after the fix for #193
+LAYER_WT_DIR="$ROOT_DIR/layers/worktrees"
+if [ -d "$LAYER_WT_DIR" ]; then
+    for layer_wt in "$LAYER_WT_DIR"/issue-*; do
+        [ -d "$layer_wt" ] || continue
+
+        extract_issue_repo "$(basename "$layer_wt")"
+        local_issue="$WT_ISSUE"
+        local_repo="$WT_REPO"
+
+        # Get branch from inner package worktree
+        local_branch=$(wt_layer_branch "$layer_wt" 2>/dev/null || echo "")
+
+        # Check dirty status
+        local_status="clean"
+        if wt_layer_is_dirty "$layer_wt"; then
+            local_status="dirty"
+        fi
+
+        echo "📦 Issue #$local_issue (layer) - Repository: $local_repo"
+        echo "   Path:   $layer_wt"
+        echo "   Branch: ${local_branch:-unknown}"
+        echo "   Status: $local_status"
+
+        if [ "$VERBOSE" = true ]; then
+            # Count changed files across all inner package worktrees
+            local_changed=0
+            for ws_dir in "$layer_wt"/*_ws; do
+                [ -d "$ws_dir" ] || continue
+                [ -L "$ws_dir" ] && continue
+                src_dir="$ws_dir/src"
+                [ -d "$src_dir" ] || continue
+                for pkg_dir in "$src_dir"/*; do
+                    [ -d "$pkg_dir" ] || continue
+                    [ -L "$pkg_dir" ] && continue
+                    if git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                        pkg_changed=$(git -C "$pkg_dir" status --porcelain 2>/dev/null | wc -l)
+                        local_changed=$((local_changed + pkg_changed))
+                    fi
+                done
+            done
+            echo "   Files changed: $local_changed"
+        fi
+
+        echo ""
+        ((LAYER_COUNT++)) || true
+    done
+fi
+
+# If no worktrees found at all, show help
+if [ -z "$WORKTREES" ] && [ "$LAYER_COUNT" -eq 0 ]; then
     echo "No worktrees found."
     echo ""
     echo "Create one with:"

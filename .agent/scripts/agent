@@ -36,6 +36,8 @@ OPTIONS:
     --layer <name>        Specify layer for ROS package work
                           (core, platforms, sensors, simulation, ui, underlay)
                           Omit for infrastructure/workspace work
+    --packages <pkg,...>  Package(s) to modify (required with --layer)
+                          Comma-separated list for multiple packages
     --help, -h            Show this help message
 
 EXAMPLES:
@@ -43,7 +45,7 @@ EXAMPLES:
     agent start-task 125
 
     # ROS package development
-    agent start-task 42 --layer core
+    agent start-task 42 --layer core --packages unh_marine_autonomy
 
 ENFORCEMENT:
     This wrapper is the ONLY approved way for agents to start work.
@@ -62,12 +64,17 @@ start_task() {
     shift
 
     local layer=""
+    local packages=""
 
     # Parse options
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --layer)
                 layer="$2"
+                shift 2
+                ;;
+            --packages)
+                packages="$2"
                 shift 2
                 ;;
             *)
@@ -101,7 +108,11 @@ start_task() {
         echo ""
 
         # Create layer worktree
-        "$SCRIPT_DIR/worktree_create.sh" --issue "$issue_num" --type layer --layer "$layer"
+        local pkg_args=()
+        if [ -n "$packages" ]; then
+            pkg_args=(--packages "$packages")
+        fi
+        "$SCRIPT_DIR/worktree_create.sh" --issue "$issue_num" --type layer --layer "$layer" "${pkg_args[@]}"
     else
         echo "Type:  Workspace worktree (infrastructure)"
         echo ""
@@ -119,12 +130,7 @@ start_task() {
     echo "  1. Enter worktree:"
     echo "     source .agent/scripts/worktree_enter.sh --issue $issue_num"
     echo ""
-    echo "  2. Or manually:"
-    if [ -n "$layer" ]; then
-        echo "     cd layers/worktrees/issue-$issue_num"
-    else
-        echo "     cd .workspace-worktrees/issue-$issue_num"
-    fi
+    echo "  2. Or use worktree_enter.sh (recommended — it also sources the environment)"
     echo ""
     echo "  3. When done:"
     echo "     .agent/scripts/worktree_remove.sh --issue $issue_num"

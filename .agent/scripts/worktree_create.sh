@@ -214,14 +214,7 @@ if [ -d "$WORKTREE_DIR" ]; then
     exit 1
 fi
 
-# Check if branch already exists
 cd "$ROOT_DIR"
-if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
-    echo "Branch '$BRANCH_NAME' already exists."
-    BRANCH_EXISTS=true
-else
-    BRANCH_EXISTS=false
-fi
 
 echo "========================================"
 echo "Creating Worktree"
@@ -237,13 +230,20 @@ echo ""
 # Create parent directory if needed
 mkdir -p "$(dirname "$WORKTREE_DIR")"
 
-# Create the worktree
-if [ "$BRANCH_EXISTS" = true ]; then
-    echo "Using existing branch '$BRANCH_NAME'..."
-    git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
+# Create the worktree directory
+if [ "$WORKTREE_TYPE" == "workspace" ]; then
+    # Workspace worktrees are full git worktrees of the workspace repo
+    if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+        echo "Using existing branch '$BRANCH_NAME'..."
+        git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
+    else
+        echo "Creating new branch '$BRANCH_NAME' from current HEAD..."
+        git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+    fi
 else
-    echo "Creating new branch '$BRANCH_NAME' from current HEAD..."
-    git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+    # Layer worktrees are plain directories containing per-package git worktrees.
+    # The branch is created in the individual package repos, not the workspace repo.
+    mkdir -p "$WORKTREE_DIR"
 fi
 
 # For layer worktrees, set up the layer structure with symlinks

@@ -28,6 +28,8 @@ CALLER_PWD="$(pwd -P)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+source "$SCRIPT_DIR/_worktree_helpers.sh"
+
 ISSUE_NUM=""
 FORCE=false
 REPO_SLUG=""
@@ -173,7 +175,11 @@ fi
 
 # Get branch name
 cd "$ROOT_DIR"
-BRANCH_NAME=$(git -C "$WORKTREE_DIR" branch --show-current 2>/dev/null || echo "")
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    BRANCH_NAME=$(wt_layer_branch "$WORKTREE_DIR" 2>/dev/null || echo "")
+else
+    BRANCH_NAME=$(git -C "$WORKTREE_DIR" branch --show-current 2>/dev/null || echo "")
+fi
 
 echo "========================================"
 echo "Removing Worktree"
@@ -278,23 +284,6 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
         done
     done
 
-    # --- Phase 2: Check workspace-level uncommitted changes ---
-    # Filter out known layer infrastructure so only genuine changes are flagged.
-    # Treat any top-level *_ws directory as infrastructure (Phase 1 already
-    # validated each workspace dir individually for unexpected content).
-    INFRA_PATTERN='^(\?\? |.. )(\.scratchpad/|[^/]*_ws(/|$))'
-    cd "$WORKTREE_DIR"
-    WORKSPACE_UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -v -E "$INFRA_PATTERN" || true)
-    cd "$ROOT_DIR"
-
-    if [ -n "$WORKSPACE_UNCOMMITTED" ] && [ "$FORCE" != true ]; then
-        echo "⚠️  Warning: Worktree has uncommitted changes:"
-        echo ""
-        echo "$WORKSPACE_UNCOMMITTED"
-        echo ""
-        HAS_ISSUES=true
-    fi
-
     if [ "$HAS_ISSUES" = true ]; then
         echo "Use --force to remove anyway, or commit/stash your changes first."
         exit 1
@@ -339,10 +328,17 @@ fi
 
 # Remove the worktree
 echo "Removing worktree..."
-if [ "$FORCE" = true ]; then
-    git worktree remove --force "$WORKTREE_DIR"
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    # Layer worktrees are plain directories (inner package worktrees already
+    # cleaned in Phase 3 above); just remove the remaining directory.
+    rm -rf "$WORKTREE_DIR"
 else
-    git worktree remove "$WORKTREE_DIR"
+    # Workspace worktrees are proper git worktrees
+    if [ "$FORCE" = true ]; then
+        git worktree remove --force "$WORKTREE_DIR"
+    else
+        git worktree remove "$WORKTREE_DIR"
+    fi
 fi
 
 # Prune worktree references for the workspace repo
@@ -352,9 +348,9 @@ echo ""
 echo "✅ Worktree removed successfully"
 
 # Offer to delete the branch
-if [ -n "$BRANCH_NAME" ]; then
+if [ -n "$BRANCH_NAME" ] && [ "$WORKTREE_TYPE" == "workspace" ]; then
     echo ""
-    # Check if branch still exists
+    # Check if branch still exists in the workspace repo
     if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
         echo "The branch '$BRANCH_NAME' still exists."
         echo ""
@@ -364,6 +360,10 @@ if [ -n "$BRANCH_NAME" ]; then
         echo "To delete it on origin (if pushed):"
         echo "  git push origin --delete $BRANCH_NAME"
     fi
+elif [ -n "$BRANCH_NAME" ] && [ "$WORKTREE_TYPE" == "layer" ]; then
+    echo ""
+    echo "Note: Branch '$BRANCH_NAME' lives in the package repo(s), not the workspace repo."
+    echo "Inner package worktree references have been pruned."
 fi
 
 echo ""
