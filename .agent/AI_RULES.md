@@ -41,7 +41,7 @@ rules plus framework-specific guidance.
 | `.agent/scripts/worktree_create.sh` | Create isolated worktree |
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
-| `.agent/scripts/status_report.sh` | Full workspace status |
+| `.agent/scripts/status_report.sh` | Workspace status (supports `--quick`, `--pr-triage`) |
 | `.agent/scripts/build.sh` | Build all layers |
 
 ## References

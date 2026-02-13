@@ -178,12 +178,14 @@ The workspace supports a locking mechanism (`.agent/scripts/lock.sh`, `.agent/sc
 
 ### Status Reporting
 
-`.agent/scripts/status_report.sh` generates a comprehensive report using `vcs` to show:
+`.agent/scripts/status_report.sh` generates a comprehensive report using `vcs` and `gh` to show:
 - Root repository status
 - All sub-repository statuses
 - Modified files
 - Branch information
 - Ahead/behind tracking
+- Open GitHub PRs and issues (use `--skip-github` or `--quick` for offline mode)
+- PR comment triage (with `--pr-triage`)
 
 ## VCS Tool Integration
 

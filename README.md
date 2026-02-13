@@ -88,7 +88,7 @@ source .agent/scripts/env.sh
 This workspace is designed to be used with an AI Agent. If you are new to agentic coding, here is how you should interact with this repository:
 
 1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
-2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`.agent/scripts/status_report.sh`).
+2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`make status` or `make status-quick`).
 3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, manifest config at `configs/manifest/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
@@ -190,13 +190,14 @@ make setup-all     # Setup all workspace layers
 make build         # Build all layers
 make test          # Run all tests
 make clean         # Clean build artifacts
-make status        # Show workspace status
+make status        # Full status (sync + repos + GitHub PRs/issues)
+make status-quick  # Quick local-only status (no sync, no GitHub)
 make lint          # Run linters
 ```
 
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
-- `status_report.sh`: Comprehensive workspace status with test history.
+- `status_report.sh`: Comprehensive workspace status with `--quick` and `--pr-triage` flags.
 
 ### Pre-commit Hooks
 Set up pre-commit hooks for automatic validation:

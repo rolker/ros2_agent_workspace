@@ -70,91 +70,55 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ## Status & Reporting
 
-### `check_full_status.py` ⭐ Recommended
+### `status_report.sh` ⭐ Recommended
 
-**One-command comprehensive status check** combining local git status and remote GitHub status.
-
-**Usage:**
-```bash
-python3 ./.agent/scripts/check_full_status.py
-```
-
-**Options:**
-```bash
-python3 ./.agent/scripts/check_full_status.py --no-local    # Skip local check
-python3 ./.agent/scripts/check_full_status.py --no-remote   # Skip remote check
-python3 ./.agent/scripts/check_full_status.py --batch-size 5  # Custom batch size
-```
-
-**What it does:**
-1. Runs local git status check (via `status_report.sh`)
-2. Discovers all workspace repositories from `.repos` files
-3. Fetches open PRs and Issues from GitHub (batched queries)
-4. Generates consolidated Markdown report
-
-**Output includes:**
-- Root repository status
-- All workspace repositories status
-- Open Pull Requests table
-- Open Issues table
-- Latest test results (if available)
-
-**Benefits:**
-- ✅ Single command (was 5 separate commands)
-- ✅ One user approval (was 3-5)
-- ✅ Automatic batching for GitHub queries
-- ✅ Server-side filtering for efficiency
-
-**Dependencies:**
-- `python3`
-- `vcstool` (for local status)
-- `gh` CLI authenticated (`gh auth login`)
-
-**When to use:**
-- Daily morning status check
-- Before starting work
-- After being away from workspace
-- To check PR/Issue backlog
-
----
-
-### `status_report.sh`
-
-Generate a comprehensive workspace status report.
+**Comprehensive workspace status** — repository sync, git status, GitHub PRs/issues, test results, and optional PR comment triage.
 
 **Usage:**
 ```bash
-./.agent/scripts/status_report.sh
+./.agent/scripts/status_report.sh                    # Full status (sync + GitHub)
+./.agent/scripts/status_report.sh --quick            # Fast local-only (no sync, no GitHub)
+./.agent/scripts/status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
+./.agent/scripts/status_report.sh --skip-github      # Local status only (offline)
+./.agent/scripts/status_report.sh --pr-triage        # Full status + PR comment classification
+./.agent/scripts/status_report.sh --help             # Show all flags
 ```
 
-**Output example:**
+**Makefile shortcuts:**
+```bash
+make status        # Full status
+make status-quick  # Equivalent to --quick
 ```
-# Workspace Status Report
-**Date**: Wed Jan 21 11:47:12 AM EST 2026
 
-## Root Repository
-- **Status**: ✅ Clean
-- **Branch**: main
+**Flags:**
 
-## Workspace: **core** (Total: 5, Clean: 4, Attention: 1)
-...
-```
+| Flag | Effect |
+|------|--------|
+| *(none)* | Full: sync + repos + GitHub PRs/issues + tests |
+| `--quick` | Alias for `--skip-sync --skip-github` |
+| `--skip-sync` | Skip git fetch |
+| `--skip-github` | Skip GitHub API calls |
+| `--pr-triage` | Add PR comment classification (critical/minor) |
+| `--help` | Usage |
 
 **What it shows:**
-- Git status of root repository
-- For each workspace layer:
-  - Number of repositories
-  - Clean vs. repositories needing attention
-  - Repositories behind on commits
-  - Repositories on non-Jazzy branches
-  - Untracked files
+- Root repository git status
+- All sub-repository statuses per workspace layer (clean vs. attention)
+- Branch tracking (ahead/behind, wrong branch)
+- Open GitHub Pull Requests and Issues (unless `--skip-github`)
+- PR comment triage table with critical/minor counts (with `--pr-triage`)
+- Latest test results (if available)
 
 **When to use:**
-- Before committing changes
-- Checking if workspace is ready for build
-- Diagnosing repository state issues
+- Daily morning status check (`make status`)
+- Quick check before committing (`make status-quick`)
+- PR pipeline overview (`--pr-triage`)
 
-**Note:** Some deprecation warnings from vcstool are harmless and can be ignored.
+**Dependencies:**
+- Required: `vcs`, `git`, `python3`, `jq`
+- Optional: `gh` CLI authenticated (`gh auth login`) — for GitHub PR/issue/triage features
+
+**Note:** `--pr-triage` makes 2 API calls per open PR, which can be slow with many PRs.
 
 ---
 
@@ -743,7 +707,8 @@ python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
 
 ### Daily status check
 ```bash
-python3 ./.agent/scripts/check_full_status.py  # Quick morning report
+make status                             # Full morning report (sync + GitHub)
+make status-quick                       # Fast local-only check
 ```
 
 ### Initialize workspace (first time)
@@ -757,14 +722,14 @@ source ./.agent/scripts/env.sh          # Source environment
 ### Daily development
 ```bash
 source ./.agent/scripts/env.sh         # Each new terminal
-./.agent/scripts/status_report.sh      # Check workspace state
+./.agent/scripts/status_report.sh --quick  # Quick workspace state check
 ./.agent/scripts/build.sh core         # Build changes
 ./.agent/scripts/test.sh core          # Run tests
 ```
 
 ### Before committing
 ```bash
-./.agent/scripts/status_report.sh      # Verify clean state
+./.agent/scripts/status_report.sh --quick  # Verify clean state
 # Commit changes to feature branch
 ```
 

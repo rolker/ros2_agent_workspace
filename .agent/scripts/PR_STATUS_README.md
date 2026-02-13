@@ -184,6 +184,14 @@ Designed to streamline the standard PR workflow:
 
 Reduces manual PR scanning time and provides actionable next steps.
 
+## Note
+
+Basic PR comment triage (critical/minor classification) is now available in
+`status_report.sh --pr-triage`, which operates across all workspace repos.
+This standalone `pr_status.sh` is still the right tool for interactive mode,
+JSON output, and `--next-critical`/`--next-minor` agent queries.
+
 ## See Also
 
+- `status_report.sh --pr-triage` - Cross-repo PR comment classification
 - `CONTRIBUTING.md` - Contribution guidelines

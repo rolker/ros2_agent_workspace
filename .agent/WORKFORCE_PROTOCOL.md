@@ -84,7 +84,7 @@ Every agent invocation is a "shift". When your shift ends (you call `notify_user
 
 *   **The Golden Rule**: *Leave the campsite cleaner than you found it.*
 *   **Requirement**:
-    *   Run `status_report.sh` or `vcs status` before finishing.
+    *   Run `status_report.sh --quick` or `vcs status` before finishing.
     *   **Alert**: If you see modifications in repositories you didn't touch, **WARN THE USER**. Do not commit them blindly.
     *   **Action**: Commit your own work to a `feature/` branch.
 
