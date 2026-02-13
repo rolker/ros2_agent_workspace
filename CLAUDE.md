@@ -34,12 +34,12 @@ The `--packages` flag takes these directory names (not individual ROS package na
 
 ```bash
 # Workspace infrastructure work (docs, .agent/, configs)
-.agent/scripts/worktree_create.sh --issue <N> --type workspace
+.agent/scripts/worktree_create.sh --issue <N> --type workspace [--draft-pr]
 source .agent/scripts/worktree_enter.sh --issue <N>
 
 # ROS package work (requires --layer and --packages)
 # --packages takes project-repo directory names from layers/main/<layer>_ws/src/
-.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <project_repo>
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <project_repo> [--draft-pr]
 source .agent/scripts/worktree_enter.sh --issue <N>
 cd core_ws/src/<project_repo>   # work here, commit/push here
 
@@ -128,7 +128,7 @@ pre-commit run --all-files                       # Lint + hooks
 |--------|---------|
 | `.agent/scripts/env.sh` | Source ROS 2 env + checkout guardrail |
 | `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) |
-| `.agent/scripts/worktree_create.sh` | Create isolated worktree |
+| `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--draft-pr` for immediate visibility) |
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |

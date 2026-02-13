@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Draft PR on Worktree Creation** (Issue #205):
+  - `--draft-pr` flag for `worktree_create.sh`
+  - Workspace worktrees: generates work plan from template, commits, pushes, creates draft PR
+  - Layer worktrees: empty commit + push + draft PR in each package repo
+  - Cross-repo issue references for layer draft PRs
+  - All operations non-fatal — worktree creation succeeds even if `gh` is unavailable
+
 ### Changed
 - **Status Script Consolidation** (Issue #203):
   - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
