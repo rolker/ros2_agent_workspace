@@ -29,18 +29,59 @@ EMOJI_READY="🟢"
 EMOJI_SEARCH="🔍"
 EMOJI_CHART="📊"
 
+# Discover all workspace repos (root + overlay + underlay)
+# Returns one owner/repo slug per line, deduplicated and sorted
+discover_repos() {
+    local repos=()
+
+    # Root workspace repo
+    local root_url
+    root_url=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || echo "")
+    if [ -n "$root_url" ]; then
+        local root_slug
+        root_slug=$(echo "$root_url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+        if [ -n "$root_slug" ]; then
+            repos+=("$root_slug")
+        fi
+    fi
+
+    # Overlay + underlay repos via list_overlay_repos.py
+    local repo_json
+    repo_json=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null || echo "[]")
+    while IFS= read -r url; do
+        if [ -n "$url" ] && [ "$url" != "null" ]; then
+            local slug
+            slug=$(echo "$url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+            if [ -n "$slug" ]; then
+                repos+=("$slug")
+            fi
+        fi
+    done < <(echo "$repo_json" | jq -r '.[].url // empty')
+
+    # Deduplicate and sort
+    printf '%s\n' "${repos[@]}" | sort -u
+}
+
 # Function to fetch all open PRs with detailed info
+# Optional arg: repo slug (owner/repo) for cross-repo queries
 fetch_prs() {
-    gh pr list \
+    local repo_flag=""
+    if [ -n "${1:-}" ]; then
+        repo_flag="--repo $1"
+    fi
+    # shellcheck disable=SC2086
+    gh pr list $repo_flag \
         --state open \
         --json number,title,updatedAt,reviewDecision \
         --limit 100
 }
 
 # Function to get review comments for a PR
+# Args: pr_number [repo_slug]
 get_review_comments() {
     local pr_number=$1
-    gh api "/repos/{owner}/{repo}/pulls/${pr_number}/comments" 2>/dev/null | jq -c '.[]'
+    local repo=${2:-"{owner}/{repo}"}
+    gh api "/repos/${repo}/pulls/${pr_number}/comments" 2>/dev/null | jq -c '.[]'
 }
 
 # Function to classify comment severity
@@ -65,8 +106,14 @@ classify_comment() {
 }
 
 # Function to analyze PR status
+# Args: pr_json [repo_slug]
 analyze_pr() {
     local pr_json=$1
+    local repo=${2:-"{owner}/{repo}"}
+    local repo_name=""
+    if [ "$repo" != "{owner}/{repo}" ]; then
+        repo_name="$repo"
+    fi
     local number
     number=$(echo "$pr_json" | jq -r '.number')
     local title
@@ -78,11 +125,11 @@ analyze_pr() {
 
     # Get review info separately
     local reviews_count
-    reviews_count=$(gh api "/repos/{owner}/{repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
+    reviews_count=$(gh api "/repos/${repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
 
     # Get review comments
     local comments
-    comments=$(get_review_comments "$number")
+    comments=$(get_review_comments "$number" "$repo")
     local comment_count=0
 
     # Classify comments
@@ -157,13 +204,16 @@ analyze_pr() {
         --arg time "$time_str" \
         --arg critical "$critical_count" \
         --arg minor "$minor_count" \
-        '{category: $category, number: $number, title: $title, time: $time, critical: ($critical | tonumber), minor: ($minor | tonumber)}'
+        --arg repo "$repo_name" \
+        '{category: $category, number: $number, title: $title, time: $time, critical: ($critical | tonumber), minor: ($minor | tonumber), repo: $repo}'
 }
 
 # Function to display dashboard
+# Args: prs_json [interactive] [repo_slug]
 display_dashboard() {
     local prs_json=$1
     local interactive=${2:-false}
+    local repo=${3:-""}
 
     echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${NC}"
     echo "===================="
@@ -177,7 +227,11 @@ display_dashboard() {
 
     while IFS= read -r pr; do
         local analyzed
-        analyzed=$(analyze_pr "$pr")
+        if [ -n "$repo" ]; then
+            analyzed=$(analyze_pr "$pr" "$repo")
+        else
+            analyzed=$(analyze_pr "$pr")
+        fi
         local category
         category=$(echo "$analyzed" | jq -r '.category')
 
@@ -234,8 +288,14 @@ display_category() {
         critical_count=$(echo "$item" | jq -r '.critical')
         local minor_count
         minor_count=$(echo "$item" | jq -r '.minor')
+        local item_repo
+        item_repo=$(echo "$item" | jq -r '.repo // ""')
 
-        printf "  #%-4s %-50s (last: %s)\n" "$number" "$title" "$time"
+        if [ -n "$item_repo" ]; then
+            printf "  [%s] #%-4s %-40s (last: %s)\n" "$item_repo" "$number" "$title" "$time"
+        else
+            printf "  #%-4s %-50s (last: %s)\n" "$number" "$title" "$time"
+        fi
 
         if [ "$critical_count" -gt 0 ]; then
             echo "        → $critical_count critical comment(s)"
@@ -248,13 +308,19 @@ display_category() {
 }
 
 # Function to output in JSON format (for agents)
+# Args: prs_json [repo_slug]
 output_json() {
     local prs_json=$1
+    local repo=${2:-""}
     local all_prs=[]
 
     while IFS= read -r pr; do
         local analyzed
-        analyzed=$(analyze_pr "$pr")
+        if [ -n "$repo" ]; then
+            analyzed=$(analyze_pr "$pr" "$repo")
+        else
+            analyzed=$(analyze_pr "$pr")
+        fi
         all_prs=$(echo "$all_prs" | jq --argjson item "$analyzed" '. + [$item]')
     done < <(echo "$prs_json" | jq -c '.[]')
 
@@ -271,13 +337,19 @@ output_json() {
 }
 
 # Function to get next actionable PR
+# Args: prs_json [category] [repo_slug]
 get_next_pr() {
     local prs_json=$1
     local category=${2:-"critical"}
+    local repo=${3:-""}
 
     while IFS= read -r pr; do
         local analyzed
-        analyzed=$(analyze_pr "$pr")
+        if [ -n "$repo" ]; then
+            analyzed=$(analyze_pr "$pr" "$repo")
+        else
+            analyzed=$(analyze_pr "$pr")
+        fi
         local pr_category
         pr_category=$(echo "$analyzed" | jq -r '.category')
 
@@ -292,8 +364,10 @@ get_next_pr() {
 }
 
 # Function to output simple text summary (for agents)
+# Args: prs_json [repo_slug]
 output_simple() {
     local prs_json=$1
+    local repo=${2:-""}
 
     local needs_review=()
     local critical=()
@@ -302,7 +376,11 @@ output_simple() {
 
     while IFS= read -r pr; do
         local analyzed
-        analyzed=$(analyze_pr "$pr")
+        if [ -n "$repo" ]; then
+            analyzed=$(analyze_pr "$pr" "$repo")
+        else
+            analyzed=$(analyze_pr "$pr")
+        fi
         local category
         category=$(echo "$analyzed" | jq -r '.category')
 
@@ -328,7 +406,13 @@ output_simple() {
             crit=$(echo "$item" | jq -r '.critical')
             local min
             min=$(echo "$item" | jq -r '.minor')
-            echo "  #$number: $title ($crit critical, $min minor)"
+            local item_repo
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title ($crit critical, $min minor)"
+            else
+                echo "  #$number: $title ($crit critical, $min minor)"
+            fi
         done
     fi
 
@@ -340,7 +424,13 @@ output_simple() {
             number=$(echo "$item" | jq -r '.number')
             local title
             title=$(echo "$item" | jq -r '.title')
-            echo "  #$number: $title"
+            local item_repo
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title"
+            else
+                echo "  #$number: $title"
+            fi
         done
     fi
 
@@ -352,7 +442,13 @@ output_simple() {
             number=$(echo "$item" | jq -r '.number')
             local title
             title=$(echo "$item" | jq -r '.title')
-            echo "  #$number: $title"
+            local item_repo
+            item_repo=$(echo "$item" | jq -r '.repo // ""')
+            if [ -n "$item_repo" ]; then
+                echo "  [$item_repo] #$number: $title"
+            else
+                echo "  #$number: $title"
+            fi
         done
     fi
 }
@@ -411,6 +507,7 @@ run_interactive() {
 # Main
 main() {
     local interactive=false
+    local all_repos=false
     local mode="dashboard"  # dashboard, json, simple, next-critical, next-minor
 
     # Parse arguments
@@ -418,6 +515,10 @@ main() {
         case $1 in
             -i|--interactive)
                 interactive=true
+                shift
+                ;;
+            --all-repos)
+                all_repos=true
                 shift
                 ;;
             --json)
@@ -445,6 +546,7 @@ main() {
                 echo ""
                 echo "Options:"
                 echo "  -i, --interactive    Run in interactive mode (for human use)"
+                echo "  --all-repos         Query all workspace repos (cross-repo triage)"
                 echo "  --json              Output full status as JSON (for agents)"
                 echo "  --simple            Output simple text summary (for agents)"
                 echo "  --next-critical     Output next PR with critical issues (for agents)"
@@ -455,6 +557,9 @@ main() {
                 echo "Examples:"
                 echo "  $0                       # Show dashboard (human-friendly)"
                 echo "  $0 --interactive         # Interactive menu (human-friendly)"
+                echo "  $0 --all-repos           # Dashboard across all workspace repos"
+                echo "  $0 --all-repos --simple  # Simple text triage across all repos"
+                echo "  $0 --all-repos --json    # JSON output with repo field"
                 echo "  $0 --simple              # Simple text output (agent-friendly)"
                 echo "  $0 --json                # JSON output (agent-friendly)"
                 echo "  $0 --next-critical       # Get next critical PR (agent-friendly)"
@@ -467,34 +572,221 @@ main() {
         esac
     done
 
-    # Fetch PRs
-    local prs
-    prs=$(fetch_prs)
+    if [ "$all_repos" = true ]; then
+        # Multi-repo mode: iterate all workspace repos
+        local repos
+        repos=$(discover_repos)
+        local merged_prs="[]"
 
-    # Execute based on mode
-    if [ "$interactive" = true ]; then
-        run_interactive
-    else
+        while IFS= read -r repo; do
+            if [ -z "$repo" ]; then
+                continue
+            fi
+            echo -e "${BLUE}Fetching PRs from ${repo}...${NC}" >&2
+            local repo_prs
+            repo_prs=$(fetch_prs "$repo" 2>/dev/null || echo "[]")
+
+            # Tag each PR with repo slug for downstream functions
+            repo_prs=$(echo "$repo_prs" | jq --arg repo "$repo" '[.[] | . + {_repo: $repo}]')
+            merged_prs=$(echo "$merged_prs $repo_prs" | jq -s '.[0] + .[1]')
+        done <<< "$repos"
+
+        # Dispatch to output mode
+        # For multi-repo, we need to analyze PRs with their repo context.
+        # We rebuild the merged array with analysis applied per-repo.
         case "$mode" in
             json)
-                output_json "$prs"
+                local all_analyzed="[]"
+                while IFS= read -r pr; do
+                    local pr_repo
+                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
+                    local analyzed
+                    analyzed=$(analyze_pr "$pr" "$pr_repo")
+                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
+                done < <(echo "$merged_prs" | jq -c '.[]')
+                echo "$all_analyzed" | jq '{
+                    summary: {
+                        total: (. | length),
+                        needs_review: ([.[] | select(.category == "needs_review")] | length),
+                        critical: ([.[] | select(.category == "critical")] | length),
+                        minor: ([.[] | select(.category == "minor")] | length),
+                        ready: ([.[] | select(.category == "ready")] | length)
+                    },
+                    prs: .
+                }'
                 ;;
             simple)
-                output_simple "$prs"
+                local all_analyzed="[]"
+                while IFS= read -r pr; do
+                    local pr_repo
+                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
+                    local analyzed
+                    analyzed=$(analyze_pr "$pr" "$pr_repo")
+                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
+                done < <(echo "$merged_prs" | jq -c '.[]')
+                # Feed pre-analyzed JSON to a simple display
+                local needs_review=()
+                local critical=()
+                local minor=()
+                local ready=()
+                while IFS= read -r item; do
+                    local cat
+                    cat=$(echo "$item" | jq -r '.category')
+                    case "$cat" in
+                        needs_review) needs_review+=("$item") ;;
+                        critical) critical+=("$item") ;;
+                        minor) minor+=("$item") ;;
+                        ready) ready+=("$item") ;;
+                    esac
+                done < <(echo "$all_analyzed" | jq -c '.[]')
+
+                echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
+
+                if [ ${#critical[@]} -gt 0 ]; then
+                    echo ""
+                    echo "CRITICAL ISSUES:"
+                    for item in "${critical[@]}"; do
+                        local number title crit min item_repo
+                        number=$(echo "$item" | jq -r '.number')
+                        title=$(echo "$item" | jq -r '.title')
+                        crit=$(echo "$item" | jq -r '.critical')
+                        min=$(echo "$item" | jq -r '.minor')
+                        item_repo=$(echo "$item" | jq -r '.repo // ""')
+                        if [ -n "$item_repo" ]; then
+                            echo "  [$item_repo] #$number: $title ($crit critical, $min minor)"
+                        else
+                            echo "  #$number: $title ($crit critical, $min minor)"
+                        fi
+                    done
+                fi
+
+                if [ ${#needs_review[@]} -gt 0 ]; then
+                    echo ""
+                    echo "NEEDS REVIEW:"
+                    for item in "${needs_review[@]}"; do
+                        local number title item_repo
+                        number=$(echo "$item" | jq -r '.number')
+                        title=$(echo "$item" | jq -r '.title')
+                        item_repo=$(echo "$item" | jq -r '.repo // ""')
+                        if [ -n "$item_repo" ]; then
+                            echo "  [$item_repo] #$number: $title"
+                        else
+                            echo "  #$number: $title"
+                        fi
+                    done
+                fi
+
+                if [ ${#ready[@]} -gt 0 ]; then
+                    echo ""
+                    echo "READY TO MERGE:"
+                    for item in "${ready[@]}"; do
+                        local number title item_repo
+                        number=$(echo "$item" | jq -r '.number')
+                        title=$(echo "$item" | jq -r '.title')
+                        item_repo=$(echo "$item" | jq -r '.repo // ""')
+                        if [ -n "$item_repo" ]; then
+                            echo "  [$item_repo] #$number: $title"
+                        else
+                            echo "  #$number: $title"
+                        fi
+                    done
+                fi
                 ;;
-            next-critical)
-                get_next_pr "$prs" "critical" || echo "No PRs with critical issues found"
-                ;;
-            next-minor)
-                get_next_pr "$prs" "minor" || echo "No PRs with minor issues found"
-                ;;
-            next-review)
-                get_next_pr "$prs" "needs_review" || echo "No PRs needing review found"
+            next-critical|next-minor|next-review)
+                local target_cat=""
+                case "$mode" in
+                    next-critical) target_cat="critical" ;;
+                    next-minor) target_cat="minor" ;;
+                    next-review) target_cat="needs_review" ;;
+                esac
+                local found=false
+                while IFS= read -r pr; do
+                    local pr_repo
+                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
+                    local analyzed
+                    analyzed=$(analyze_pr "$pr" "$pr_repo")
+                    local pr_category
+                    pr_category=$(echo "$analyzed" | jq -r '.category')
+                    if [ "$pr_category" = "$target_cat" ]; then
+                        echo "$analyzed"
+                        found=true
+                        break
+                    fi
+                done < <(echo "$merged_prs" | jq -c '.[]')
+                if [ "$found" = false ]; then
+                    echo "No PRs with $target_cat issues found"
+                fi
                 ;;
             dashboard)
-                display_dashboard "$prs"
+                # For dashboard, analyze each PR with its repo context and display
+                local all_analyzed="[]"
+                while IFS= read -r pr; do
+                    local pr_repo
+                    pr_repo=$(echo "$pr" | jq -r '._repo // ""')
+                    local analyzed
+                    analyzed=$(analyze_pr "$pr" "$pr_repo")
+                    all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
+                done < <(echo "$merged_prs" | jq -c '.[]')
+
+                echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard (All Repos)${NC}"
+                echo "=================================="
+                echo ""
+
+                local needs_review=()
+                local critical=()
+                local minor=()
+                local ready=()
+                while IFS= read -r item; do
+                    local cat
+                    cat=$(echo "$item" | jq -r '.category')
+                    case "$cat" in
+                        needs_review) needs_review+=("$item") ;;
+                        critical) critical+=("$item") ;;
+                        minor) minor+=("$item") ;;
+                        ready) ready+=("$item") ;;
+                    esac
+                done < <(echo "$all_analyzed" | jq -c '.[]')
+
+                display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
+                display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
+                display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
+                display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
+
+                local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
+                echo ""
+                echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
+                echo ""
                 ;;
         esac
+    else
+        # Single-repo mode (original behavior)
+        local prs
+        prs=$(fetch_prs)
+
+        if [ "$interactive" = true ]; then
+            run_interactive
+        else
+            case "$mode" in
+                json)
+                    output_json "$prs"
+                    ;;
+                simple)
+                    output_simple "$prs"
+                    ;;
+                next-critical)
+                    get_next_pr "$prs" "critical" || echo "No PRs with critical issues found"
+                    ;;
+                next-minor)
+                    get_next_pr "$prs" "minor" || echo "No PRs with minor issues found"
+                    ;;
+                next-review)
+                    get_next_pr "$prs" "needs_review" || echo "No PRs needing review found"
+                    ;;
+                dashboard)
+                    display_dashboard "$prs"
+                    ;;
+            esac
+        fi
     fi
 }
 
