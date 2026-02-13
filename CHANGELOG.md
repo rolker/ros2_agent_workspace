@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cross-Repo PR Triage Dashboard** (Issue #207):
+  - `--all-repos` flag for `pr_status.sh` — queries all workspace repos in one view
+  - `discover_repos()` function reusing `list_overlay_repos.py --include-underlay`
+  - Repo name shown in dashboard, simple, and JSON output when using `--all-repos`
+  - `make pr-triage` convenience target (`pr_status.sh --all-repos --simple`)
+
 ### Changed
 - **Status Script Consolidation** (Issue #203):
   - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
