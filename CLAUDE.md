@@ -23,11 +23,11 @@ source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude
 
 Every task must use an isolated worktree — never work in the main tree or default branches.
 
-**Project repos**: Directories under `layers/main/*_ws/src/` are independent git repos
-(e.g., `unh_marine_autonomy`), each containing one or more ROS 2 packages. Layer
+**Project repos**: Directories under `layers/main/*_ws/src/` are typically independent git
+repos (e.g., `unh_marine_autonomy`), each containing one or more ROS 2 packages. Layer
 worktrees create git worktrees *inside* these project repos — you commit and push to the
-project repo, not the workspace repo. The `--packages` flag takes these directory names
-(not individual ROS package names).
+project repo, not the workspace repo. Non-git directories are symlinked instead.
+The `--packages` flag takes these directory names (not individual ROS package names).
 
 ```bash
 # Workspace infrastructure work (docs, .agent/, configs)
@@ -60,8 +60,9 @@ and reference it in PRs with `Closes #<N>`.
 Issues and PRs live in whichever repo owns the code being changed — check the project
 repo (e.g., `rolker/unh_marine_autonomy`), not just the workspace repo.
 
-**Trivial fixes** (typos, minor doc corrections) don't need a new issue but must still
-use an existing worktree — never commit directly to default branches.
+**Trivial fixes** (typos, minor doc corrections) don't need a dedicated issue — use the
+current task's worktree or create a quick issue for a new one.
+Never commit directly to default branches.
 
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 
