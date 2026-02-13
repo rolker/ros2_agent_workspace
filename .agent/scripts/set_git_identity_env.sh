@@ -138,11 +138,19 @@ elif [ "$1" == "--detect" ]; then
     echo "Detected framework: $DETECTED"
 
 elif [ $# -eq 2 ]; then
-    # Manual name and email (without model)
+    # Manual name and email — detect framework for model
     AGENT_NAME="$1"
     AGENT_EMAIL="$2"
-    AGENT_MODEL="Unknown Model"
-    AGENT_FRAMEWORK="custom"
+    DETECTED=$(detect_framework)
+    if [ "$DETECTED" != "unknown" ]; then
+        FRAMEWORK_KEY="${DETECTED%-cli}"
+        FRAMEWORK_KEY="${FRAMEWORK_KEY,,}"
+        AGENT_MODEL="${FRAMEWORK_MODELS[$FRAMEWORK_KEY]:-Unknown Model}"
+        AGENT_FRAMEWORK="$DETECTED"
+    else
+        AGENT_MODEL="Unknown Model"
+        AGENT_FRAMEWORK="custom"
+    fi
 elif [ $# -eq 3 ]; then
     # Manual name, email, and model
     AGENT_NAME="$1"
