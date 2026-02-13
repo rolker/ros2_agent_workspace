@@ -33,6 +33,6 @@ declare -A FRAMEWORK_MODELS=(
     ["copilot"]="GPT-4o"
     ["gemini"]="Gemini 2.0 Flash"
     ["antigravity"]="Gemini 2.5 Pro"
-    ["claude"]="Claude Opus 4.5"
-    ["claude-code"]="Claude Opus 4.5"
+    ["claude"]="Claude Opus 4.6"
+    ["claude-code"]="Claude Opus 4.6"
 )

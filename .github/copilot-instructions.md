@@ -10,6 +10,9 @@ source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 
+After sourcing, verify `$AGENT_MODEL` matches your actual model (from your system prompt).
+If stale, update the default in `.agent/scripts/framework_config.sh` and commit the one-line fix.
+
 ## Git Rules
 
 - **Never commit to `main`** — branch is protected; direct pushes are rejected.
