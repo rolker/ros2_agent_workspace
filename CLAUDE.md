@@ -24,20 +24,35 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 
 ## Worktree Workflow (Required)
 
-Every task must use an isolated worktree — never work in the main tree.
+Every task must use an isolated worktree — never work in the main tree or default branches.
+
+**Project repos**: Directories under `layers/main/*_ws/src/` are typically independent git
+repos (e.g., `unh_marine_autonomy`), each containing one or more ROS 2 packages. Layer
+worktrees create git worktrees *inside* these project repos — you commit and push to the
+project repo, not the workspace repo. Non-git directories are symlinked instead.
+The `--packages` flag takes these directory names (not individual ROS package names).
 
 ```bash
-# Create + enter
+# Workspace infrastructure work (docs, .agent/, configs)
 .agent/scripts/worktree_create.sh --issue <N> --type workspace
 source .agent/scripts/worktree_enter.sh --issue <N>
 
-# For ROS package work, use layer worktrees
-.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core
+# ROS package work (requires --layer and --packages)
+# --packages takes project-repo directory names from layers/main/<layer>_ws/src/
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <project_repo>
+source .agent/scripts/worktree_enter.sh --issue <N>
+cd core_ws/src/<project_repo>   # work here, commit/push here
+
+# Multiple project repos in one worktree
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <repo1>,<repo2>
 
 # List / remove
 .agent/scripts/worktree_list.sh
 .agent/scripts/worktree_remove.sh --issue <N>
 ```
+
+See [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) for hybrid structure details,
+`--repo-slug` disambiguation, and troubleshooting.
 
 ## Issue-First Policy
 
@@ -45,7 +60,12 @@ No code without a ticket. Check for an existing GitHub issue first; if none exis
 ask the user: "Should I open an issue to track this?" Use the issue number in branches
 and reference it in PRs with `Closes #<N>`.
 
-**Exception**: trivial typo/doc fixes.
+Issues and PRs live in whichever repo owns the code being changed — check the project
+repo (e.g., `rolker/unh_marine_autonomy`), not just the workspace repo.
+
+**Trivial fixes** (typos, minor doc corrections) don't need a dedicated issue — use the
+current task's worktree or create a quick issue for a new one.
+Never commit directly to default branches.
 
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 
@@ -126,12 +146,10 @@ pre-commit run --all-files                       # Lint + hooks
 
 ```
 layers/main/
-├── underlay_ws/    # Additional dependencies
-├── core_ws/        # UNH Marine Autonomy Framework
-├── platforms_ws/   # Platform-specific code
-├── sensors_ws/     # Sensor drivers
-├── simulation_ws/  # Simulation tools
-└── ui_ws/          # Visualization
+├── underlay_ws/    # Optional: additional dependencies
+├── <overlay>_ws/   # One or more overlay workspaces
+│   └── src/        # Independent git repos ("project repos"), each with one or more ROS 2 packages
+└── ...
 ```
 
 `layers/` is gitignored — use `ls` to inspect it, not grep/glob.
