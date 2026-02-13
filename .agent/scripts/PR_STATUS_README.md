@@ -225,7 +225,10 @@ make pr-triage  # Runs: pr_status.sh --all-repos --simple
 Basic PR comment triage (critical/minor classification) is also available in
 `status_report.sh --pr-triage`, which provides a lighter-weight cross-repo view.
 This standalone `pr_status.sh` with `--all-repos` provides richer features:
-interactive mode, JSON output, and `--next-critical`/`--next-minor` agent queries.
+JSON output and `--next-critical`/`--next-minor` agent queries.
+
+**Note:** `--interactive` is not supported with `--all-repos`. Use interactive
+mode for single-repo workflows only.
 
 ## See Also
 
