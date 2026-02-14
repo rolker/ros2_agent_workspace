@@ -23,6 +23,7 @@ setup_mock_workspace() {
     cd "$WORKSPACE_DIR" || return 1
     git config user.email "test@example.com"
     git config user.name "Test User"
+    git config commit.gpgsign false
 
     # Initial commit (bare repos need at least one)
     echo "init" > README.md
@@ -143,6 +144,7 @@ setup_mock_layer_workspace() {
     cd "$tmp_clone" || return 1
     git config user.email "test@example.com"
     git config user.name "Test User"
+    git config commit.gpgsign false
     echo "init" > README.md
     git add README.md
     git commit -q -m "Initial commit"
@@ -155,6 +157,7 @@ setup_mock_layer_workspace() {
     git init -q .
     git config user.email "test@example.com"
     git config user.name "Test User"
+    git config commit.gpgsign false
     echo "workspace" > README.md
     git add README.md
     git commit -q -m "Workspace init"
@@ -165,6 +168,7 @@ setup_mock_layer_workspace() {
     cd "$WORKSPACE_DIR/layers/main/core_ws/src/test_pkg" || return 1
     git config user.email "test@example.com"
     git config user.name "Test User"
+    git config commit.gpgsign false
     cd "$WORKSPACE_DIR" || return 1
 
     # Create required directories
@@ -252,6 +256,94 @@ test_layer_creates_new_branch() {
     [[ "$output" == *"new branch"* ]]
 }
 run_test "Layer creates new branch when none exists" test_layer_creates_new_branch
+
+# ===== --draft-pr tests =====
+
+# Test 7: --draft-pr creates work plan for workspace (gh unavailable is non-fatal)
+test_draft_pr_workspace_creates_plan() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    # Copy template into mock workspace and commit it so it appears in worktrees
+    mkdir -p .agent/templates
+    cat > .agent/templates/ISSUE_PLAN.md << 'TPLEOF'
+# Work Plan: Issue #{ISSUE_NUMBER} - {ISSUE_TITLE}
+**Assignee**: {AGENT_NAME}
+**Started**: {START_DATE}
+TPLEOF
+    git add .agent/templates/ISSUE_PLAN.md
+    git commit -q -m "Add plan template"
+
+    # Hide gh so the script can't create a real PR (non-fatal path)
+    # Auto-detected slug will be "origin" (basename of bare repo path)
+    local output
+    output=$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v gh | tr '\n' ':') \
+        .agent/scripts/worktree_create.sh --issue 555 --type workspace --draft-pr 2>&1) || true
+
+    # Worktree should still be created successfully
+    if [[ "$output" != *"Worktree Created Successfully"* ]]; then
+        echo "    Expected worktree creation success message"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Work plan file should exist in the worktree
+    # Slug is "origin" (basename of the bare repo path without .git)
+    local worktree_plan="$WORKSPACE_DIR/.workspace-worktrees/issue-origin-555/.agent/work-plans/PLAN_ISSUE-555.md"
+    if [ ! -f "$worktree_plan" ]; then
+        echo "    Expected work plan at: $worktree_plan"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Verify template substitution worked (issue number should appear)
+    if ! grep -q "Issue #555" "$worktree_plan"; then
+        echo "    Expected issue number substitution in work plan"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    cleanup_mock_workspace
+    return 0
+}
+run_test "--draft-pr creates work plan for workspace type" test_draft_pr_workspace_creates_plan
+
+# Test 8: layer worktree packages have .git file detected by -e (not just -d)
+test_layer_worktree_has_git_file() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    # Create a layer worktree (slug auto-detected as "pkg_origin")
+    local output
+    output=$(.agent/scripts/worktree_create.sh --issue 666 --type layer --layer core --packages test_pkg 2>&1) || true
+
+    if [[ "$output" != *"Worktree Created Successfully"* ]]; then
+        echo "    Failed to create layer worktree"
+        cleanup_mock_layer_workspace
+        return 1
+    fi
+
+    # The package in the layer worktree should have a .git entry
+    # (git worktree creates a .git *file*, not a directory)
+    local wt_pkg_dir="$WORKSPACE_DIR/layers/worktrees/issue-pkg_origin-666/core_ws/src/test_pkg"
+    if [ ! -e "$wt_pkg_dir/.git" ]; then
+        echo "    No .git entry in worktree package dir: $wt_pkg_dir"
+        cleanup_mock_layer_workspace
+        return 1
+    fi
+
+    # Confirm it's a file (worktree marker) not a directory
+    if [ -d "$wt_pkg_dir/.git" ]; then
+        echo "    .git is a directory — expected a file for git worktrees"
+        cleanup_mock_layer_workspace
+        return 1
+    fi
+
+    cleanup_mock_layer_workspace
+    return 0
+}
+run_test "Layer worktree packages have .git file (not directory)" test_layer_worktree_has_git_file
 
 # Summary
 echo "========================================"
