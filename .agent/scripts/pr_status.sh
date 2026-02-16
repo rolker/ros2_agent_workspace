@@ -64,6 +64,9 @@ discover_repos() {
     if [ ${#repos[@]} -gt 0 ]; then
         printf '%s\n' "${repos[@]}" | sort -u
     fi
+
+    # Always succeed, even when no repos are found, to avoid set -e aborts.
+    return 0
 }
 
 # Function to fetch all open PRs with detailed info
