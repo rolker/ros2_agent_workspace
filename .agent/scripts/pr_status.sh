@@ -128,8 +128,8 @@ analyze_pr() {
 
     # Get review info separately
     local reviews_count
-    reviews_count=$(gh api --paginate "/repos/${repo}/pulls/${number}/reviews" \
-        --jq 'length' 2>/dev/null | awk '{s+=$1} END {print (s=="") ? 0 : s}' || echo "0")
+    reviews_count=$(gh api --paginate "/repos/${repo}/pulls/${number}/reviews" 2>/dev/null \
+        | jq -s 'add | length' 2>/dev/null || echo "0")
 
     # Get review comments
     local comments
@@ -240,10 +240,10 @@ _pre_analyze_prs() {
 
 # Function to display dashboard (single-repo mode)
 # Delegates to display_analyzed_dashboard after pre-analyzing
-# Args: prs_json [interactive] [repo_slug]
+# Args: prs_json [repo_slug]
 display_dashboard() {
     local prs_json=$1
-    local repo=${3:-""}
+    local repo=${2:-""}
     local analyzed
     analyzed=$(_pre_analyze_prs "$prs_json" "$repo")
     display_analyzed_dashboard "$analyzed"
@@ -476,7 +476,7 @@ run_interactive() {
         clear
         local prs
         prs=$(fetch_prs)
-        display_dashboard "$prs" true
+        display_dashboard "$prs"
 
         echo "What would you like to do?"
         echo "1) Review a PR (launch Copilot review)"
