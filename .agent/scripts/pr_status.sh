@@ -35,9 +35,10 @@ discover_repos() {
     local repos=()
 
     # Root workspace repo
+    # NOTE: gh CLI only supports GitHub — skip non-GitHub remote URLs
     local root_url
     root_url=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || echo "")
-    if [ -n "$root_url" ]; then
+    if [ -n "$root_url" ] && [[ "$root_url" == *"github.com"* ]]; then
         local root_slug
         root_slug=$(echo "$root_url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
         if [ -n "$root_slug" ]; then
@@ -49,7 +50,8 @@ discover_repos() {
     local repo_json
     repo_json=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null || echo "[]")
     while IFS= read -r url; do
-        if [ -n "$url" ] && [ "$url" != "null" ]; then
+        # Skip non-GitHub URLs — gh CLI is GitHub-only
+        if [ -n "$url" ] && [ "$url" != "null" ] && [[ "$url" == *"github.com"* ]]; then
             local slug
             slug=$(echo "$url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
             if [ -n "$slug" ]; then
@@ -59,7 +61,9 @@ discover_repos() {
     done < <(echo "$repo_json" | jq -r '.[].url // empty')
 
     # Deduplicate and sort
-    printf '%s\n' "${repos[@]}" | sort -u
+    if [ ${#repos[@]} -gt 0 ]; then
+        printf '%s\n' "${repos[@]}" | sort -u
+    fi
 }
 
 # Function to fetch all open PRs with detailed info
@@ -77,7 +81,7 @@ fetch_prs() {
 get_review_comments() {
     local pr_number=$1
     local repo=${2:-"{owner}/{repo}"}
-    gh api "/repos/${repo}/pulls/${pr_number}/comments" 2>/dev/null | jq -c '.[]'
+    gh api --paginate "/repos/${repo}/pulls/${pr_number}/comments" 2>/dev/null | jq -c '.[]'
 }
 
 # Function to classify comment severity
@@ -121,7 +125,8 @@ analyze_pr() {
 
     # Get review info separately
     local reviews_count
-    reviews_count=$(gh api "/repos/${repo}/pulls/${number}/reviews" --jq 'length' 2>/dev/null || echo "0")
+    reviews_count=$(gh api --paginate "/repos/${repo}/pulls/${number}/reviews" \
+        --jq 'length' 2>/dev/null | awk '{s+=$1} END {print (s=="") ? 0 : s}' || echo "0")
 
     # Get review comments
     local comments
@@ -712,7 +717,9 @@ main() {
             if [ -z "$repo" ]; then
                 continue
             fi
-            echo -e "${BLUE}Fetching PRs from ${repo}...${NC}" >&2
+            if [ "$mode" = "dashboard" ]; then
+                echo -e "${BLUE}Fetching PRs from ${repo}...${NC}" >&2
+            fi
             local repo_prs
             repo_prs=$(fetch_prs "$repo" 2>/dev/null || echo "[]")
 
