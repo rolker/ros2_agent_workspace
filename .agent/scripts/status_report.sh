@@ -221,6 +221,9 @@ else
                             warning="🔀 $branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"
                          fi
+                    else
+                        # Flag repos where expected branch couldn't be resolved from .repos config
+                        status_str="${status_str:+$status_str, }❓ Expected branch unknown"
                     fi
 
                     if [ -n "$EXPECTED_REPOS" ]; then
