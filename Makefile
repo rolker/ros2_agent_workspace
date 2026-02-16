@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature pr-triage
 
 VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
@@ -26,6 +26,7 @@ help:
 	@echo "  setup-dev     - Create dev-tools venv and install pre-commit"
 	@echo "  format        - Format Python code with black"
 	@echo "  lint          - Run pre-commit hooks on all files"
+	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo ""
 
@@ -85,6 +86,9 @@ sync:
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py
+
+pr-triage:
+	@./.agent/scripts/pr_status.sh --all-repos --simple
 
 revert-feature:
 	@if [ -z "$(ISSUE)" ]; then \

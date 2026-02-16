@@ -14,17 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Layer worktrees: empty commit + push + draft PR in each package repo
   - Cross-repo issue references for layer draft PRs
   - All operations non-fatal — worktree creation succeeds even if `gh` is unavailable
-
-### Changed
-- **Status Script Consolidation** (Issue #203):
-  - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
-  - Added `--quick` flag (alias for `--skip-sync --skip-github`) for fast local-only checks
-  - Added `--pr-triage` flag for PR comment classification (critical/minor) across all workspace repos
-  - Removed `check_full_status.py` (functionality merged into `status_report.sh`)
-  - Updated `Makefile` targets: `make status` and `make status-quick` both use `status_report.sh`
-  - Added deprecation note to `pr_status.sh` pointing to `--pr-triage`
-
-### Added
+- **Cross-Repo PR Triage Dashboard** (Issue #207):
+  - `--all-repos` flag for `pr_status.sh` — queries all workspace repos in one view
+  - `discover_repos()` function reusing `list_overlay_repos.py --include-underlay`
+  - Repo name shown in dashboard, simple, and JSON output when using `--all-repos`
+  - `make pr-triage` convenience target (`pr_status.sh --all-repos --simple`)
 - **PR Status Dashboard** (Issue #164):
   - `.agent/scripts/pr_status.sh` - Interactive PR pipeline visibility tool
   - Automatic categorization: Needs Review, Critical Issues, Minor Issues, Ready to Merge
@@ -85,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added detailed headers to setup.sh, build.sh, test.sh
 
 ### Changed
+- **Status Script Consolidation** (Issue #203):
+  - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
+  - Added `--quick` flag (alias for `--skip-sync --skip-github`) for fast local-only checks
+  - Added `--pr-triage` flag for PR comment classification (critical/minor) across all workspace repos
+  - Removed `check_full_status.py` (functionality merged into `status_report.sh`)
+  - Updated `Makefile` targets: `make status` and `make status-quick` both use `status_report.sh`
+  - Added deprecation note to `pr_status.sh` pointing to `--pr-triage`
 - **Git Hygiene** (Issue #44):
   - Updated `.agent/rules/common/clean-root.md` with detailed scratchpad policy
   - Added `.agent/scratchpad/` to `.gitignore`
@@ -96,8 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Troubleshooting section with common issues
   - Development tools section
   - Links to all documentation
-
-### Changed
 - Fixed shellcheck warnings in scripts:
   - bootstrap.sh - Separated variable declaration and assignment (SC2155)
   - build.sh - Used grouped redirects for efficiency (SC2129)
