@@ -425,7 +425,7 @@ if [ "$DRAFT_PR" = true ]; then
     fi
 
     # Escape ISSUE_TITLE for use in sed replacement strings
-    # Must escape \, &, / and newlines — sed replacement specials
+    # Escape \, &, / — sed replacement specials handled below
     SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed -e 's/[\\&/]/\\&/g')
 
     # Agent name for signatures — fall back to generic if unset
