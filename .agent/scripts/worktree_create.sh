@@ -3,12 +3,13 @@
 # Create a git worktree for isolated task development
 #
 # Usage:
-#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>] [--packages <pkg,...>]
+#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>] [--packages <pkg,...>] [--draft-pr]
 #
 # Examples:
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp
 #   ./worktree_create.sh --issue 123 --type workspace
+#   ./worktree_create.sh --issue 123 --type workspace --draft-pr
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages sonar_driver --branch feature/custom-name
 #
 # Worktree Types:
@@ -45,6 +46,7 @@ BRANCH_NAME=""
 TARGET_LAYER=""
 REPO_SLUG=""
 TARGET_PACKAGES=""  # Comma-separated list of packages to modify
+DRAFT_PR=false
 
 # Available layers (same order as env.sh)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
@@ -61,6 +63,7 @@ show_usage() {
     echo "                        Comma-separated list for multiple packages"
     echo "  --repo-slug <slug>    Repository slug for naming (auto-detected if not provided)"
     echo "  --branch <name>       Custom branch name (default: feature/issue-<N>)"
+    echo "  --draft-pr            Push branch and create draft PR immediately"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy"
@@ -95,6 +98,10 @@ while [[ $# -gt 0 ]]; do
         --packages)
             TARGET_PACKAGES="$2"
             shift 2
+            ;;
+        --draft-pr)
+            DRAFT_PR=true
+            shift
             ;;
         -h|--help)
             show_usage
@@ -404,6 +411,163 @@ echo "========================================"
 echo "✅ Worktree Created Successfully"
 echo "========================================"
 echo ""
+
+# --draft-pr: push branch and create a draft PR to signal work in progress
+if [ "$DRAFT_PR" = true ]; then
+    echo "Creating draft PR for issue #$ISSUE_NUM..."
+    echo ""
+
+    # Fetch issue title (used in PR title)
+    ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
+    if [ -z "$ISSUE_TITLE" ]; then
+        echo "  ⚠️  Could not fetch issue title; using generic title"
+        ISSUE_TITLE="Issue #$ISSUE_NUM"
+    fi
+
+    # Escape ISSUE_TITLE for use in sed replacement strings
+    # Escape \, &, / — sed replacement specials handled below
+    SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed -e 's/[\\&/]/\\&/g')
+
+    # Agent name for signatures — fall back to generic if unset
+    DRAFT_AGENT_NAME="${AGENT_NAME:-AI Agent}"
+
+    if [ "$WORKTREE_TYPE" == "workspace" ]; then
+        # --- Workspace draft PR ---
+        # Generate work plan from template
+        TEMPLATE_FILE="$WORKTREE_DIR/.agent/templates/ISSUE_PLAN.md"
+        PLAN_DIR="$WORKTREE_DIR/.agent/work-plans"
+        PLAN_FILE="$PLAN_DIR/PLAN_ISSUE-${ISSUE_NUM}.md"
+
+        if [ -f "$TEMPLATE_FILE" ]; then
+            mkdir -p "$PLAN_DIR"
+            sed -e "s/{ISSUE_NUMBER}/$ISSUE_NUM/g" \
+                -e "s/{ISSUE_TITLE}/$SAFE_ISSUE_TITLE/g" \
+                -e "s/{AGENT_NAME}/${DRAFT_AGENT_NAME}/g" \
+                -e "s/{START_DATE}/$(date +%Y-%m-%d)/g" \
+                "$TEMPLATE_FILE" > "$PLAN_FILE"
+            echo "  ✓ Work plan created: .agent/work-plans/PLAN_ISSUE-${ISSUE_NUM}.md"
+        else
+            echo "  ⚠️  Template not found: $TEMPLATE_FILE (skipping work plan)"
+        fi
+
+        # Commit work plan (or empty commit if template was missing) and push
+        cd "$WORKTREE_DIR"
+        if [ -f "$PLAN_FILE" ]; then
+            git add ".agent/work-plans/PLAN_ISSUE-${ISSUE_NUM}.md"
+            git commit -m "docs: add work plan for #$ISSUE_NUM" || true
+        else
+            git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
+        fi
+        if ! git push -u origin "$BRANCH_NAME"; then
+            echo "  ⚠️  Push failed — skipping draft PR (non-fatal)"
+            cd "$ROOT_DIR"
+        else
+            # Create draft PR (only after successful push)
+            BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+            cat << PREOF > "$BODY_FILE"
+## Work in Progress
+
+This draft PR tracks ongoing work for issue #$ISSUE_NUM.
+
+Closes #$ISSUE_NUM
+
+---
+**Authored-By**: \`${DRAFT_AGENT_NAME}\`
+**Model**: \`${AGENT_MODEL:-Unknown}\`
+PREOF
+            if gh pr create --draft \
+                --title "WIP: $ISSUE_TITLE" \
+                --body-file "$BODY_FILE"; then
+                echo "  ✓ Draft PR created for workspace repo"
+            else
+                echo "  ⚠️  Draft PR creation failed (non-fatal)"
+            fi
+            rm -f "$BODY_FILE"
+            cd "$ROOT_DIR"
+        fi
+
+    elif [ "$WORKTREE_TYPE" == "layer" ]; then
+        # --- Layer draft PR ---
+        # Determine workspace repo slug for cross-repo issue reference
+        WS_REMOTE_URL=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
+        WS_REPO_SLUG=""
+        if [ -n "$WS_REMOTE_URL" ]; then
+            # Extract owner/repo from URL
+            WS_REPO_SLUG=$(echo "$WS_REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+        fi
+
+        # Iterate over packages in the target layer src directory
+        for pkg_dir in "$WORKTREE_DIR"/"${TARGET_LAYER}_ws"/src/*; do
+            # Skip symlinks (unmodified packages) and non-git dirs
+            if [ -L "$pkg_dir" ]; then
+                continue
+            fi
+            if [ ! -e "$pkg_dir/.git" ]; then
+                continue
+            fi
+
+            pkg_name=$(basename "$pkg_dir")
+            echo "  Creating draft PR for package: $pkg_name"
+
+            cd "$pkg_dir"
+
+            # Determine repo slug from remote
+            PKG_REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+            PKG_REPO_SLUG=""
+            if [ -n "$PKG_REMOTE_URL" ]; then
+                PKG_REPO_SLUG=$(echo "$PKG_REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+            fi
+
+            # Empty commit and push
+            git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
+            if ! git push -u origin "$BRANCH_NAME"; then
+                echo "    ⚠️  Push failed for $pkg_name (non-fatal)"
+                continue
+            fi
+
+            # Build issue reference (cross-repo if different from package repo)
+            ISSUE_REF="#$ISSUE_NUM"
+            if [ -n "$WS_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$WS_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
+                ISSUE_REF="https://github.com/$WS_REPO_SLUG/issues/$ISSUE_NUM"
+            fi
+
+            # Create draft PR in the package's repo
+            BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+            cat << PREOF > "$BODY_FILE"
+## Work in Progress
+
+This draft PR tracks ongoing work for $ISSUE_REF.
+
+---
+**Authored-By**: \`${DRAFT_AGENT_NAME}\`
+**Model**: \`${AGENT_MODEL:-Unknown}\`
+PREOF
+            if [ -n "$PKG_REPO_SLUG" ]; then
+                if gh pr create --draft \
+                    --repo "$PKG_REPO_SLUG" \
+                    --title "WIP: $ISSUE_TITLE" \
+                    --body-file "$BODY_FILE"; then
+                    echo "    ✓ Draft PR created for $pkg_name"
+                else
+                    echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                fi
+            else
+                if gh pr create --draft \
+                    --title "WIP: $ISSUE_TITLE" \
+                    --body-file "$BODY_FILE"; then
+                    echo "    ✓ Draft PR created for $pkg_name"
+                else
+                    echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                fi
+            fi
+            rm -f "$BODY_FILE"
+        done
+        cd "$ROOT_DIR"
+    fi
+
+    echo ""
+fi
+
 echo "To enter this worktree:"
 echo "  source $SCRIPT_DIR/worktree_enter.sh --issue $ISSUE_NUM"
 echo ""
