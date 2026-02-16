@@ -84,7 +84,7 @@ fetch_prs() {
 get_review_comments() {
     local pr_number=$1
     local repo=${2:-"{owner}/{repo}"}
-    gh api --paginate "/repos/${repo}/pulls/${pr_number}/comments" 2>/dev/null | jq -c '.[]'
+    (gh api --paginate "/repos/${repo}/pulls/${pr_number}/comments" 2>/dev/null || echo '[]') | jq -c '.[]'
 }
 
 # Function to classify comment severity
@@ -599,32 +599,36 @@ main() {
         # Multi-repo mode: iterate all workspace repos, analyze once, reuse output functions
         local repos
         repos=$(discover_repos)
-        local merged_prs="[]"
+        local pr_ndjson
+        pr_ndjson=$(mktemp /tmp/pr_status_prs.XXXXXX)
 
         while IFS= read -r repo; do
-            if [ -z "$repo" ]; then
-                continue
-            fi
+            [ -z "$repo" ] && continue
             if [ "$mode" = "dashboard" ]; then
                 echo -e "${BLUE}Fetching PRs from ${repo}...${NC}" >&2
             fi
             local repo_prs
             repo_prs=$(fetch_prs "$repo" 2>/dev/null || echo "[]")
-
-            # Tag each PR with repo slug for downstream functions
-            repo_prs=$(echo "$repo_prs" | jq --arg repo "$repo" '[.[] | . + {_repo: $repo}]')
-            merged_prs=$(echo "$merged_prs $repo_prs" | jq -s '.[0] + .[1]')
+            echo "$repo_prs" | jq -c --arg repo "$repo" '.[] | . + {_repo: $repo}' >> "$pr_ndjson"
         done <<< "$repos"
 
+        local merged_prs
+        merged_prs=$(jq -s '. // []' "$pr_ndjson")
+        rm -f "$pr_ndjson"
+
         # Pre-analyze all PRs with their repo context
-        local all_analyzed="[]"
+        local analyzed_ndjson
+        analyzed_ndjson=$(mktemp /tmp/pr_status_analyzed.XXXXXX)
+
         while IFS= read -r pr; do
             local pr_repo
             pr_repo=$(echo "$pr" | jq -r '._repo // ""')
-            local analyzed
-            analyzed=$(analyze_pr "$pr" "$pr_repo")
-            all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
+            analyze_pr "$pr" "$pr_repo" >> "$analyzed_ndjson"
         done < <(echo "$merged_prs" | jq -c '.[]')
+
+        local all_analyzed
+        all_analyzed=$(jq -s '. // []' "$analyzed_ndjson")
+        rm -f "$analyzed_ndjson"
 
         # Dispatch to output mode using shared helpers
         case "$mode" in
