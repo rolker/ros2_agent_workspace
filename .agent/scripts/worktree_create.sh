@@ -425,8 +425,8 @@ if [ "$DRAFT_PR" = true ]; then
     fi
 
     # Escape ISSUE_TITLE for use in sed replacement strings
-    # (handles &, /, \, and other sed-special characters)
-    SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed 's/[&/\]/\\&/g')
+    # Escape \, &, / — sed replacement specials handled below
+    SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed -e 's/[\\&/]/\\&/g')
 
     # Agent name for signatures — fall back to generic if unset
     DRAFT_AGENT_NAME="${AGENT_NAME:-AI Agent}"
@@ -502,7 +502,7 @@ PREOF
             if [ -L "$pkg_dir" ]; then
                 continue
             fi
-            if [ ! -d "$pkg_dir/.git" ]; then
+            if [ ! -e "$pkg_dir/.git" ]; then
                 continue
             fi
 
