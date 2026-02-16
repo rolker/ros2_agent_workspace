@@ -221,8 +221,6 @@ else
                             warning="🔀 $branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"
                          fi
-                    elif [ "$branch" != "jazzy" ] && [ "$current_repo" != "ros2_agent_workspace" ]; then
-                         status_str="${status_str:+$status_str, }🔀 Non-Jazzy?"
                     fi
 
                     if [ -n "$EXPECTED_REPOS" ]; then
@@ -245,8 +243,9 @@ else
                     # Process previous repo
                     process_repo
 
-                    # Start new repo
+                    # Start new repo — use basename only (vcs outputs paths like ./src/repo_name)
                     current_repo=$(echo "$line" | sed 's/^=== \(.*\) (git) ===$/\1/')
+                    current_repo=$(basename "$current_repo")
                     is_dirty=false
                     sync_status=""
                     branch=""
@@ -260,8 +259,8 @@ else
                     elif [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+),[[:space:]]behind[[:space:]]([0-9]+)\] ]]; then
                         sync_status="↕️ Ahead ${BASH_REMATCH[1]}, Behind ${BASH_REMATCH[2]}"
                     fi
-                    # Extract branch name (first word)
-                    branch=$(echo "$branch_line" | awk '{print $1}')
+                    # Extract local branch name (strip tracking suffix like ...origin/jazzy)
+                    branch=$(echo "$branch_line" | sed 's/\.\.\..*//')
                 elif [[ "$line" =~ ^[[:space:]]?[MADRCU?!] ]]; then
                     is_dirty=true
                 fi
