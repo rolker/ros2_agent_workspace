@@ -82,7 +82,7 @@ make validate                                    # Validate workspace
 cd layers/main/core_ws && colcon build --packages-select <package>
 colcon test --packages-select <package> && colcon test-result --verbose
 
-pre-commit run --all-files                       # Lint + hooks
+make lint                                        # Lint + hooks (uses venv pre-commit)
 ```
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
