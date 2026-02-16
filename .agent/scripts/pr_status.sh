@@ -198,33 +198,29 @@ analyze_pr() {
     fi
 
     # Output JSON for aggregation
-    jq -n \
+    # Only include repo field when non-empty (i.e., in --all-repos mode)
+    local base_json
+    base_json=$(jq -n \
         --arg category "$category" \
         --arg number "$number" \
         --arg title "$title" \
         --arg time "$time_str" \
         --arg critical "$critical_count" \
         --arg minor "$minor_count" \
-        --arg repo "$repo_name" \
-        '{category: $category, number: $number, title: $title, time: $time, critical: ($critical | tonumber), minor: ($minor | tonumber), repo: $repo}'
+        '{category: $category, number: $number, title: $title, time: $time, critical: ($critical | tonumber), minor: ($minor | tonumber)}')
+    if [ -n "$repo_name" ]; then
+        echo "$base_json" | jq --arg repo "$repo_name" '. + {repo: $repo}'
+    else
+        echo "$base_json"
+    fi
 }
 
-# Function to display dashboard
-# Args: prs_json [interactive] [repo_slug]
-display_dashboard() {
+# Pre-analyze all PRs in a raw JSON array, returning a JSON array of analyzed objects
+# Args: prs_json [repo_slug]
+_pre_analyze_prs() {
     local prs_json=$1
-    local interactive=${2:-false}
-    local repo=${3:-""}
-
-    echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${NC}"
-    echo "===================="
-    echo ""
-
-    # Categorize PRs
-    local needs_review=()
-    local critical=()
-    local minor=()
-    local ready=()
+    local repo=${2:-""}
+    local all_analyzed="[]"
 
     while IFS= read -r pr; do
         local analyzed
@@ -233,36 +229,21 @@ display_dashboard() {
         else
             analyzed=$(analyze_pr "$pr")
         fi
-        local category
-        category=$(echo "$analyzed" | jq -r '.category')
-
-        case "$category" in
-            needs_review)
-                needs_review+=("$analyzed")
-                ;;
-            critical)
-                critical+=("$analyzed")
-                ;;
-            minor)
-                minor+=("$analyzed")
-                ;;
-            ready)
-                ready+=("$analyzed")
-                ;;
-        esac
+        all_analyzed=$(echo "$all_analyzed" | jq --argjson item "$analyzed" '. + [$item]')
     done < <(echo "$prs_json" | jq -c '.[]')
 
-    # Display categories
-    display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
-    display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
-    display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
-    display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
+    echo "$all_analyzed"
+}
 
-    # Summary
-    local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
-    echo ""
-    echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
-    echo ""
+# Function to display dashboard (single-repo mode)
+# Delegates to display_analyzed_dashboard after pre-analyzing
+# Args: prs_json [interactive] [repo_slug]
+display_dashboard() {
+    local prs_json=$1
+    local repo=${3:-""}
+    local analyzed
+    analyzed=$(_pre_analyze_prs "$prs_json" "$repo")
+    display_analyzed_dashboard "$analyzed"
 }
 
 # Function to display a category
@@ -308,24 +289,11 @@ display_category() {
     echo ""
 }
 
-# Function to output in JSON format (for agents)
-# Args: prs_json [repo_slug]
-output_json() {
-    local prs_json=$1
-    local repo=${2:-""}
-    local all_prs=[]
-
-    while IFS= read -r pr; do
-        local analyzed
-        if [ -n "$repo" ]; then
-            analyzed=$(analyze_pr "$pr" "$repo")
-        else
-            analyzed=$(analyze_pr "$pr")
-        fi
-        all_prs=$(echo "$all_prs" | jq --argjson item "$analyzed" '. + [$item]')
-    done < <(echo "$prs_json" | jq -c '.[]')
-
-    echo "$all_prs" | jq '{
+# Wrap a pre-analyzed JSON array with summary counts
+# Args: analyzed_json_array (stdin or $1)
+_wrap_json_summary() {
+    local analyzed_json=${1:-$(cat)}
+    echo "$analyzed_json" | jq '{
         summary: {
             total: (. | length),
             needs_review: ([.[] | select(.category == "needs_review")] | length),
@@ -337,121 +305,38 @@ output_json() {
     }'
 }
 
-# Function to get next actionable PR
+# Function to output in JSON format (for agents)
+# Delegates to _pre_analyze_prs + _wrap_json_summary
+# Args: prs_json [repo_slug]
+output_json() {
+    local prs_json=$1
+    local repo=${2:-""}
+    local analyzed
+    analyzed=$(_pre_analyze_prs "$prs_json" "$repo")
+    _wrap_json_summary "$analyzed"
+}
+
+# Function to get next actionable PR (single-repo mode)
+# Delegates to _pre_analyze_prs + get_next_analyzed_pr
 # Args: prs_json [category] [repo_slug]
 get_next_pr() {
     local prs_json=$1
     local category=${2:-"critical"}
     local repo=${3:-""}
-
-    while IFS= read -r pr; do
-        local analyzed
-        if [ -n "$repo" ]; then
-            analyzed=$(analyze_pr "$pr" "$repo")
-        else
-            analyzed=$(analyze_pr "$pr")
-        fi
-        local pr_category
-        pr_category=$(echo "$analyzed" | jq -r '.category')
-
-        if [ "$pr_category" = "$category" ]; then
-            echo "$analyzed"
-            return 0
-        fi
-    done < <(echo "$prs_json" | jq -c '.[]')
-
-    # No PR found in requested category
-    return 1
+    local analyzed
+    analyzed=$(_pre_analyze_prs "$prs_json" "$repo")
+    get_next_analyzed_pr "$analyzed" "$category"
 }
 
-# Function to output simple text summary (for agents)
+# Function to output simple text summary (single-repo mode)
+# Delegates to _pre_analyze_prs + output_analyzed_simple
 # Args: prs_json [repo_slug]
 output_simple() {
     local prs_json=$1
     local repo=${2:-""}
-
-    local needs_review=()
-    local critical=()
-    local minor=()
-    local ready=()
-
-    while IFS= read -r pr; do
-        local analyzed
-        if [ -n "$repo" ]; then
-            analyzed=$(analyze_pr "$pr" "$repo")
-        else
-            analyzed=$(analyze_pr "$pr")
-        fi
-        local category
-        category=$(echo "$analyzed" | jq -r '.category')
-
-        case "$category" in
-            needs_review) needs_review+=("$analyzed") ;;
-            critical) critical+=("$analyzed") ;;
-            minor) minor+=("$analyzed") ;;
-            ready) ready+=("$analyzed") ;;
-        esac
-    done < <(echo "$prs_json" | jq -c '.[]')
-
-    echo "SUMMARY: ${#needs_review[@]} need review, ${#critical[@]} critical, ${#minor[@]} minor, ${#ready[@]} ready"
-
-    if [ ${#critical[@]} -gt 0 ]; then
-        echo ""
-        echo "CRITICAL ISSUES:"
-        for item in "${critical[@]}"; do
-            local number
-            number=$(echo "$item" | jq -r '.number')
-            local title
-            title=$(echo "$item" | jq -r '.title')
-            local crit
-            crit=$(echo "$item" | jq -r '.critical')
-            local min
-            min=$(echo "$item" | jq -r '.minor')
-            local item_repo
-            item_repo=$(echo "$item" | jq -r '.repo // ""')
-            if [ -n "$item_repo" ]; then
-                echo "  [$item_repo] #$number: $title ($crit critical, $min minor)"
-            else
-                echo "  #$number: $title ($crit critical, $min minor)"
-            fi
-        done
-    fi
-
-    if [ ${#needs_review[@]} -gt 0 ]; then
-        echo ""
-        echo "NEEDS REVIEW:"
-        for item in "${needs_review[@]}"; do
-            local number
-            number=$(echo "$item" | jq -r '.number')
-            local title
-            title=$(echo "$item" | jq -r '.title')
-            local item_repo
-            item_repo=$(echo "$item" | jq -r '.repo // ""')
-            if [ -n "$item_repo" ]; then
-                echo "  [$item_repo] #$number: $title"
-            else
-                echo "  #$number: $title"
-            fi
-        done
-    fi
-
-    if [ ${#ready[@]} -gt 0 ]; then
-        echo ""
-        echo "READY TO MERGE:"
-        for item in "${ready[@]}"; do
-            local number
-            number=$(echo "$item" | jq -r '.number')
-            local title
-            title=$(echo "$item" | jq -r '.title')
-            local item_repo
-            item_repo=$(echo "$item" | jq -r '.repo // ""')
-            if [ -n "$item_repo" ]; then
-                echo "  [$item_repo] #$number: $title"
-            else
-                echo "  #$number: $title"
-            fi
-        done
-    fi
+    local analyzed
+    analyzed=$(_pre_analyze_prs "$prs_json" "$repo")
+    output_analyzed_simple "$analyzed"
 }
 
 # Function to display from pre-analyzed JSON array
@@ -741,16 +626,7 @@ main() {
         # Dispatch to output mode using shared helpers
         case "$mode" in
             json)
-                echo "$all_analyzed" | jq '{
-                    summary: {
-                        total: (. | length),
-                        needs_review: ([.[] | select(.category == "needs_review")] | length),
-                        critical: ([.[] | select(.category == "critical")] | length),
-                        minor: ([.[] | select(.category == "minor")] | length),
-                        ready: ([.[] | select(.category == "ready")] | length)
-                    },
-                    prs: .
-                }'
+                _wrap_json_summary "$all_analyzed"
                 ;;
             simple)
                 output_analyzed_simple "$all_analyzed"

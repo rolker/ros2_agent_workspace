@@ -13,6 +13,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PR_STATUS="$SCRIPT_DIR/../pr_status.sh"
+REAL_GIT=$(command -v git)
 
 TEST_PASS=0
 TEST_FAIL=0
@@ -88,7 +89,7 @@ if [[ "\$*" == *"remote get-url"* ]]; then
     echo '$url'
 else
     # Pass through to real git for other commands
-    /usr/bin/git "\$@"
+    $REAL_GIT "\$@"
 fi
 STUBEOF
     chmod +x "$dir/git"
@@ -122,7 +123,7 @@ echo ""
 
 # ---- Test 1: --all-repos --json produces valid JSON with repo field ----
 echo "Test 1: --all-repos --json produces valid JSON with repo field"
-(
+if (
     setup_test_env "test1"
 
     output=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos --json 2>/dev/null)
@@ -149,13 +150,12 @@ echo "Test 1: --all-repos --json produces valid JSON with repo field"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "JSON output valid with repo field"; else fail "JSON output valid with repo field"; fi
+); then pass "JSON output valid with repo field"; else fail "JSON output valid with repo field"; fi
 echo ""
 
 # ---- Test 2: --all-repos --simple has no progress messages on stdout ----
 echo "Test 2: --all-repos --simple produces clean output (no progress noise)"
-(
+if (
     setup_test_env "test2"
 
     stdout_output=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos --simple 2>/dev/null)
@@ -173,13 +173,12 @@ echo "Test 2: --all-repos --simple produces clean output (no progress noise)"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "Simple output clean"; else fail "Simple output clean"; fi
+); then pass "Simple output clean"; else fail "Simple output clean"; fi
 echo ""
 
 # ---- Test 3: --all-repos --dashboard shows progress on stderr ----
 echo "Test 3: --all-repos dashboard shows progress messages on stderr"
-(
+if (
     setup_test_env "test3"
 
     stderr_output=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos 2>&1 1>/dev/null)
@@ -190,13 +189,12 @@ echo "Test 3: --all-repos dashboard shows progress messages on stderr"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "Dashboard shows progress on stderr"; else fail "Dashboard shows progress on stderr"; fi
+); then pass "Dashboard shows progress on stderr"; else fail "Dashboard shows progress on stderr"; fi
 echo ""
 
 # ---- Test 4: Empty repo list doesn't crash ----
 echo "Test 4: Empty repo list (no GitHub URLs) doesn't crash"
-(
+if (
     setup_test_env "test4" '[]' 'https://gitlab.com/someorg/somerepo.git'
 
     # Should not crash even with no repos found
@@ -210,13 +208,12 @@ echo "Test 4: Empty repo list (no GitHub URLs) doesn't crash"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "Empty repo list doesn't crash"; else fail "Empty repo list doesn't crash"; fi
+); then pass "Empty repo list doesn't crash"; else fail "Empty repo list doesn't crash"; fi
 echo ""
 
 # ---- Test 5: Non-GitHub URLs are skipped ----
 echo "Test 5: Non-GitHub URLs are skipped in discover_repos"
-(
+if (
     setup_test_env "test5" \
         '[{"url":"https://gitlab.com/org/repo.git"},{"url":"https://github.com/testorg/goodrepo.git"}]'
 
@@ -235,13 +232,12 @@ echo "Test 5: Non-GitHub URLs are skipped in discover_repos"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "Non-GitHub URLs skipped"; else fail "Non-GitHub URLs skipped"; fi
+); then pass "Non-GitHub URLs skipped"; else fail "Non-GitHub URLs skipped"; fi
 echo ""
 
 # ---- Test 6: --interactive --all-repos is rejected ----
 echo "Test 6: --interactive --all-repos is rejected"
-(
+if (
     setup_test_env "test6"
 
     if bash "$TEST_ENV_DIR/bin/pr_status.sh" --interactive --all-repos 2>/dev/null; then
@@ -250,8 +246,7 @@ echo "Test 6: --interactive --all-repos is rejected"
     fi
 
     exit 0
-)
-if [ $? -eq 0 ]; then pass "--interactive --all-repos rejected"; else fail "--interactive --all-repos rejected"; fi
+); then pass "--interactive --all-repos rejected"; else fail "--interactive --all-repos rejected"; fi
 echo ""
 
 # Summary
