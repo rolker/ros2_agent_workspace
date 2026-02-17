@@ -418,7 +418,7 @@ EOF
                             git fetch --quiet origin "$REPOS_BRANCH" 2>/dev/null || true
                         fi
 
-                        # Prefer the issue branch for this package: local first, then remote, then new
+                        # Prefer the issue branch for this package: local first, then remote, then new from .repos branch, then new from HEAD
                         if git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
                             echo "      ✓ Worktree created from existing local branch: $BRANCH_NAME"
                         elif fetch_remote_branch "$pkg_path" "$BRANCH_NAME" && \
