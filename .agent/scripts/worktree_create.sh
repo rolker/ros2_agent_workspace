@@ -50,6 +50,22 @@ extract_gh_slug() {
     fi
 }
 
+# Resolve the .repos version (branch/tag) for a package name.
+# Prints the version on stdout; prints nothing if not found or unknown.
+resolve_repos_branch() {
+    local pkg_name="$1"
+    local version
+    version=$(python3 -c "
+import sys; sys.path.insert(0, '${SCRIPT_DIR}')
+from lib.workspace import find_repo_version
+v = find_repo_version('$pkg_name')
+if v and v != 'unknown': print(v)
+" 2>/dev/null)
+    if [ -n "$version" ]; then
+        echo "$version"
+    fi
+}
+
 # Defaults
 ISSUE_NUM=""
 WORKTREE_TYPE="layer"
@@ -396,12 +412,21 @@ EOF
                         cd "$pkg_path"
                         WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
 
+                        # Resolve the .repos base branch for this package
+                        REPOS_BRANCH=$(resolve_repos_branch "$pkg_name")
+                        if [ -n "$REPOS_BRANCH" ]; then
+                            git fetch --quiet origin "$REPOS_BRANCH" 2>/dev/null || true
+                        fi
+
                         # Prefer the issue branch for this package: local first, then remote, then new
                         if git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
                             echo "      ✓ Worktree created from existing local branch: $BRANCH_NAME"
                         elif fetch_remote_branch "$pkg_path" "$BRANCH_NAME" && \
                              git worktree add --track -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$BRANCH_NAME" 2>/dev/null; then
                             echo "      ✓ Worktree created tracking remote branch: origin/$BRANCH_NAME"
+                        elif [ -n "$REPOS_BRANCH" ] && \
+                             git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$REPOS_BRANCH" 2>/dev/null; then
+                            echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from $REPOS_BRANCH)"
                         elif git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME"
                         else
@@ -635,14 +660,19 @@ Closes $ISSUE_REF
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
+            # Resolve the .repos base branch for the PR target
+            PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
+
             GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
             if [ -n "$PKG_REPO_SLUG" ]; then
                 PKG_PR_URL=$(gh pr create --draft \
                     --repo "$PKG_REPO_SLUG" \
+                    ${PKG_BASE_BRANCH:+--base "$PKG_BASE_BRANCH"} \
                     --title "WIP: $ISSUE_TITLE" \
                     --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             else
                 PKG_PR_URL=$(gh pr create --draft \
+                    ${PKG_BASE_BRANCH:+--base "$PKG_BASE_BRANCH"} \
                     --title "WIP: $ISSUE_TITLE" \
                     --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             fi
