@@ -67,6 +67,11 @@ repo (e.g., `rolker/unh_marine_autonomy`), not just the workspace repo.
 current task's worktree or create a quick issue for a new one.
 Never commit directly to default branches.
 
+**Verify before committing**: Before your first commit, confirm the issue matches
+your task: `gh issue view $WORKTREE_ISSUE --json title --jq '.title'`
+If the title does not match, stop — you may be in the wrong worktree or have the
+wrong issue number copied from a plan or status report.
+
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 
 ```markdown
