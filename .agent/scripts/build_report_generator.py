@@ -80,7 +80,7 @@ def main():
                 try:
                     data = ast.literal_eval(data_str)
                     rc = data.get("rc", 0)
-                except (ValueError, SyntaxError):
+                except (ValueError, SyntaxError, AttributeError):
                     # Default to failure when we can't parse the return code;
                     # silently assuming success would hide real build failures.
                     rc = 1
