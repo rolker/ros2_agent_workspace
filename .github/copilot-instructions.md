@@ -148,5 +148,6 @@ layers/main/
 - [`.agent/AI_IDENTITY_STRATEGY.md`](../.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`.agent/WORKFORCE_PROTOCOL.md`](../.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`.agent/knowledge/`](../.agent/knowledge/) — ROS 2 development patterns and CLI best practices
+- Project repo `AGENTS.md` -- Per-repo agent guide: package inventory, code layout, pitfalls (if present)
 - [`.agent/project_knowledge/`](../.agent/project_knowledge/) — Project-specific conventions and architecture (symlink, may not exist)
 - [`.agent/templates/`](../.agent/templates/) — Issue and test templates
