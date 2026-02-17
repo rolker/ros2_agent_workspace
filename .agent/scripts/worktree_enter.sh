@@ -185,9 +185,11 @@ if command -v gh &>/dev/null; then
     # retry with the workspace repo if the first attempt fails
     if [ -z "$_ISSUE_TITLE" ]; then
         _WS_REMOTE=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
-        if [ -n "$_WS_REMOTE" ]; then
+        if [[ -n "$_WS_REMOTE" && "$_WS_REMOTE" == *"github.com"* ]]; then
             _WS_SLUG=$(echo "$_WS_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
-            _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+            if [[ "$_WS_SLUG" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
+                _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+            fi
         fi
     fi
 fi
