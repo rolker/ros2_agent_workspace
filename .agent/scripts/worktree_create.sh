@@ -209,8 +209,22 @@ if [ -z "$REPO_SLUG" ]; then
     fi
     echo "Auto-detected repository slug: $REPO_SLUG"
 else
-    # Sanitize explicitly provided repo slug using the same rules
+    # --repo-slug controls worktree naming; still auto-detect GH_REPO_SLUG
+    # for GitHub API calls (gh issue view, etc.)
     GH_REPO_SLUG=""
+    if [ "$WORKTREE_TYPE" == "layer" ] && [ -n "$TARGET_PACKAGES" ]; then
+        FIRST_PKG="${TARGET_PACKAGES%%,*}"
+        FIRST_PKG="${FIRST_PKG#"${FIRST_PKG%%[![:space:]]*}"}"
+        FIRST_PKG="${FIRST_PKG%"${FIRST_PKG##*[![:space:]]}"}"
+        PKG_PATH="$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/$FIRST_PKG"
+        if [ -d "$PKG_PATH" ] && git -C "$PKG_PATH" remote get-url origin &>/dev/null; then
+            REMOTE_URL=$(git -C "$PKG_PATH" remote get-url origin)
+            GH_REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+        fi
+    elif git -C "$ROOT_DIR" remote get-url origin &>/dev/null; then
+        REMOTE_URL=$(git -C "$ROOT_DIR" remote get-url origin)
+        GH_REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+    fi
     REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 fi
 
@@ -503,7 +517,7 @@ Closes #$ISSUE_NUM
 PREOF
             PR_URL=$(gh pr create --draft \
                 --title "WIP: $ISSUE_TITLE" \
-                --body-file "$BODY_FILE" 2>&1) && PR_CREATED=true || PR_CREATED=false
+                --body-file "$BODY_FILE" 2>/dev/null) && PR_CREATED=true || PR_CREATED=false
             if [ "$PR_CREATED" = true ]; then
                 echo "  ✓ Draft PR created for workspace repo"
                 # Post work plan as PR comment
@@ -584,11 +598,11 @@ PREOF
                 PKG_PR_URL=$(gh pr create --draft \
                     --repo "$PKG_REPO_SLUG" \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>&1) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
+                    --body-file "$BODY_FILE" 2>/dev/null) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             else
                 PKG_PR_URL=$(gh pr create --draft \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>&1) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
+                    --body-file "$BODY_FILE" 2>/dev/null) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             fi
             if [ "$PKG_PR_CREATED" = true ]; then
                 echo "    ✓ Draft PR created for $pkg_name"
@@ -605,7 +619,7 @@ PREOF
             fi
             rm -f "$BODY_FILE"
         done
-        rm -f "$LAYER_PLAN_FILE"
+        if [ -n "$LAYER_PLAN_FILE" ]; then rm -f "$LAYER_PLAN_FILE"; fi
         cd "$ROOT_DIR"
     fi
 
