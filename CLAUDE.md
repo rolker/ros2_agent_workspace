@@ -116,6 +116,19 @@ make lint                                        # Lint + hooks (uses venv pre-c
 - Use the verification workflow in [`.agent/knowledge/documentation_verification.md`](.agent/knowledge/documentation_verification.md).
 - Use the documentation template in [`.agent/templates/package_documentation.md`](.agent/templates/package_documentation.md).
 
+## Project-Level Guidance
+
+When working in a project repository (`layers/main/<layer>_ws/src/<project_repo>/`),
+check for `.agents/README.md` at the repo root. If present, read it before making changes —
+it contains the package inventory, code layout, architecture overview, and repo-specific
+pitfalls documented by previous agents.
+
+If no `.agents/README.md` exists, note this gap. To create one, use the template at
+[`.agent/templates/project_agents_guide.md`](.agent/templates/project_agents_guide.md)
+and follow the [documentation verification workflow](.agent/knowledge/documentation_verification.md).
+This should be a dedicated task with its own issue in the project repo, not a side-effect
+of unrelated work.
+
 ## Workspace Cleanliness
 
 - Keep repo root and `layers/*/src/` clean — no temp files, build artifacts, or logs.

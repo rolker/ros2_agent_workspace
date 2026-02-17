@@ -18,5 +18,11 @@ Project-specific conventions and architecture docs are available via
 directory, created by `setup.sh`). This symlink may not exist if the manifest
 repo does not provide an `agent_context/` directory.
 
+## Project-Level Agent Guides
+
+Project repositories may contain a `.agents/README.md` at their root with repo-specific
+guidance for agents. To create one, use the template at
+[`../templates/project_agents_guide.md`](../templates/project_agents_guide.md).
+
 ---
 *Note: This index is manually maintained. Update it when adding new knowledge files.*
