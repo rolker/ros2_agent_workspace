@@ -21,6 +21,9 @@ rules plus framework-specific guidance.
 4. **Never `git checkout <branch>`** — `env.sh` blocks it. Use worktrees: `.agent/scripts/worktree_create.sh --issue <N> --type workspace [--draft-pr]`
 5. **GIT_EDITOR=true** for rebase/amend/merge to avoid hanging on interactive editors.
 6. **Issue-first** — no code without a GitHub issue. Reference with `Closes #<N>` in PRs.
+   Before your first commit, verify the issue matches your task:
+   `gh issue view $WORKTREE_ISSUE --json title --jq '.title'`
+   If the title doesn't match, stop — you may have the wrong issue number.
 7. **AI signature required** on all GitHub Issues/PRs/Comments:
    ```
    ---

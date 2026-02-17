@@ -78,6 +78,7 @@ GitHub Issues are the **Source of Truth** for what is being worked on.
 *   **Before Starting**:
     *   Search for open issues or projects.
     *   **Check for draft PRs** - they indicate active work
+    *   **Verify the issue number**: Run `gh issue view <N> --json title --jq '.title'` and confirm the title matches your task. If it doesn't, stop — you may have inherited the wrong issue copied from a plan or status report.
     *   **Do not** pick up an issue assigned to another user/agent unless explicitly instructed to "Join" or "Collaborate".
 *   **During Work**:
     *   Assign the issue to yourself (if possible) or comment "Taking this".

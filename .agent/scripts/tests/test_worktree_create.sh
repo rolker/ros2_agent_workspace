@@ -345,6 +345,109 @@ test_layer_worktree_has_git_file() {
 }
 run_test "Layer worktree packages have .git file (not directory)" test_layer_worktree_has_git_file
 
+# ===== Issue title/state fetching tests =====
+
+# Helper: create a fake `gh` script that returns controlled output
+setup_fake_gh() {
+    local fake_dir="$TEST_DIR/fake_bin"
+    mkdir -p "$fake_dir"
+    cat > "$fake_dir/gh" << 'FAKEEOF'
+#!/bin/bash
+# Fake gh CLI for testing issue title/state fetching
+# Behaviour is controlled by FAKE_GH_MODE env var
+if [[ "$1" == "issue" && "$2" == "view" ]]; then
+    case "${FAKE_GH_MODE:-}" in
+        open)
+            echo "Fix the widget||OPEN"
+            ;;
+        closed)
+            echo "Old bug||CLOSED"
+            ;;
+        fail)
+            exit 1
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+else
+    # Pass through anything else (shouldn't happen in tests)
+    exit 1
+fi
+FAKEEOF
+    chmod +x "$fake_dir/gh"
+    echo "$fake_dir"
+}
+
+# Test 9: Issue title is displayed when gh succeeds
+test_issue_title_displayed() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_GH_MODE=open PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 501 --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"Fix the widget"* ]]; then
+        echo "    Expected issue title 'Fix the widget' in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Issue title is displayed when gh succeeds" test_issue_title_displayed
+
+# Test 10: CLOSED warning is shown when issue state is CLOSED
+test_closed_issue_warning() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_GH_MODE=closed PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 502 --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"CLOSED"* ]]; then
+        echo "    Expected CLOSED warning in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "CLOSED warning shown for closed issues" test_closed_issue_warning
+
+# Test 11: Offline/invalid-issue fallback message when gh fails
+test_offline_fallback_message() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_GH_MODE=fail PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 503 --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"Could not fetch issue"* ]]; then
+        echo "    Expected offline fallback message in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Offline fallback message when gh fails" test_offline_fallback_message
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"

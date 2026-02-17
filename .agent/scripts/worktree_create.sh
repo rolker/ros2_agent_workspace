@@ -239,6 +239,31 @@ else
     REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 fi
 
+# Validate issue exists and fetch title (after GH_REPO_SLUG is resolved)
+ISSUE_TITLE=""
+ISSUE_STATE=""
+if command -v gh &>/dev/null; then
+    if [ -n "$GH_REPO_SLUG" ]; then
+        _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+    else
+        _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+    fi
+    if [[ "$_ISSUE_INFO" == *"||"* ]]; then
+        ISSUE_TITLE="${_ISSUE_INFO%||*}"
+        ISSUE_STATE="${_ISSUE_INFO##*||}"
+    fi
+fi
+if [ -n "$ISSUE_TITLE" ]; then
+    echo "📋 Issue #$ISSUE_NUM: $ISSUE_TITLE"
+    if [ "$ISSUE_STATE" = "CLOSED" ]; then
+        echo "   ⚠️  Warning: Issue #$ISSUE_NUM is CLOSED"
+    fi
+else
+    echo "⚠️  Could not fetch issue #$ISSUE_NUM title (offline or issue does not exist)"
+    echo "   Proceeding anyway — verify the issue number is correct."
+fi
+echo ""
+
 # Set default branch name if not provided
 if [ -z "$BRANCH_NAME" ]; then
     BRANCH_NAME="feature/issue-${ISSUE_NUM}"
@@ -440,6 +465,9 @@ echo ""
 echo "========================================"
 echo "✅ Worktree Created Successfully"
 echo "========================================"
+if [ -n "$ISSUE_TITLE" ]; then
+    echo "  Issue #$ISSUE_NUM: $ISSUE_TITLE"
+fi
 echo ""
 
 # --draft-pr: push branch and create a draft PR to signal work in progress
@@ -447,12 +475,7 @@ if [ "$DRAFT_PR" = true ]; then
     echo "Creating draft PR for issue #$ISSUE_NUM..."
     echo ""
 
-    # Fetch issue title (used in PR title)
-    if [ -n "$GH_REPO_SLUG" ]; then
-        ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
-    else
-        ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
-    fi
+    # Use issue title fetched earlier; fall back to generic
     if [ -z "$ISSUE_TITLE" ]; then
         echo "  ⚠️  Could not fetch issue title; using generic title"
         ISSUE_TITLE="Issue #$ISSUE_NUM"
