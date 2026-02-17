@@ -14,22 +14,12 @@ Output:
     - Package counts (total/successful)
     - Failed/warning packages
     - Status emoji
-
-Security Note:
-    This script uses eval() to parse Python repr() output from colcon logs.
-    This is acceptable since the logs are generated locally by colcon, but
-    be cautious when processing logs from untrusted sources.
 """
 
 import argparse
 import ast
 import os
-
-# Try to import colcon-core if available, otherwise we might need to parse manually or warn.
-# For simplicity in this environment, we will assume standard python
-# libraries and minimal dependencies or parse the log lines as python
-# literals since they are string representations of dicts/tuples.
-# The logs look like: [timestamp] (name) EventType: {data}
+import re
 
 
 def parse_args():
@@ -41,45 +31,22 @@ def parse_args():
     return parser.parse_args()
 
 
+_LOG_LINE_RE = re.compile(r"^\[[\d.]+\] \(([^)]+)\) (\w+): (.*)$")
+
+
 def parse_log_line(line):
     """
-    Rudimentary parser for colcon log lines.
-    Format: [timestamp] (package_name) EventType: {data_repr}
+    Parse a colcon log line into (pkg_name, event_type, data_str).
+
+    Returns the raw data string rather than parsing it, because some event
+    types (e.g. JobQueued, Command) contain non-literal Python objects like
+    OrderedDict() that ast.literal_eval cannot handle.  Callers parse the
+    data string only for event types that need it.
     """
-    try:
-        # Split by first ' ' then first ' ' then first ': '
-        # Example: [0.000463] (command_bridge) JobQueued: {'identifier': ...}
-
-        # Find closing bracket of timestamp
-        t_end = line.find("] ")
-        if t_end == -1:
-            return None
-
-        remaining = line[t_end + 2 :]  # (pkg_name) EventType: {...}
-
-        # Find end of package name
-        p_end = remaining.find(") ")
-        if p_end == -1:
-            return None
-
-        pkg_name = remaining[1:p_end]
-        remaining = remaining[p_end + 2 :]  # EventType: {...}
-
-        # Find event type separator
-        e_end = remaining.find(": ")
-        if e_end == -1:
-            return None
-
-        event_type = remaining[:e_end]
-        data_str = remaining[e_end + 2 :]
-
-        # The log data is Python repr() output (dicts/tuples/strings).
-        # Use ast.literal_eval for safe parsing of Python literals.
-        data = ast.literal_eval(data_str)
-        return pkg_name, event_type, data
-
-    except Exception:
+    m = _LOG_LINE_RE.match(line)
+    if not m:
         return None
+    return m.group(1), m.group(2), m.group(3)
 
 
 def main():
@@ -104,21 +71,22 @@ def main():
             if not parsed:
                 continue
 
-            pkg_name, event_type, data = parsed
+            pkg_name, event_type, data_str = parsed
 
-            # Identify all packages
             if event_type == "JobQueued":
                 packages.add(pkg_name)
 
-            # Check for job completion
-            if event_type == "JobEnded":
-                rc = data.get("rc", 0)
+            elif event_type == "JobEnded":
+                try:
+                    data = ast.literal_eval(data_str)
+                    rc = data.get("rc", 0)
+                except (ValueError, SyntaxError):
+                    rc = 0
                 results[pkg_name] = rc
                 if rc != 0:
                     failed_packages.add(pkg_name)
 
-            # Check for persistent stderr (warnings or errors)
-            if event_type == "StderrLine":
+            elif event_type == "StderrLine":
                 stderr_packages.add(pkg_name)
 
     # Compile Summary
