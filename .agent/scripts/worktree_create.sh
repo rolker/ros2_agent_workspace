@@ -39,6 +39,17 @@ fetch_remote_branch() {
     git -C "$git_path" fetch --quiet origin -- "$branch" 2>/dev/null
 }
 
+# Extract a validated owner/repo slug from a GitHub remote URL.
+# Prints the slug on stdout; prints nothing for non-GitHub or malformed URLs.
+extract_gh_slug() {
+    local url="$1"
+    local slug
+    slug=$(echo "$url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+    if [[ "$slug" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
+        echo "$slug"
+    fi
+}
+
 # Defaults
 ISSUE_NUM=""
 WORKTREE_TYPE="layer"
@@ -188,7 +199,7 @@ if [ -z "$REPO_SLUG" ]; then
 
     if [ -n "$REMOTE_URL" ]; then
         # Extract owner/repo slug for GitHub CLI (e.g., "org/repo")
-        GH_REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+        GH_REPO_SLUG=$(extract_gh_slug "$REMOTE_URL")
 
         # Extract repo name from URL (works for both HTTPS and SSH)
         # e.g., https://github.com/org/repo.git -> repo
@@ -219,11 +230,11 @@ else
         PKG_PATH="$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/$FIRST_PKG"
         if [ -d "$PKG_PATH" ] && git -C "$PKG_PATH" remote get-url origin &>/dev/null; then
             REMOTE_URL=$(git -C "$PKG_PATH" remote get-url origin)
-            GH_REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+            GH_REPO_SLUG=$(extract_gh_slug "$REMOTE_URL")
         fi
     elif git -C "$ROOT_DIR" remote get-url origin &>/dev/null; then
         REMOTE_URL=$(git -C "$ROOT_DIR" remote get-url origin)
-        GH_REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+        GH_REPO_SLUG=$(extract_gh_slug "$REMOTE_URL")
     fi
     REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 fi
@@ -515,9 +526,10 @@ Closes #$ISSUE_NUM
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
+            GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
             PR_URL=$(gh pr create --draft \
                 --title "WIP: $ISSUE_TITLE" \
-                --body-file "$BODY_FILE" 2>/dev/null) && PR_CREATED=true || PR_CREATED=false
+                --body-file "$BODY_FILE" 2>"$GH_STDERR") && PR_CREATED=true || PR_CREATED=false
             if [ "$PR_CREATED" = true ]; then
                 echo "  ✓ Draft PR created for workspace repo"
                 # Post work plan as PR comment
@@ -530,15 +542,14 @@ PREOF
                 fi
             else
                 echo "  ⚠️  Draft PR creation failed (non-fatal)"
+                cat "$GH_STDERR" >&2
             fi
-            rm -f "$BODY_FILE"
+            rm -f "$GH_STDERR" "$BODY_FILE"
             cd "$ROOT_DIR"
         fi
 
     elif [ "$WORKTREE_TYPE" == "layer" ]; then
         # --- Layer draft PR ---
-        # Issue and PR are in the same project repo, so #N always works
-        ISSUE_REF="#$ISSUE_NUM"
 
         # Generate work plan from template for PR comments
         LAYER_TEMPLATE_FILE="$ROOT_DIR/.agent/templates/ISSUE_PLAN.md"
@@ -571,7 +582,14 @@ PREOF
             PKG_REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
             PKG_REPO_SLUG=""
             if [ -n "$PKG_REMOTE_URL" ]; then
-                PKG_REPO_SLUG=$(echo "$PKG_REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+                PKG_REPO_SLUG=$(extract_gh_slug "$PKG_REMOTE_URL")
+            fi
+
+            # Build issue reference — use cross-repo format when PR repo != issue repo
+            if [ -n "$GH_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$GH_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
+                ISSUE_REF="$GH_REPO_SLUG#$ISSUE_NUM"
+            else
+                ISSUE_REF="#$ISSUE_NUM"
             fi
 
             # Empty commit and push
@@ -594,15 +612,16 @@ Closes $ISSUE_REF
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
+            GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
             if [ -n "$PKG_REPO_SLUG" ]; then
                 PKG_PR_URL=$(gh pr create --draft \
                     --repo "$PKG_REPO_SLUG" \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>/dev/null) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
+                    --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             else
                 PKG_PR_URL=$(gh pr create --draft \
                     --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>/dev/null) && PKG_PR_CREATED=true || PKG_PR_CREATED=false
+                    --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
             fi
             if [ "$PKG_PR_CREATED" = true ]; then
                 echo "    ✓ Draft PR created for $pkg_name"
@@ -616,8 +635,9 @@ PREOF
                 fi
             else
                 echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
+                cat "$GH_STDERR" >&2
             fi
-            rm -f "$BODY_FILE"
+            rm -f "$GH_STDERR" "$BODY_FILE"
         done
         if [ -n "$LAYER_PLAN_FILE" ]; then rm -f "$LAYER_PLAN_FILE"; fi
         cd "$ROOT_DIR"
