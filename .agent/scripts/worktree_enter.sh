@@ -177,6 +177,32 @@ export WORKTREE_ISSUE="$ISSUE_NUM"
 export WORKTREE_TYPE="$WORKTREE_TYPE"
 export WORKTREE_ROOT="$WORKTREE_DIR"
 
+# Fetch and display issue title so agents can verify they're on the right issue
+_ISSUE_TITLE=""
+if command -v gh &>/dev/null; then
+    _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
+    # Layer worktrees cd into package repos where gh context may differ;
+    # retry with the workspace repo if the first attempt fails
+    if [ -z "$_ISSUE_TITLE" ]; then
+        _WS_REMOTE=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
+        if [ -n "$_WS_REMOTE" ]; then
+            _WS_SLUG=$(echo "$_WS_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+            _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+        fi
+    fi
+fi
+export WORKTREE_ISSUE_TITLE="$_ISSUE_TITLE"
+
+if [ -n "$_ISSUE_TITLE" ]; then
+    echo "  Title: $_ISSUE_TITLE"
+    echo "  >>> Verify this matches your task <<<"
+    echo ""
+else
+    echo "  Title: (could not fetch)"
+    echo "  Run: gh issue view $ISSUE_NUM --json title --jq '.title'"
+    echo ""
+fi
+
 # For layer worktrees, also set up scratchpad path
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
