@@ -81,7 +81,9 @@ def main():
                     data = ast.literal_eval(data_str)
                     rc = data.get("rc", 0)
                 except (ValueError, SyntaxError):
-                    rc = 0
+                    # Default to failure when we can't parse the return code;
+                    # silently assuming success would hide real build failures.
+                    rc = 1
                 results[pkg_name] = rc
                 if rc != 0:
                     failed_packages.add(pkg_name)
