@@ -122,6 +122,36 @@ The underlying script (`.agent/scripts/check_branch_updates.sh`) provides the ac
 
 ---
 
+### `verify-issue-branch.py`
+
+**Purpose**: Display the issue title before each commit so agents can verify they're working on the right issue.
+
+**What it does**:
+- Extracts issue number from the branch name (`feature/issue-<N>` or `feature/ISSUE-<N>-*`)
+- Fetches issue title and state via `gh issue view`
+- Prints the issue title prominently with a verification prompt
+- Warns if the issue is CLOSED
+- Falls back to `$WORKTREE_ISSUE_TITLE` env var if `gh` is unavailable (set by `worktree_enter.sh`)
+
+**When it runs**: Before every commit (via pre-commit framework)
+
+**Exit codes**:
+- `0` - Always (informational only — never blocks commits)
+
+**Configuration**: See `.pre-commit-config.yaml`
+
+**Related**:
+- `worktree_enter.sh` sets `$WORKTREE_ISSUE_TITLE` as a fallback
+- Issue #221
+
+**Example output**:
+```
+🔍 Issue #42: Add sonar driver timeout parameter
+   >>> Verify this matches your task <<<
+```
+
+---
+
 ## Installing Hooks
 
 Pre-commit hooks are automatically configured via the `.pre-commit-config.yaml` file.
