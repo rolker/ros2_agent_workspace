@@ -32,9 +32,9 @@ Link to `docs/` for details if available.
 
 Prioritized list for agents new to this repo:
 
-1. `path/to/entry_point` -- Main node or launch file
-2. `path/to/config.yaml` -- Default parameters
-3. `path/to/interfaces/` -- Custom message/service/action definitions
+1. `path/to/entry_point` — Main node or launch file
+2. `path/to/config.yaml` — Default parameters
+3. `path/to/interfaces/` — Custom message/service/action definitions
 
 ## Build & Test
 
@@ -62,8 +62,8 @@ Known build issues or special requirements:
 
 ## Instructions for Use
 
-1. Copy this template to `AGENTS.md` at the project repo root.
-2. Fill every section by reading actual source code -- never assume.
+1. Copy this template to `.agents/README.md` at the project repo root.
+2. Fill every section by reading actual source code — never assume.
 3. Follow the verification workflow in
    [`.agent/knowledge/documentation_verification.md`](../../.agent/knowledge/documentation_verification.md).
 4. **Omit** any section that does not apply (e.g., if there are no cross-layer

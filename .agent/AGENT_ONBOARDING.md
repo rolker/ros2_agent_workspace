@@ -51,4 +51,4 @@ source .agent/scripts/worktree_enter.sh --issue <N>
 - [`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`WORKTREE_GUIDE.md`](WORKTREE_GUIDE.md) — Worktree patterns
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — System design
-- Project repo `AGENTS.md` -- Per-repo agent guide: package inventory, code layout, pitfalls (if present)
+- Project repo `.agents/README.md` — Per-repo agent guide: package inventory, code layout, pitfalls (if present)
