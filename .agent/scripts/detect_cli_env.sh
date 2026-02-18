@@ -57,11 +57,12 @@ if [ "$USER" == "antigravity" ] || [ -n "$ANTIGRAVITY_SESSION" ]; then
 fi
 
 # Claude Code detection
-# Only $CLAUDE_CODE is a reliable signal — it is set by Claude Code when it
-# spawns subshells.  $ANTHROPIC_API_KEY / $CLAUDE_API_KEY are API credentials
-# that users commonly have in their profile and do NOT indicate an active
-# Claude Code session.  Likewise, having the `claude` CLI installed does not
-# mean we are running inside it.
+# Claude Code sets CLAUDECODE=1 and CLAUDE_CODE_ENTRYPOINT in subshells.
+# We also check CLAUDE_CODE (with underscore) for forward compatibility.
+# ANTHROPIC_API_KEY / CLAUDE_API_KEY are API credentials that users commonly
+# have in their profile and do NOT indicate an active Claude Code session.
+# Likewise, having the `claude` CLI installed does not mean we are running
+# inside it.
 if [ -n "$CLAUDECODE" ] || [ -n "$CLAUDE_CODE" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
     export AGENT_FRAMEWORK="claude-code"
     if command -v claude &> /dev/null; then
