@@ -39,22 +39,18 @@ To prevent duplicate work and enable collaboration, agents must make work-in-pro
 
 *   **Before Starting Work on an Issue**:
     *   Check for existing draft PRs (indicates another agent is working)
-    *   Use `worktree_create.sh` with `--draft-pr` to automate the draft PR step:
+    *   Use `worktree_create.sh` with `--plan-file <path>` to automate the draft PR step:
         ```bash
-        # Workspace work — creates worktree, generates work plan, pushes, and opens draft PR
-        .agent/scripts/worktree_create.sh --issue <N> --type workspace --draft-pr
+        # Workspace work — creates worktree, pushes, and opens draft PR with plan summary
+        .agent/scripts/worktree_create.sh --issue <N> --type workspace --plan-file /path/to/plan.md
 
-        # Layer work — creates worktree, pushes empty commit, and opens draft PR in each package repo
-        .agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <pkg> --draft-pr
+        # Layer work — creates worktree, pushes, and opens draft PR in each package repo
+        .agent/scripts/worktree_create.sh --issue <N> --type layer --layer core --packages <pkg> --plan-file /path/to/plan.md
         ```
-    *   For workspace worktrees, `--draft-pr` creates:
-        - Feature branch `feature/issue-<N>`
-        - Work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`
-        - Draft PR with the work plan committed
-    *   For layer worktrees, `--draft-pr` creates:
-        - Feature branch in each package repo
-        - Draft PR in each package repo with cross-repo issue reference
-    *   Edit the plan to document your approach
+    *   `--plan-file` takes a path to an approved plan file and:
+        - Creates a draft PR with a structured summary body (including `Closes #<N>`)
+        - Posts the full plan as a PR comment
+        - No template file is committed to the repository
     *   Commit and push updates as you work
 
 *   **During Work**:

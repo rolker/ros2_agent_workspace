@@ -466,14 +466,14 @@ Create an isolated worktree for a specific issue/task.
 
 **Usage:**
 ```bash
-./.agent/scripts/worktree_create.sh --issue <number> [--type layer|workspace] [--draft-pr]
+./.agent/scripts/worktree_create.sh --issue <number> [--type layer|workspace] [--plan-file <path>]
 ```
 
 **Examples:**
 ```bash
 ./.agent/scripts/worktree_create.sh --issue 123                    # Layer worktree (default)
 ./.agent/scripts/worktree_create.sh --issue 123 --type workspace   # Workspace worktree
-./.agent/scripts/worktree_create.sh --issue 123 --type workspace --draft-pr  # With draft PR
+./.agent/scripts/worktree_create.sh --issue 123 --type workspace --plan-file /path/to/plan.md  # With draft PR from plan
 ./.agent/scripts/worktree_create.sh --issue 123 --branch feature/custom-name
 ```
 
@@ -481,17 +481,17 @@ Create an isolated worktree for a specific issue/task.
 - **layer** (default): For ROS package development. Created in `layers/worktrees/issue-<N>/`
 - **workspace**: For infrastructure work (.agent/, configs/, docs). Created in `.workspace-worktrees/issue-<N>/`
 
-**`--draft-pr` flag:**
+**`--plan-file <path>` flag:**
 When set, pushes the branch and creates a draft PR immediately after worktree creation,
-making work visible on GitHub. For workspace worktrees, this also generates a work plan
-from `.agent/templates/ISSUE_PLAN.md`. For layer worktrees, creates an empty commit and
-draft PR in each package repo. All draft PR operations are non-fatal.
+making work visible on GitHub. The plan file is used to generate a structured PR summary
+body (with `Closes #N`) and the full plan is posted as a PR comment. No template file is
+committed to the repository. All draft PR operations are non-fatal.
 
 **What it does:**
 1. Creates a new git worktree at the specified location
 2. Creates a new branch `feature/issue-<N>` (or uses existing)
 3. Sets up task-specific scratchpad directory
-4. (With `--draft-pr`) Pushes branch and creates draft PR
+4. (With `--plan-file`) Pushes branch and creates draft PR with plan
 
 ---
 

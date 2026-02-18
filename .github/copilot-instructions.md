@@ -27,12 +27,12 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 Every task must use an isolated worktree — never work in the main tree.
 
 ```bash
-# Create + enter (add --draft-pr to create a draft PR immediately)
-.agent/scripts/worktree_create.sh --issue <N> --type workspace [--draft-pr]
+# Create + enter (add --plan-file <path> to create a draft PR with plan)
+.agent/scripts/worktree_create.sh --issue <N> --type workspace [--plan-file <path>]
 source .agent/scripts/worktree_enter.sh --issue <N>
 
 # For ROS package work, use layer worktrees
-.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core [--draft-pr]
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer core [--plan-file <path>]
 
 # List / remove
 .agent/scripts/worktree_list.sh
@@ -132,7 +132,7 @@ of unrelated work.
 |--------|---------|
 | `.agent/scripts/env.sh` | Source ROS 2 env + checkout guardrail |
 | `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) |
-| `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--draft-pr` for immediate visibility) |
+| `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--plan-file` to create draft PR with plan) |
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
