@@ -538,8 +538,8 @@ if [ -n "$PLAN_FILE" ]; then
     # Arguments:
     #   $1 - git directory to push from
     #   $2 - issue reference (e.g. "#123" or "owner/repo#123")
-    #   $3 - (optional) --repo <slug> for gh pr create
-    #   $4 - (optional) --base <branch> for gh pr create
+    #   $3 - (optional) repo slug for gh pr create
+    #   $4 - (optional) base branch for gh pr create
     create_draft_pr() {
         local git_dir="$1"
         local issue_ref="$2"

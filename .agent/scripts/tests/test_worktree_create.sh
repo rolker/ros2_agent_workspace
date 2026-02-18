@@ -301,6 +301,7 @@ PLANEOF
         return 1
     fi
 
+    rm -f "$plan_file"
     cleanup_mock_workspace
     return 0
 }
