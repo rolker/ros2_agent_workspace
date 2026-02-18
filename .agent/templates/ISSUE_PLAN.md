@@ -1,62 +1,47 @@
-# Work Plan: Issue #{ISSUE_NUMBER} - {ISSUE_TITLE}
+# Work Plan Template
 
-**Issue**: #{ISSUE_NUMBER}  
-**Title**: {ISSUE_TITLE}  
-**Assignee**: {AGENT_NAME}  
-**Started**: {START_DATE}  
-**Status**: 🚧 In Progress
+Reference for agents writing implementation plans. Use this structure as a guide
+when preparing a plan for user approval. Not all sections are required — include
+only what is relevant to the task.
+
+Claude Code agents do not need to follow this template literally; plan mode
+produces well-structured plans naturally. This is primarily useful for agent
+frameworks without a built-in planning step.
 
 ---
 
 ## Problem Analysis
 
-{Describe the problem this issue addresses. What is broken, missing, or needs improvement?}
+Describe what is broken, missing, or needs improvement. Include relevant context
+from the issue and any investigation findings.
 
 ## Proposed Approach
 
-{Outline your solution strategy. What's the high-level plan to solve this?}
-
-{If there are alternative approaches, mention them and explain why you chose this one}
+Outline the solution strategy. If there are alternative approaches, mention them
+and explain why this one was chosen.
 
 ## Implementation Tasks
 
-### Phase 1: {Phase Name}
-- [ ] Task 1
-- [ ] Task 2
-- [ ] Task 3
+Break the work into concrete steps, grouped by phase if appropriate.
 
-### Phase 2: {Phase Name}
-- [ ] Task 1
-- [ ] Task 2
+### Phase 1: ...
+- Task 1
+- Task 2
 
-{Add more phases as needed}
+### Phase 2: ...
+- Task 1
+- Task 2
 
 ## Design Decisions
 
-### ✅ Decision 1
-**Rationale**: {Explain why this choice was made}
-
-### ✅ Decision 2
-**Rationale**: {Explain why this choice was made}
+Document key choices and their rationale, especially where reasonable alternatives
+exist.
 
 ## Open Questions
 
-1. **Question 1**: {Describe uncertainty}
-   - **Current answer**: {Your best guess or plan to resolve}
-   
-2. **Question 2**: {Describe uncertainty}
-   - **Current answer**: {Your best guess or plan to resolve}
+List any uncertainties and how you plan to resolve them. These should ideally be
+resolved with the user before starting implementation.
 
 ## Success Criteria
 
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Criterion 3
-
-## Notes
-
-{Any additional context, risks, or considerations}
-
----
-
-**🤖 Authored-By**: `{AGENT_NAME}`
+Define what "done" looks like — how will you verify the implementation is correct?

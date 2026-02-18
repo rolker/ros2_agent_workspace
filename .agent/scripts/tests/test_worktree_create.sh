@@ -257,28 +257,33 @@ test_layer_creates_new_branch() {
 }
 run_test "Layer creates new branch when none exists" test_layer_creates_new_branch
 
-# ===== --draft-pr tests =====
+# ===== --plan-file tests =====
 
-# Test 7: --draft-pr creates work plan for workspace (gh unavailable is non-fatal)
-test_draft_pr_workspace_creates_plan() {
+# Test 7: --plan-file accepts a plan file for workspace (gh unavailable is non-fatal)
+test_plan_file_workspace_accepted() {
     setup_mock_workspace
     cd "$WORKSPACE_DIR" || return 1
 
-    # Copy template into mock workspace and commit it so it appears in worktrees
-    mkdir -p .agent/templates
-    cat > .agent/templates/ISSUE_PLAN.md << 'TPLEOF'
-# Work Plan: Issue #{ISSUE_NUMBER} - {ISSUE_TITLE}
-**Assignee**: {AGENT_NAME}
-**Started**: {START_DATE}
-TPLEOF
-    git add .agent/templates/ISSUE_PLAN.md
-    git commit -q -m "Add plan template"
+    # Create a temp plan file to pass via --plan-file
+    local plan_file
+    plan_file=$(mktemp "$TEST_DIR/plan_XXXXXX.md")
+    cat > "$plan_file" << 'PLANEOF'
+# Plan for Issue #555
+
+## Goals
+- Fix the widget
+
+## Steps
+1. Read the code
+2. Make the fix
+3. Test it
+PLANEOF
 
     # Hide gh so the script can't create a real PR (non-fatal path)
     # Auto-detected slug will be "origin" (basename of bare repo path)
     local output
     output=$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v gh | tr '\n' ':') \
-        .agent/scripts/worktree_create.sh --issue 555 --type workspace --draft-pr 2>&1) || true
+        .agent/scripts/worktree_create.sh --issue 555 --type workspace --plan-file "$plan_file" 2>&1) || true
 
     # Worktree should still be created successfully
     if [[ "$output" != *"Worktree Created Successfully"* ]]; then
@@ -288,26 +293,19 @@ TPLEOF
         return 1
     fi
 
-    # Work plan file should exist in the worktree
-    # Slug is "origin" (basename of the bare repo path without .git)
-    local worktree_plan="$WORKSPACE_DIR/.workspace-worktrees/issue-origin-555/.agent/work-plans/PLAN_ISSUE-555.md"
-    if [ ! -f "$worktree_plan" ]; then
-        echo "    Expected work plan at: $worktree_plan"
+    # The --plan-file flag should have been accepted without argument parsing errors
+    if [[ "$output" == *"Unknown option"* ]] || [[ "$output" == *"requires an argument"* ]]; then
+        echo "    --plan-file flag was not accepted correctly"
+        echo "    Output: $output"
         cleanup_mock_workspace
         return 1
     fi
 
-    # Verify template substitution worked (issue number should appear)
-    if ! grep -q "Issue #555" "$worktree_plan"; then
-        echo "    Expected issue number substitution in work plan"
-        cleanup_mock_workspace
-        return 1
-    fi
-
+    rm -f "$plan_file"
     cleanup_mock_workspace
     return 0
 }
-run_test "--draft-pr creates work plan for workspace type" test_draft_pr_workspace_creates_plan
+run_test "--plan-file accepts plan file for workspace type" test_plan_file_workspace_accepted
 
 # Test 8: layer worktree packages have .git file detected by -e (not just -d)
 test_layer_worktree_has_git_file() {

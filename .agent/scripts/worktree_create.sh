@@ -3,14 +3,14 @@
 # Create a git worktree for isolated task development
 #
 # Usage:
-#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>] [--packages <pkg,...>] [--draft-pr]
+#   ./worktree_create.sh --issue <number> [--type layer|workspace] [--branch <name>] [--layer <layer_name>] [--packages <pkg,...>] [--plan-file <path>]
 #
 # Examples:
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp
 #   ./worktree_create.sh --issue 123 --type workspace
-#   ./worktree_create.sh --issue 123 --type workspace --draft-pr
-#   ./worktree_create.sh --issue 123 --type layer --layer core --packages sonar_driver --branch feature/custom-name
+#   ./worktree_create.sh --issue 123 --type workspace --plan-file /tmp/plan.md
+#   ./worktree_create.sh --issue 123 --type layer --layer core --packages sonar_driver --plan-file /tmp/plan.md
 #
 # Worktree Types:
 #   layer     - For ROS package development
@@ -73,7 +73,7 @@ BRANCH_NAME=""
 TARGET_LAYER=""
 REPO_SLUG=""
 TARGET_PACKAGES=""  # Comma-separated list of packages to modify
-DRAFT_PR=false
+PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 
 # Available layers (same order as env.sh)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
@@ -90,7 +90,7 @@ show_usage() {
     echo "                        Comma-separated list for multiple packages"
     echo "  --repo-slug <slug>    Repository slug for naming (auto-detected if not provided)"
     echo "  --branch <name>       Custom branch name (default: feature/issue-<N>)"
-    echo "  --draft-pr            Push branch and create draft PR immediately"
+    echo "  --plan-file <path>    Path to approved plan file; creates draft PR and posts plan as comment"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy"
@@ -126,9 +126,9 @@ while [[ $# -gt 0 ]]; do
             TARGET_PACKAGES="$2"
             shift 2
             ;;
-        --draft-pr)
-            DRAFT_PR=true
-            shift
+        --plan-file)
+            PLAN_FILE="$2"
+            shift 2
             ;;
         -h|--help)
             show_usage
@@ -495,8 +495,8 @@ if [ -n "$ISSUE_TITLE" ]; then
 fi
 echo ""
 
-# --draft-pr: push branch and create a draft PR to signal work in progress
-if [ "$DRAFT_PR" = true ]; then
+# --plan-file: push branch, create draft PR, post plan as comment
+if [ -n "$PLAN_FILE" ]; then
     echo "Creating draft PR for issue #$ISSUE_NUM..."
     echo ""
 
@@ -506,9 +506,13 @@ if [ "$DRAFT_PR" = true ]; then
         ISSUE_TITLE="Issue #$ISSUE_NUM"
     fi
 
-    # Escape ISSUE_TITLE for use in sed replacement strings
-    # Escape \, &, / — sed replacement specials handled below
-    SAFE_ISSUE_TITLE=$(printf '%s' "$ISSUE_TITLE" | sed -e 's/[\\&/]/\\&/g')
+    # Validate plan file exists
+    HAS_PLAN=false
+    if [ ! -f "$PLAN_FILE" ]; then
+        echo "  ⚠️  Plan file not found: $PLAN_FILE (creating PR without plan comment)"
+    else
+        HAS_PLAN=true
+    fi
 
     # Auto-detect agent identity if not already set in environment
     if [ -z "$AGENT_NAME" ] || [ -z "$AGENT_MODEL" ]; then
@@ -530,104 +534,101 @@ if [ "$DRAFT_PR" = true ]; then
     DRAFT_AGENT_NAME="${AGENT_NAME:-AI Agent}"
     DRAFT_AGENT_MODEL="${AGENT_MODEL:-Unknown}"
 
-    if [ "$WORKTREE_TYPE" == "workspace" ]; then
-        # --- Workspace draft PR ---
-        # Generate work plan from template
-        TEMPLATE_FILE="$WORKTREE_DIR/.agent/templates/ISSUE_PLAN.md"
-        PLAN_DIR="$WORKTREE_DIR/.agent/work-plans"
-        PLAN_FILE="$PLAN_DIR/PLAN_ISSUE-${ISSUE_NUM}.md"
+    # Helper: create a draft PR and optionally post the plan as a comment.
+    # Arguments:
+    #   $1 - git directory to push from
+    #   $2 - issue reference (e.g. "#123" or "owner/repo#123")
+    #   $3 - (optional) repo slug for gh pr create
+    #   $4 - (optional) base branch for gh pr create
+    create_draft_pr() {
+        local git_dir="$1"
+        local issue_ref="$2"
+        local repo_flag="${3:-}"
+        local base_flag="${4:-}"
 
-        if [ -f "$TEMPLATE_FILE" ]; then
-            mkdir -p "$PLAN_DIR"
-            sed -e "s/{ISSUE_NUMBER}/$ISSUE_NUM/g" \
-                -e "s/{ISSUE_TITLE}/$SAFE_ISSUE_TITLE/g" \
-                -e "s/{AGENT_NAME}/${DRAFT_AGENT_NAME}/g" \
-                -e "s/{START_DATE}/$(date +%Y-%m-%d)/g" \
-                "$TEMPLATE_FILE" > "$PLAN_FILE"
-            echo "  ✓ Work plan created: .agent/work-plans/PLAN_ISSUE-${ISSUE_NUM}.md"
-        else
-            echo "  ⚠️  Template not found: $TEMPLATE_FILE (skipping work plan)"
-        fi
+        cd "$git_dir"
 
-        # Commit work plan (or empty commit if template was missing) and push
-        cd "$WORKTREE_DIR"
-        if [ -f "$PLAN_FILE" ]; then
-            git add ".agent/work-plans/PLAN_ISSUE-${ISSUE_NUM}.md"
-            git commit -m "docs: add work plan for #$ISSUE_NUM" || true
-        else
-            git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
+        # Push branch (empty commit if needed to create the remote ref)
+        if ! git rev-parse --verify "origin/$BRANCH_NAME" &>/dev/null; then
+            git commit --allow-empty -m "chore: start work on $issue_ref" || true
         fi
-        if ! git push -u origin "$BRANCH_NAME"; then
+        if ! git push -u origin "$BRANCH_NAME" 2>/dev/null; then
             echo "  ⚠️  Push failed — skipping draft PR (non-fatal)"
-            cd "$ROOT_DIR"
+            return 1
+        fi
+
+        # Check if a PR already exists for this branch
+        local existing_pr=""
+        if [ -n "$repo_flag" ]; then
+            existing_pr=$(gh pr list --repo "$repo_flag" --head "$BRANCH_NAME" --json url --jq '.[0].url' 2>/dev/null || echo "")
         else
-            # Create draft PR (only after successful push)
-            BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-            cat << PREOF > "$BODY_FILE"
-## Work in Progress
+            existing_pr=$(gh pr list --head "$BRANCH_NAME" --json url --jq '.[0].url' 2>/dev/null || echo "")
+        fi
+        if [ -n "$existing_pr" ]; then
+            echo "  ℹ PR already exists: $existing_pr"
+            # Post plan as comment on existing PR if available
+            if [ "$HAS_PLAN" = true ]; then
+                if gh pr comment "$existing_pr" --body-file "$PLAN_FILE" >/dev/null 2>&1; then
+                    echo "  ✓ Plan posted as comment on existing PR"
+                fi
+            fi
+            return 0
+        fi
 
-This draft PR tracks ongoing work for issue #$ISSUE_NUM.
+        # Create draft PR
+        BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+        cat > "$BODY_FILE" << PREOF
+## Summary
 
-Closes #$ISSUE_NUM
+$ISSUE_TITLE
+
+Closes $issue_ref
 
 ---
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
-            GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
-            PR_URL=$(gh pr create --draft \
-                --title "WIP: $ISSUE_TITLE" \
-                --body-file "$BODY_FILE" 2>"$GH_STDERR") && PR_CREATED=true || PR_CREATED=false
-            if [ "$PR_CREATED" = true ]; then
-                echo "  ✓ Draft PR created for workspace repo"
-                # Post work plan as PR comment
-                if [ -f "$PLAN_FILE" ]; then
-                    if gh pr comment "$PR_URL" --body-file "$PLAN_FILE" >/dev/null 2>&1; then
-                        echo "  ✓ Work plan posted as PR comment"
-                    else
-                        echo "  ⚠️  Failed to post work plan comment (non-fatal)"
-                    fi
+
+        local gh_args=(pr create --draft --title "$ISSUE_TITLE" --body-file "$BODY_FILE")
+        [ -n "$repo_flag" ] && gh_args+=(--repo "$repo_flag")
+        [ -n "$base_flag" ] && gh_args+=(--base "$base_flag")
+
+        GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
+        local pr_url
+        pr_url=$(gh "${gh_args[@]}" 2>"$GH_STDERR") && PR_CREATED=true || PR_CREATED=false
+
+        if [ "$PR_CREATED" = true ]; then
+            echo "  ✓ Draft PR created: $pr_url"
+            # Post plan as PR comment
+            if [ "$HAS_PLAN" = true ]; then
+                if gh pr comment "$pr_url" --body-file "$PLAN_FILE" >/dev/null 2>&1; then
+                    echo "  ✓ Plan posted as PR comment"
+                else
+                    echo "  ⚠️  Failed to post plan comment (non-fatal)"
                 fi
-            else
-                echo "  ⚠️  Draft PR creation failed (non-fatal)"
-                cat "$GH_STDERR" >&2
             fi
-            rm -f "$GH_STDERR" "$BODY_FILE"
-            cd "$ROOT_DIR"
+        else
+            echo "  ⚠️  Draft PR creation failed (non-fatal)"
+            cat "$GH_STDERR" >&2
         fi
+        rm -f "$GH_STDERR" "$BODY_FILE"
+    }
+
+    if [ "$WORKTREE_TYPE" == "workspace" ]; then
+        create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM"
+        cd "$ROOT_DIR"
 
     elif [ "$WORKTREE_TYPE" == "layer" ]; then
-        # --- Layer draft PR ---
-
-        # Generate work plan from template for PR comments
-        LAYER_TEMPLATE_FILE="$ROOT_DIR/.agent/templates/ISSUE_PLAN.md"
-        LAYER_PLAN_FILE=""
-        if [ -f "$LAYER_TEMPLATE_FILE" ]; then
-            LAYER_PLAN_FILE=$(mktemp /tmp/gh_plan.XXXXXX.md)
-            sed -e "s/{ISSUE_NUMBER}/$ISSUE_NUM/g" \
-                -e "s/{ISSUE_TITLE}/$SAFE_ISSUE_TITLE/g" \
-                -e "s/{AGENT_NAME}/${DRAFT_AGENT_NAME}/g" \
-                -e "s/{START_DATE}/$(date +%Y-%m-%d)/g" \
-                "$LAYER_TEMPLATE_FILE" > "$LAYER_PLAN_FILE"
-        fi
-
-        # Iterate over packages in the target layer src directory
         for pkg_dir in "$WORKTREE_DIR"/"${TARGET_LAYER}_ws"/src/*; do
             # Skip symlinks (unmodified packages) and non-git dirs
-            if [ -L "$pkg_dir" ]; then
-                continue
-            fi
-            if [ ! -e "$pkg_dir/.git" ]; then
-                continue
-            fi
+            [ -L "$pkg_dir" ] && continue
+            [ ! -e "$pkg_dir/.git" ] && continue
 
             pkg_name=$(basename "$pkg_dir")
             echo "  Creating draft PR for package: $pkg_name"
 
-            cd "$pkg_dir"
-
             # Determine repo slug from remote
-            PKG_REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+            PKG_REMOTE_URL=$(git -C "$pkg_dir" remote get-url origin 2>/dev/null || echo "")
             PKG_REPO_SLUG=""
             if [ -n "$PKG_REMOTE_URL" ]; then
                 PKG_REPO_SLUG=$(extract_gh_slug "$PKG_REMOTE_URL")
@@ -640,59 +641,11 @@ PREOF
                 ISSUE_REF="#$ISSUE_NUM"
             fi
 
-            # Empty commit and push
-            git commit --allow-empty -m "chore: start work on #$ISSUE_NUM" || true
-            if ! git push -u origin "$BRANCH_NAME"; then
-                echo "    ⚠️  Push failed for $pkg_name (non-fatal)"
-                continue
-            fi
-
-            # Create draft PR in the package's repo
-            BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-            cat << PREOF > "$BODY_FILE"
-## Work in Progress
-
-This draft PR tracks ongoing work for $ISSUE_REF.
-
-Closes $ISSUE_REF
-
----
-**Authored-By**: \`${DRAFT_AGENT_NAME}\`
-**Model**: \`${DRAFT_AGENT_MODEL}\`
-PREOF
             # Resolve the .repos base branch for the PR target
             PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
 
-            GH_STDERR=$(mktemp /tmp/gh_stderr.XXXXXX)
-            if [ -n "$PKG_REPO_SLUG" ]; then
-                PKG_PR_URL=$(gh pr create --draft \
-                    --repo "$PKG_REPO_SLUG" \
-                    ${PKG_BASE_BRANCH:+--base "$PKG_BASE_BRANCH"} \
-                    --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
-            else
-                PKG_PR_URL=$(gh pr create --draft \
-                    ${PKG_BASE_BRANCH:+--base "$PKG_BASE_BRANCH"} \
-                    --title "WIP: $ISSUE_TITLE" \
-                    --body-file "$BODY_FILE" 2>"$GH_STDERR") && PKG_PR_CREATED=true || PKG_PR_CREATED=false
-            fi
-            if [ "$PKG_PR_CREATED" = true ]; then
-                echo "    ✓ Draft PR created for $pkg_name"
-                # Post work plan as PR comment
-                if [ -n "$LAYER_PLAN_FILE" ] && [ -f "$LAYER_PLAN_FILE" ]; then
-                    if gh pr comment "$PKG_PR_URL" --body-file "$LAYER_PLAN_FILE" >/dev/null 2>&1; then
-                        echo "    ✓ Work plan posted as PR comment"
-                    else
-                        echo "    ⚠️  Failed to post work plan comment (non-fatal)"
-                    fi
-                fi
-            else
-                echo "    ⚠️  Draft PR creation failed for $pkg_name (non-fatal)"
-                cat "$GH_STDERR" >&2
-            fi
-            rm -f "$GH_STDERR" "$BODY_FILE"
+            create_draft_pr "$pkg_dir" "$ISSUE_REF" "$PKG_REPO_SLUG" "$PKG_BASE_BRANCH"
         done
-        if [ -n "$LAYER_PLAN_FILE" ]; then rm -f "$LAYER_PLAN_FILE"; fi
         cd "$ROOT_DIR"
     fi
 
