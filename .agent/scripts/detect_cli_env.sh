@@ -17,34 +17,23 @@ export AGENT_FRAMEWORK_VERSION=""
 # Detection logic (order matters - more specific checks first)
 
 # GitHub Copilot CLI detection
-# Check for environment variables first (more reliable in CI/container environments)
+# Only session-specific env vars are reliable — they are set by the Copilot
+# runtime when it spawns shells.  Having `gh copilot` installed is not proof
+# we are running inside it.
 if [ -n "$COPILOT_API_URL" ] || [ -n "$COPILOT_AGENT_CALLBACK_URL" ]; then
     export AGENT_FRAMEWORK="copilot-cli"
-    # Try to get version from runtime env
     if [ -n "$COPILOT_AGENT_RUNTIME_VERSION" ]; then
         export AGENT_FRAMEWORK_VERSION="$COPILOT_AGENT_RUNTIME_VERSION"
     fi
     return 0
 fi
 
-# Fallback: Check for gh copilot command
-if command -v gh &> /dev/null; then
-    if gh copilot --version &> /dev/null 2>&1; then
-        export AGENT_FRAMEWORK="copilot-cli"
-        # Try to get version
-        VERSION=$(gh copilot --version 2>/dev/null | head -n 1)
-        if [ -n "$VERSION" ]; then
-            export AGENT_FRAMEWORK_VERSION="$VERSION"
-        fi
-        return 0
-    fi
-fi
-
 # Gemini CLI detection
-# Check for Gemini-specific environment variables
-if [ -n "$GEMINI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]; then
+# GEMINI_API_KEY / GOOGLE_API_KEY are API credentials that users commonly set
+# in their profile — they do NOT indicate an active Gemini CLI session.
+# Rely on session-specific indicators only.
+if [ -n "$GEMINI_SESSION" ]; then
     export AGENT_FRAMEWORK="gemini-cli"
-    # Try to detect version from common locations
     if command -v gemini &> /dev/null; then
         VERSION=$(gemini --version 2>/dev/null | head -n 1)
         if [ -n "$VERSION" ]; then
@@ -68,10 +57,13 @@ if [ "$USER" == "antigravity" ] || [ -n "$ANTIGRAVITY_SESSION" ]; then
 fi
 
 # Claude Code detection
-# Check for Claude Code specific environment variables or command
-if [ -n "$CLAUDE_CODE" ] || [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_API_KEY" ]; then
+# Only $CLAUDE_CODE is a reliable signal — it is set by Claude Code when it
+# spawns subshells.  $ANTHROPIC_API_KEY / $CLAUDE_API_KEY are API credentials
+# that users commonly have in their profile and do NOT indicate an active
+# Claude Code session.  Likewise, having the `claude` CLI installed does not
+# mean we are running inside it.
+if [ -n "$CLAUDECODE" ] || [ -n "$CLAUDE_CODE" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
     export AGENT_FRAMEWORK="claude-code"
-    # Try to detect version from claude command
     if command -v claude &> /dev/null; then
         VERSION=$(claude --version 2>/dev/null | head -n 1)
         if [ -n "$VERSION" ]; then
@@ -79,21 +71,6 @@ if [ -n "$CLAUDE_CODE" ] || [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_API_KEY
         fi
     fi
     return 0
-fi
-
-# Fallback: Check for claude command with version validation
-if command -v claude &> /dev/null; then
-    CLAUDE_VERSION_OUTPUT=$(claude --version 2>/dev/null)
-    if [ $? -eq 0 ]; then
-        CLAUDE_VERSION_LINE=$(echo "$CLAUDE_VERSION_OUTPUT" | head -n 1)
-        if echo "$CLAUDE_VERSION_LINE" | grep -qi "claude"; then
-            export AGENT_FRAMEWORK="claude-code"
-            if [ -n "$CLAUDE_VERSION_LINE" ]; then
-                export AGENT_FRAMEWORK_VERSION="$CLAUDE_VERSION_LINE"
-            fi
-            return 0
-        fi
-    fi
 fi
 
 # Check for generic AI agent indicators
