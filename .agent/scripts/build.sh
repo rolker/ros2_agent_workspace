@@ -105,6 +105,8 @@ for layer in "${LAYERS[@]}"; do
     # We rely on the log configuration to write to log/latest_build/events.log
     # --symlink-install is standard for dev
     # We allow stdout to flow to the user's terminal
+    # When running colcon manually in a layer workspace, use the same flags:
+    #   colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 

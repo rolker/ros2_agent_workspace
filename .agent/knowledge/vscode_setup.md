@@ -90,10 +90,19 @@ create `.vscode/tasks.json` at the workspace root:
 
 ## C++ IntelliSense
 
-The build script generates `compile_commands.json` for each package
-(via `CMAKE_EXPORT_COMPILE_COMMANDS=ON`). To enable IntelliSense in a
-layer, create `.vscode/c_cpp_properties.json` inside the layer workspace
-directory (e.g., `layers/main/core_ws/.vscode/c_cpp_properties.json`):
+The build script generates `compile_commands.json` for each **package**
+(via `CMAKE_EXPORT_COMPILE_COMMANDS=ON`). After building, files appear at
+`build/<package>/compile_commands.json`.
+
+To merge them into a single file for IntelliSense, run from a layer
+workspace (e.g., `layers/main/core_ws`):
+
+```bash
+jq -s 'add' build/*/compile_commands.json > build/compile_commands.json
+```
+
+Then create `.vscode/c_cpp_properties.json` in the layer directory
+(e.g., `layers/main/core_ws/.vscode/c_cpp_properties.json`):
 
 ```jsonc
 {
@@ -108,12 +117,8 @@ directory (e.g., `layers/main/core_ws/.vscode/c_cpp_properties.json`):
 }
 ```
 
-> **Note**: Some build systems generate per-package compile commands
-> (e.g., `build/<package>/compile_commands.json`). If the top-level
-> `build/compile_commands.json` doesn't exist, you can use a symlink
-> or merge script, or point to a specific package's file.
-
-After building, verify the file exists:
+Re-run the `jq` merge after each build, or add it as a post-build
+VS Code task. Verify per-package files exist after building:
 
 ```bash
 ls layers/main/core_ws/build/*/compile_commands.json
@@ -122,18 +127,25 @@ ls layers/main/core_ws/build/*/compile_commands.json
 ## Python IntelliSense
 
 For Python ROS packages, add the install space to your analysis paths.
-In the layer's `.vscode/settings.json`:
+With `colcon build --symlink-install` (the default), packages are installed
+at `install/<package>/lib/python3.XX/site-packages/`. In the layer's
+`.vscode/settings.json`:
 
 ```jsonc
 {
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/install/lib/python3/dist-packages"
+    "${workspaceFolder}/install/*/lib/python3.12/site-packages"
   ]
 }
 ```
 
-Adjust the Python path to match your distribution (check
-`ls install/lib/python*/dist-packages/` after building).
+To discover the correct Python version for your environment:
+
+```bash
+ls install/*/lib/python*/site-packages/ 2>/dev/null | head -1
+```
+
+Adjust `python3.12` to match your distribution if different.
 
 ## Claude Code Integration
 

@@ -199,6 +199,9 @@ make lint          # Run linters
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
 - `status_report.sh`: Comprehensive workspace status with `--quick` and `--pr-triage` flags.
 
+### IDE Setup
+- [VS Code Setup Guide](.agent/knowledge/vscode_setup.md): Multi-root workspace, build tasks, C++/Python IntelliSense configuration.
+
 ### Pre-commit Hooks
 Set up pre-commit hooks for automatic validation:
 ```bash
