@@ -1,0 +1,170 @@
+# VS Code Setup Guide
+
+How to use VS Code with the ROS 2 Agent Workspace. All VS Code configuration
+files are gitignored — this guide describes how to generate them locally.
+
+## Quick Start
+
+```bash
+code /path/to/ros2_agent_workspace
+```
+
+## Multi-Root Workspace (Recommended)
+
+A multi-root workspace lets you work across the root and all layers with
+per-layer settings. Create a `.code-workspace` file at the repo root:
+
+```jsonc
+// ros2_agent.code-workspace
+{
+  "folders": [
+    { "path": ".", "name": "Workspace Root" },
+    { "path": "layers/main/core_ws", "name": "Core" },
+    { "path": "layers/main/platforms_ws", "name": "Platforms" },
+    { "path": "layers/main/sensors_ws", "name": "Sensors" },
+    { "path": "layers/main/simulation_ws", "name": "Simulation" },
+    { "path": "layers/main/ui_ws", "name": "UI" }
+  ],
+  "settings": {},
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": []
+  }
+}
+```
+
+Open it with `code ros2_agent.code-workspace`. Each layer appears as a
+top-level folder in the Explorer sidebar. Layers that haven't been set up
+yet will appear grayed out.
+
+> **Note**: The `.code-workspace` file references paths under `layers/`
+> which is gitignored. This file is local to your machine.
+
+## Makefile Tasks
+
+The workspace Makefile wraps common operations. To use them from VS Code,
+create `.vscode/tasks.json` at the workspace root:
+
+```jsonc
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build All",
+      "type": "shell",
+      "command": "make build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "Test All",
+      "type": "shell",
+      "command": "make test",
+      "group": "test"
+    },
+    {
+      "label": "Lint",
+      "type": "shell",
+      "command": "make lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Status",
+      "type": "shell",
+      "command": "make status",
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+- **Ctrl+Shift+B** runs the default build task (`make build`)
+- **Ctrl+Shift+P > Tasks: Run Task** shows all available tasks
+
+## C++ IntelliSense
+
+The build script generates `compile_commands.json` for each package
+(via `CMAKE_EXPORT_COMPILE_COMMANDS=ON`). To enable IntelliSense in a
+layer, create `.vscode/c_cpp_properties.json` inside the layer workspace
+directory (e.g., `layers/main/core_ws/.vscode/c_cpp_properties.json`):
+
+```jsonc
+{
+  "configurations": [
+    {
+      "name": "ROS 2",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "intelliSenseMode": "linux-gcc-x64"
+    }
+  ],
+  "version": 4
+}
+```
+
+> **Note**: Some build systems generate per-package compile commands
+> (e.g., `build/<package>/compile_commands.json`). If the top-level
+> `build/compile_commands.json` doesn't exist, you can use a symlink
+> or merge script, or point to a specific package's file.
+
+After building, verify the file exists:
+
+```bash
+ls layers/main/core_ws/build/*/compile_commands.json
+```
+
+## Python IntelliSense
+
+For Python ROS packages, add the install space to your analysis paths.
+In the layer's `.vscode/settings.json`:
+
+```jsonc
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/install/lib/python3/dist-packages"
+  ]
+}
+```
+
+Adjust the Python path to match your distribution (check
+`ls install/lib/python*/dist-packages/` after building).
+
+## Claude Code Integration
+
+The [Claude Code VS Code extension](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code)
+integrates directly into the editor:
+
+1. Install the **Claude Code** extension from the VS Code marketplace
+2. The extension shares configuration and history with the CLI
+3. Use `Ctrl+Esc` to toggle focus between the editor and Claude
+
+Both the extension and the CLI terminal can be used simultaneously.
+Conversation history is shared — use `claude --resume` in the terminal
+to continue an extension conversation.
+
+## Recommended Extensions
+
+- **C/C++** (`ms-vscode.cpptools`) — IntelliSense, debugging
+- **Python** (`ms-python.python`) — Python language support
+- **Claude Code** (`anthropic.claude-code`) — AI assistant integration
+- **XML** (`redhat.vscode-xml`) — For `package.xml` and launch files
+- **YAML** (`redhat.vscode-yaml`) — For ROS config files
+
+## Working in Worktrees
+
+When working on a task in a worktree, open VS Code in the worktree
+directory for correct git context:
+
+```bash
+source .agent/scripts/worktree_enter.sh --issue <N>
+code .
+```
+
+You can have multiple VS Code windows open for different worktrees
+simultaneously.

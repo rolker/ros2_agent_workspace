@@ -106,7 +106,7 @@ for layer in "${LAYERS[@]}"; do
     # --symlink-install is standard for dev
     # We allow stdout to flow to the user's terminal
 
-    colcon build --symlink-install
+    colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     BUILD_RC=$?
 

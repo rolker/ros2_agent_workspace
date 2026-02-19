@@ -8,6 +8,9 @@ checked out in `layers/`.
 - **[ROS 2 CLI Best Practices](ros2_cli_best_practices.md)**: Using the `ros2` CLI effectively as an automated agent.
 - **[ROS 2 Development Patterns](ros2_development_patterns.md)**: Package structure and build patterns for the layered workspace.
 
+## IDE Setup
+- **[VS Code Setup Guide](vscode_setup.md)**: Multi-root workspace configuration, Makefile tasks, C++/Python IntelliSense, and Claude Code extension integration.
+
 ## Agent Workflows
 - **[Documentation Verification](documentation_verification.md)**: Mandatory verification workflow for writing accurate ROS 2 package documentation. Includes command cookbook and hallucination anti-patterns.
 
