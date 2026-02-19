@@ -40,7 +40,8 @@ make agent-build
 The image is based on `ros:jazzy-perception` and includes:
 - ROS 2 Jazzy dev tools, rosdep, vcstool
 - Node.js 22.x + Claude Code CLI
-- Git (for local commits only — no SSH keys or `gh` auth)
+- GitHub CLI (`gh`) for read-only access (see [Read-Only GitHub Access](#read-only-github-access))
+- Git (for local commits only — no SSH keys)
 
 The build passes your host UID/GID to match file ownership.
 
@@ -88,11 +89,11 @@ earlier ones at the same path. So `.agent/` (ro) overlays the base (rw), and
 
 ## Security Model
 
-The container has **zero network authentication**:
+The container has **no write-level network authentication**:
 
 - No SSH keys (`~/.ssh/` not mounted)
-- No GitHub CLI auth (`~/.config/gh/` not mounted)
-- No `GITHUB_TOKEN` environment variable
+- No GitHub CLI write auth (`~/.config/gh/` not mounted)
+- Optional read-only `GH_TOKEN` for `gh` CLI read operations (see [Read-Only GitHub Access](#read-only-github-access))
 - `git commit` works (local operation)
 - `git push` fails (no credentials) — by design
 
@@ -124,6 +125,57 @@ Signal files are stored in `.agent/scratchpad/push-requests/<issue>.json`.
 # Process specific issue
 .agent/scripts/push_gateway.sh --issue 42
 ```
+
+## Read-Only GitHub Access
+
+Container agents can optionally have read-only `gh` CLI access for viewing issues, PRs,
+and code. This uses a fine-grained Personal Access Token (PAT) with read-only permissions,
+passed as `GH_TOKEN` into the container.
+
+### Setup
+
+1. Create a fine-grained PAT at https://github.com/settings/personal-access-tokens/new:
+   - **Token name**: `ros2-agent-readonly` (or similar)
+   - **Expiration**: choose an appropriate duration
+   - **Repository access**: select the repos your agents work with
+   - **Permissions** (read-only):
+     - Issues: Read
+     - Pull requests: Read
+     - Contents: Read
+     - Metadata: Read (auto-selected)
+
+2. Save the token to the config file:
+
+```bash
+mkdir -p ~/.config/ros2-agent
+echo "ghp_yourTokenHere" > ~/.config/ros2-agent/gh-readonly-token
+chmod 600 ~/.config/ros2-agent/gh-readonly-token
+```
+
+3. The launcher picks it up automatically on next run. Verify in the launch banner:
+
+```
+  GitHub:    read-only token
+```
+
+### Alternative: environment variable
+
+Instead of the config file, export `AGENT_GH_TOKEN` before launching:
+
+```bash
+export AGENT_GH_TOKEN="ghp_yourTokenHere"
+make agent-run ISSUE=42
+```
+
+### What agents can do with read-only access
+
+- `gh issue view`, `gh issue list` — read issues and comments
+- `gh pr view`, `gh pr list`, `gh pr diff` — read pull requests
+- `gh api` — read-only API calls
+- `gh search` — search code, issues, PRs
+
+Agents still **cannot** push, create PRs, or create issues from inside the container.
+Those actions go through the push gateway on the host.
 
 ## Troubleshooting
 
@@ -166,12 +218,8 @@ ls -la $(cat .git | awk '{print $2}')  # Should be accessible
 
 Some rosdep dependencies may not be available in the container. The entrypoint runs
 rosdep install with best-effort (`-y` flag) and continues on failures. If a specific
-package fails to build due to missing dependencies, install them manually:
-
-```bash
-# Inside container (shell mode)
-sudo apt-get update && sudo apt-get install -y <package>
-```
+package fails to build due to missing dependencies, report them via `issue_request.sh`
+or note them for the host user. The container runs as a non-root user without sudo.
 
 ### Container won't start
 

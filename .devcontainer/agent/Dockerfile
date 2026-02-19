@@ -1,6 +1,6 @@
 # Sandboxed Agent DevContainer
 # For running Claude Code in YOLO mode with container-level isolation.
-# No SSH keys or GitHub credentials — pushes happen on the host.
+# No SSH keys — pushes happen on the host. Optional read-only gh token via GH_TOKEN.
 
 FROM ros:jazzy-perception
 
@@ -38,6 +38,14 @@ RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
     && echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI via signed apt repo (for read-only access inside container)
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | gpg --dearmor -o /usr/share/keyrings/githubcli.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI globally

@@ -189,10 +189,25 @@ if [ -f "$CLAUDE_CREDS" ]; then
     MOUNT_ARGS+=(-v "$CLAUDE_CREDS:/tmp/claude-credentials.json:ro")
 fi
 
+# ---------- Read-only GitHub token (optional) ----------
+# Provides container agents with read-only gh CLI access (view issues, PRs, code search).
+# Token sources (first match wins):
+#   1. AGENT_GH_TOKEN env var (explicit override)
+#   2. ~/.config/ros2-agent/gh-readonly-token file (persistent config)
+# If neither is set, gh inside the container has no auth (existing behavior).
+
+AGENT_GH_TOKEN="${AGENT_GH_TOKEN:-}"
+GH_TOKEN_FILE="$HOME/.config/ros2-agent/gh-readonly-token"
+
+if [ -z "$AGENT_GH_TOKEN" ] && [ -f "$GH_TOKEN_FILE" ]; then
+    read -r AGENT_GH_TOKEN < "$GH_TOKEN_FILE" || true
+fi
+
 # ---------- Container environment ----------
 
 ENV_ARGS=(
     ${ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY"}
+    ${AGENT_GH_TOKEN:+-e "GH_TOKEN=$AGENT_GH_TOKEN"}
     -e "CLAUDE_CODE_ENTRYPOINT=1"
     -e "ROS2_AGENT_WORKSPACE_ROOT=$ROOT_DIR"
     -e "WORKTREE_ROOT=$WORKTREE_PATH"
@@ -222,6 +237,7 @@ echo "  Issue:     #$ISSUE"
 echo "  Worktree:  $WORKTREE_PATH"
 echo "  Container: $CONTAINER_NAME"
 echo "  Mode:      $([ "$SHELL_MODE" = true ] && echo 'shell (debug)' || echo 'Claude Code (YOLO)')"
+echo "  GitHub:    $([ -n "$AGENT_GH_TOKEN" ] && echo 'read-only token' || echo 'no token')"
 echo "========================================="
 echo ""
 
