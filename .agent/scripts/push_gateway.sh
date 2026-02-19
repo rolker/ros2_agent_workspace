@@ -103,6 +103,51 @@ validate_repo_path() {
     return 0
 }
 
+# ---------- Helper: validate branch name ----------
+# Prevents option injection and dangerous refspecs in git push/gh pr create.
+# Container-written branch names are untrusted input and must be validated
+# before use in git commands.
+validate_branch_name() {
+    local branch="$1"
+    
+    # Reject empty or missing branch
+    if [ -z "$branch" ]; then
+        echo "  ERROR: Branch name is empty." >&2
+        return 1
+    fi
+    
+    # Reject branch names starting with '-' (option injection)
+    if [[ "$branch" =~ ^- ]]; then
+        echo "  ERROR: Branch name '$branch' starts with '-' (potential option injection)." >&2
+        return 1
+    fi
+    
+    # Reject dangerous refspecs and special git options
+    case "$branch" in
+        --all|--mirror|--tags|--force|--delete|--prune|HEAD|@)
+            echo "  ERROR: Branch name '$branch' is a dangerous refspec or git option." >&2
+            return 1
+            ;;
+        refs/*)
+            # Allow explicit refs/ paths (e.g., refs/heads/feature/issue-123)
+            # but validate them with git check-ref-format
+            if ! git check-ref-format "$branch" 2>/dev/null; then
+                echo "  ERROR: Branch name '$branch' is not a valid git ref." >&2
+                return 1
+            fi
+            ;;
+        *)
+            # For short branch names, use --branch flag which allows branch shorthands
+            if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+                echo "  ERROR: Branch name '$branch' is not a valid git branch name." >&2
+                return 1
+            fi
+            ;;
+    esac
+    
+    return 0
+}
+
 # ---------- Helper: check if a worktree ID matches the filter ----------
 
 matches_filter() {
@@ -163,6 +208,13 @@ process_push_requests() {
         # Validate repo_path is under workspace root and is a git repo
         if ! validate_repo_path "$repo_path"; then
             echo "  Skipping push request from $signal_file"
+            echo ""
+            continue
+        fi
+
+        # Validate branch name (prevent option injection and dangerous refspecs)
+        if ! validate_branch_name "$branch"; then
+            echo "  Skipping push request from $signal_file due to invalid branch name."
             echo ""
             continue
         fi
