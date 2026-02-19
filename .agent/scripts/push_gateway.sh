@@ -43,6 +43,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --worktree-id|--issue)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: $1 requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            ;;&
         --worktree-id)
             FILTER_WORKTREE_ID="$2"; shift 2 ;;
         --issue)
@@ -55,6 +62,46 @@ while [[ $# -gt 0 ]]; do
             exit 1 ;;
     esac
 done
+
+# ---------- Helper: confine file path to scratchpad ----------
+# Prevents path traversal attacks where a container-written JSON points
+# body_file at an arbitrary host file (e.g., ~/.ssh/id_rsa).
+SCRATCHPAD_DIR="$ROOT_DIR/.agent/scratchpad"
+
+validate_body_file() {
+    local file_path="$1"
+    [ -n "$file_path" ] || return 1
+    [ -f "$file_path" ] || return 1
+    local real_path
+    real_path="$(realpath "$file_path" 2>/dev/null)" || return 1
+    case "$real_path" in
+        "$SCRATCHPAD_DIR"/*) return 0 ;;
+        *)
+            echo "  WARNING: body_file '$file_path' is outside scratchpad — ignoring." >&2
+            return 1
+            ;;
+    esac
+}
+
+# ---------- Helper: validate repo_path is under workspace root ----------
+validate_repo_path() {
+    local repo_path="$1"
+    [ -d "$repo_path" ] || return 1
+    local real_path
+    real_path="$(realpath "$repo_path" 2>/dev/null)" || return 1
+    case "$real_path" in
+        "$ROOT_DIR"/*) ;;
+        *)
+            echo "  ERROR: repo_path '$repo_path' is outside workspace root — skipping." >&2
+            return 1
+            ;;
+    esac
+    if ! git -C "$real_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "  ERROR: repo_path '$repo_path' is not a git repository — skipping." >&2
+        return 1
+    fi
+    return 0
+}
 
 # ---------- Helper: check if a worktree ID matches the filter ----------
 
@@ -113,6 +160,20 @@ process_push_requests() {
         body_file=$(jq -r '.pr_body_file // ""' "$signal_file")
         requested_at=$(jq -r '.requested_at' "$signal_file")
 
+        # Validate repo_path is under workspace root and is a git repo
+        if ! validate_repo_path "$repo_path"; then
+            echo "  Skipping push request from $signal_file"
+            echo ""
+            continue
+        fi
+
+        # Re-derive repo_slug from the actual git remote (don't trust container JSON)
+        local origin_url
+        origin_url="$(git -C "$repo_path" remote get-url origin 2>/dev/null || echo "")"
+        if [ -n "$origin_url" ]; then
+            repo_slug="$(printf '%s' "$origin_url" | sed -E 's|.*github\.com[:/]||;s|\.git$||')"
+        fi
+
         echo "-----------------------------------------"
         echo "  Issue:      #$issue"
         echo "  Branch:     $branch"
@@ -147,7 +208,8 @@ process_push_requests() {
                         --title "$pr_title"
                     )
 
-                    if [ -n "$body_file" ] && [ -f "$body_file" ]; then
+                    # Confine body_file to scratchpad (prevents path traversal)
+                    if validate_body_file "$body_file"; then
                         pr_args+=(--body-file "$body_file")
                     else
                         pr_args+=(--body "Closes #$issue")
@@ -156,15 +218,19 @@ process_push_requests() {
                     local pr_url
                     if pr_url=$(gh "${pr_args[@]}" 2>&1); then
                         echo "PR created: $pr_url"
+                        local tmp
+                        tmp=$(mktemp)
+                        jq '.status = "pushed"' "$signal_file" > "$tmp" && mv "$tmp" "$signal_file"
                     else
                         echo "WARNING: PR creation failed: $pr_url" >&2
                         echo "You can create it manually:" >&2
                         echo "  gh pr create --repo $repo_slug --head $branch --title \"$pr_title\"" >&2
+                        # Mark as pushed (git push succeeded) but note PR failure
+                        local tmp
+                        tmp=$(mktemp)
+                        jq '.status = "pushed_no_pr"' "$signal_file" > "$tmp" && mv "$tmp" "$signal_file"
                     fi
 
-                    local tmp
-                    tmp=$(mktemp)
-                    jq '.status = "pushed"' "$signal_file" > "$tmp" && mv "$tmp" "$signal_file"
                     echo ""
                     break
                     ;;
@@ -267,7 +333,8 @@ process_issue_requests() {
                         --title "$title"
                     )
 
-                    if [ -n "$body_file" ] && [ -f "$body_file" ]; then
+                    # Confine body_file to scratchpad (prevents path traversal)
+                    if validate_body_file "$body_file"; then
                         gh_args+=(--body-file "$body_file")
                     fi
 
@@ -297,13 +364,13 @@ process_issue_requests() {
 
                 v|V|view)
                     echo ""
-                    if [ -n "$body_file" ] && [ -f "$body_file" ]; then
+                    if validate_body_file "$body_file"; then
                         echo "--- Issue Body ---"
                         cat "$body_file"
                         echo ""
                         echo "--- End ---"
                     else
-                        echo "(no body provided)"
+                        echo "(no body provided or file outside scratchpad)"
                     fi
                     echo ""
                     ;;

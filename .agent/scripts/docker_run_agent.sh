@@ -65,6 +65,11 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --issue)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --issue requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
             ISSUE="$2"; shift 2 ;;
         --build)
             BUILD_IMAGE=true; shift ;;

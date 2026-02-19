@@ -47,6 +47,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --title|--body|--body-file)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: $1 requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            ;;&
         --title)
             PR_TITLE="$2"; shift 2 ;;
         --body)
@@ -74,7 +81,7 @@ ISSUE="${WORKTREE_ISSUE:-}"
 if [ -z "$ISSUE" ]; then
     # Try to extract from branch name (feature/issue-N)
     BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
-    ISSUE="$(echo "$BRANCH" | grep -oP 'issue-\K\d+' || echo "")"
+    ISSUE="$(printf '%s\n' "$BRANCH" | sed -n 's/.*issue-\([0-9][0-9]*\).*/\1/p' | head -n1)"
 fi
 
 if [ -z "$ISSUE" ]; then

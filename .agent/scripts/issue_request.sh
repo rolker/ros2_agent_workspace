@@ -51,6 +51,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --repo|--title|--body|--body-file|--labels)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: $1 requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            ;;&
         --repo)
             REPO_SLUG="$2"; shift 2 ;;
         --title)
