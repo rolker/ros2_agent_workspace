@@ -12,8 +12,14 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# Use the workspace root env var (set by docker_run_agent.sh) so we always
+# write to the shared scratchpad mount, not the worktree's local .agent/ copy.
+ROOT_DIR="${ROS2_AGENT_WORKSPACE_ROOT:-}"
+if [ -z "$ROOT_DIR" ]; then
+    # Fallback for host-side usage: derive from script location
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+fi
 
 # ---------- Argument parsing ----------
 
