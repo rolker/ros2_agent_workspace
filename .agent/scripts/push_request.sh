@@ -121,11 +121,19 @@ fi
 
 # ---------- Write signal file ----------
 
+# Use WORKTREE_ID as the unique key (avoids collision when multiple repos
+# share the same issue number).
+WORKTREE_ID="${WORKTREE_ID:-}"
+if [ -z "$WORKTREE_ID" ]; then
+    echo "ERROR: WORKTREE_ID not set. This script must run inside a container launched by docker_run_agent.sh." >&2
+    exit 1
+fi
+
 PUSH_DIR="$ROOT_DIR/.agent/scratchpad/push-requests"
 mkdir -p "$PUSH_DIR"
 
-SIGNAL_FILE="$PUSH_DIR/$ISSUE.json"
-BODY_FILE="$PUSH_DIR/$ISSUE-body.md"
+SIGNAL_FILE="$PUSH_DIR/$WORKTREE_ID.json"
+BODY_FILE="$PUSH_DIR/$WORKTREE_ID-body.md"
 
 # Write PR body to separate file (avoids JSON escaping issues)
 printf '%s\n' "$PR_BODY" > "$BODY_FILE"
@@ -133,6 +141,7 @@ printf '%s\n' "$PR_BODY" > "$BODY_FILE"
 # Write JSON signal
 cat > "$SIGNAL_FILE" <<ENDJSON
 {
+  "worktree_id": "$WORKTREE_ID",
   "issue": $ISSUE,
   "branch": "$BRANCH",
   "repo_slug": "$REPO_SLUG",

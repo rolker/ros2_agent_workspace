@@ -114,7 +114,8 @@ if [ -z "$WORKTREE_PATH" ]; then
     exit 1
 fi
 
-echo "Using worktree: $WORKTREE_PATH"
+WORKTREE_ID="$(basename "$WORKTREE_PATH")"
+echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
 
 # ---------- Build image (if requested or missing) ----------
 
@@ -190,6 +191,7 @@ ENV_ARGS=(
     -e "CLAUDE_CODE_ENTRYPOINT=1"
     -e "ROS2_AGENT_WORKSPACE_ROOT=$ROOT_DIR"
     -e "WORKTREE_ROOT=$WORKTREE_PATH"
+    -e "WORKTREE_ID=$WORKTREE_ID"
     -e "WORKTREE_ISSUE=$ISSUE"
     -e "GIT_EDITOR=true"
 )
@@ -205,7 +207,7 @@ fi
 
 # ---------- Launch container ----------
 
-CONTAINER_NAME="${CONTAINER_PREFIX}-issue-${ISSUE}"
+CONTAINER_NAME="${CONTAINER_PREFIX}-${WORKTREE_ID}"
 
 echo ""
 echo "========================================="
@@ -231,21 +233,40 @@ docker run -it --rm \
     "${CONTAINER_CMD[@]}" \
     || EXIT_CODE=$?
 
-# ---------- Post-exit: check for push requests ----------
+# ---------- Post-exit: check for outbox items ----------
 
 echo ""
-PUSH_REQUEST="$ROOT_DIR/.agent/scratchpad/push-requests/$ISSUE.json"
+HAS_PENDING=false
+
+# Check push requests
+PUSH_REQUEST="$ROOT_DIR/.agent/scratchpad/push-requests/$WORKTREE_ID.json"
 if [ -f "$PUSH_REQUEST" ]; then
     STATUS=$(jq -r '.status // "pending"' "$PUSH_REQUEST" 2>/dev/null || echo "unknown")
     if [ "$STATUS" = "pending" ]; then
-        echo "Push request found for issue #$ISSUE."
-        echo ""
-        if [ -x "$SCRIPT_DIR/push_gateway.sh" ]; then
-            "$SCRIPT_DIR/push_gateway.sh" --issue "$ISSUE"
-        else
-            echo "Run manually: .agent/scripts/push_gateway.sh --issue $ISSUE"
+        HAS_PENDING=true
+    fi
+fi
+
+# Check issue requests
+ISSUE_DIR="$ROOT_DIR/.agent/scratchpad/issue-requests/$WORKTREE_ID"
+if [ -d "$ISSUE_DIR" ]; then
+    for req in "$ISSUE_DIR"/*.json; do
+        [ -f "$req" ] || continue
+        STATUS=$(jq -r '.status // "pending"' "$req" 2>/dev/null || echo "unknown")
+        if [ "$STATUS" = "pending" ]; then
+            HAS_PENDING=true
+            break
         fi
+    done
+fi
+
+if [ "$HAS_PENDING" = true ]; then
+    if [ -x "$SCRIPT_DIR/push_gateway.sh" ]; then
+        "$SCRIPT_DIR/push_gateway.sh" --worktree-id "$WORKTREE_ID"
+    else
+        echo "Pending outbox items found. Run manually:"
+        echo "  .agent/scripts/push_gateway.sh --worktree-id $WORKTREE_ID"
     fi
 else
-    echo "No push request found. Container exited with code $EXIT_CODE."
+    echo "No pending outbox items. Container exited with code $EXIT_CODE."
 fi
