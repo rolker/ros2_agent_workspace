@@ -223,6 +223,7 @@ EXIT_CODE=0
 docker run -it --rm \
     --name "$CONTAINER_NAME" \
     --hostname "agent-$ISSUE" \
+    --security-opt no-new-privileges:true \
     -w "$WORKTREE_PATH" \
     "${MOUNT_ARGS[@]}" \
     "${ENV_ARGS[@]}" \

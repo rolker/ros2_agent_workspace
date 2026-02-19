@@ -17,18 +17,24 @@ if [ -z "$WORKSPACE_ROOT" ]; then
     exit 1
 fi
 
+# Resolve the target non-root user (matches Dockerfile ARG USERNAME)
+TARGET_USER="ros"
+TARGET_UID="$(id -u "$TARGET_USER")"
+TARGET_GID="$(id -g "$TARGET_USER")"
+
 # ---------- 1. Fix anonymous volume ownership ----------
-# Docker creates anonymous volumes as root. Fix ownership so the ros user
-# can write to build/install/log directories.
+# Docker creates anonymous volumes as root. Entrypoint runs as root so we
+# can fix ownership directly — no sudo needed.
 echo "Fixing volume ownership..."
 for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
     [ -d "$ws_dir" ] || continue
     for subdir in build install log; do
         target="$ws_dir/$subdir"
         if [ -d "$target" ]; then
-            sudo chown -R "$(id -u):$(id -g)" "$target" 2>/dev/null || true
+            chown -R "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null || true
         else
             mkdir -p "$target"
+            chown "$TARGET_UID:$TARGET_GID" "$target"
         fi
     done
 done
@@ -68,17 +74,19 @@ done
 #   ~/.claude.json              — onboarding state (hasCompletedOnboarding flag)
 #   ~/.claude/settings.json     — user preferences
 #   ~/.claude/.credentials.json — Anthropic subscription auth
-mkdir -p "$HOME/.claude"
+TARGET_HOME="$(eval echo "~$TARGET_USER")"
+mkdir -p "$TARGET_HOME/.claude"
 if [ -f /tmp/claude-state.json ]; then
-    cp /tmp/claude-state.json "$HOME/.claude.json"
+    cp /tmp/claude-state.json "$TARGET_HOME/.claude.json"
 fi
 if [ -f /tmp/claude-settings.json ]; then
-    cp /tmp/claude-settings.json "$HOME/.claude/settings.json"
+    cp /tmp/claude-settings.json "$TARGET_HOME/.claude/settings.json"
 fi
 if [ -f /tmp/claude-credentials.json ]; then
-    cp /tmp/claude-credentials.json "$HOME/.claude/.credentials.json"
-    chmod 600 "$HOME/.claude/.credentials.json"
+    cp /tmp/claude-credentials.json "$TARGET_HOME/.claude/.credentials.json"
+    chmod 600 "$TARGET_HOME/.claude/.credentials.json"
 fi
+chown -R "$TARGET_UID:$TARGET_GID" "$TARGET_HOME/.claude" "$TARGET_HOME/.claude.json" 2>/dev/null || true
 
 # ---------- 6. Hand off to CMD ----------
 # Restore working directory to the worktree (entrypoint cd'd to WORKSPACE_ROOT above)
@@ -96,4 +104,7 @@ echo "  ROS 2:     ${ROS_DISTRO:-not sourced}"
 echo "========================================="
 echo ""
 
-exec "$@"
+# Drop privileges: run CMD as the non-root target user.
+# setpriv uses setuid(2) directly (no setuid bits) so it works with
+# --security-opt no-new-privileges:true.
+exec setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- "$@"

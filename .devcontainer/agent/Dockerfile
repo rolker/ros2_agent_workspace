@@ -11,13 +11,9 @@ ARG USER_GID=$USER_UID
 # Delete user if it exists in base image with same UID
 RUN if id -u $USER_UID >/dev/null 2>&1; then userdel -r $(id -un $USER_UID); fi
 
-# Create user with sudo access
+# Create non-root user (no sudo — entrypoint runs as root, drops privileges)
 RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && apt-get update \
-    && apt-get install -y sudo \
-    && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
 
 # Enable universe repo (needed for some rosdep dependencies)
 RUN apt-get update && apt-get install -y software-properties-common \
@@ -52,7 +48,9 @@ USER $USERNAME
 # Update rosdep as non-root user
 RUN rosdep update
 
-# Entrypoint handles volume ownership and environment setup
+# Entrypoint runs as root to fix volume ownership, then drops to $USERNAME
+# via setpriv (no setuid bits — compatible with --security-opt no-new-privileges)
+USER root
 COPY --chmod=755 agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
 ENTRYPOINT ["agent-entrypoint.sh"]
 CMD ["claude", "--dangerously-skip-permissions"]
