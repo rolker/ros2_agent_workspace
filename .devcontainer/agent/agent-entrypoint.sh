@@ -58,6 +58,8 @@ source "$WORKSPACE_ROOT/.agent/scripts/env.sh"
 set -u
 
 # ---------- 4. Install rosdep dependencies (best-effort) ----------
+# Refresh apt index — the Dockerfile's apt-get update is stale by container start
+apt-get update -qq
 echo "Installing rosdep dependencies..."
 for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
     [ -d "$ws_dir/src" ] || continue
