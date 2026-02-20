@@ -78,7 +78,7 @@ rm "$BODY_FILE"
 
 ## GitHub Reference Links in Summaries
 
-- On first mention of any GitHub issue, PR, commit, or repository in summaries/reports, include a clickable URL.
+- When referencing any GitHub issue, PR, commit, or repository in summaries/reports, include a clickable URL on every mention.
 - Use markdown links where supported; in plain terminal output include a full URL inline or on the next line.
 - This is a link rule only; summary structure remains flexible.
 
