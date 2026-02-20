@@ -91,12 +91,51 @@ its toolchain via `apt` and `rosdep`. mise's tool management value is diminished
 ROS environment where system packages dominate. However, its task runner could be useful
 if the team wants a single tool for environment + tasks.
 
+### `colcon defaults.yaml` — Declarative Build Configuration
+
+Regardless of which task runner is chosen, colcon's own `defaults.yaml` can absorb
+flags currently hardcoded in scripts. Instead of encoding `--symlink-install` and
+`--cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` in `build.sh`, declare them in a
+`defaults.yaml` file per layer. This makes build scripts thinner and the configuration
+more discoverable. See [colcon Quick Start](https://colcon.readthedocs.io/en/released/user/quick-start.html).
+
 ### Recommendation
 
 **`just` is the strongest candidate** for replacing the Makefile. It has the closest
 syntax to Make (lowering migration cost), provides self-documentation natively, and
 has emerging AI/LLM integration. However, **the current Makefile with self-documenting
 patterns** (see Section 2) may be sufficient if the team prefers zero new dependencies.
+
+Example migration of current Makefile to justfile:
+
+```just
+# justfile
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# Show available recipes
+default:
+    @just --list
+
+# Build all workspace layers
+build:
+    ./.agent/scripts/build.sh
+
+# Build a specific package
+build-pkg package:
+    cd layers/main/core_ws && colcon build --packages-select {{package}}
+
+# Run tests on all layers
+test:
+    ./.agent/scripts/test.sh
+
+# Show workspace status
+status *args:
+    ./.agent/scripts/status_report.sh {{args}}
+
+# Revert all commits for an issue
+revert-feature issue:
+    ./.agent/scripts/revert_feature.sh --issue {{issue}}
+```
 
 ---
 
@@ -205,6 +244,26 @@ However, the maintainer's comment notes that duplication was **intentional** to 
 compromise. AGENTS.md's design addresses this: framework-specific files can override or
 extend AGENTS.md, so security-sensitive rules can remain in per-framework files.
 
+### Multi-Tool Symlink Strategy
+
+For workspaces that use both CLAUDE.md and AGENTS.md, the recommended approach
+([Kaushik Gopal](https://kau.sh/blog/agents-md/)) is:
+
+```bash
+# Option 1: AGENTS.md as canonical, symlink for Claude
+mv CLAUDE.md AGENTS.md
+ln -s AGENTS.md CLAUDE.md
+
+# Option 2: Separate files, Claude imports shared content
+# CLAUDE.md contains:
+#   @AGENTS.md
+#   # Claude-specific overrides below
+```
+
+For this workspace, **Option 2 is better** because CLAUDE.md has Claude-specific
+behavioral rules (env.sh sourcing, worktree guards) that should not appear in the
+universal AGENTS.md.
+
 ### Relationship to Anthropic's Agent Skills
 
 Anthropic introduced **Agent Skills** (October 2025) as a complementary standard — modular,
@@ -217,6 +276,9 @@ from AGENTS.md and could be relevant for the workspace's script organization.
 - [OpenAI Codex Guide — AGENTS.md](https://developers.openai.com/codex/guides/agents-md/)
 - [Agentic AI Foundation (OpenAI announcement)](https://openai.com/index/agentic-ai-foundation/)
 - [AGENTS.md Deep Dive (PRPM)](https://prpm.dev/blog/agents-md-deep-dive)
+- [AGENTS.md Sync Strategy (Kaushik Gopal)](https://kau.sh/blog/agents-md/)
+- [One File to Guide Them All (Layer5)](https://layer5.io/blog/ai/agentsmd-one-file-to-guide-them-all/)
+- [AI Instruction Files Comparison (0xdevalias)](https://gist.github.com/0xdevalias/f40bc5a6f84c4c5ad862e314894b2fa6)
 
 ---
 
@@ -273,6 +335,16 @@ Based on the workspace exploration:
 **Audit for deprecation**:
 - Scripts listed in the issue as "dead or undocumented" — requires individual review
 
+#### 4d. Target Reduction
+
+Based on industry research ([ScriptRunner](https://www.scriptrunner.com/blog-cio-head-of-it/tool-sprawl-killing-it-productivity)),
+73% of professionals say fragmented tooling blocks collaboration. A realistic target
+for this workspace is reducing from 42 scripts to approximately 15-20 by:
+1. Inlining simple wrapper scripts into the task runner
+2. Merging related scripts (status, identity, validation)
+3. Deprecating unused or experimental scripts
+4. Moving test scripts to a test framework
+
 ---
 
 ## 5. Documentation Consolidation
@@ -318,11 +390,37 @@ This approach:
 - Eliminates redundancy between AI_RULES.md and framework files
 - Preserves the maintainer's intent for framework-specific isolation
 
-#### 5c. Documentation Tools (Lower Priority)
+#### 5c. CLAUDE.md Best Practices (Anthropic Guidance)
+
+Based on [Anthropic's official guidance](https://code.claude.com/docs/en/best-practices),
+[builder.io](https://www.builder.io/blog/claude-md-guide), and
+[HumanLayer](https://www.humanlayer.dev/blog/writing-a-good-claude-md):
+
+- **Keep CLAUDE.md under 300 lines** — for every line, ask "Would removing this cause
+  Claude to make mistakes?" If not, cut it. Bloated files cause instructions to be ignored.
+- **Use `@imports` for progressive disclosure** — put detailed instructions in separate
+  files and reference them with `@path/to/file`. Claude pulls in content when relevant.
+- **Use `.claude/rules/` for topic-specific rules** — instead of one massive file, split
+  into focused rule files (e.g., `code-style.md`, `git-workflow.md`). Auto-loaded.
+- **Evolve organically** — treat CLAUDE.md like code. Review it when agent behavior
+  is wrong. Use emphasis (`IMPORTANT`, `YOU MUST`) sparingly but when needed.
+
+#### 5d. Documentation Tools (Lower Priority)
 
 For this workspace, dedicated documentation tooling (mdBook, Docusaurus) is overkill.
 The content is operational instructions, not user-facing documentation. Plain Markdown
 files in the repository are the right format.
+
+If a browsable docs site becomes needed later, **MkDocs Material**
+([squidfunk.github.io/mkdocs-material](https://squidfunk.github.io/mkdocs-material/))
+is the best fit — Python-native (aligns with ROS 2 ecosystem), supports Mermaid diagrams
+for architecture visualization, and can render existing .md files with minimal config.
+
+#### 5e. Documentation Drift Detection
+
+An emerging tool, [Packmind's context-evaluator](https://packmind.com/evaluate-context-ai-coding-agent/),
+analyzes git repos and flags stale AI instruction files. This addresses the workspace's
+documented problem of features being "implemented but not reliably followed."
 
 ---
 
