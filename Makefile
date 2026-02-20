@@ -119,6 +119,7 @@ $(PRE_COMMIT):
 
 setup-dev: $(PRE_COMMIT)
 	@$(PRE_COMMIT) install
+	@./.agent/scripts/generate_make_skills.sh
 	@echo "Dev-tools venv is ready. Git hooks installed."
 
 lint: $(PRE_COMMIT)
