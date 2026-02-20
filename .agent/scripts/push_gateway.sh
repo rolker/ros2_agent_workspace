@@ -109,47 +109,46 @@ validate_repo_path() {
 # before use in git commands.
 validate_branch_name() {
     local branch="$1"
-    
-    # Reject empty or missing branch
-    if [ -z "$branch" ]; then
-        echo "  ERROR: Branch name is empty." >&2
+
+    # Reject empty, missing, or jq-null branch names
+    if [ -z "$branch" ] || [ "$branch" = "null" ]; then
+        echo "  ERROR: Branch name is empty or missing." >&2
         return 1
     fi
-    
-    # Reject branch names starting with '-' (option injection) or '+' (force-push refspec)
-    if [[ "$branch" =~ ^[-+] ]]; then
-        echo "  ERROR: Branch name '$branch' starts with '-' or '+' (potential option/refspec injection)." >&2
-        return 1
-    fi
-    
-    # Reject dangerous refspecs and special git options
+
+    # Reject dangerous git options and refspecs (checked before generic ^[-+] so
+    # specific options like --mirror get a more informative error message)
     case "$branch" in
         --all|--mirror|--tags|--force|--delete|--prune|HEAD|@)
             echo "  ERROR: Branch name '$branch' is a dangerous refspec or git option." >&2
             return 1
             ;;
-        refs/heads/*)
-            # Allow explicit branch refs under refs/heads/ (e.g., refs/heads/feature/issue-123)
-            # but validate them with git check-ref-format
-            if ! git check-ref-format "$branch" 2>/dev/null; then
-                echo "  ERROR: Branch name '$branch' is not a valid git ref." >&2
-                return 1
-            fi
-            ;;
         refs/*)
-            # Disallow non-branch refs such as refs/tags/*, refs/notes/*, refs/replace/*, etc.
-            echo "  ERROR: Only branch refs under 'refs/heads/' are allowed; got '$branch'." >&2
+            # Full refs are not allowed — gh pr create --head expects short names
+            echo "  ERROR: Full refs are not allowed; use the short branch name (e.g., 'feature/issue-123' instead of 'refs/heads/feature/issue-123')." >&2
             return 1
             ;;
-        *)
-            # For short branch names, use --branch flag which allows branch shorthands
-            if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
-                echo "  ERROR: Branch name '$branch' is not a valid git branch name." >&2
-                return 1
-            fi
-            ;;
     esac
-    
+
+    # Reject branch names starting with '-' (option injection) or '+' (force-push refspec)
+    if [[ "$branch" =~ ^[-+] ]]; then
+        echo "  ERROR: Branch name '$branch' starts with '-' or '+' (potential option/refspec injection)." >&2
+        return 1
+    fi
+
+    # Validate with git's own ref format checker
+    if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+        echo "  ERROR: Branch name '$branch' is not a valid git branch name." >&2
+        return 1
+    fi
+
+    # Restrict to safe characters — prevents shell metacharacter injection when
+    # branch names are rendered in suggested copy-paste commands
+    if [[ "$branch" =~ [^a-zA-Z0-9/_.\-] ]]; then
+        echo "  ERROR: Branch name '$branch' contains disallowed characters. Only alphanumerics, '/', '_', '.', and '-' are allowed." >&2
+        return 1
+    fi
+
     return 0
 }
 
