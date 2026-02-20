@@ -102,10 +102,14 @@ To merge them into a single file for IntelliSense, run from a layer
 workspace (e.g., `layers/main/core_ws`):
 
 ```bash
-mapfile -t compdb_files < <(find build -name compile_commands.json -not -path build/compile_commands.json -print)
-if [ "${#compdb_files[@]}" -gt 0 ]; then
-  jq -s 'add' "${compdb_files[@]}" > /tmp/compile_commands_merged.json
-  mv /tmp/compile_commands_merged.json build/compile_commands.json
+if [ -d build ]; then
+  mapfile -t compdb_files < <(find build -name compile_commands.json -not -path build/compile_commands.json -print)
+  if [ "${#compdb_files[@]}" -gt 0 ]; then
+    jq -s 'add' "${compdb_files[@]}" > /tmp/compile_commands_merged.json
+    mv /tmp/compile_commands_merged.json build/compile_commands.json
+  else
+    echo "No compile_commands.json files found. Build CMake packages first."
+  fi
 else
   echo "No compile_commands.json files found. Build CMake packages first."
 fi
