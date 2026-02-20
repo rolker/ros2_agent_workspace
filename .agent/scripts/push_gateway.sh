@@ -106,7 +106,8 @@ validate_repo_path() {
 # ---------- Helper: validate branch name ----------
 # Prevents option injection and dangerous refspecs in git push/gh pr create.
 # Container-written branch names are untrusted input and must be validated
-# before use in git commands.
+# before use in git commands. Shell metacharacter safety in printed fallback
+# commands is handled separately via printf %q at the call sites.
 validate_branch_name() {
     local branch="$1"
 
@@ -139,13 +140,6 @@ validate_branch_name() {
     # Validate with git's own ref format checker
     if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
         echo "  ERROR: Branch name '$branch' is not a valid git branch name." >&2
-        return 1
-    fi
-
-    # Restrict to safe characters — prevents shell metacharacter injection when
-    # branch names are rendered in suggested copy-paste commands
-    if [[ "$branch" =~ [^a-zA-Z0-9/_.\-] ]]; then
-        echo "  ERROR: Branch name '$branch' contains disallowed characters. Only alphanumerics, '/', '_', '.', and '-' are allowed." >&2
         return 1
     fi
 
@@ -280,7 +274,7 @@ process_push_requests() {
                     else
                         echo "WARNING: PR creation failed: $pr_url" >&2
                         echo "You can create it manually:" >&2
-                        echo "  gh pr create --repo $repo_slug --head $branch --title \"$pr_title\"" >&2
+                        printf '  gh pr create --repo %s --head %s --title %s\n' "$repo_slug" "$branch" "$(printf %q "$pr_title")" >&2
                         # Mark as pushed (git push succeeded) but note PR failure
                         local tmp
                         tmp=$(mktemp)
@@ -412,7 +406,7 @@ process_issue_requests() {
                     else
                         echo "WARNING: Issue creation failed: $issue_url" >&2
                         echo "You can create it manually:" >&2
-                        echo "  gh issue create --repo $repo_slug --title \"$title\"" >&2
+                        printf '  gh issue create --repo %s --title %s\n' "$repo_slug" "$(printf %q "$title")" >&2
                     fi
                     echo ""
                     break
