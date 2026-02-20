@@ -90,15 +90,20 @@ create `.vscode/tasks.json` at the workspace root:
 
 ## C++ IntelliSense
 
-The build script generates `compile_commands.json` for each **package**
-(via `CMAKE_EXPORT_COMPILE_COMMANDS=ON`). After building, files appear at
-`build/<package>/compile_commands.json`.
+The build script generates `compile_commands.json` for each CMake-based **package**
+(via `CMAKE_EXPORT_COMPILE_COMMANDS=ON`). After building, CMake packages will have files at
+`build/<package>/compile_commands.json` (Python-only packages will not).
 
 To merge them into a single file for IntelliSense, run from a layer
 workspace (e.g., `layers/main/core_ws`):
 
 ```bash
-jq -s 'add' build/*/compile_commands.json > build/compile_commands.json
+mapfile -t compdb_files < <(find build -name compile_commands.json -print)
+if [ "${#compdb_files[@]}" -gt 0 ]; then
+  jq -s 'add' "${compdb_files[@]}" > build/compile_commands.json
+else
+  echo "No compile_commands.json files found. Build CMake packages first."
+fi
 ```
 
 Then create `.vscode/c_cpp_properties.json` in the layer directory

@@ -143,10 +143,9 @@ Ensure ROS 2 Jazzy is installed:
 
 #### Build Failures
 1. Check the build report: `cat .agent/scratchpad/build_report.md`
-2. Try building a single layer:
+2. Try rebuilding all layers:
    ```bash
-   cd layers/main/core_ws
-   colcon build --symlink-install
+   make build
    ```
 3. Check for missing dependencies:
    ```bash
