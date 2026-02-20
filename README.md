@@ -143,10 +143,9 @@ Ensure ROS 2 Jazzy is installed:
 
 #### Build Failures
 1. Check the build report: `cat .agent/scratchpad/build_report.md`
-2. Try building a single layer:
+2. Try rebuilding all layers:
    ```bash
-   cd layers/main/core_ws
-   colcon build --symlink-install
+   make build
    ```
 3. Check for missing dependencies:
    ```bash
@@ -198,6 +197,9 @@ make lint          # Run linters
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
 - `status_report.sh`: Comprehensive workspace status with `--quick` and `--pr-triage` flags.
+
+### IDE Setup
+- [VS Code Setup Guide](.agent/knowledge/vscode_setup.md): Multi-root workspace, build tasks, C++/Python IntelliSense configuration.
 
 ### Pre-commit Hooks
 Set up pre-commit hooks for automatic validation:
