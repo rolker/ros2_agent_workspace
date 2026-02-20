@@ -34,6 +34,12 @@ rules plus framework-specific guidance.
 8. **Use `--body-file`** for `gh` CLI, not inline `--body` (newlines break).
 9. **Build in layer directories only** — never `colcon build` from workspace root.
 10. **Never document from assumptions** — verify every parameter, topic, service, and message type by reading source code. See [`knowledge/documentation_verification.md`](knowledge/documentation_verification.md).
+11. **Link GitHub references on first mention** — in summaries/reports, include a clickable URL for each issue, PR, commit, or repository when first mentioned. Use markdown links where supported; otherwise include the full URL inline or on the next line. This is a link rule only, not a required summary template.
+
+Examples:
+- `[Issue #129: Clickable GitHub references](https://github.com/rolker/ros2_agent_workspace/issues/129)`
+- `PR #68: https://github.com/rolker/unh_marine_autonomy/pull/68`
+- `[e8c32bc](https://github.com/rolker/unh_marine_autonomy/commit/e8c32bc)`
 
 ## Key Scripts
 
