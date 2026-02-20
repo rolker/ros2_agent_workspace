@@ -102,9 +102,10 @@ To merge them into a single file for IntelliSense, run from a layer
 workspace (e.g., `layers/main/core_ws`):
 
 ```bash
-mapfile -t compdb_files < <(find build -name compile_commands.json -print)
+mapfile -t compdb_files < <(find build -name compile_commands.json -not -path build/compile_commands.json -print)
 if [ "${#compdb_files[@]}" -gt 0 ]; then
-  jq -s 'add' "${compdb_files[@]}" > build/compile_commands.json
+  jq -s 'add' "${compdb_files[@]}" > /tmp/compile_commands_merged.json
+  mv /tmp/compile_commands_merged.json build/compile_commands.json
 else
   echo "No compile_commands.json files found. Build CMake packages first."
 fi
@@ -130,7 +131,7 @@ Re-run the `jq` merge after each build, or add it as a post-build
 VS Code task. Verify per-package files exist after building:
 
 ```bash
-ls layers/main/core_ws/build/*/compile_commands.json
+ls build/*/compile_commands.json
 ```
 
 ## Python IntelliSense
@@ -143,10 +144,14 @@ at `install/<package>/lib/python3.XX/site-packages/`. In the layer's
 ```jsonc
 {
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/install/*/lib/python3.12/site-packages"
+    "${workspaceFolder}/install/<package>/lib/python3.12/site-packages"
   ]
 }
 ```
+
+> **Note**: Add one entry per Python package. Pylance does not expand glob
+> patterns in `extraPaths`. Use the discovery command below to find installed
+> package names.
 
 To discover the correct Python version for your environment:
 
@@ -211,7 +216,7 @@ resolve headers. Always build in the same context you're editing:
 
 ```bash
 # Inside the worktree's layer directory
-cd core_ws && colcon build --symlink-install
+cd core_ws && colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 
 ### File watching and search
