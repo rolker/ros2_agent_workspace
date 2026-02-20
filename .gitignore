@@ -24,6 +24,9 @@ COLCON_IGNORE
 .vscode/
 *.code-workspace
 
+# Generated Claude Code skills (regenerate with: make generate-skills)
+.claude/skills/make_*/
+
 # Agent Scratchpad (Temporary files and artifacts)
 .agent/scratchpad/*
 !.agent/scratchpad/README.md

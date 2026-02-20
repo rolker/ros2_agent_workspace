@@ -137,6 +137,10 @@ make lint                                        # Lint + hooks (uses venv pre-c
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
 
+All Makefile targets are available as `/make_*` slash commands (e.g., `/make_build`,
+`/make_test`, `/make_status`). After adding or removing Makefile targets, run
+`make generate-skills` to regenerate the slash commands.
+
 ## Documentation Accuracy
 
 - **Never document from assumptions** — every claim about parameters, topics, services,
