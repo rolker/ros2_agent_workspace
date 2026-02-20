@@ -116,9 +116,9 @@ validate_branch_name() {
         return 1
     fi
     
-    # Reject branch names starting with '-' (option injection)
-    if [[ "$branch" =~ ^- ]]; then
-        echo "  ERROR: Branch name '$branch' starts with '-' (potential option injection)." >&2
+    # Reject branch names starting with '-' (option injection) or '+' (force-push refspec)
+    if [[ "$branch" =~ ^[-+] ]]; then
+        echo "  ERROR: Branch name '$branch' starts with '-' or '+' (potential option/refspec injection)." >&2
         return 1
     fi
     
@@ -128,13 +128,18 @@ validate_branch_name() {
             echo "  ERROR: Branch name '$branch' is a dangerous refspec or git option." >&2
             return 1
             ;;
-        refs/*)
-            # Allow explicit refs/ paths (e.g., refs/heads/feature/issue-123)
+        refs/heads/*)
+            # Allow explicit branch refs under refs/heads/ (e.g., refs/heads/feature/issue-123)
             # but validate them with git check-ref-format
             if ! git check-ref-format "$branch" 2>/dev/null; then
                 echo "  ERROR: Branch name '$branch' is not a valid git ref." >&2
                 return 1
             fi
+            ;;
+        refs/*)
+            # Disallow non-branch refs such as refs/tags/*, refs/notes/*, refs/replace/*, etc.
+            echo "  ERROR: Only branch refs under 'refs/heads/' are allowed; got '$branch'." >&2
+            return 1
             ;;
         *)
             # For short branch names, use --branch flag which allows branch shorthands
