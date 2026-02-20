@@ -103,6 +103,49 @@ validate_repo_path() {
     return 0
 }
 
+# ---------- Helper: validate branch name ----------
+# Prevents option injection and dangerous refspecs in git push/gh pr create.
+# Container-written branch names are untrusted input and must be validated
+# before use in git commands. Shell metacharacter safety in printed fallback
+# commands is handled separately via printf %q at the call sites.
+validate_branch_name() {
+    local branch="$1"
+
+    # Reject empty, missing, or jq-null branch names
+    if [ -z "$branch" ] || [ "$branch" = "null" ]; then
+        echo "  ERROR: Branch name is empty or missing." >&2
+        return 1
+    fi
+
+    # Reject dangerous git options and refspecs (checked before generic ^[-+] so
+    # specific options like --mirror get a more informative error message)
+    case "$branch" in
+        --all|--mirror|--tags|--force|--delete|--prune|HEAD|@)
+            echo "  ERROR: Branch name '$branch' is a dangerous refspec or git option." >&2
+            return 1
+            ;;
+        refs/*)
+            # Full refs are not allowed — gh pr create --head expects short names
+            echo "  ERROR: Full refs are not allowed; use the short branch name (e.g., 'feature/issue-123' instead of 'refs/heads/feature/issue-123')." >&2
+            return 1
+            ;;
+    esac
+
+    # Reject branch names starting with '-' (option injection) or '+' (force-push refspec)
+    if [[ "$branch" =~ ^[-+] ]]; then
+        echo "  ERROR: Branch name '$branch' starts with '-' or '+' (potential option/refspec injection)." >&2
+        return 1
+    fi
+
+    # Validate with git's own ref format checker
+    if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+        echo "  ERROR: Branch name '$branch' is not a valid git branch name." >&2
+        return 1
+    fi
+
+    return 0
+}
+
 # ---------- Helper: check if a worktree ID matches the filter ----------
 
 matches_filter() {
@@ -167,6 +210,13 @@ process_push_requests() {
             continue
         fi
 
+        # Validate branch name (prevent option injection and dangerous refspecs)
+        if ! validate_branch_name "$branch"; then
+            echo "  Skipping push request from $signal_file due to invalid branch name."
+            echo ""
+            continue
+        fi
+
         # Re-derive repo_slug from the actual git remote (don't trust container JSON)
         local origin_url
         origin_url="$(git -C "$repo_path" remote get-url origin 2>/dev/null || echo "")"
@@ -224,7 +274,7 @@ process_push_requests() {
                     else
                         echo "WARNING: PR creation failed: $pr_url" >&2
                         echo "You can create it manually:" >&2
-                        echo "  gh pr create --repo $repo_slug --head $branch --title \"$pr_title\"" >&2
+                        printf '  gh pr create --repo %s --head %s --title %s\n' "$(printf %q "$repo_slug")" "$(printf %q "$branch")" "$(printf %q "$pr_title")" >&2
                         # Mark as pushed (git push succeeded) but note PR failure
                         local tmp
                         tmp=$(mktemp)
@@ -356,7 +406,7 @@ process_issue_requests() {
                     else
                         echo "WARNING: Issue creation failed: $issue_url" >&2
                         echo "You can create it manually:" >&2
-                        echo "  gh issue create --repo $repo_slug --title \"$title\"" >&2
+                        printf '  gh issue create --repo %s --title %s\n' "$(printf %q "$repo_slug")" "$(printf %q "$title")" >&2
                     fi
                     echo ""
                     break
