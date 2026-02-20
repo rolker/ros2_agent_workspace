@@ -83,6 +83,18 @@ wrong issue number copied from a plan or status report.
 Use your actual runtime identity — never copy example model names from docs.
 Check `$AGENT_NAME` / `$AGENT_MODEL` environment variables if unsure.
 
+## GitHub URLs: Never Guess, Always Look Up
+
+The local directory name may not match the GitHub repo name.
+**Never construct GitHub URLs from directory names or assumptions.** Always use `gh` to
+retrieve URLs:
+
+```bash
+gh issue view <N> --json url --jq '.url'
+gh pr view <N> --json url --jq '.url'
+gh repo view --json url --jq '.url'
+```
+
 ## GitHub CLI: Use `--body-file`, Not `--body`
 
 Multiline `--body` strings break newlines. Always write to a temp file first:
