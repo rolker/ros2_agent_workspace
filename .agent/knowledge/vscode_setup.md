@@ -19,6 +19,7 @@ per-layer settings. Create a `.code-workspace` file at the repo root:
 {
   "folders": [
     { "path": ".", "name": "Workspace Root" },
+    { "path": "layers/main/underlay_ws", "name": "Underlay" },
     { "path": "layers/main/core_ws", "name": "Core" },
     { "path": "layers/main/platforms_ws", "name": "Platforms" },
     { "path": "layers/main/sensors_ws", "name": "Sensors" },
@@ -39,6 +40,9 @@ yet will appear grayed out.
 
 > **Note**: The `.code-workspace` file references paths under `layers/`
 > which is gitignored. This file is local to your machine.
+
+> **Tip**: The layer list is project-specific — it comes from
+> `configs/manifest/layers.txt`. Adjust the folders list to match your workspace.
 
 ## Makefile Tasks
 
@@ -175,13 +179,58 @@ to continue an extension conversation.
 
 ## Working in Worktrees
 
-When working on a task in a worktree, open VS Code in the worktree
-directory for correct git context:
+Open each worktree in its own VS Code window — don't add worktree
+folders to the main workspace. VS Code's source control targets whichever
+`.git` root it detects first, so mixing worktrees and the main checkout
+in one window causes commits to land in the wrong place.
 
 ```bash
 source .agent/scripts/worktree_enter.sh --issue <N>
 code .
 ```
 
-You can have multiple VS Code windows open for different worktrees
-simultaneously.
+### Workspace worktrees
+
+Workspace worktrees (`.workspace-worktrees/issue-workspace-<N>/`) are full
+checkouts of the workspace repo with `layers/main` symlinked back to the
+main tree. The `.code-workspace` file works here because the layer paths
+resolve through the symlink.
+
+### Layer worktrees
+
+Layer worktrees (`layers/worktrees/issue-<slug>-<N>/`) use a hybrid layout:
+real git worktrees for modified project repos and symlinks for the rest.
+Open `code .` from the worktree root; the multi-root `.code-workspace` file
+doesn't apply here since only a subset of packages are checked out.
+
+### IntelliSense paths
+
+`compile_commands.json` records absolute paths at build time. If you build
+in the main tree but edit in a worktree (or vice versa), IntelliSense won't
+resolve headers. Always build in the same context you're editing:
+
+```bash
+# Inside the worktree's layer directory
+cd core_ws && colcon build --symlink-install
+```
+
+### File watching and search
+
+VS Code follows symlinks by default, which causes duplicate search results
+and high file-watcher load in worktrees. Add these to the layer-level
+`.vscode/settings.json` (or the `.code-workspace` settings block):
+
+```jsonc
+{
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/install/**": true,
+    "**/log/**": true
+  },
+  "search.exclude": {
+    "**/build/**": true,
+    "**/install/**": true,
+    "**/log/**": true
+  }
+}
+```
