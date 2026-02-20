@@ -274,7 +274,7 @@ process_push_requests() {
                     else
                         echo "WARNING: PR creation failed: $pr_url" >&2
                         echo "You can create it manually:" >&2
-                        printf '  gh pr create --repo %s --head %s --title %s\n' "$repo_slug" "$branch" "$(printf %q "$pr_title")" >&2
+                        printf '  gh pr create --repo %s --head %s --title %s\n' "$(printf %q "$repo_slug")" "$(printf %q "$branch")" "$(printf %q "$pr_title")" >&2
                         # Mark as pushed (git push succeeded) but note PR failure
                         local tmp
                         tmp=$(mktemp)
@@ -406,7 +406,7 @@ process_issue_requests() {
                     else
                         echo "WARNING: Issue creation failed: $issue_url" >&2
                         echo "You can create it manually:" >&2
-                        printf '  gh issue create --repo %s --title %s\n' "$repo_slug" "$(printf %q "$title")" >&2
+                        printf '  gh issue create --repo %s --title %s\n' "$(printf %q "$repo_slug")" "$(printf %q "$title")" >&2
                     fi
                     echo ""
                     break
