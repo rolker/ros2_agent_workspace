@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature pr-triage
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature pr-triage generate-skills
 
 VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
@@ -28,6 +28,7 @@ help:
 	@echo "  lint          - Run pre-commit hooks on all files"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
+	@echo "  generate-skills - Regenerate Claude Code /make_* slash commands from Makefile"
 	@echo ""
 
 health-check:
@@ -116,3 +117,6 @@ setup-dev: $(PRE_COMMIT)
 
 lint: $(PRE_COMMIT)
 	@$(PRE_COMMIT) run --all-files
+
+generate-skills:
+	@./.agent/scripts/generate_make_skills.sh
