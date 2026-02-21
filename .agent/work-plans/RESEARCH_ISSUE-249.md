@@ -1356,5 +1356,181 @@ had UNH Marine Autonomy terms, for example).
 
 ---
 
+## Appendix B: Technology Landscape Scan — Existing Tools and Emerging Methodologies
+
+Systematic scan (February 2026) of tools, frameworks, and research that overlap with
+the capabilities this workspace is building. Organized by problem domain. For each tool:
+what it does, maturity, and whether we should adopt, monitor, or skip it.
+
+### B1. Git Archaeology & Architecture Recovery from History
+
+**The gap we identified**: No existing tool mines the "rejection history" (closed-without-
+merge PRs, reverted commits, deleted files) to reconstruct architectural rationale.
+
+| Tool | What It Does | Maturity | Action |
+|------|-------------|----------|--------|
+| **CodeScene** | Behavioral code analysis: hotspots, temporal coupling, organizational analysis from git history. Grounded in "Your Code as a Crime Scene" methodology | Production (commercial) | **Monitor** — expensive but the temporal coupling analysis is exactly what you'd want for identifying hidden architectural dependencies |
+| **Code-Maat** | Open-source engine behind the Crime Scene methodology. Git log forensics | Stable | **Evaluate** — free, could complement our archaeology method for quantitative analysis |
+| **iCODES** | LLM-powered semantic search over commit intent. Builds SQLite DB of commit insights | Early | **Evaluate** — closest tool to our archaeology method; semantic commit search could accelerate the process |
+| **Microsoft Code Researcher** | Deep research agent for multi-step reasoning over code + commit history. Tested on Linux kernel | Research prototype (2025) | **Monitor** — methodology paper is valuable; tool not publicly available |
+| **RepoAgent** | LLM-powered documentation generation via global structure analysis + git change tracking | Published (EMNLP 2024) | **Evaluate** — could generate per-package docs from code; used on 270k LOC codebases |
+| **Git-Native Semantic Memory** | Auto-capture architectural decisions as git notes with semantic embeddings. Zero infrastructure | Prototype (Dec 2025) | **High interest** — stores decisions in git itself; sub-10ms retrieval; directly addresses our "lost rationale" problem |
+| **MCP ADR Analysis Server** | AI-powered ADR analysis exposed as MCP tools for coding agents. Detects tech stacks, generates ADRs from requirements | Active OSS | **Evaluate** — could give Claude Code native ADR generation capabilities via MCP |
+| **GitHub Actions + LLM ADR Pipeline** | Methodology: collect PR metadata, call LLM to draft ADR, commit to `/docs/adr/` for review | Pattern (2025) | **Adopt pattern** — implementable with standard GH Actions; every architectural PR ships with a draft ADR |
+| **GitEvo** | Python tool combining git + tree-sitter to track how code constructs evolve over time | Early (MSR 2026) | **Monitor** — syntax-tree level evolution tracking; Python/JS/TS/Java only |
+| **PyDriller** | Python framework for mining git repos programmatically | Mature | **Adopt as library** — building block for any custom archaeology tooling |
+
+**Key finding**: Our workspace archaeology method (§7c) fills a gap that no existing tool
+covers — specifically the systematic mining of *negative space* (what was rejected, removed,
+or abandoned). The closest tools focus on what *exists* in the codebase, not what was tried
+and discarded. The "Vibe ADR" pattern (ADRs as agent-readable decision graphs) aligns with
+our vision of ADRs serving both human and agent audiences.
+
+### B2. AI Agent Guardrails & Compliance Enforcement
+
+**The gap we identified**: The gap is between writing rules and verifying compliance. Many
+tools help define rules; very few verify that agents actually followed them.
+
+| Tool | What It Does | Maturity | Action |
+|------|-------------|----------|--------|
+| **Claude Code Hooks** (PreToolUse/PostToolUse/Stop) | Deterministic lifecycle hooks that can block, modify, or validate agent actions. "Block-at-Submit" recommended pattern | Production | **Already in use** — expand beyond `env.sh` guardrail to cover commit format, issue references, worktree enforcement |
+| **Ruler** | CLI that maintains single `.ruler/` source of truth and distributes rules to 30+ agent config formats (Claude, Cursor, Copilot, Aider, etc.) | Active (v0.3.32) | **Adopt if multi-agent** — eliminates rule duplication across tools |
+| **AGENTS.md standard** | Community standard for cross-agent instruction files using RFC 2119 keywords. Native in Codex CLI, OpenCode | Early | **Align** — our `.agents/README.md` convention already fits; formalizing as `AGENTS.md` adds portability |
+| **Open Policy Agent (OPA)** | General-purpose policy engine (CNCF graduated) using Rego declarative language. Decouples policy from enforcement | Production | **Evaluate** — hook sends tool metadata as JSON to OPA; OPA evaluates against versioned Rego policies. Provides testable, auditable policy layer beyond soft prompt rules |
+| **LlamaFirewall CodeShield** | Static analysis of LLM-generated code using Semgrep/regex across 8 languages. 96% precision | Production (Meta) | **Evaluate for CI** — catches insecure AI-generated code patterns |
+| **Superagent Safety Agent** | Separate "safety agent" that evaluates prompts, tool calls, and responses against policies | Active OSS | **Monitor** — the pattern of a compliance agent reviewing another agent's work is architecturally interesting |
+| **Policy-as-Prompt** | Research: auto-extract enforceable policies from design artifacts into testable classifiers | Research (NeurIPS 2025) | **Monitor** — converting CLAUDE.md rules into testable classifiers would close the rules-verification gap |
+| **Guardrails AI** | Python framework for I/O guards with community validator hub | Production (v0.9) | **Skip** — designed for LLM app outputs, not coding agent workspace compliance |
+| **NVIDIA NeMo Guardrails** | Colang DSL for dialogue flows and programmable rails | Production | **Skip** — conversational AI focus, wrong abstraction for coding agents |
+
+**Key findings**:
+1. The "rules file" pattern (`CLAUDE.md`, `.cursorrules`, etc.) is now universal — our approach is mainstream
+2. Frontier LLMs follow ~150-200 instructions consistently; priority saturates beyond that. Our CLAUDE.md must stay focused
+3. Deterministic enforcement (hooks + CI) must complement soft rules — agents bypass hooks, can't bypass CI + branch protection
+4. No existing tool validates "did this agent follow its CLAUDE.md correctly?" — this remains an open problem
+5. The "block-at-submit" hook pattern (let agent work, validate at commit) is the recommended approach
+
+### B3. Architecture Drift Detection & Layer Boundary Enforcement
+
+**The gap we identified**: No tool in the ROS 2 ecosystem validates package.xml dependencies
+against architectural layer boundaries.
+
+| Tool | What It Does | Maturity | Action |
+|------|-------------|----------|--------|
+| **import-linter** | Python architecture contracts: Layers, Independence, Forbidden Modules. Builds import graph, checks edges against rules | Production | **Adopt** — directly usable for Python packages in our workspace |
+| **PyTestArch** | ArchUnit-inspired architecture testing as pytest tests | Active | **Evaluate** — alternative to import-linter with pytest integration |
+| **deptry** | Finds unused/missing/misclassified Python dependencies. Rust-powered parser | Production | **Adopt** — catches dependency hygiene issues in Python packages |
+| **IWYU (Include-What-You-Use)** | Enforces that each C++ file directly includes what it uses. CMake integration | Production (Clang 18+) | **Adopt** — include hygiene for C++ packages |
+| **CppDepend** | Customizable C++ code queries for architecture and coding standards. Dependency analysis, cycle detection | Production (commercial) | **Evaluate** — most capable C++ architecture tool, but commercial |
+| **Sonargraph-Architect** | Architecture checks via DSL for C/C++, Python, Java. Quality gates with baselines | Production (commercial) | **Monitor** — supports our languages but expensive |
+| **SonarQube Architecture-as-Code** | Define architecture in YAML; detect drift in CI | New (2025, Java only; C++ "under consideration") | **Monitor** — when C++/Python support ships, this becomes very relevant |
+| **Structurizr** | C4 model DSL for version-controlled architecture diagrams | Production | **Adopt for docs** — architecture diagrams as code, rendered from DSL |
+| **colcon graph** | ROS 2 native package dependency visualization (DOT/Graphviz) | Production | **Already available** — use as input to custom boundary checker |
+| **Nx Module Boundaries** | Tag-based dependency constraints (JS/TS) | Production | **Use as design blueprint** — the `depConstraints` model maps perfectly to ROS 2 workspace layers |
+| **Bazel Visibility** | Package-level visibility controls | Production | **Use as design blueprint** — the visibility model informs our layer boundary design |
+| **catkin_lint** | Validates package.xml vs CMakeLists.txt consistency (ROS 1 only) | Stable (ROS 1) | **Gap** — no ROS 2 equivalent exists; this is a significant ecosystem gap |
+
+**Key findings**:
+1. **Must build**: A custom layer boundary checker that parses `package.xml`, maps packages to layers by workspace location, validates dependency edges against rules in a `layer_architecture.yaml`. No existing tool does this
+2. Python tooling is rich (`import-linter`, `PyTestArch`, `deptry`) — adopt directly
+3. C++ architecture testing has no open-source ArchUnit equivalent; options are commercial tools or custom scripts
+4. The Nx/Bazel conceptual models are the right design blueprints for our custom checker
+5. `catkin_lint` for ROS 2 is a missing piece the whole ecosystem needs
+
+### B4. Multi-Agent Coordination & Workspace Orchestration
+
+**The gap we identified**: No tool combines worktree isolation + advisory locks + agent
+messaging + task orchestration for a multi-repo workspace.
+
+| Tool | What It Does | Maturity | Action |
+|------|-------------|----------|--------|
+| **Clash** | Detects merge conflicts between worktree pairs using `git merge-tree` simulation. JSON output, watch mode, pre-edit hooks | Early OSS (Rust) | **Evaluate now** — drop-in conflict detection for our existing worktrees |
+| **MCP Agent Mail** | Async agent coordination via MCP: identities, inboxes, advisory file reservations, searchable history. Git + SQLite backed | Active OSS | **Evaluate now** — advisory reservations map well to our worktree model; MCP means native Claude Code integration |
+| **Claude Agent SDK** | Programmatic access to Claude Code's tools and agent loop. Subagent parallelization with context isolation | Production (Anthropic) | **Adopt for orchestration** — the native way to build a multi-agent orchestrator that spawns subagents in worktrees |
+| **CCManager** | CLI for managing multiple AI coding sessions across worktrees. Session context transfer, hooks | Active OSS | **Evaluate** — context transfer between worktrees could integrate with our scripts |
+| **ccswarm** | Specialized agent pools (Frontend, Backend, DevOps, QA) using Claude Code CLI | Active OSS | **Evaluate** — agent pool concept maps to ROS 2 subsystems (navigation, perception, infrastructure) |
+| **Agent-MCP** | Multi-agent framework with hard file locks, task dependencies, real-time dashboard | OSS (AGPL) | **Monitor** — hard locks are too restrictive for worktree-isolated agents |
+| **Claude-Flow** | Third-party orchestration claiming 64-agent systems, 84.8% SWE-Bench | Active (claims unverified) | **Monitor skeptically** — extraordinary claims need independent verification |
+| **Microsoft Agent Framework** | Unified SDK for multi-agent with enterprise governance. Task adherence, PII detection | Public preview | **Monitor** — relevant if heterogeneous agent teams (Claude + Copilot) are needed |
+| **CrewAI** | Role-based multi-agent with workflows and governance | Production | **Skip** — no git/code/worktree awareness |
+| **MetaGPT** | Simulates software company (PM, architect, engineers) from one-line spec | Research-grade | **Skip** — greenfield generation, not incremental development |
+
+**Key architectural lessons from the ecosystem**:
+
+1. **Advisory locks > hard locks**: Multiple projects converged on this. Hard locks cause
+   head-of-line blocking; advisory reservations surface intent while allowing progress.
+   Soft locks + batching reduced duplicate work from 2.3% to 0.2% (Skywork study)
+
+2. **Cursor's three-role hierarchy**: Equal-status agents with locking failed. Optimistic
+   concurrency also failed (agents became risk-averse). The working pattern: **Planners**
+   (explore + create tasks) → **Workers** (execute without coordinating) → **Judges**
+   (evaluate at cycle end)
+
+3. **Worktree isolation is now industry standard**: Cursor 2.0 (8 parallel agents in
+   worktrees), OpenAI Codex (auto-worktree per agent), and our workspace all converged
+   independently on the same pattern
+
+4. **Runtime isolation beyond filesystem**: DoltHub discovered that worktrees share ports,
+   databases, Docker daemon. For ROS 2 this means shared `ROS_DOMAIN_ID` and DDS discovery.
+   Container isolation (#229) addresses this
+
+5. **Cost-aware orchestration**: Anthropic's Plan-and-Execute pattern (expensive model
+   plans, cheap model executes) reduces costs 90%. No open-source tool implements this
+   with worktree awareness yet
+
+6. **Google DORA 2025 warning**: 90% AI adoption increase correlates with 9% bug rate
+   climb, 91% more code review time, 154% larger PRs. Coordination quality matters more
+   than parallelism throughput
+
+### B5. Instruction/Prompt Regression Testing
+
+*(Research in progress — to be completed when final agent reports)*
+
+### B6. Cross-Cutting Synthesis: What to Adopt, Build, or Skip
+
+**Adopt now** (existing tools that directly solve our problems):
+| Tool | Problem Solved | Effort |
+|------|---------------|--------|
+| `import-linter` | Python architecture boundary enforcement | Low — pip install + config |
+| `deptry` | Python dependency hygiene | Low — pip install + CI step |
+| IWYU | C++ include hygiene | Low — CMake integration exists |
+| PyDriller | Library for custom archaeology tooling | Low — pip install |
+| `AGENTS.md` alignment | Cross-agent instruction portability | Low — rename/formalize existing files |
+| GitHub Actions + LLM ADR pipeline | Auto-draft ADRs from architectural PRs | Medium — GH Action + LLM API |
+| Structurizr DSL | Architecture diagrams as code | Low — DSL + Docker for rendering |
+
+**Build custom** (no existing tool covers these):
+| Tool | Problem Solved | Effort |
+|------|---------------|--------|
+| ROS 2 layer boundary checker | Validate package.xml deps against `layer_architecture.yaml` | Medium — Python script parsing XML + graph analysis |
+| Instruction compliance test suite | Verify agents follow CLAUDE.md rules | High — requires eval framework integration |
+| Archaeology automation | Scripted version of our manual archaeology method | Medium — PyDriller + LLM + GitHub API |
+
+**Evaluate soon** (promising, need hands-on testing):
+| Tool | Why Evaluate | Risk |
+|------|-------------|------|
+| Clash | Drop-in worktree conflict detection | Early-stage, may have rough edges |
+| MCP Agent Mail | Advisory file reservations via MCP | Adds infrastructure dependency |
+| Claude Agent SDK | Native multi-agent orchestrator | Requires orchestrator development |
+| OPA (Rego policies) | Formal, testable policy enforcement via hooks | Rego learning curve |
+| iCODES | Semantic search over commit intent | Early-stage |
+| Git-native semantic memory | Auto-capture decisions as git notes | Prototype only |
+| Ruler | Multi-agent rule distribution | Only needed if we adopt multiple agent tools |
+
+**Monitor** (interesting but not ready or not our problem yet):
+- CodeScene (commercial, expensive)
+- SonarQube Architecture-as-Code (waiting for C++/Python)
+- Microsoft Agent Framework (wrong ecosystem unless we go multi-vendor)
+- Policy-as-Prompt research (auto-extract rules into classifiers)
+- Sonargraph-Architect (commercial, expensive)
+- AEBOP (Agentic Engineering Body of Practices — emerging standard)
+
+**Skip** (wrong problem or wrong ecosystem):
+- Guardrails AI / NeMo Guardrails (chatbot guardrails, not coding agent workspace)
+- CrewAI / MetaGPT / OpenAI Agents SDK (no git/workspace awareness, or wrong vendor)
+- GitButler virtual branches (incompatible with ROS 2 build requirements)
+
+---
+
 **Authored-By**: `Claude Code Agent`
 **Model**: `Claude Opus 4.6`
