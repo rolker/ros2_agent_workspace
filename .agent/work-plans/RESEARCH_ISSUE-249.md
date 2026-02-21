@@ -1588,5 +1588,15 @@ significantly, and several frameworks can be adapted.
 
 ---
 
+## Appendix C: Spec-Driven Development and AI Agent Specification Practices
+
+See [RESEARCH_ISSUE-249_APPENDIX-C.md](RESEARCH_ISSUE-249_APPENDIX-C.md) — evaluates
+the spec-driven development movement (Addy Osmani's O'Reilly article, GitHub Spec Kit,
+Amazon Kiro) against the workspace's existing workflow. Key findings: the three-tier
+boundary system for agent instruction files, Spec Kit's `/analyze` consistency validator,
+and the recommendation to cherry-pick concepts rather than adopt the full SDD framework.
+
+---
+
 **Authored-By**: `Claude Code Agent`
 **Model**: `Claude Opus 4.6`
