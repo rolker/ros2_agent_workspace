@@ -1098,6 +1098,16 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
   criteria) from "Execute Incrementally" (one section at a time, self-audit after
   each). This mostly formalizes existing `--plan-file` practice but adds explicit
   self-audit loops and spec-update steps.
+- **Optional requirements spec for complex issues** (from Appendix D, §D6): For issues
+  tagged `architecture-relevant` or similarly complex, add an optional "Requirements &
+  Acceptance Criteria" section to the plan template. This captures goals, constraints,
+  and testable criteria *before* the plan captures approach. Not a mandatory gate — avoid
+  the Spec Kit waterfall overhead (see D3.5).
+- **Do not adopt Spec Kit wholesale** (from Appendix D, §D6): The workspace's existing
+  workflow (issue → plan → draft PR → implement) already covers ~70% of Spec Kit's value.
+  The full four-phase gated workflow adds ceremony that conflicts with the "radical
+  simplicity" principle. Cherry-pick useful concepts (three-tier boundaries, `/analyze`
+  validator, constitution pattern) rather than importing the framework.
 
 ### For Phase 5 (Architecture Documentation Lifecycle)
 
@@ -1113,9 +1123,10 @@ Ordered by impact-to-effort ratio:
 | 6 | Add layer dependency boundary CI check (no upward deps in package.xml) | Medium | No |
 | 7 | Add architecture-sync pre-commit hook (warning-only) | Low | No |
 | 8 | Create lightweight instruction conformance file (`.agent/conformance/`) with deterministic checks as a stepping stone to full Promptfoo pipeline (Appendix B-ext, Idea 4) | Low-Medium | No |
-| 9 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
+| 9 | Add `/analyze`-style consistency checker (from Appendix D, §D3): validate that instruction files, plans, and code are internally consistent — referenced paths exist, spec terms match code names, no naming drift across documents. GitHub Spec Kit demonstrates the concept; we can implement a lightweight version as a script. | Medium | No |
+| 10 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
 
-Key insight: items 1–8 are all deterministic, traditional CI/tooling. AI (item 9)
+Key insight: items 1–9 are all deterministic, traditional CI/tooling. AI (item 10)
 adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
 and should be deferred until the structural checks are in place.
 
@@ -1136,6 +1147,11 @@ to this workspace.
 - Consider `agent commit` wrapper that runs checks explicitly
 - Longer-term: container isolation (#229) is the strongest enforcement — it prevents
   violations by construction (read-only mounts) rather than detecting them after the fact
+- **File-change-triggered enforcement** (from Appendix D, §D4): Amazon Kiro validates
+  the pattern of triggering validation prompts on specific file changes. Claude Code's
+  PostToolUse hooks can implement a similar pattern — e.g., after edits to `package.xml`,
+  `ARCHITECTURE.md`, or `CLAUDE.md`, automatically run a validation check. This bridges
+  the gap between pre-commit hooks (too late) and real-time monitoring (too expensive).
 
 **User trust / transparency**:
 - Define transparency levels (`minimal`, `standard`, `detailed`) as a configurable dial
@@ -1395,6 +1411,10 @@ This appendix compares Osmani's framework (targeted at individual developers usi
 coding agents) against our workspace infrastructure (targeted at multi-agent teams in
 an established ROS 2 workspace). The goal: identify ideas we can borrow to improve our
 system.
+
+> **See also**: [Appendix D](RESEARCH_ISSUE-249_APPENDIX-D.md) provides a deeper dive
+> into the broader spec-driven development movement — GitHub Spec Kit architecture,
+> Amazon Kiro hooks, the Scott Logic critique, and strategic adoption recommendations.
 
 ### B-ext.1 Article Summary
 
@@ -1712,6 +1732,7 @@ tools help define rules; very few verify that agents actually followed them.
 | **Policy-as-Prompt** | Research: auto-extract enforceable policies from design artifacts into testable classifiers | Research (NeurIPS 2025) | **Monitor** — converting CLAUDE.md rules into testable classifiers would close the rules-verification gap |
 | **Guardrails AI** | Python framework for I/O guards with community validator hub | Production (v0.9) | **Skip** — designed for LLM app outputs, not coding agent workspace compliance |
 | **NVIDIA NeMo Guardrails** | Colang DSL for dialogue flows and programmable rails | Production | **Skip** — conversational AI focus, wrong abstraction for coding agents |
+| **Amazon Kiro Hooks** | File-change-triggered validation prompts (e.g., "when `src/models/` changes, run validation"). Bridges gap between pre-commit hooks (too late) and real-time monitoring (too expensive) | Production (GA Dec 2025) | **Adopt pattern** — Claude Code PostToolUse hooks can implement file-change-triggered validation; validates the reactive enforcement pattern. See Appendix D, §D4 |
 
 **Key findings**:
 1. The "rules file" pattern (`CLAUDE.md`, `.cursorrules`, etc.) is now universal — our approach is mainstream
@@ -1719,6 +1740,7 @@ tools help define rules; very few verify that agents actually followed them.
 3. Deterministic enforcement (hooks + CI) must complement soft rules — agents bypass hooks, can't bypass CI + branch protection
 4. No existing tool validates "did this agent follow its CLAUDE.md correctly?" — this remains an open problem
 5. The "block-at-submit" hook pattern (let agent work, validate at commit) is the recommended approach
+6. File-change-triggered enforcement (Kiro pattern) is becoming an industry standard alongside lifecycle hooks
 
 ### C3. Architecture Drift Detection & Layer Boundary Enforcement
 
@@ -1762,6 +1784,7 @@ messaging + task orchestration for a multi-repo workspace.
 | **Agent-MCP** | Multi-agent framework with hard file locks, task dependencies, real-time dashboard | OSS (AGPL) | **Monitor** — hard locks are too restrictive for worktree-isolated agents |
 | **Claude-Flow** | Third-party orchestration claiming 64-agent systems, 84.8% SWE-Bench | Active (claims unverified) | **Monitor skeptically** — extraordinary claims need independent verification |
 | **Microsoft Agent Framework** | Unified SDK for multi-agent with enterprise governance. Task adherence, PII detection | Public preview | **Monitor** — relevant if heterogeneous agent teams (Claude + Copilot) are needed |
+| **GitHub Spec Kit** | Agent-agnostic spec-driven development toolkit. Four-phase gated workflow (Specify → Plan → Tasks → Implement), `/analyze` consistency validator, per-feature spec directories, constitution pattern | Experimental (40k+ stars) | **Evaluate selectively** — full four-phase ceremony is overkill (Scott Logic found 1,600 lines of spec overhead for moderate tasks). Cherry-pick: `/analyze` validator concept, constitution pattern, per-feature spec directories. See Appendix D, §D3 |
 | **CrewAI** | Role-based multi-agent with workflows and governance | Production | **Skip** — no git/code/worktree awareness |
 | **MetaGPT** | Simulates software company (PM, architect, engineers) from one-line spec | Research-grade | **Skip** — greenfield generation, not incremental development |
 
@@ -1898,13 +1921,19 @@ significantly, and several frameworks can be adapted.
 
 ---
 
-## Appendix C: Spec-Driven Development and AI Agent Specification Practices
+## Appendix D: Spec-Driven Development and AI Agent Specification Practices
 
-See [RESEARCH_ISSUE-249_APPENDIX-C.md](RESEARCH_ISSUE-249_APPENDIX-C.md) — evaluates
+See [RESEARCH_ISSUE-249_APPENDIX-D.md](RESEARCH_ISSUE-249_APPENDIX-D.md) — evaluates
 the spec-driven development movement (Addy Osmani's O'Reilly article, GitHub Spec Kit,
 Amazon Kiro) against the workspace's existing workflow. Key findings: the three-tier
 boundary system for agent instruction files, Spec Kit's `/analyze` consistency validator,
 and the recommendation to cherry-pick concepts rather than adopt the full SDD framework.
+
+> **Note**: Appendix B covers the Osmani article's direct overlap with this report's
+> existing findings and proposes 5 concrete borrowable ideas. This appendix (D) goes
+> deeper into the broader SDD movement — Spec Kit architecture, Kiro hooks, the Scott
+> Logic critique — and provides strategic adoption recommendations. Read B for "what
+> to borrow," D for "what to avoid and why."
 
 ---
 

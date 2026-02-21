@@ -1,12 +1,15 @@
-# Appendix C: Spec-Driven Development and AI Agent Specification Practices
+# Appendix D: Spec-Driven Development and AI Agent Specification Practices
 
 **Parent report**: [RESEARCH_ISSUE-249.md](RESEARCH_ISSUE-249.md)
 **Date**: 2026-02-21
 **Researcher**: Claude Code Agent (Claude Opus 4.6)
+**See also**: Appendix B in the parent report covers the Osmani article's overlap
+with existing findings and proposes 5 concrete borrowable ideas with implementation
+sketches. This appendix goes deeper into the broader SDD movement.
 
 ---
 
-## C1. Overview: The Spec-Driven Development Movement
+## D1. Overview: The Spec-Driven Development Movement
 
 A convergence is happening across the AI-assisted development ecosystem: multiple
 vendors and practitioners are independently arriving at the same conclusion — that
@@ -29,12 +32,12 @@ and identifies specific gaps and opportunities.
 
 ---
 
-## C2. Osmani's Five Principles for Agent Specifications
+## D2. Osmani's Five Principles for Agent Specifications
 
 From the [O'Reilly Radar article](https://www.oreilly.com/radar/how-to-write-a-good-spec-for-ai-agents/)
 and the [author's blog](https://addyosmani.com/blog/good-spec/):
 
-### C2.1 Start high-level, let the agent elaborate
+### D2.1 Start high-level, let the agent elaborate
 
 Write the *what* and *why* — goals, constraints, user needs. Let the agent draft
 the *how*. Osmani calls this "waterfall in 15 minutes" — rapid structured planning
@@ -46,7 +49,7 @@ informal — it lives in issue descriptions of varying quality rather than a
 structured artifact. The plan template's "Problem Analysis" section could be
 expanded or split into a formal spec step.
 
-### C2.2 Structure like a PRD
+### D2.2 Structure like a PRD
 
 Treat the spec as a professional Product Requirements Document: clear sections,
 parseable by a "literal-minded" AI. Osmani recommends blending PRD (user-centric
@@ -57,7 +60,7 @@ plans than PRDs. They describe *approach* well but often skip *requirements* and
 *acceptance criteria* — the agent decides what "done" looks like rather than the
 human specifying it upfront.
 
-### C2.3 Keep things modular
+### D2.3 Keep things modular
 
 Break specs into manageable, focused sections. Don't put everything in one massive
 prompt. Use `@imports` or file references for progressive disclosure.
@@ -66,7 +69,7 @@ prompt. Use `@imports` or file references for progressive disclosure.
 the `.agent/knowledge/` directory provides topic-specific context. The report's
 §5c documents this pattern.
 
-### C2.4 Build in guardrails — the three-tier boundary system
+### D2.4 Build in guardrails — the three-tier boundary system
 
 GitHub's analysis of 2,500+ agent instruction files found the most effective specs
 use a **three-tier boundary system** rather than a flat rule list:
@@ -107,7 +110,7 @@ the AGENTS.md restructuring recommended in the main report's Phase 4.
 - Push to branches not matching your session
 ```
 
-### C2.5 Iterate — specs are living documents
+### D2.5 Iterate — specs are living documents
 
 Don't write and forget. Update specs as decisions are made. Version-control them.
 Commit them to the repo so both humans and agents can track evolution.
@@ -117,7 +120,7 @@ progresses. The gap is that plans are often created *after* the approach is deci
 rather than *before* as a negotiation artifact. Osmani's point is that the spec
 should be the *first* commit, not the plan.
 
-### C2.6 Conformance testing
+### D2.6 Conformance testing
 
 Via Simon Willison: build conformance suites — language-independent tests (often
 YAML-based) that any implementation must pass. The spec itself should be testable.
@@ -130,7 +133,7 @@ testing to feature-level verification: if a spec defines acceptance criteria, th
 criteria should be expressible as automated tests that the agent runs before
 declaring the task complete.
 
-### C2.7 Adjust detail to complexity
+### D2.7 Adjust detail to complexity
 
 Don't under-spec hard problems (the agent flails) or over-spec trivial ones (the
 agent wastes context). A six-area checklist for completeness: commands, testing,
@@ -143,9 +146,9 @@ for simple tasks while ensuring complex ones get adequate specification.
 
 ---
 
-## C3. GitHub Spec Kit — Architecture and Evaluation
+## D3. GitHub Spec Kit — Architecture and Evaluation
 
-### C3.1 What it is
+### D3.1 What it is
 
 [Spec Kit](https://github.com/github/spec-kit) is an MIT-licensed toolkit that
 scaffolds a four-phase gated workflow. It drops templates and agent-specific
@@ -155,7 +158,7 @@ Cursor, Windsurf, Kilo Code, and 7+ other agents.
 Status: experimental. Creator Den Delimarsky stressed it is "not a production
 scenario." Despite this, 40k+ stars and active community adoption.
 
-### C3.2 Four-phase gated workflow
+### D3.2 Four-phase gated workflow
 
 Each phase produces a specific artifact. You do not advance until the current
 phase is validated.
@@ -170,7 +173,7 @@ phase is validated.
 Additionally, `/analyze` cross-checks all documents against the constitution for
 naming drift, conflicts, and inconsistencies.
 
-### C3.3 Repository structure
+### D3.3 Repository structure
 
 ```
 .specify/
@@ -206,7 +209,7 @@ Notable design choices:
 - **Contracts directory** — formalized API or interface contracts for the feature
 - **Parallel task markers** — tasks tagged `[P]` can execute concurrently
 
-### C3.4 Mapping to this workspace
+### D3.4 Mapping to this workspace
 
 | Spec Kit | This workspace | Assessment |
 |----------|---------------|------------|
@@ -218,7 +221,7 @@ Notable design choices:
 | Per-feature directories | Worktree per issue | Different mechanism, same isolation intent. Worktrees are stronger (full git isolation) but don't persist spec artifacts in a browsable directory |
 | Contracts | Nothing formal | **Minor gap**: interface contracts between packages aren't formalized. For ROS 2, this would mean documenting expected topics/services/params as a contract |
 
-### C3.5 Critical evaluation
+### D3.5 Critical evaluation
 
 **Strengths:**
 - Agent-agnostic by design — templates work across 12+ tools
@@ -251,13 +254,13 @@ However, specific components are worth adopting:
 
 ---
 
-## C4. Amazon Kiro — Spec-Driven Development in an IDE
+## D4. Amazon Kiro — Spec-Driven Development in an IDE
 
 [Kiro](https://kiro.dev/) (Amazon, July 2025, GA Dec 2025) embeds spec-driven
 development directly into the editor rather than relying on repo-level templates.
 Pricing: free (50 interactions/month), $19/month (1,000), $39/month (3,000).
 
-### C4.1 Relevant innovations
+### D4.1 Relevant innovations
 
 **Hooks** — user-defined prompts triggered by file changes. Unlike Claude Code's
 lifecycle hooks (PreToolUse/PostToolUse), Kiro hooks are *file-change-triggered*:
@@ -273,7 +276,7 @@ tasks. This addresses the universal problem of specs drifting from implementatio
 sharing steering files and MCP settings. This matters for CI integration and
 headless agent workflows.
 
-### C4.2 Relevance to this workspace
+### D4.2 Relevance to this workspace
 
 Kiro's file-change hooks validate the report's recommendation in §7f (defense in
 depth) from a different angle. The workspace could implement a similar pattern
@@ -283,17 +286,17 @@ check automatically.
 
 Kiro's bidirectional spec sync is aspirational for the workspace — currently,
 plans are manually updated. Automating "does the plan still match the code?" would
-require the `/analyze`-style consistency checking identified as a gap in C3.4.
+require the `/analyze`-style consistency checking identified as a gap in D3.4.
 
 ---
 
-## C5. Three-Tier Boundary System — Detailed Analysis
+## D5. Three-Tier Boundary System — Detailed Analysis
 
 The Osmani article cites [GitHub's analysis of 2,500+ agent instruction files](https://addyosmani.com/blog/good-spec/)
 as the empirical basis for the three-tier boundary system. This section expands on
 how to apply it to this workspace's instruction files.
 
-### C5.1 Current state of CLAUDE.md boundaries
+### D5.1 Current state of CLAUDE.md boundaries
 
 The workspace's CLAUDE.md uses several boundary patterns:
 
@@ -306,7 +309,7 @@ These are scattered throughout the document rather than collected in one scannab
 section. An agent must read the entire file to build a mental model of what's
 allowed, what needs approval, and what's forbidden.
 
-### C5.2 Why three tiers outperform flat rules
+### D5.2 Why three tiers outperform flat rules
 
 From the GitHub analysis and supporting research (AgentIF, NeurIPS 2025 — cited
 in main report B5):
@@ -320,7 +323,7 @@ in main report B5):
   behavior; "Ask first" → confirmation prompts or hooks; "Never" → hard blocks
   (hooks, CI, branch protection)
 
-### C5.3 Mapping tiers to enforcement layers
+### D5.3 Mapping tiers to enforcement layers
 
 Connecting the three-tier model to the enforcement hierarchy from §7g and §9:
 
@@ -337,7 +340,7 @@ enforced in CI is a soft "Never" that will eventually be violated.
 
 ---
 
-## C6. Recommendations
+## D6. Recommendations
 
 ### For the main report's Phase 4 (Align Agent Instructions)
 
@@ -382,7 +385,7 @@ enforced in CI is a soft "Never" that will eventually be violated.
 
 ---
 
-## C7. Sources
+## D7. Sources
 
 - [How to Write a Good Spec for AI Agents — O'Reilly Radar (Addy Osmani)](https://www.oreilly.com/radar/how-to-write-a-good-spec-for-ai-agents/)
 - [How to write a good spec for AI agents — addyosmani.com](https://addyosmani.com/blog/good-spec/)
