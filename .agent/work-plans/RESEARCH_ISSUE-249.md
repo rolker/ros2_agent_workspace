@@ -1015,5 +1015,236 @@ and should be deferred until the structural checks are in place.
 
 ---
 
+## Appendix A: Workspace Archaeology — Lost and Underweight Intent
+
+Analysis of 95 closed issues, 129 closed PRs (4 unmerged), and 236 commits to identify
+ideas and intentions that were implemented then removed, partially implemented, or
+proposed but never delivered.
+
+### A1. Lost Intent (Implemented Then Removed)
+
+These features were built, merged, and later deleted during the doc consolidation (#181).
+The question for each: was the *intent* worth preserving even if the *implementation*
+was wrong?
+
+#### Continuous Improvement Workflow (#110)
+**What it was**: A structured process for agents to report infrastructure friction at
+session end. Agents would review their session for documentation gaps, workflow problems,
+environment issues, and discoverability problems, then file well-formed improvement issues.
+
+**Why it was removed**: Deleted as part of the 51-file cleanup in #181. The workflow
+file format (`.agent/workflows/`) was deemed unnecessary — agents don't need step-by-step
+workflow files to use `gh issue create`.
+
+**Is the intent still valuable?** Yes. The *mechanism* was over-engineered, but the
+*practice* of agents reporting friction is how the workspace improves. Currently nothing
+prompts agents to do this. A single line in AGENTS.md ("At session end, file an issue
+for any friction you encountered") would preserve the intent without the overhead.
+
+**Triage**: Add to Phase 3 recommendations — one line in AGENTS.md, not a workflow file.
+
+#### Workspace Glossary (#100)
+**What it was**: A comprehensive terminology reference disambiguating "project" vs
+"workspace", "underlay" vs "overlay", "repository" vs "package", etc. Included an
+"Ambiguity Resolution Examples" section and a "Terms to Avoid" section.
+
+**Why it was removed**: Deleted in #181 phase 6 with the rationale "agents understand
+these terms." Also contained Project11-specific content (UNH Marine Autonomy definitions).
+
+**Is the intent still valuable?** Partially. Agents *don't* reliably understand the
+workspace/project/package/repository distinctions — this is exactly the kind of ambiguity
+that causes wrong-worktree and wrong-repo bugs. The generic ROS 2 terminology section
+belongs in AGENTS.md or `.agent/knowledge/`. The Project11-specific section belongs in
+the project repo (consistent with §8's workspace/project boundary).
+
+**Triage**: Extract generic terms (workspace, overlay, underlay, package, repository,
+layer) into AGENTS.md. Project-specific terms go in project repo's AGENTS.md.
+
+#### Guiding Principles / Agent Optimizer Guide (#90)
+**What it was**: Five pillars for workspace design decisions: quality artifacts,
+continuous self-improvement, multi-agent scalability, radical simplicity, and
+industry alignment.
+
+**Why it was removed**: Deleted in #181 — content was either inlined into framework
+files or deemed unnecessary.
+
+**Is the intent still valuable?** The principles themselves are sound and align with
+this research's findings. "Radical Simplicity" is literally what #249 is about.
+"Multi-Agent Scalability" motivates the worktree isolation pattern. These principles
+would be useful in ARCHITECTURE.md as the "why" behind design decisions — not as a
+separate file, but as a section that gives future agents (and humans) the design
+philosophy.
+
+**Triage**: Seed as part of the ADR effort (Phase 5). ADR-0001: "Workspace Design
+Principles" capturing the five pillars as architectural context.
+
+#### Skills System (test-engineering, doc-coauthoring, project-management, etc.)
+**What it was**: 18 skill files providing structured procedures for tasks like
+writing ROS 2 tests, triaging issues, creating documentation, etc. Each had templates,
+step-by-step procedures, and scope definitions.
+
+**Why it was removed**: The custom skill framework was unused by any agent framework.
+Test templates were preserved in `.agent/templates/testing/`.
+
+**Is the intent still valuable?** The test engineering templates survive. The rest
+was genuinely over-engineered — agents don't need a "skill framework" to write docs
+or triage issues. However, the *knowledge* in the test engineering skill (ROS 2 test
+patterns, launch_testing examples, GTest/PyTest templates) is valuable reference
+material. It currently lives in `.agent/templates/testing/` which is adequate.
+
+**Triage**: No action needed — valuable content was preserved, framework was
+rightfully removed.
+
+#### Start-Feature Workflow & Submit-PR Workflow
+**What it was**: Step-by-step workflows for starting feature work (check status,
+create branch/worktree, create work plan, open draft PR) and submitting PRs
+(verification checklist, PR description template, post-submit steps).
+
+**Why it was removed**: Content inlined into framework instruction files (CLAUDE.md
+etc.) which now contain the worktree workflow directly.
+
+**Is the intent still valuable?** The content is preserved — CLAUDE.md contains the
+worktree workflow. But the *PR submission checklist* may have been lost in the
+inlining. Worth verifying that the PR template recommendation (Phase 5, item 1)
+would recapture this.
+
+**Triage**: Verify PR template covers what submit-pr.md had. If not, incorporate
+into `.github/PULL_REQUEST_TEMPLATE.md`.
+
+### A2. Undelivered Intent (Proposed But Never Implemented)
+
+#### Agent Instruction Regression Testing (#154, PR #159)
+**What it was**: Promptfoo-based framework to automatically test that agent
+instruction files produce correct agent behavior. PR #159 implemented it but
+was closed without merging due to Gemini API timeouts in CI.
+
+**Why it failed**: Technical — API provider timeouts, not a bad idea. The concept
+(regression testing for agent instructions) remains unimplemented.
+
+**Is the intent still valuable?** Yes — this is the most significant undelivered
+capability. As instruction files evolve (AGENTS.md, CLAUDE.md), there's no
+automated way to verify they still produce correct behavior. Manual testing is
+the only option today.
+
+**Triage**: Add as a future-phase recommendation. The Promptfoo approach may not
+be the right tool (CI-time API calls are fragile), but the *concept* of instruction
+regression testing deserves exploration. Alternatives: static analysis of instruction
+files (do referenced paths exist? are command examples valid?), or periodic
+human-in-the-loop review.
+
+#### Track Lifecycle Management (#150)
+**What it was**: Ability to archive and restore feature tracks — marking completed
+work as archived so it doesn't clutter active views, with the ability to restore
+if needed.
+
+**Status**: Issue was closed as completed, but the feature tracks themselves were
+later removed in the #181 consolidation. The archive/restore concept is moot without
+the track system.
+
+**Triage**: No action needed — the underlying system was removed.
+
+#### Git Notes for Agent Handoff Audit Trail (#151)
+**What it was**: Using `git notes` to attach metadata to commits for agent handoff
+— recording which agent worked on what, session boundaries, and decision context.
+
+**Status**: Issue was closed as completed, but the notes system was removed in the
+consolidation.
+
+**Is the intent still valuable?** The handoff problem is real in multi-agent
+environments. Git notes are a clever low-overhead approach, but they don't transfer
+across forks/clones by default. The draft PR workflow (create PR with work plan)
+is the current solution and is arguably better — PR descriptions are visible,
+searchable, and survive forks.
+
+**Triage**: No action needed — draft PR workflow serves this purpose.
+
+#### Review-Against-Rules Workflow (#149)
+**What it was**: Automated checking of code changes against workspace rules
+before submission.
+
+**Status**: Closed as completed, but the workflow was later deleted. The intent
+(automated rule compliance checking) is partially covered by pre-commit hooks
+and CI.
+
+**Triage**: Covered by Phase 6 (CI parity with pre-commit hooks). No separate
+action needed.
+
+### A3. Partially Delivered Intent
+
+#### Multi-Agent Workflow (PR #38, Issue #35)
+**What it was**: RFC proposing phased multi-agent coordination using worktrees,
+Docker isolation, and TDD. PR #38 delivered Phases 1-2 (testing/reporting and
+agent behavior codification). The proposal was set to "Implementing" status,
+suggesting further phases.
+
+**What was delivered**: Worktree isolation, identity management, draft PR
+visibility, and the WORKFORCE_PROTOCOL.md.
+
+**What wasn't**: Docker-based isolation (now tracked as #229), TDD integration
+as a first-class workflow, and formalized agent-to-agent handoff.
+
+**Triage**: Docker isolation is tracked (#229). TDD as a workflow is partially
+covered by test templates. Agent handoff is handled by draft PRs. The original
+RFC's vision is mostly realized through different mechanisms.
+
+#### Workspace/Project Config Separation (#132)
+**What was delivered**: `bootstrap.yaml` pattern, `setup.sh` integration,
+`.agent/project_knowledge` symlink, ARCHITECTURE.md documentation.
+
+**What the owner intended but may be underweight**: rolker's design discussion
+formalized two patterns (standalone config repo vs. key-repo-is-also-a-package)
+and detailed the `agent_context/` directory structure. The symlink aggregation
+pattern we discussed in §8 is exactly what was designed here, but the current
+implementation may not fully reflect the detailed design from the comment.
+
+**Triage**: Verify current implementation matches the design in rolker's Feb 12
+comment on #132. The §8 section of this research should align with that intent.
+
+#### Enforce Workflow Protocol Compliance (#103)
+**What was delivered**: Pre-commit hook blocking commits to main, git checkout
+guardrail, commit identity validation, GitHub issue template.
+
+**What was deferred**: "Remaining UX improvements tracked separately" per rolker's
+closing comment. These became #214 (still open): Makefile target for issue
+workflow, additional issue templates, main workspace warning.
+
+**Triage**: Already tracked as open issue #214.
+
+### A4. Recurring Themes from the Archaeological Record
+
+**1. Enforcement over documentation** (threads: #103 → #125 → #178 → #241)
+The workspace repeatedly learned that agents don't follow written rules. The
+evolution: documentation → prominent warnings → pre-commit hooks → checkout
+guardrails → worktree enforcement → container isolation. Each layer was added
+after the previous one proved insufficient. This arc validates the enforcement
+hierarchy in §9 (cross-reference section).
+
+**2. Build-then-delete cycle** (threads: #90 → #181, skills → #181, workflows → #181)
+Complex systems were built (51 workflow/rule/skill files, agent optimizer guide,
+glossary) and later deleted when they proved to be unused overhead. The lesson:
+start with the minimum viable instruction and add complexity only when agents
+demonstrably need it. This validates the "radical simplicity" principle and the
+CLAUDE.md best practice of keeping instruction files under 300 lines.
+
+**3. Identity is hard** (threads: #49 → #51 → #77 → #84 → #92 → #124 → #144 → #195)
+Eight issues across the workspace's history deal with agents getting their own
+identity wrong — copying example model names, attributing commits to the wrong
+author, reporting stale model names. The problem keeps recurring because identity
+detection is environment-dependent and fragile. Open issue #124 still tracks this.
+
+**4. Pre-commit fragility** (threads: #198 → #212 → #213 → #172)
+Pre-commit hooks are the workspace's primary fast-feedback mechanism, but they're
+fragile: not installed by default (#198), not on PATH for agents (#212), bypassed
+by `--no-verify` (#241), and no CI equivalent for some checks (#172). The defense-
+in-depth recommendation (§7f) directly addresses this pattern.
+
+**5. Workspace reusability as a design goal** (threads: #132 → §8 → this research)
+The intent to make this workspace generic (not Project11-specific) has been explicit
+since #132 and is now formalized in §8. But it requires ongoing discipline —
+project-specific content keeps creeping into workspace-level files (the glossary
+had UNH Marine Autonomy terms, for example).
+
+---
+
 **Authored-By**: `Claude Code Agent`
 **Model**: `Claude Opus 4.6`
