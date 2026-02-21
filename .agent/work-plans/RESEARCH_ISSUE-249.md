@@ -553,6 +553,47 @@ Accepted | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)
 dependencies) provides `adr new`, `adr list`, `adr generate toc`. Alternatively,
 just create files manually — no tooling required.
 
+**Bootstrapping from project history ("workspace archaeology")**:
+
+Most projects that need ARCHITECTURE.md and ADRs already have a rich history of
+architectural decisions — they're just buried in closed issues, PR descriptions,
+commit messages, and deleted files. The archaeology method systematically recovers
+this intent:
+
+1. **Closed issues**: Scan for design proposals, RFCs, and "architecture" labels.
+   Issues often contain the *context* and *alternatives considered* that ADRs need.
+2. **Unmerged PRs**: PRs closed without merging represent approaches that were tried
+   and rejected — exactly the "alternatives considered" section of an ADR.
+3. **Commit history**: Look for `revert`, `refactor`, phase-numbered commits, and
+   commit bodies containing "TODO", "future work", or "deferred." These signal
+   decisions that evolved over time.
+4. **Deleted files**: Use `git log --diff-filter=D --summary` to find files that
+   were built and later removed. The build-then-delete pattern often represents
+   an architectural decision (e.g., "we tried a skill framework and decided it
+   was over-engineered").
+5. **Recurring themes**: Group findings by theme. If the same problem was addressed
+   3+ times (e.g., "agents don't follow rules" → documentation → hooks → guardrails
+   → container isolation), that progression *is* the architectural rationale and
+   deserves an ADR.
+
+The output of this process is:
+- A set of retroactive ADRs capturing decisions that were made implicitly
+- An ARCHITECTURE.md grounded in actual history, not aspirational design
+- A list of lost or underweight intent that may warrant new issues
+
+This method is especially valuable for **project repos that have been under
+development without formal architecture documentation**. An agent can perform
+the archaeology as a dedicated task (with its own issue), producing ADRs and an
+ARCHITECTURE.md that reflects how the project actually evolved — not how someone
+imagines it was designed.
+
+For this workspace, the archaeology in Appendix A recovered five themes, identified
+three items of lost intent worth restoring, and surfaced the most significant
+undelivered capability (instruction regression testing). The same technique applied
+to a project repo like `unh_marine_autonomy` would recover design decisions about
+sensor driver patterns, mission planning architecture, and simulation integration
+that currently live only in git history.
+
 ### 7d. Agent Instruction Integration
 
 Add an "Architecture Checkpoints" section to CLAUDE.md (and equivalents) that names
@@ -994,6 +1035,14 @@ Ordered by impact-to-effort ratio:
 Key insight: items 1–7 are all deterministic, traditional CI/tooling. AI (item 8)
 adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
 and should be deferred until the structural checks are in place.
+
+**Bootstrapping ADRs and ARCHITECTURE.md for project repos**: Use the workspace
+archaeology method (§7c) as a repeatable pattern. For each project repo that needs
+architecture docs, an agent can perform the archaeology as a dedicated task —
+scanning closed issues, unmerged PRs, reverted commits, and deleted files to
+recover implicit decisions. This produces retroactive ADRs grounded in actual
+history rather than aspirational design. See Appendix A for the method applied
+to this workspace.
 
 ### For Phase 6 (Agent Compliance and User Trust)
 
