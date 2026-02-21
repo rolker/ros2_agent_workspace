@@ -726,7 +726,72 @@ ADR, and agents just point to it.
 
 ---
 
-## 8. Cross-Reference with Open Issues
+## 8. Workspace vs. Project Boundary
+
+### Design Intent
+
+This workspace repo is a **generic ROS 2 agent workspace** — it should work for any
+ROS 2 project, not just the current dogfood project (project 11, UNH marine autonomy).
+Everything in this repo should be either generic ROS 2 tooling or framework-agnostic
+agent infrastructure. Project-specific content belongs in the project repos.
+
+| Content type | Lives in | Examples |
+|---|---|---|
+| Build/worktree/CI infrastructure | Workspace repo | Makefile, `.agent/scripts/`, worktree workflow |
+| Agent instruction patterns | Workspace repo | CLAUDE.md, AGENTS.md templates, `.agent/knowledge/` |
+| Architecture doc *patterns* (ADR templates, PR templates) | Workspace repo | `.agent/templates/`, `.github/PULL_REQUEST_TEMPLATE.md` |
+| Generic ROS 2 agent knowledge | Workspace repo | How to build/test/lint ROS 2 packages |
+| Integration docs for external packages | Workspace repo | `.agent/project_knowledge/robot_localization.md` |
+| Project architecture (`ARCHITECTURE.md`) | Project repo | `unh_marine_autonomy/ARCHITECTURE.md` |
+| Project ADRs | Project repo | `unh_marine_autonomy/docs/decisions/` |
+| Project agent guide (`.agents/README.md`) | Project repo | Package inventory, conventions, pitfalls |
+
+### The Role of `.agent/project_knowledge/`
+
+This directory serves as a **symlink aggregation point** that gives agents a unified
+view of project-level knowledge without traversing the full `layers/main/*/src/*/` tree.
+
+It has two types of content:
+
+**1. Symlinks to project repo knowledge** (for repos you own):
+
+```
+.agent/project_knowledge/
+├── unh_marine_autonomy/ → ../../layers/main/core_ws/src/unh_marine_autonomy/.agents/
+```
+
+The project repo contains the canonical knowledge (architecture, conventions, pitfalls).
+The symlink makes it accessible from the workspace root so agents can grasp the big
+picture without knowing the layer structure.
+
+**2. Integration docs for external packages** (for repos you don't own):
+
+```
+.agent/project_knowledge/
+├── robot_localization.md      # How we configure and depend on it
+├── ros_gz.md                  # Our Gazebo integration assumptions
+```
+
+These are workspace-level files documenting your *relationship* to packages you use
+but can't add documentation to. They answer:
+- What specific interfaces (topics/services/params) does our code depend on?
+- What configuration assumptions are in our launch files?
+- What version constraints matter and why?
+- What workarounds are we carrying?
+
+**Why this matters for agents**: When an agent enters a worktree, it can read
+`.agent/project_knowledge/` to understand the full project context — both the
+project's own architecture (via symlinks) and the integration surface with
+external packages (via workspace-level docs). No tree traversal needed.
+
+**Why this matters for reusability**: When someone forks this workspace for a
+different ROS 2 project, the `project_knowledge/` directory starts empty. They
+populate it with symlinks to their own project repos and integration docs for
+the external packages they use. The workspace infrastructure doesn't change.
+
+---
+
+## 9. Cross-Reference with Open Issues
 
 21 issues are currently open. Several overlap with or complement #249's scope. This
 section maps each relevant issue to this research, identifies synergies, and flags
@@ -788,7 +853,7 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
 
 ---
 
-## 9. Recommendations Summary
+## 10. Recommendations Summary
 
 ### For Phase 1 (Audit)
 - Use the script categorization in Section 4c as a starting framework
@@ -809,6 +874,12 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
 - Keep `ARCHITECTURE.md` as the referenced architecture document
 - Deprecate `AI_RULES.md` (replaced by AGENTS.md)
 - Deprecate `.agent/scripts/README.md` (fold into `make help` or `just --list`)
+- Formalize `.agent/project_knowledge/` as symlink aggregation point (see §8):
+  - Symlinks to project repos' `.agents/` directories for owned packages
+  - Integration docs (plain files) for external packages you use but don't own
+  - Document this pattern in CLAUDE.md and AGENTS.md so agents know to check it
+- Ensure all workspace-repo content is generic ROS 2 / agent infrastructure — project-
+  specific architecture docs, ADRs, and `.agents/README.md` belong in project repos
 
 ### For Phase 4 (Align Agent Instructions)
 - CLAUDE.md references AGENTS.md for shared instructions, contains only:
@@ -838,7 +909,7 @@ and should be deferred until the structural checks are in place.
 
 ### For Phase 6 (Agent Compliance and User Trust)
 
-**Agent compliance** (see also §8 cross-reference with #241, #247, #229):
+**Agent compliance** (see also §9 cross-reference with #241, #247, #229):
 - Ensure every pre-commit hook check has a CI equivalent — hooks are fast feedback,
   CI is enforcement. Agents bypass hooks; they can't bypass CI + branch protection.
 - Add "hooks are mandatory" language to AGENTS.md (cross-framework)
