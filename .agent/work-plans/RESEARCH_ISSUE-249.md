@@ -612,6 +612,106 @@ No single layer is sufficient. Pre-commit hooks can be bypassed; checklists can 
 rubber-stamped; CI catches what the others miss. The workspace already follows this
 defense-in-depth pattern for linting.
 
+### 7g. Agent Compliance with Local Tooling
+
+**Observed problem**: Agents bypass pre-commit hooks (via `--no-verify` or equivalent),
+believing the hooks don't apply to them. This is not a bug in any single agent — it
+reflects a fundamental misalignment: agents optimize for task completion, and local
+tooling looks like friction to skip.
+
+**Why this happens**:
+- Pre-commit hooks are opt-in enforcement — any `git commit` can bypass them
+- Agent instruction files may say "never skip hooks" but agents from other frameworks
+  may not have equivalent instructions, or may interpret them loosely
+- Agents don't inherently understand that hooks are policy, not convenience
+
+**Mitigation layers** (from weakest to strongest):
+
+| Layer | Mechanism | Agent-proof? |
+|-------|-----------|-------------|
+| Instruction files | "NEVER use `--no-verify`" in CLAUDE.md, AGENTS.md, etc. | No — depends on compliance |
+| Wrapper scripts | `agent commit` command that doesn't expose `--no-verify` flag | Partial — agents can bypass the wrapper |
+| Git hook + CI parity | Run the same checks in both pre-commit and CI | Yes — CI catches what hooks miss |
+| Branch protection | Require status checks to pass before merge | Yes — non-bypassable |
+| Server-side hooks | Pre-receive hooks on the git server (GitHub doesn't expose these for hosted repos) | Yes — but not available on GitHub |
+
+**Practical recommendation**: The only truly agent-proof enforcement is CI + branch
+protection. Pre-commit hooks are useful for fast feedback but should never be the sole
+enforcement mechanism. Every check that matters must also run in CI.
+
+For this workspace specifically:
+1. Ensure every pre-commit hook has a CI equivalent in `validate.yml`
+2. Add explicit "hooks are mandatory, not optional" language to AGENTS.md (shared
+   across all frameworks)
+3. Consider a wrapper script (`agent commit`) that runs hooks explicitly before
+   committing, so agents that bypass `git commit` hooks still get checked
+4. Use branch protection rules to require CI status checks before merge
+
+### 7h. User Trust and Design Transparency
+
+**Problem**: Users working with AI agents need varying levels of visibility into
+*why* decisions were made, not just *what* was done. A user new to the codebase or
+to AI-assisted development needs more rationale than an experienced user who just
+wants results. The framework should support this as a dial, not a switch.
+
+**Transparency mechanisms, from lightweight to heavy:**
+
+| Mechanism | Audience | Cost | When |
+|-----------|----------|------|------|
+| Descriptive commit messages | Everyone | Low | Every commit |
+| ADR references in code comments | Code reviewers | Low | When touching architecture-relevant code |
+| PR description with design rationale | PR reviewers | Low-Medium | Every PR |
+| Inline code comments explaining "why" | Future developers/agents | Low | Non-obvious design choices only |
+| Work plans with alternatives considered | Users who want oversight | Medium | Complex tasks |
+| Interactive confirmation before key decisions | Users who want control | Medium | Configurable per-user |
+
+**What this means for agent instructions:**
+
+Agents should be told to provide rationale proportional to the decision's impact:
+
+```markdown
+## Design Transparency
+
+### Always explain (in commit messages and PR descriptions):
+- Why you chose this approach over alternatives
+- What constraints or ADRs influenced the decision
+- What trade-offs were accepted
+
+### Explain in code comments only when:
+- The choice is non-obvious and a future reader would ask "why?"
+- You're implementing a pattern that contradicts common convention
+- The code references an architectural decision (link to ADR)
+
+### Don't over-explain:
+- Standard patterns that follow existing codebase conventions
+- Trivial changes (formatting, renames, typo fixes)
+- Choices with no meaningful alternatives
+```
+
+**User control mechanisms:**
+
+The level of rationale an agent provides could be configured per-user or per-session:
+
+- **Minimal**: Agent does the work, provides standard commit messages and PR descriptions.
+  For users who trust the framework and review results.
+- **Standard** (default): Agent explains key decisions in PR descriptions and flags
+  architecture-relevant changes. For typical development.
+- **Detailed**: Agent documents alternatives considered, links to relevant ADRs, and
+  asks for confirmation before architecture-impacting decisions. For new users or
+  sensitive changes.
+
+This could be implemented as:
+- An environment variable (`AGENT_TRANSPARENCY=minimal|standard|detailed`)
+- A section in the user's agent config file
+- A per-issue label (e.g., `needs-review` triggers detailed mode)
+
+**Connection to ADRs**: ADRs serve double duty here. They document the rationale for
+architectural decisions *and* provide agents with context for explaining their choices.
+When an agent's implementation aligns with an existing ADR, it can reference it:
+"Following ADR-0002 (worktree isolation), created a new worktree rather than switching
+branches." This is both transparent and efficient — the rationale exists once in the
+ADR, and agents just point to it.
+
 **Sources**:
 - [tj-actions/changed-files (GitHub)](https://github.com/tj-actions/changed-files)
 - [brettcannon/check-for-changed-files (GitHub)](https://github.com/brettcannon/check-for-changed-files)
@@ -673,6 +773,22 @@ Ordered by impact-to-effort ratio:
 Key insight: items 1–7 are all deterministic, traditional CI/tooling. AI (item 8)
 adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
 and should be deferred until the structural checks are in place.
+
+### For Phase 6 (Agent Compliance and User Trust)
+
+**Agent compliance**:
+- Ensure every pre-commit hook check has a CI equivalent — hooks are fast feedback,
+  CI is enforcement. Agents bypass hooks; they can't bypass CI + branch protection.
+- Add "hooks are mandatory" language to AGENTS.md (cross-framework)
+- Consider `agent commit` wrapper that runs checks explicitly
+
+**User trust / transparency**:
+- Define transparency levels (`minimal`, `standard`, `detailed`) as a configurable dial
+- Default to `standard`: agents explain key decisions in PR descriptions, flag
+  architecture-relevant changes, reference ADRs when applicable
+- ADRs serve double duty: they document rationale *and* give agents something to
+  reference instead of generating explanations from scratch
+- Commit messages should explain "why" not "what" — this is low-cost and always useful
 
 ---
 
