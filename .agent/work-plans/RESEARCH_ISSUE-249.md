@@ -15,6 +15,15 @@ cross-platform standard (**AGENTS.md**) directly addresses the multi-framework i
 file duplication problem, while modern command runners (**just**, **Task**, **mise**) offer
 compelling alternatives to the current Makefile + shell script architecture.
 
+A late addition (Appendix B) analyzes Addy Osmani's "[How to Write a Good Spec for AI
+Agents](https://www.oreilly.com/radar/how-to-write-a-good-spec-for-ai-agents/)" (O'Reilly,
+January 2026), which draws on GitHub's analysis of 2,500+ agent configuration files. Five
+actionable ideas are identified: the **Always/Ask/Never rule taxonomy**, **self-audit
+instructions**, **SPEC.md as a persistent session anchor**, **conformance suites as
+stepping stones** to full instruction testing, and **formalizing the two-phase task
+pattern** (draft spec, then execute incrementally). These are integrated into the
+recommendations in §10.
+
 ---
 
 ## 1. Command Runner Alternatives to Make
@@ -1041,6 +1050,9 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
 - **Option B (moderate)**: Replace Makefile with `justfile`. Better UX, self-documenting
   by default, low migration cost. Requires installing `just`.
 - Expand the `agent` subcommand pattern to serve as the primary human/agent interface.
+- **SPEC.md worktree anchor** (from Appendix B-ext, Idea 3): When entering a worktree,
+  surface the work plan so agents always re-read it. Minor script change to
+  `worktree_enter.sh` + instruction update in CLAUDE.md.
 
 ### For Phase 3 (Documentation)
 - Adopt **AGENTS.md** as the cross-platform agent instruction file
@@ -1055,6 +1067,11 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
   - Document this pattern in CLAUDE.md and AGENTS.md so agents know to check it
 - Ensure all workspace-repo content is generic ROS 2 / agent infrastructure — project-
   specific architecture docs, ADRs, and `.agents/README.md` belong in project repos
+- **Restructure rules using Always/Ask/Never taxonomy** (from Appendix B-ext, Idea 1):
+  Reorganize CLAUDE.md and AGENTS.md rules into three tiers (Always do / Ask first /
+  Never do) based on GitHub's analysis of 2,500+ agent configuration files. This is
+  cleaner and more parseable than the current flat list with inconsistent emphasis markers.
+  See §B-ext.3 for concrete example
 
 ### For Phase 4 (Align Agent Instructions)
 - **Workspace-level** instruction files (CLAUDE.md, copilot-instructions.md, etc.)
@@ -1071,6 +1088,16 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
 - The workspace layer adds context on top (worktrees, `make build`, integration
   docs) — project repos are oblivious to it, just as packages are oblivious to
   which workspace they're built in.
+- **Add self-audit instruction** (from Appendix B-ext, Idea 2): Add a "Post-Task
+  Verification" section to CLAUDE.md and AGENTS.md requiring agents to compare
+  their work against the issue/spec before declaring a task complete. Zero
+  implementation cost, addresses the intent-level gap between CI checks and
+  human review. See §B-ext.3 for concrete wording.
+- **Formalize the two-phase task pattern** (from Appendix B-ext, Idea 5): Explicitly
+  separate "Draft the Spec" (plan mode, read architecture docs, generate acceptance
+  criteria) from "Execute Incrementally" (one section at a time, self-audit after
+  each). This mostly formalizes existing `--plan-file` practice but adds explicit
+  self-audit loops and spec-update steps.
 
 ### For Phase 5 (Architecture Documentation Lifecycle)
 
@@ -1085,9 +1112,10 @@ Ordered by impact-to-effort ratio:
 | 5 | Add structural validation CI check (referenced paths exist) | Medium | No |
 | 6 | Add layer dependency boundary CI check (no upward deps in package.xml) | Medium | No |
 | 7 | Add architecture-sync pre-commit hook (warning-only) | Low | No |
-| 8 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
+| 8 | Create lightweight instruction conformance file (`.agent/conformance/`) with deterministic checks as a stepping stone to full Promptfoo pipeline (Appendix B-ext, Idea 4) | Low-Medium | No |
+| 9 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
 
-Key insight: items 1–7 are all deterministic, traditional CI/tooling. AI (item 8)
+Key insight: items 1–8 are all deterministic, traditional CI/tooling. AI (item 9)
 adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
 and should be deferred until the structural checks are in place.
 
@@ -1356,13 +1384,295 @@ had UNH Marine Autonomy terms, for example).
 
 ---
 
-## Appendix B: Technology Landscape Scan — Existing Tools and Emerging Methodologies
+## Appendix B: External Analysis — Osmani's "How to Write a Good Spec for AI Agents"
+
+**Source**: Addy Osmani, "How to Write a Good Spec for AI Agents" (January 2026).
+Published on [O'Reilly Radar](https://www.oreilly.com/radar/how-to-write-a-good-spec-for-ai-agents/),
+[addyosmani.com](https://addyosmani.com/blog/good-spec/), and
+[Substack](https://addyo.substack.com/p/how-to-write-a-good-spec-for-ai-agents).
+
+This appendix compares Osmani's framework (targeted at individual developers using AI
+coding agents) against our workspace infrastructure (targeted at multi-agent teams in
+an established ROS 2 workspace). The goal: identify ideas we can borrow to improve our
+system.
+
+### B-ext.1 Article Summary
+
+Osmani's core framework, informed by **GitHub's analysis of 2,500+ agent configuration
+files**, proposes five principles for writing effective AI agent specs:
+
+1. **Start with a high-level vision, let the AI draft the details** — provide a "product
+   brief" and let the agent elaborate into a full spec. Human controls direction, AI
+   handles expansion.
+
+2. **Structure the spec like a professional PRD** — cover six core areas: Commands,
+   Testing, Project Structure, Code Style, Git Workflow, and Boundaries.
+
+3. **Break tasks into modular prompts (divide & conquer)** — feed only the relevant
+   section of the spec for each task. Refresh context per major task to avoid stale or
+   irrelevant information.
+
+4. **Use Plan Mode and spec-driven development** — start in read-only mode, draft and
+   refine the spec until no ambiguity remains, save as `SPEC.md`, then execute
+   incrementally. The spec persists between sessions as a context anchor.
+
+5. **Keep it goal-oriented and make it a living document** — focus on *what* and *why*
+   (user stories, acceptance criteria), not detailed *how*. Update the spec as decisions
+   are made.
+
+Additional patterns from the article:
+
+- **Three-tier boundary system** (from the GitHub analysis): categorize rules as
+  "Always do" (autonomous), "Ask first" (human approval), or "Never do" (hard stops).
+  More effective than flat rule lists.
+- **Self-audit instruction**: "After implementing, compare the result with the spec and
+  confirm all requirements are met. List any spec items not addressed."
+- **LLM-as-Judge**: Use a second agent to review the first agent's output against the
+  spec's quality guidelines. Effective for subjective criteria (code style, readability,
+  architectural coherence).
+- **Conformance suites**: Language-independent tests (often YAML-based) that any
+  implementation must pass. Include in the spec's "Success" section.
+
+### B-ext.2 Overlap Analysis
+
+| Topic | Osmani's Framing | Our Research | Difference |
+|-------|-----------------|--------------|------------|
+| Structured instruction files | "6 core areas" (commands, testing, project structure, code style, git workflow, boundaries) from 2,500+ config analysis | §3 (AGENTS.md), §5 (CLAUDE.md best practices) | Nearly identical conclusions. Our "keep CLAUDE.md under 300 lines" matches his "attention budget" concern. His empirical base (2,500 configs) validates our approach |
+| Living document | Update spec as decisions are made; version-control it | §7c (ADRs), §7h (transparency), §5c ("evolve organically") | We formalize this as ADRs + architecture checkpoints rather than a monolithic spec |
+| Plan before execute | Plan Mode (read-only), draft spec, then implement incrementally | Already in practice — `worktree_create.sh --plan-file`, draft PRs with plans | Same idea, different mechanism |
+| LLM-as-Judge | Second agent reviews against spec quality guidelines | §C5 (Promptfoo, DeepEval, AgentIF, constraint decomposition) | We go much deeper — full testing architecture, academic papers, cost analysis |
+| Modular context feeding | Feed only the relevant spec section per task | §5c (`@imports` for progressive disclosure, `.claude/rules/` for topic-specific rules) | Same principle, different implementation |
+| Version-control specs | Commit the spec to the repo | Implicit throughout | Aligned |
+
+### B-ext.3 Borrowable Ideas (Actionable for This Workspace)
+
+#### Idea 1: Always / Ask First / Never Taxonomy for CLAUDE.md
+
+**What Osmani proposes**: A three-tier boundary system derived from GitHub's analysis of
+2,500+ agent configuration files. Rules are categorized as:
+
+- **Always do** (agent proceeds autonomously): "Always run tests before commits."
+- **Ask first** (agent pauses for human): "Ask before modifying database schemas."
+- **Never do** (hard stop): "Never commit secrets or API keys."
+
+**Why this matters for us**: CLAUDE.md is currently a flat list of rules with inconsistent
+emphasis (`IMPORTANT`, `NEVER`, `YOU MUST`). The three-tier system provides a cleaner
+structure that maps directly to our enforcement hierarchy (§7g):
+
+| Tier | Maps to enforcement layer |
+|------|--------------------------|
+| Always | Hooks enforce, CI validates |
+| Ask First | Agent pauses, wrapper scripts confirm |
+| Never | CI blocks, branch protection prevents |
+
+**Concrete application**:
+
+```markdown
+## Boundaries
+
+### Always (proceed autonomously)
+- Run pre-commit hooks before committing
+- Use worktrees for all feature work
+- Include AI signature on all GitHub artifacts
+- Reference issue numbers in branch names and PRs
+- Read AGENTS.md / .agents/README.md before modifying a project repo
+- Use `--body-file` for multiline GitHub CLI content
+
+### Ask First (get human approval)
+- Before modifying CLAUDE.md, AGENTS.md, or other instruction files
+- Before adding/removing a workspace layer
+- Before changing CI pipeline configuration
+- Before adding new dependencies to package.xml
+- Before modifying branch protection rules
+
+### Never (hard stops)
+- Never commit to main (branch is protected)
+- Never use `git checkout <branch>` (env.sh blocks it)
+- Never skip hooks with `--no-verify`
+- Never push to a branch you didn't create
+- Never commit secrets, API keys, or credentials
+- Never document from assumptions — verify against source code
+```
+
+**Priority**: High — simple restructuring with immediate clarity benefit.
+
+#### Idea 2: Self-Audit Instruction
+
+**What Osmani proposes**: Append to agent instructions: "After implementing, compare the
+result with the spec and confirm all requirements are met. List any spec items not
+addressed." The agent outputs a short checklist after each implementation, catching
+omissions before tests even run.
+
+**Why this matters for us**: Agents currently declare tasks "done" without systematic
+self-checking. Our CI catches structural problems, but intent-level gaps (did I actually
+address all the requirements in the issue?) go undetected until human review.
+
+**Concrete application** (add to CLAUDE.md):
+
+```markdown
+## Post-Task Verification
+
+Before marking a task complete or opening a PR for review:
+1. Re-read the issue description and any linked work plan
+2. Compare your changes against each stated requirement
+3. List any requirements not yet addressed
+4. If items remain, either complete them or explain in the PR why they were deferred
+```
+
+**Priority**: High — zero implementation cost, addresses a real gap.
+
+#### Idea 3: SPEC.md as Persistent Worktree Anchor
+
+**What Osmani proposes**: Save the refined spec as `SPEC.md` in the repo. It persists
+between sessions, anchoring the agent whenever work resumes. This mitigates the
+"forgetfulness" problem where long conversations or agent restarts lose context.
+
+**Why this matters for us**: Our `worktree_create.sh --plan-file` already creates a
+draft PR with the plan attached, and work plans live in `.agent/work-plans/`. But agents
+don't always re-read the plan when resuming work. The plan is "out there" but not
+prominently in the agent's path.
+
+**Concrete application**: When `worktree_enter.sh` is sourced, check for a plan file
+associated with the worktree's issue and remind the agent:
+
+```bash
+# In worktree_enter.sh
+if [ -f ".agent/work-plans/PLAN_ISSUE-${WORKTREE_ISSUE}.md" ]; then
+    echo "📋 Work plan available: .agent/work-plans/PLAN_ISSUE-${WORKTREE_ISSUE}.md"
+    echo "   Read it before starting work."
+fi
+```
+
+And add to CLAUDE.md:
+
+```markdown
+## Entering a Worktree
+
+After sourcing worktree_enter.sh, check for a work plan or SPEC file:
+- `.agent/work-plans/PLAN_ISSUE-${WORKTREE_ISSUE}.md`
+- `SPEC.md` in the worktree root
+If present, read it before starting work — it contains the scope, plan, and
+acceptance criteria for this task.
+```
+
+**Priority**: Medium — requires minor script change + instruction update.
+
+#### Idea 4: Conformance Framing for Instruction Testing
+
+**What Osmani proposes**: Include conformance criteria directly in the spec's "Success"
+section. Language-independent tests (often YAML-based) that any implementation must pass.
+
+**How this differs from our approach**: Our §C5 evaluates full testing frameworks
+(Promptfoo, DeepEval) as separate infrastructure. Osmani frames conformance as part of
+the spec itself — simpler and more immediate.
+
+**Concrete application**: For our instruction files, start with a lightweight conformance
+file before building the full Promptfoo pipeline:
+
+```yaml
+# .agent/conformance/instruction-rules.yaml
+# Deterministic checks — run as a CI step or pre-commit hook
+
+rules:
+  - name: "Branch names follow pattern"
+    type: deterministic
+    check: "git branch --show-current | grep -qE '^(feature/(issue-|ISSUE-)|claude/|main$)'"
+
+  - name: "AI signature present in PR body"
+    type: deterministic
+    check: "gh pr view --json body --jq '.body' | grep -q 'Authored-By'"
+
+  - name: "No commits to main by agents"
+    type: deterministic
+    check: "! git log main --author='Claude' --oneline | grep -q ."
+
+  - name: "--body-file used instead of --body for multiline"
+    type: deterministic
+    check: "! git diff HEAD~1 -- '*.sh' | grep -q '\\-\\-body '"
+
+  - name: "Commit message explains why, not just what"
+    type: llm-judged
+    prompt: "Does this commit message explain WHY the change was made, not just WHAT was changed?"
+```
+
+This is a stepping stone to the full Promptfoo architecture (§C5) — start with
+deterministic checks that run in CI today, add LLM-judged checks when the framework is
+ready.
+
+**Priority**: Medium — bridges the gap between "no testing" and "full eval framework."
+
+#### Idea 5: Product Brief → AI-Generated Spec Pattern
+
+**What Osmani proposes**: Start with a short goal statement (3-5 sentences). Let the AI
+elaborate it into a full spec with implementation details, test plans, and edge cases.
+Review and refine. Then save and execute incrementally.
+
+**Why this matters for us**: We do something similar (issue descriptions → work plans via
+`--plan-file`), but the pattern isn't formalized. The key insight is that the elaboration
+step should be explicit and named — "draft the spec" — not just an implied part of
+planning.
+
+**Concrete application**: Formalize the two-phase pattern in agent instructions:
+
+```markdown
+## Starting a New Task
+
+### Phase 1: Draft the Spec
+1. Read the issue description
+2. Read relevant architecture docs (ARCHITECTURE.md, ADRs, .agents/README.md)
+3. Generate a detailed spec: scope, approach, acceptance criteria, test plan
+4. Save as work plan via `--plan-file` (creates draft PR for review)
+5. Wait for approval before proceeding
+
+### Phase 2: Execute Incrementally
+1. Work through the spec one section at a time
+2. Feed only the relevant context for each sub-task
+3. Self-audit against the spec after completing each section
+4. Update the spec if decisions change during implementation
+```
+
+**Priority**: Low-Medium — mostly formalizes existing practice, but the explicit
+"self-audit after each section" and "update spec if decisions change" steps add value.
+
+### B-ext.4 What Our Research Covers That Osmani Doesn't
+
+Osmani targets individual developers on greenfield projects. Our research addresses
+infrastructure concerns for multi-agent teams in an established workspace:
+
+| Our research topic | Why Osmani doesn't cover it |
+|---|---|
+| Multi-agent coordination & worktree isolation (§4, §C4) | Single-developer focus |
+| Enforcement hierarchy: instructions → hooks → CI → containers (§7f, §7g, §9) | Assumes developer compliance |
+| Architecture documentation lifecycle: ADRs, CI-enforced drift detection (§7a-7h) | Not an infrastructure concern for individual developers |
+| Workspace archaeology: mining git history for lost intent (§7c, Appendix A) | Assumes greenfield or recent projects |
+| Workspace/project boundary: package.xml principle for instruction portability (§8) | Single-repo assumption |
+| Technology landscape scan: 60+ tools evaluated (Appendix C) | Article, not reference guide |
+| Agent compliance gap analysis (§7g) | Assumes agents follow instructions |
+| Diff-time rationale (§7h) | Not an approval-workflow concern |
+| ROS 2 / robotics-specific tooling (§6) | Web/app development focus |
+
+### B-ext.5 Recommendations Integration
+
+The five borrowable ideas are incorporated into the main recommendations (§10) as
+follows:
+
+| Idea | Incorporated into | Phase |
+|------|------------------|-------|
+| Always/Ask/Never taxonomy | Phase 3 (Documentation) & Phase 4 (Align Instructions) | 3-4 |
+| Self-audit instruction | Phase 4 (Align Instructions) & Phase 6 (Compliance/Trust) | 4, 6 |
+| SPEC.md worktree anchor | Phase 2 (Simplify Interface) | 2 |
+| Conformance framing | Phase 5 (Architecture Documentation) or standalone | 5 |
+| Product brief → AI spec | Phase 4 (Align Instructions) | 4 |
+
+---
+
+## Appendix C: Technology Landscape Scan — Existing Tools and Emerging Methodologies
 
 Systematic scan (February 2026) of tools, frameworks, and research that overlap with
 the capabilities this workspace is building. Organized by problem domain. For each tool:
 what it does, maturity, and whether we should adopt, monitor, or skip it.
 
-### B1. Git Archaeology & Architecture Recovery from History
+### C1. Git Archaeology & Architecture Recovery from History
 
 **The gap we identified**: No existing tool mines the "rejection history" (closed-without-
 merge PRs, reverted commits, deleted files) to reconstruct architectural rationale.
@@ -1386,7 +1696,7 @@ or abandoned). The closest tools focus on what *exists* in the codebase, not wha
 and discarded. The "Vibe ADR" pattern (ADRs as agent-readable decision graphs) aligns with
 our vision of ADRs serving both human and agent audiences.
 
-### B2. AI Agent Guardrails & Compliance Enforcement
+### C2. AI Agent Guardrails & Compliance Enforcement
 
 **The gap we identified**: The gap is between writing rules and verifying compliance. Many
 tools help define rules; very few verify that agents actually followed them.
@@ -1410,7 +1720,7 @@ tools help define rules; very few verify that agents actually followed them.
 4. No existing tool validates "did this agent follow its CLAUDE.md correctly?" — this remains an open problem
 5. The "block-at-submit" hook pattern (let agent work, validate at commit) is the recommended approach
 
-### B3. Architecture Drift Detection & Layer Boundary Enforcement
+### C3. Architecture Drift Detection & Layer Boundary Enforcement
 
 **The gap we identified**: No tool in the ROS 2 ecosystem validates package.xml dependencies
 against architectural layer boundaries.
@@ -1437,7 +1747,7 @@ against architectural layer boundaries.
 4. The Nx/Bazel conceptual models are the right design blueprints for our custom checker
 5. `catkin_lint` for ROS 2 is a missing piece the whole ecosystem needs
 
-### B4. Multi-Agent Coordination & Workspace Orchestration
+### C4. Multi-Agent Coordination & Workspace Orchestration
 
 **The gap we identified**: No tool combines worktree isolation + advisory locks + agent
 messaging + task orchestration for a multi-repo workspace.
@@ -1482,7 +1792,7 @@ messaging + task orchestration for a multi-repo workspace.
    climb, 91% more code review time, 154% larger PRs. Coordination quality matters more
    than parallelism throughput
 
-### B5. Instruction/Prompt Regression Testing
+### C5. Instruction/Prompt Regression Testing
 
 **The gap we identified**: When CLAUDE.md changes, nothing verifies that agents still
 follow the rules correctly. Appendix A identified this as the most significant
@@ -1537,7 +1847,7 @@ significantly, and several frameworks can be adapted.
 - **LLM-as-judge reliability**: Even frontier models struggle to judge conditional/nested
   constraints (AgentIF finding)
 
-### B6. Cross-Cutting Synthesis: What to Adopt, Build, or Skip
+### C6. Cross-Cutting Synthesis: What to Adopt, Build, or Skip
 
 **Adopt now** (existing tools that directly solve our problems):
 | Tool | Problem Solved | Effort |
