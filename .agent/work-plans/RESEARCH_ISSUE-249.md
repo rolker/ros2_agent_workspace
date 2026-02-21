@@ -1484,7 +1484,58 @@ messaging + task orchestration for a multi-repo workspace.
 
 ### B5. Instruction/Prompt Regression Testing
 
-*(Research in progress — to be completed when final agent reports)*
+**The gap we identified**: When CLAUDE.md changes, nothing verifies that agents still
+follow the rules correctly. Appendix A identified this as the most significant
+undelivered capability.
+
+**Critical finding**: No tool is specifically designed for testing CLAUDE.md / .cursorrules
+/ AGENTS.md files. However, the general-purpose prompt evaluation ecosystem has matured
+significantly, and several frameworks can be adapted.
+
+| Tool | What It Does | Maturity | Action |
+|------|-------------|----------|--------|
+| **Promptfoo** | Declarative YAML test cases with mixed assertions (exact, regex, LLM-as-judge, semantic similarity). Official GitHub Action with PR score breakdowns. [Evaluate Coding Agents guide](https://www.promptfoo.dev/docs/guides/evaluate-coding-agents/) | Production (17k stars, used by Anthropic internally) | **Adopt** — strongest fit for instruction regression testing. YAML-driven, CI-native, cost caching |
+| **DeepEval** | Python/pytest with 50+ metrics including G-Eval (custom NL criteria scored by LLM). Built-in IFEval benchmark. Regression tracking with green/red rows | Production (Apache 2.0) | **Evaluate** — alternative if pytest integration preferred. G-Eval maps directly to rule compliance scoring |
+| **Evidently AI** | GitHub Action for LLM testing: run agent, evaluate, fail CI on regression. 100+ built-in evals | Production (Apache 2.0) | **Evaluate** — GH Action workflow fits our CI pipeline well |
+| **Arize prompt-learning** | LLM-as-judge evaluates coding agent output, auto-rewrites CLAUDE.md for accuracy. 5-15% SWE-Bench improvement. Has [Claude Code-specific code](https://github.com/Arize-ai/prompt-learning/tree/main/coding_agent_rules_optimization/claude_code) | Published | **Evaluate** — only published work targeting CLAUDE.md optimization with automated eval |
+| **Braintrust AutoEvals** | Model-graded evaluation with GitHub Action posting PR score comparisons. Production traces → test cases | Production (commercial + OSS) | **Monitor** — PR integration excellent but OSS component thinner |
+| **Inspect AI** (UK AISI) | Sandboxed agent execution (Docker/K8s). 100+ pre-built evals. Most rigorous safety framework | Production (govt-backed) | **Monitor** — right model for verifying agents *actually* use worktrees, but high overhead |
+| **Anthropic Bloom** | Auto-generates adversarial scenarios from behavior descriptions. Measures compliance frequency/severity | OSS (Dec 2025) | **Monitor** — designed for safety behaviors, but architecture generalizes to workspace rules |
+
+**Key academic research informing the approach:**
+
+| Paper | Key Contribution | Relevance |
+|-------|-----------------|-----------|
+| **AgentIF** (NeurIPS 2025, [code](https://github.com/THU-KEG/AgentIF)) | First benchmark for instruction following in agentic scenarios. 707 instructions, avg 11.9 constraints. Even best models follow <30% of instructions perfectly | **Very high** — validates need; methodology (extract constraints → per-constraint eval → CSR/ISR metrics) directly applicable |
+| **InFoBench** (ACL 2024) | Decomposed Requirements Following Ratio (DRFR) — breaks complex instructions into yes/no verification questions | **High** — CLAUDE.md is a complex instruction with many sub-requirements; DRFR decomposition maps directly |
+| **IFEval** (Google 2023) | "Verifiable instructions" checked deterministically (format, keyword, structure) | **High** — many CLAUDE.md rules are deterministically verifiable: branch names, signatures, `--body-file` usage |
+| **LLMBar** (ICLR 2024) | Meta-evaluation: how reliable is LLM-as-judge for scoring instruction compliance? | **Medium** — validates reliability of our proposed evaluation approach |
+
+**Recommended implementation architecture:**
+
+1. **Constraint decomposition** (InFoBench/AgentIF method): Break each CLAUDE.md rule
+   into individually testable constraints. Classify each as:
+   - **Deterministic** (branch naming pattern, AI signature presence, `--body-file` usage)
+   - **LLM-judgable** (commit message quality, design rationale, "why" vs "what")
+   - **Behavioral** (actually uses worktrees, refuses to commit to main — requires sandbox)
+
+2. **Promptfoo for test execution**: Define constraints as YAML test cases with mixed
+   assertion types. Deterministic assertions where possible, model-graded for semantic
+   rules. Run via GitHub Action on every PR modifying instruction files
+
+3. **CI gate**: Post results as PR comment showing per-constraint scores. Block merge
+   if compliance drops below threshold. Cache LLM calls to manage costs
+
+4. **Feedback loop**: Real agent compliance failures become new test cases. Re-evaluate
+   full suite against new model versions periodically
+
+**Practical challenges:**
+- **Cost**: Agentic test cases cost $0.10-$0.30 each, take 30-120 seconds. Full compliance
+  suites need careful test selection and caching
+- **Non-determinism**: Same instructions produce different behavior across runs. Multiple
+  trials per test case are needed, increasing cost
+- **LLM-as-judge reliability**: Even frontier models struggle to judge conditional/nested
+  constraints (AgentIF finding)
 
 ### B6. Cross-Cutting Synthesis: What to Adopt, Build, or Skip
 
@@ -1495,6 +1546,7 @@ messaging + task orchestration for a multi-repo workspace.
 | `deptry` | Python dependency hygiene | Low — pip install + CI step |
 | IWYU | C++ include hygiene | Low — CMake integration exists |
 | PyDriller | Library for custom archaeology tooling | Low — pip install |
+| Promptfoo | Instruction regression testing framework | Medium — YAML config + GH Action |
 | `AGENTS.md` alignment | Cross-agent instruction portability | Low — rename/formalize existing files |
 | GitHub Actions + LLM ADR pipeline | Auto-draft ADRs from architectural PRs | Medium — GH Action + LLM API |
 | Structurizr DSL | Architecture diagrams as code | Low — DSL + Docker for rendering |
@@ -1503,7 +1555,7 @@ messaging + task orchestration for a multi-repo workspace.
 | Tool | Problem Solved | Effort |
 |------|---------------|--------|
 | ROS 2 layer boundary checker | Validate package.xml deps against `layer_architecture.yaml` | Medium — Python script parsing XML + graph analysis |
-| Instruction compliance test suite | Verify agents follow CLAUDE.md rules | High — requires eval framework integration |
+| CLAUDE.md constraint decomposition | Break rules into testable constraints (deterministic + LLM-judged) | Medium — one-time analysis + Promptfoo YAML |
 | Archaeology automation | Scripted version of our manual archaeology method | Medium — PyDriller + LLM + GitHub API |
 
 **Evaluate soon** (promising, need hands-on testing):
@@ -1512,6 +1564,8 @@ messaging + task orchestration for a multi-repo workspace.
 | Clash | Drop-in worktree conflict detection | Early-stage, may have rough edges |
 | MCP Agent Mail | Advisory file reservations via MCP | Adds infrastructure dependency |
 | Claude Agent SDK | Native multi-agent orchestrator | Requires orchestrator development |
+| DeepEval / Evidently AI | Alternative eval frameworks for instruction testing | May overlap with Promptfoo |
+| Arize prompt-learning | Auto-optimize CLAUDE.md via eval feedback loop | Requires LLM API costs |
 | OPA (Rego policies) | Formal, testable policy enforcement via hooks | Rego learning curve |
 | iCODES | Semantic search over commit intent | Early-stage |
 | Git-native semantic memory | Auto-capture decisions as git notes | Prototype only |
@@ -1523,12 +1577,14 @@ messaging + task orchestration for a multi-repo workspace.
 - Microsoft Agent Framework (wrong ecosystem unless we go multi-vendor)
 - Policy-as-Prompt research (auto-extract rules into classifiers)
 - Sonargraph-Architect (commercial, expensive)
+- Inspect AI / Anthropic Bloom (safety eval frameworks — useful if we need sandboxed testing)
 - AEBOP (Agentic Engineering Body of Practices — emerging standard)
 
 **Skip** (wrong problem or wrong ecosystem):
 - Guardrails AI / NeMo Guardrails (chatbot guardrails, not coding agent workspace)
 - CrewAI / MetaGPT / OpenAI Agents SDK (no git/workspace awareness, or wrong vendor)
 - GitButler virtual branches (incompatible with ROS 2 build requirements)
+- LangSmith (LangChain ecosystem lock-in)
 
 ---
 
