@@ -753,6 +753,61 @@ When an agent's implementation aligns with an existing ADR, it can reference it:
 branches." This is both transparent and efficient — the rationale exists once in the
 ADR, and agents just point to it.
 
+**The diff-approval gap — real-time rationale at the point of decision:**
+
+The mechanisms above (commit messages, PR descriptions, ADRs) all provide rationale
+*after* the work is done. But the most critical transparency moment is earlier: when
+the agent presents a diff for approval and the user must decide yes/no *right now*.
+
+At that moment, the user typically sees:
+- Which file is being modified (gives context about the area)
+- The raw diff (shows *what* changed)
+
+What's missing:
+- **Why this approach** — what pattern is being applied, what alternative was rejected
+- **How this edit fits the big picture** — is this 1 of 12 related changes? The
+  foundation for something coming next? A prerequisite?
+- **What design decision is embedded** — is this introducing a new pattern, or
+  following an existing one?
+
+This matters because a diff that looks wrong in isolation might be correct in context,
+and a diff that looks fine might be subtly introducing architectural drift. The user
+can't evaluate either without knowing the agent's reasoning at that moment.
+
+**Possible approaches (from lightweight to heavy):**
+
+| Approach | Mechanism | Cost | Trade-off |
+|----------|-----------|------|-----------|
+| Pre-edit narration | Agent states intent *before* presenting the diff: "I'm applying the observer pattern here because..." | Low | Depends on agent discipline; easy to skip |
+| Edit annotations | Structured comment above each tool call explaining rationale, pattern, and big-picture fit | Low-Medium | Adds tokens to every edit; may be noise for experienced users |
+| Session plan visibility | Agent publishes a numbered plan at task start; each edit references its step: "Edit 3/7: implementing the subscriber (step 2 of plan)" | Medium | Requires planning discipline; plan may drift |
+| Claude Code hooks (PostToolUse) | A hook that captures the edit context and presents a summary alongside the diff | Medium | Technical; requires hook development |
+| Diff annotation metadata | Tool-level support where the Edit tool accepts optional `rationale` and `pattern` fields displayed in the approval UI | Low (if supported) | Requires upstream Claude Code changes |
+
+The lightest viable approach is **pre-edit narration as agent instruction** — adding
+to `CLAUDE.md`:
+
+```markdown
+## Edit Rationale
+
+Before presenting a diff for approval, briefly state:
+1. What pattern or approach this edit implements
+2. How it fits into the current task (e.g., "3 of 5 changes for the new subscriber")
+3. Any non-obvious design choice and why you made it
+
+Skip rationale for trivial edits (formatting, typos, renames).
+```
+
+This costs nothing to implement — it's just an instruction. The question is whether
+agents follow it consistently, which connects back to the instruction compliance
+problem (§9). The heavier approaches (hooks, tool metadata) enforce it mechanically
+but require development effort.
+
+**Connection to workspace archaeology**: The rationale that's lost when a session ends
+is exactly the kind of context that workspace archaeology must later reconstruct from
+commit messages, PR descriptions, and issue comments. If the rationale is captured at
+edit time and flows into commits, the archaeology becomes easier — or unnecessary.
+
 **Sources**:
 - [tj-actions/changed-files (GitHub)](https://github.com/tj-actions/changed-files)
 - [brettcannon/check-for-changed-files (GitHub)](https://github.com/brettcannon/check-for-changed-files)
@@ -1061,6 +1116,12 @@ to this workspace.
 - ADRs serve double duty: they document rationale *and* give agents something to
   reference instead of generating explanations from scratch
 - Commit messages should explain "why" not "what" — this is low-cost and always useful
+- **Diff-time rationale** (§7h): Add "Edit Rationale" instruction to CLAUDE.md requiring
+  agents to state the pattern, big-picture fit, and non-obvious choices *before* each
+  diff. This is the cheapest intervention with the highest trust impact — it closes the
+  gap between "I can see what changed" and "I understand why it changed this way." Longer
+  term, Claude Code tool-level metadata (rationale field on Edit) would make this
+  mechanical rather than instruction-dependent.
 
 ---
 
