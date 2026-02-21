@@ -450,7 +450,183 @@ around it, not the pattern itself.
 
 ---
 
-## 7. Recommendations Summary
+## 7. Architecture Documentation Lifecycle
+
+### Problem Statement
+
+ARCHITECTURE.md is a reference document, but nothing in the workflow requires consulting
+it. The instruction files say "Read When Needed, Not Upfront" — which agents interpret as
+"skip it." Decisions documented only in commit messages or issue comments are at risk of
+being silently reverted.
+
+### Current State
+
+- `ARCHITECTURE.md` exists at workspace root, describing system design and layering
+- `.github/workflows/validate.yml` checks that `ARCHITECTURE.md` exists (line 37), but
+  does **not** check whether it was updated when relevant files changed
+- `.pre-commit-config.yaml` has four custom hooks, none related to architecture sync
+- No PR template exists (`.github/PULL_REQUEST_TEMPLATE.md` is missing)
+- No Architecture Decision Records (ADRs) — design rationale lives only in issues/commits
+
+### 7a. CI Enforcement (No AI Required)
+
+Most architecture enforcement is structural and deterministic. Traditional CI checks are
+fast, free, and cover the failure modes that actually occur in practice.
+
+**File-change correlation** — "If infrastructure files changed, did architecture docs get
+updated too?" Uses [tj-actions/changed-files](https://github.com/tj-actions/changed-files)
+(4,000+ stars) to detect changes in architecture-relevant files (`configs/`, `Makefile`,
+`.agent/scripts/env.sh`, `setup.sh`) and warn if neither `ARCHITECTURE.md` nor
+`docs/decisions/` was updated in the same PR.
+
+**Structural validation** — "Does the doc match reality?" Script-based checks that verify
+paths referenced in ARCHITECTURE.md actually exist, and that every `*_ws` directory is
+mentioned. Catches the common drift pattern where a layer is added/removed without
+updating the docs.
+
+**Dependency boundary enforcement** — "Do packages respect layer ordering?" Parse
+`package.xml` files and verify that packages in `core_ws` don't depend on packages in
+higher-layer workspaces. This is graph analysis — no AI needed. This **prevents**
+architecture violations rather than just documenting them.
+
+**New package → require ADR** — If a PR adds a new `package.xml`, require a corresponding
+ADR in `docs/decisions/` explaining why the package was added and which layer it belongs
+to. Enforced as a CI check that blocks merge.
+
+**PR checklist enforcement** — GitHub Actions can parse the PR body and verify that if
+"Architecture-relevant change" is checked, the sub-items (ARCHITECTURE.md updated, ADR
+created) are also checked.
+
+### 7b. Where AI Adds Value (Optional, Lower Priority)
+
+| Check | Needs AI? | Why |
+|-------|-----------|-----|
+| File-change correlation | No | File existence check |
+| Directory tree matches doc | No | Path existence check |
+| Layer dependency violations | No | Graph analysis of package.xml |
+| PR approach contradicts ADR intent | **Yes** | Natural language understanding |
+| Should this PR have created an ADR? | **Maybe** | Heuristics get 80%, AI gets the rest |
+| Is the ARCHITECTURE.md update accurate? | **Yes** | Requires reading code + prose together |
+
+AI-powered semantic review is expensive, slow, and non-deterministic — three things you
+generally don't want in CI. It also requires API keys and cost management. Start with the
+structural checks; add AI review later only if the gap is felt.
+
+### 7c. Architecture Decision Records (ADRs)
+
+ADRs are short, immutable documents — one per decision — that capture **context**,
+**decision**, and **consequences**. The canonical template is
+[MADR (Markdown Architectural Decision Records)](https://adr.github.io/madr/).
+
+**Proposed file organization:**
+
+```
+docs/decisions/
+  0001-layered-workspace-architecture.md
+  0002-worktree-isolation-over-branch-switching.md
+  0003-duplicate-agent-instructions-per-framework.md
+  0004-env-vars-for-agent-identity.md
+```
+
+ADR #3 is critical — it documents that instruction duplication was **intentional**, making
+the decision discoverable and durable rather than buried in an issue comment.
+
+**Minimal MADR template:**
+
+```markdown
+# {short title}
+
+## Status
+Accepted | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)
+
+## Context and Problem Statement
+{Why was this decision needed?}
+
+## Decision
+{What was decided.}
+
+## Consequences
+{Positive and negative consequences.}
+```
+
+**Tooling**: [adr-tools](https://github.com/npryce/adr-tools) (pure Bash, zero
+dependencies) provides `adr new`, `adr list`, `adr generate toc`. Alternatively,
+just create files manually — no tooling required.
+
+### 7d. Agent Instruction Integration
+
+Add an "Architecture Checkpoints" section to CLAUDE.md (and equivalents) that names
+specific files at specific workflow stages:
+
+```markdown
+## Architecture Checkpoints
+
+### Before Planning
+- Read ARCHITECTURE.md "Core Concepts" — which layer does this touch?
+- Scan docs/decisions/ titles — any ADRs that constrain this area?
+
+### Before Opening PR
+- If you added/removed/renamed a package → update ARCHITECTURE.md
+- If you made a design decision with alternatives → create an ADR
+```
+
+This works because agents process their instruction file on every session. It converts
+architecture consultation from a suggestion into a workflow step.
+
+### 7e. PR Template
+
+Create `.github/PULL_REQUEST_TEMPLATE.md` with an architecture impact section:
+
+```markdown
+## Architecture Impact
+
+- [ ] No architecture impact (routine change within existing patterns)
+- [ ] Architecture-relevant change (check all that apply below):
+  - [ ] Adds/removes/renames a package or layer
+  - [ ] Changes cross-layer dependencies
+  - [ ] Changes the build or source order
+  - [ ] Modifies agent workflow or instruction files
+
+### If architecture-relevant:
+- [ ] ARCHITECTURE.md updated (or confirmed still accurate)
+- [ ] ADR created in docs/decisions/ (if a new architectural decision)
+```
+
+Research indicates checklists are effective when short (5-8 items), project-specific, and
+enforced by automation. For AI agents, the template text becomes part of the PR creation
+context, forcing active engagement with each checkbox.
+
+### 7f. Defense in Depth
+
+The most effective pattern combines multiple layers:
+
+| Layer | Speed | Bypassable? | Purpose |
+|-------|-------|-------------|---------|
+| Pre-commit hook | Fast | Yes (`--no-verify`) | Developer feedback |
+| PR template checklist | At PR creation | Rubber-stampable | Conscious acknowledgment |
+| CI file-correlation check | Minutes | No | Enforcement |
+| CI structural validation | Minutes | No | Drift detection |
+| CI dependency boundary check | Minutes | No | Violation prevention |
+
+No single layer is sufficient. Pre-commit hooks can be bypassed; checklists can be
+rubber-stamped; CI catches what the others miss. The workspace already follows this
+defense-in-depth pattern for linting.
+
+**Sources**:
+- [tj-actions/changed-files (GitHub)](https://github.com/tj-actions/changed-files)
+- [brettcannon/check-for-changed-files (GitHub)](https://github.com/brettcannon/check-for-changed-files)
+- [pre-commit.com](https://pre-commit.com/)
+- [ADR process — AWS Prescriptive Guidance](https://docs.aws.amazon.com/prescriptive-guidance/latest/architectural-decision-records/adr-process.html)
+- [adr.github.io](https://adr.github.io/)
+- [MADR documentation](https://adr.github.io/madr/)
+- [npryce/adr-tools (GitHub)](https://github.com/npryce/adr-tools)
+- [GitHub PR Template (Pull Checklist)](https://www.pullchecklist.com/posts/github-pr-template)
+- [Pull Request Template — Microsoft Engineering Playbook](https://microsoft.github.io/code-with-engineering-playbook/code-reviews/pull-request-template/)
+- [arxiv: Agentic Coding Manifests](https://arxiv.org/html/2509.14744v1)
+
+---
+
+## 8. Recommendations Summary
 
 ### For Phase 1 (Audit)
 - Use the script categorization in Section 4c as a starting framework
@@ -478,6 +654,25 @@ around it, not the pattern itself.
   - Claude-specific behavioral rules
   - Worktree workflow rules (if Claude-specific)
 - Same pattern for copilot-instructions.md and gemini-cli.instructions.md
+
+### For Phase 5 (Architecture Documentation Lifecycle)
+
+Ordered by impact-to-effort ratio:
+
+| Priority | Action | Effort | AI? |
+|----------|--------|--------|-----|
+| 1 | Create `.github/PULL_REQUEST_TEMPLATE.md` with architecture impact checklist | Low | No |
+| 2 | Add "Architecture Checkpoints" to CLAUDE.md and equivalent instruction files | Low | No |
+| 3 | Create `docs/decisions/` and seed 3-5 retroactive ADRs (layered workspaces, worktree isolation, instruction duplication, env.sh guardrails) | Medium | No |
+| 4 | Add file-change correlation CI check to `validate.yml` | Medium | No |
+| 5 | Add structural validation CI check (referenced paths exist) | Medium | No |
+| 6 | Add layer dependency boundary CI check (no upward deps in package.xml) | Medium | No |
+| 7 | Add architecture-sync pre-commit hook (warning-only) | Low | No |
+| 8 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
+
+Key insight: items 1–7 are all deterministic, traditional CI/tooling. AI (item 8)
+adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
+and should be deferred until the structural checks are in place.
 
 ---
 
