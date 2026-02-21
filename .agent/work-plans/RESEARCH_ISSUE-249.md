@@ -726,7 +726,69 @@ ADR, and agents just point to it.
 
 ---
 
-## 8. Recommendations Summary
+## 8. Cross-Reference with Open Issues
+
+21 issues are currently open. Several overlap with or complement #249's scope. This
+section maps each relevant issue to this research, identifies synergies, and flags
+topics the research may have underweighted.
+
+### Directly Addressed by This Research
+
+| Issue | Title | Covered in |
+|-------|-------|------------|
+| #241 | Enforce Antigravity Agent Compliance | §7g (agent compliance), §7f (defense in depth) |
+| #172 | Pre-commit hook for outdated doc references | §7a (structural validation), §7f (defense in depth) |
+| #126 | Workspace Context Awareness & Drift Detection | §5e (drift detection), §7a (structural validation) |
+| #214 | UX: improve workflow discoverability | §1 (just/Make), §2 (self-documenting Makefile), §4a (subcommand pattern) |
+| #155 | Add Context Analysis & DoD to Feature Template | §7d (architecture checkpoints), §7e (PR template) |
+| #245 | Generate Claude Code slash commands from Makefile | §1a (just + just-mcp), §4a (subcommand pattern) |
+
+### Complementary (Not Directly Addressed but Related)
+
+| Issue | Title | Relationship | Gap in research? |
+|-------|-------|-------------|-----------------|
+| #247 | Harden worktree rules — prohibit editing main tree | Enforcement problem (like §7g). The issue proposes instruction-level rules, but the same compliance gap applies: agents may ignore instructions. Container-level isolation (#229) is the stronger solution. | Minor — §7g covers the enforcement philosophy but doesn't address worktree-specific guardrails |
+| #229 | Sandboxed agent development: DevContainer with YOLO mode | The strongest form of §7g's enforcement: instead of telling agents not to bypass hooks, make it physically impossible via filesystem constraints (read-only mounts, volume isolation). | **Yes — research should note container isolation as the ultimate enforcement layer** |
+| #234 | Incremental package quality improvement | Quality-on-entry pattern complements §7d (architecture checkpoints). When an agent enters a package, it checks quality gaps — same principle as checking ARCHITECTURE.md before planning. | Minor — could reference as a parallel pattern |
+| #235 | Periodic workspace health sweep | The "structural validation" CI check (§7a) is a subset of this. The health sweep is broader: instruction consistency, script relevance, template freshness, dependency alignment. | Minor — §7a covers architecture-specific checks; #235 covers the full workspace |
+| #124 | Automate Agent Identity & Git Signatures | Related to §7g — identity setup is another thing agents skip or get wrong. The instruction-based approach has the same compliance gap. | No — orthogonal to architecture enforcement |
+| #131 | Agent guidance for ROS 2 package licensing | Not covered by this research. Licensing is a quality gate, not an architecture concern. Could be a CI check (verify `package.xml` has a license field). | No — out of scope |
+
+### Key Insight from Issue Cross-Reference
+
+**Container isolation (#229, #237, #236) is the missing enforcement layer.** The research
+(§7g) identifies CI + branch protection as "agent-proof" enforcement, but the open issues
+reveal a more ambitious approach already being explored: **make violations impossible at
+the filesystem level** rather than detecting them after the fact.
+
+The enforcement hierarchy, updated:
+
+| Layer | Mechanism | Catches violations... |
+|-------|-----------|----------------------|
+| Instructions | CLAUDE.md, AGENTS.md | ...if the agent reads and follows them |
+| Pre-commit hooks | `.pre-commit-config.yaml` | ...before commit, if not bypassed |
+| Wrapper scripts | `agent commit` | ...before commit, if agent uses the wrapper |
+| CI + branch protection | GitHub Actions + rules | ...before merge (non-bypassable) |
+| **Container isolation** | DevContainer + read-only mounts | ...**before they can happen** (filesystem prevents them) |
+
+Container isolation (bottom layer) is the strongest because it shifts from
+**detect-and-block** to **prevent-by-construction**. An agent in a container with
+read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
+
+### Issues Not Related to This Research
+
+| Issue | Title | Why not related |
+|-------|-------|----------------|
+| #243 | Root Cause Analysis: validate_workspace.py | Bug investigation, not architecture |
+| #244 | CLAUDE.md rule: never guess GitHub URLs | Instruction quality, not simplification |
+| #230 | ros2launch_session for integration testing | Testing tooling, not architecture/CI |
+| #162 | Stacked PRs and sub-issues | Git workflow, not architecture enforcement |
+| #129 | Format GitHub references as clickable links | UX polish |
+| #102 | Project-specific glossary | Documentation content, not structure |
+
+---
+
+## 9. Recommendations Summary
 
 ### For Phase 1 (Audit)
 - Use the script categorization in Section 4c as a starting framework
@@ -776,11 +838,13 @@ and should be deferred until the structural checks are in place.
 
 ### For Phase 6 (Agent Compliance and User Trust)
 
-**Agent compliance**:
+**Agent compliance** (see also §8 cross-reference with #241, #247, #229):
 - Ensure every pre-commit hook check has a CI equivalent — hooks are fast feedback,
   CI is enforcement. Agents bypass hooks; they can't bypass CI + branch protection.
 - Add "hooks are mandatory" language to AGENTS.md (cross-framework)
 - Consider `agent commit` wrapper that runs checks explicitly
+- Longer-term: container isolation (#229) is the strongest enforcement — it prevents
+  violations by construction (read-only mounts) rather than detecting them after the fact
 
 **User trust / transparency**:
 - Define transparency levels (`minimal`, `standard`, `detailed`) as a configurable dial
