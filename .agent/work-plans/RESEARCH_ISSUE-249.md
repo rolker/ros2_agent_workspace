@@ -789,6 +789,85 @@ different ROS 2 project, the `project_knowledge/` directory starts empty. They
 populate it with symlinks to their own project repos and integration docs for
 the external packages they use. The workspace infrastructure doesn't change.
 
+### Agent Instruction Portability: The package.xml Principle
+
+**Problem**: Project repos will contain agent instructions (`AGENTS.md`),
+architecture docs, ADRs, and `.agents/README.md`. These files must make sense
+in two very different contexts:
+
+1. **In-workspace**: An agent has the full picture — workspace CLAUDE.md,
+   worktree workflow, `.agent/project_knowledge/`, layered build infrastructure.
+2. **Standalone on GitHub**: A PR reviewer (GitHub Copilot, a human, a CI bot)
+   sees only the project repo. No workspace context exists.
+
+If project repo instructions reference workspace concepts (worktrees, `make build`,
+`.agent/project_knowledge/`), they become confusing or broken in the standalone
+context.
+
+**The principle**: Packages don't know about workspaces. A `package.xml` declares
+its own dependencies — it never says "I'm in core_ws" or "build me with `make build`."
+That's a workspace concern. **Agent instructions should follow the same pattern.**
+
+**Project repo AGENTS.md must be fully standalone.** It assumes the reader (human
+or AI) has only this repo. No references to worktrees, layered builds, `make`
+targets, or `.agent/project_knowledge/`. Standard ROS 2 commands only:
+
+```markdown
+# AGENTS.md (in a project repo)
+
+## Build & Test
+colcon build --packages-select <package>
+colcon test --packages-select <package>
+
+## Architecture
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system design.
+See [docs/decisions/](docs/decisions/) for architectural decision records.
+
+## Packages
+- pkg_a: Sensor drivers and hardware interfaces
+- pkg_b: Mission planning and execution
+
+## Conventions
+- ...
+```
+
+GitHub Copilot reviewing a PR sees this, understands the project on its own terms,
+and gives useful reviews. No dangling references to workspace infrastructure it
+can't see.
+
+**The workspace adds context on top, never the other way around.** The workspace's
+CLAUDE.md / AGENTS.md says "when working in a project repo, also check
+`.agent/project_knowledge/`" and "use worktrees, not branch checkout" and "build
+via `make build`." Those are workspace-level overlays. The project repo is oblivious.
+
+**Instruction layering** (mirrors the ROS 2 overlay pattern):
+
+```
+┌─────────────────────────────────────┐
+│ Workspace CLAUDE.md / AGENTS.md     │  Workspace-specific: worktrees,
+│ .agent/project_knowledge/           │  layered builds, integration docs
+├─────────────────────────────────────┤
+│ Project repo AGENTS.md              │  Standalone: standard ROS 2 commands,
+│ Project repo ARCHITECTURE.md        │  project architecture, conventions
+│ Project repo .agents/README.md      │
+│ Project repo docs/decisions/        │
+└─────────────────────────────────────┘
+```
+
+An agent in the workspace sees both layers. An agent on GitHub (Copilot reviewing
+a PR, a contributor cloning just the repo) sees only the bottom layer. Both get
+coherent, non-contradictory instructions.
+
+**The discipline this requires**: when writing project repo docs, never use
+workspace-specific commands or reference workspace-level paths. Always use
+standard ROS 2 commands (`colcon build`, `colcon test`, `rosdep install`). If
+you catch yourself writing workspace-specific instructions in a project repo,
+that content belongs in the workspace layer instead.
+
+**Test for correctness**: clone the project repo into a fresh, standalone
+workspace with no agent infrastructure. Do the instructions in AGENTS.md still
+work? If not, they've leaked workspace assumptions.
+
 ---
 
 ## 9. Cross-Reference with Open Issues
@@ -882,11 +961,20 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
   specific architecture docs, ADRs, and `.agents/README.md` belong in project repos
 
 ### For Phase 4 (Align Agent Instructions)
-- CLAUDE.md references AGENTS.md for shared instructions, contains only:
+- **Workspace-level** instruction files (CLAUDE.md, copilot-instructions.md, etc.)
+  reference a shared AGENTS.md and contain only framework-specific overrides:
   - Environment setup commands
-  - Claude-specific behavioral rules
-  - Worktree workflow rules (if Claude-specific)
-- Same pattern for copilot-instructions.md and gemini-cli.instructions.md
+  - Framework-specific behavioral rules
+  - Worktree workflow rules
+- **Project-level** AGENTS.md files must be fully standalone (see §8, "package.xml
+  principle"): standard ROS 2 commands only, no workspace references. These must
+  work for GitHub Copilot reviewing PRs, contributors cloning just the repo, or
+  any context outside the workspace.
+- **Portability test**: clone the project repo into a bare workspace. If the
+  instructions break, they've leaked workspace assumptions.
+- The workspace layer adds context on top (worktrees, `make build`, integration
+  docs) — project repos are oblivious to it, just as packages are oblivious to
+  which workspace they're built in.
 
 ### For Phase 5 (Architecture Documentation Lifecycle)
 
