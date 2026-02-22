@@ -2511,14 +2511,17 @@ This is **not** a recommendation to weaken CI — it's a recommendation to make 
 | Container isolation for agent sandboxing (#229) | Not discussed (likely handled by Codex platform) |
 | Project-level vs. workspace-level instruction separation (§8) | Monorepo — no separation needed |
 | Three-tier boundary taxonomy with enforcement layer mapping (§D5) | Implicit in their approach but not formalized as a reusable pattern |
+| Instruction regression testing / conformance suites (Appendix A, C5) | Martin Fowler notes this gap: "what he is missing in the write-up is *verification of functionality and behaviour*" — the harness enforces structure but doesn't verify agent output meets specs |
 
 ### E5. Key Takeaway
 
 OpenAI's experience at 1M LOC scale validates several of our report's recommendations
 while adding concrete patterns we hadn't considered. The strongest signal: **the harness
 (environment, constraints, feedback loops) matters more than the agent's capabilities**.
-The same team with the same model would produce worse results without the architectural
-enforcement, progressive disclosure, and garbage collection that comprise the harness.
+Early slowness was "not because Codex was incapable, but because the environment was
+underspecified." The same team with the same model would produce worse results without
+the architectural enforcement, progressive disclosure, and garbage collection that
+comprise the harness.
 
 For our workspace, the most actionable ideas in order of impact-to-effort:
 
