@@ -21,8 +21,13 @@ January 2026), which draws on GitHub's analysis of 2,500+ agent configuration fi
 actionable ideas are identified: the **Always/Ask/Never rule taxonomy**, **self-audit
 instructions**, **SPEC.md as a persistent session anchor**, **conformance suites as
 stepping stones** to full instruction testing, and **formalizing the two-phase task
-pattern** (draft spec, then execute incrementally). These are integrated into the
-recommendations in §10.
+pattern** (draft spec, then execute incrementally). Appendix E analyzes OpenAI's
+"[Harness Engineering](https://openai.com/index/harness-engineering/)" (February 2026),
+documenting production-scale agent-first development (~1M LOC, zero human code, 3.5
+PRs/engineer/day). Key borrowable ideas: **CLAUDE.md as ~150-line map** (not encyclopedia),
+**lint error messages as agent teaching**, **garbage collection agents** for continuous
+drift correction, and **quality grading** per package/layer. All findings are integrated
+into §10.
 
 ---
 
@@ -1072,6 +1077,12 @@ read-only mounts on `layers/main/*/src/` physically cannot modify the main tree.
   Never do) based on GitHub's analysis of 2,500+ agent configuration files. This is
   cleaner and more parseable than the current flat list with inconsistent emphasis markers.
   See §B-ext.3 for concrete example
+- **CLAUDE.md as map, not encyclopedia** (from Appendix E, Idea 1): OpenAI's experience
+  at 1M LOC scale shows monolithic instruction files "rot instantly." Restructure CLAUDE.md
+  to ~150 lines: env setup, Always/Ask/Never boundaries, and a "Where to look" section
+  pointing to `.agent/knowledge/` topic files. The knowledge base — not the instruction
+  file — is the system of record. This aligns with §5b (tiered documentation) and §5c
+  (progressive disclosure)
 
 ### For Phase 4 (Align Agent Instructions)
 - **Workspace-level** instruction files (CLAUDE.md, copilot-instructions.md, etc.)
@@ -1126,6 +1137,18 @@ Ordered by impact-to-effort ratio:
 | 9 | Add `/analyze`-style consistency checker (from Appendix D, §D3): validate that instruction files, plans, and code are internally consistent — referenced paths exist, spec terms match code names, no naming drift across documents. GitHub Spec Kit demonstrates the concept; we can implement a lightweight version as a script. | Medium | No |
 | 10 | (Future) AI-powered semantic architecture review on PRs | High | Yes |
 
+**Agent-teachable error messages** (from Appendix E, Idea 2): For all custom linters and
+CI checks (items 4–9), write error messages that include remediation instructions targeted
+at agent consumption. OpenAI's experience: "Because the lints are custom, they write the
+error messages to inject remediation instructions into agent context." Every lint failure
+becomes a lesson, not just a gate. Include: what went wrong, why, how to fix it, and a
+pointer to the relevant doc.
+
+**Quality grading document** (from Appendix E, Idea 4): Create `.agent/QUALITY.md` that
+grades each package/layer on documentation, tests, architecture conformance, and
+conventions. Updated by CI or agents after each PR. Gives both humans and agents a quick
+read on where attention is needed.
+
 Key insight: items 1–9 are all deterministic, traditional CI/tooling. AI (item 10)
 adds value only for semantic checks ("does this PR contradict the *intent* of an ADR?")
 and should be deferred until the structural checks are in place.
@@ -1166,6 +1189,23 @@ to this workspace.
   gap between "I can see what changed" and "I understand why it changed this way." Longer
   term, Claude Code tool-level metadata (rationale field on Edit) would make this
   mechanical rather than instruction-dependent.
+
+**Garbage collection agents** (from Appendix E, Idea 3): Once multi-agent workflows are
+available (Claude Agent SDK, C4), implement recurring background tasks that scan for
+deviations and open auto-mergeable fix-up PRs:
+- Doc gardener (stale docs, broken links, outdated parameter lists)
+- Convention enforcer (naming drift, missing AI signatures, worktree cleanup)
+- Quality tracker (update `.agent/QUALITY.md` grades per package)
+
+OpenAI's experience: "This functions like garbage collection — technical debt is treated
+like a high-interest loan, better paid down continuously." Most fix-up PRs can be reviewed
+in under a minute and automerged.
+
+**"Corrections are cheap, waiting is expensive"** (from Appendix E, Idea 5): For agent-
+generated PRs, favor fast feedback loops over blocking gates. Reserve hard blocks for the
+"Never" tier only (safety-critical rules). Everything else: detect, report, let the agent
+self-correct in a follow-up. This doesn't weaken CI — it makes CI faster and more
+informative so agents can iterate quickly rather than blocking on every warning.
 
 ---
 
@@ -2309,6 +2349,192 @@ enforced in CI is a soft "Never" that will eventually be violated.
 - [Spec-Driven AI Coding With GitHub's Spec Kit — InfoWorld](https://www.infoworld.com/article/4062524/spec-driven-ai-coding-with-githubs-spec-kit.html)
 - [GitHub Spec Kit: A Guide to Spec-Driven AI Development — IntuitionLabs](https://intuitionlabs.ai/articles/spec-driven-development-spec-kit)
 - [Chapter 5: Spec-Driven Development with Claude Code — Agent Factory](https://agentfactory.panaversity.org/docs/General-Agents-Foundations/spec-driven-development)
+
+---
+
+## Appendix E: OpenAI's "Harness Engineering" — Production-Scale Agent-First Development
+
+**Source**: Ryan Lopopolo (OpenAI), "Harness engineering: leveraging Codex in an agent-first
+world" (February 11, 2026). Published on [OpenAI Blog](https://openai.com/index/harness-engineering/).
+See also: [Martin Fowler's analysis](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html),
+[InfoQ coverage](https://www.infoq.com/news/2026/02/openai-harness-engineering-codex/).
+
+> **Note**: Where Appendix B (Osmani) is prescriptive ("here's how to write specs for agents")
+> and Appendix D (SDD movement) is evaluative ("here are frameworks, cherry-pick wisely"),
+> this appendix is **empirical** — it documents what actually happened when a team of 3–7
+> engineers built a production product with zero human-written code using Codex over 5 months.
+
+### E1. Article Summary
+
+OpenAI's internal team built a beta product from scratch using only Codex agents (GPT-5).
+No human wrote any code — not the application logic, not the tests, not the CI config,
+not the documentation, not even the initial AGENTS.md file. The first commit landed in
+late August 2025. Five months later: ~1 million lines of code, ~1,500 merged PRs, from
+a team that grew from 3 to 7 engineers. Average throughput: 3.5 PRs per engineer per day.
+
+The team's job was not to write code but to **design the environment** in which agents
+could do reliable work: define boundaries, build feedback loops, encode taste, and manage
+entropy. They estimate they built in ~1/10th the time hand-coding would have required.
+
+Martin Fowler categorizes their "harness" into three components:
+1. **Context engineering** — instruction files, documentation, progressive disclosure
+2. **Architectural constraints** — deterministic linters, structural tests, layer rules
+3. **Garbage collection** — background agents that fight entropy continuously
+
+### E2. Overlap Analysis
+
+| OpenAI concept | Our report | Assessment |
+|----------------|-----------|------------|
+| AGENTS.md as ~100-line table of contents | §3, §5c (progressive disclosure via `@` references) | **Partial overlap** — we recommend AGENTS.md and modular docs, but haven't proposed the "100-line ceiling" or named the pattern "table of contents vs encyclopedia" |
+| Rigid layer architecture with enforced dependency direction (Types → Config → Repo → Service → Runtime → UI) | §7, C3 (layer boundary enforcement for ROS 2 package.xml) | **Strong overlap** — same concept, different implementation. Our report proposes `layer_architecture.yaml` + custom checker |
+| Custom linters with remediation instructions in error messages | C2 (hooks), C3 (import-linter) | **New insight** — we discuss linters but not the pattern of writing error messages that inject agent-teachable context |
+| Providers as single interface for cross-cutting concerns | Not covered | **New** — relevant for ROS 2 where cross-cutting concerns (TF, logging, parameters) enter packages ad hoc |
+| Plans as first-class versioned artifacts with progress logs | §7c (ADRs), work-plan workflow | **Overlap** — we already version plans; their execution-plan pattern with checked-in progress logs goes further |
+| Quality grading per domain/layer, tracked over time | Not covered | **New** — systematic quality tracking with versioned grades |
+| Garbage collection agents (background scan → fix-up PRs) | Not covered | **New** — closest we have is the doc-gardening concept in §7, but theirs is systematic across all domains |
+| "Taste invariants" (structured logging, naming, file size limits) | §7h (transparency levels) | **New framing** — we discuss style and conventions but not the concept of encoding subjective "taste" as enforceable lints |
+| Doc-gardening agent (stale doc scanner → auto-fix PRs) | §7a (CI enforcement), §10 Phase 5 | **Partial** — we propose CI checks for doc staleness; they automate the *fix*, not just the detection |
+| Progressive disclosure (small entry point → deeper docs) | §5c (`@` references, modular docs) | **Overlap** — same pattern, they gave it a name |
+| "Corrections are cheap, waiting is expensive" (minimal blocking gates) | Not covered | **New philosophy** — challenges our conventional approach of blocking CI gates |
+| "Invariants over micromanagement" | §D5 (three-tier boundary system) | **Overlap** — different framing of the same principle (encode what matters, let agents decide how) |
+| Mechanical enforcement (linters + CI validate knowledge base structure) | §7a, §10 Phase 5 | **Overlap** — we propose the same with structural CI checks |
+
+### E3. Borrowable Ideas (Actionable for This Workspace)
+
+#### Idea 1: AGENTS.md / CLAUDE.md as Table of Contents
+
+OpenAI's insight: a monolithic instruction file "rots instantly — a monolithic manual turns
+into a graveyard of stale rules where agents can't tell what's still true, humans stop
+maintaining it, and the file quietly becomes an attractive nuisance."
+
+Their solution: ~100-line AGENTS.md that serves as a **map**, with pointers to deeper sources
+of truth in a structured `docs/` directory. The knowledge base — not the instruction file —
+is the system of record.
+
+**Workspace application**: Our CLAUDE.md is already long (and growing). The workspace already
+practices progressive disclosure via `.agent/knowledge/` files and `@` references. The
+missing step: explicitly restructure CLAUDE.md to be a concise map (~100 lines) that points
+to knowledge files, rather than containing the rules inline. This reinforces the
+recommendation in §3 and §5b (tiered documentation) with hard empirical evidence.
+
+**Concrete proposal**:
+- Move detailed rules (worktree workflow, build instructions, documentation verification)
+  from CLAUDE.md into `.agent/knowledge/` topic files
+- CLAUDE.md retains: env setup, the Always/Ask/Never boundaries (from Appendix D), and
+  a "Where to look" section pointing to knowledge files
+- Target: CLAUDE.md under 150 lines (adjusted for our multi-repo complexity)
+
+#### Idea 2: Lint Error Messages as Agent Teaching
+
+OpenAI's insight: "Because the lints are custom, they write the error messages to inject
+remediation instructions into agent context." Every lint failure isn't just a gate — it's
+a lesson that tells the agent exactly how to fix the problem.
+
+**Workspace application**: When we build the layer boundary checker (§10 Phase 5, item 6)
+and other custom lints, the error messages should be written for agent consumption:
+
+```
+ERROR: Package 'mission_manager' in layer 'core' depends on 'project_11_sim'
+in layer 'sim'. Core packages must not depend on simulation packages.
+
+Fix: If mission_manager needs functionality from project_11_sim, either:
+1. Extract the shared logic into a core-layer package
+2. Use a runtime interface (ROS service/action) instead of a build dependency
+3. Move mission_manager to the sim layer if it's simulation-specific
+
+See: docs/architecture/layer_boundaries.md
+```
+
+This pattern applies to every custom check we build — the error message is context
+engineering for the agent's next attempt.
+
+#### Idea 3: Garbage Collection Agents
+
+OpenAI's insight: "On a regular cadence, they have a set of background Codex tasks that
+scan for deviations, update quality grades, and open targeted refactoring pull requests.
+Most of these can be reviewed in under a minute and automerged. This functions like garbage
+collection — technical debt is treated like a high-interest loan, better paid down
+continuously."
+
+**Workspace application**: Once the workspace supports multi-agent workflows (§10 Phase 4,
+Claude Agent SDK in C4), implement recurring background tasks:
+
+- **Doc gardener**: scan for stale documentation (broken links, references to renamed
+  files, outdated parameter lists) and open fix-up PRs
+- **Convention enforcer**: scan for naming convention drift, missing AI signatures on
+  recent issues/PRs, or worktree cleanup
+- **Quality tracker**: maintain a `QUALITY.md` that grades each package/layer on
+  documentation completeness, test coverage, and architectural conformance
+
+These would be low-frequency (daily/weekly), small-scope, auto-mergeable PRs that
+prevent drift from accumulating into large cleanup efforts.
+
+#### Idea 4: Quality Grading Document
+
+OpenAI tracks quality per domain and architectural layer in a versioned document,
+updated by background agents. Gaps are visible and tracked over time.
+
+**Workspace application**: Create `.agent/QUALITY.md` (or similar) that grades each
+package on:
+- Documentation: does it have `.agents/README.md`? Is it current?
+- Tests: does `colcon test` pass? What's the coverage?
+- Architecture: does it conform to layer boundaries?
+- Conventions: does it follow naming and logging standards?
+
+Updated by agents (or CI) after each PR merge. Gives both humans and agents a quick
+read on where attention is needed.
+
+#### Idea 5: "Corrections Are Cheap, Waiting Is Expensive"
+
+OpenAI's insight: "In a system where agent throughput far exceeds human attention,
+corrections are cheap and waiting is expensive — a tradeoff that would be irresponsible
+in a low-throughput environment but is often the right one here."
+
+**Workspace application**: This challenges our current approach where pre-commit hooks
+and CI gates block progress. For agent-generated PRs specifically:
+- Favor fast-feedback loops over blocking gates
+- Allow agents to self-correct after CI failure rather than blocking the PR
+- Reserve hard blocks for the "Never" tier (§D5.3) — safety-critical rules only
+- Everything else: detect, report, let the agent fix in a follow-up
+
+This is **not** a recommendation to weaken CI — it's a recommendation to make CI
+*faster and more informative* so agents can iterate quickly.
+
+### E4. What Our Research Covers That OpenAI Doesn't
+
+| Our finding | Why it's absent from OpenAI's approach |
+|------------|---------------------------------------|
+| Workspace archaeology: mining git history for lost intent (§7c, Appendix A) | Greenfield project — no history to mine |
+| Multi-repo workspace with layered overlays | Monorepo; different organizational model |
+| ROS 2-specific concerns (DDS discovery, ROS_DOMAIN_ID isolation, package.xml deps) | Web application, not robotics |
+| Cross-framework agent instruction portability (§3, §8) | Single agent tool (Codex only) |
+| Container isolation for agent sandboxing (#229) | Not discussed (likely handled by Codex platform) |
+| Project-level vs. workspace-level instruction separation (§8) | Monorepo — no separation needed |
+| Three-tier boundary taxonomy with enforcement layer mapping (§D5) | Implicit in their approach but not formalized as a reusable pattern |
+
+### E5. Key Takeaway
+
+OpenAI's experience at 1M LOC scale validates several of our report's recommendations
+while adding concrete patterns we hadn't considered. The strongest signal: **the harness
+(environment, constraints, feedback loops) matters more than the agent's capabilities**.
+The same team with the same model would produce worse results without the architectural
+enforcement, progressive disclosure, and garbage collection that comprise the harness.
+
+For our workspace, the most actionable ideas in order of impact-to-effort:
+
+1. **Restructure CLAUDE.md as a map** (~150 lines) — high impact, low effort
+2. **Write lint errors for agent consumption** — low effort (just changes how we write error messages), compounds over time
+3. **Quality grading document** — medium effort, high visibility for both humans and agents
+4. **Garbage collection agent pattern** — higher effort (needs multi-agent infra), highest long-term impact on drift
+
+### E6. Sources
+
+- [Harness engineering: leveraging Codex in an agent-first world — OpenAI Blog (Ryan Lopopolo)](https://openai.com/index/harness-engineering/)
+- [Unlocking the Codex harness: how we built the App Server — OpenAI Blog](https://openai.com/index/unlocking-the-codex-harness/)
+- [Martin Fowler's Harness Engineering analysis](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html)
+- [OpenAI Introduces Harness Engineering — InfoQ](https://www.infoq.com/news/2026/02/openai-harness-engineering-codex/)
+- [Harness Engineering Is Not Context Engineering — mtrajan/Substack](https://mtrajan.substack.com/p/harness-engineering-is-not-context)
+- [Custom instructions with AGENTS.md — OpenAI Codex Docs](https://developers.openai.com/codex/guides/agents-md/)
 
 ---
 
