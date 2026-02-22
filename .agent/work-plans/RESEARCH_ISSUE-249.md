@@ -2356,7 +2356,8 @@ enforced in CI is a soft "Never" that will eventually be violated.
 
 **Source**: Ryan Lopopolo (OpenAI), "Harness engineering: leveraging Codex in an agent-first
 world" (February 11, 2026). Published on [OpenAI Blog](https://openai.com/index/harness-engineering/).
-See also: [Martin Fowler's analysis](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html),
+See also: [Birgitta Böckeler's analysis](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html)
+(Distinguished Engineer, Thoughtworks; published on martinfowler.com, February 17, 2026),
 [InfoQ coverage](https://www.infoq.com/news/2026/02/openai-harness-engineering-codex/).
 
 > **Note**: Where Appendix B (Osmani) is prescriptive ("here's how to write specs for agents")
@@ -2376,10 +2377,24 @@ The team's job was not to write code but to **design the environment** in which 
 could do reliable work: define boundaries, build feedback loops, encode taste, and manage
 entropy. They estimate they built in ~1/10th the time hand-coding would have required.
 
-Martin Fowler categorizes their "harness" into three components:
+Birgitta Böckeler (Thoughtworks) categorizes their "harness" into three components:
 1. **Context engineering** — instruction files, documentation, progressive disclosure
 2. **Architectural constraints** — deterministic linters, structural tests, layer rules
 3. **Garbage collection** — background agents that fight entropy continuously
+
+A core design principle: **"From the agent's point of view, anything it can't access
+in-context while running effectively doesn't exist."** Knowledge in Google Docs, chat
+threads, or people's heads is invisible to the system. Only repository-local, versioned
+artifacts (code, markdown, schemas, executable plans) are visible. When the agent
+struggles, the team treats it as a signal — identify what's missing (tools, guardrails,
+documentation) and feed it back into the repository, always by having Codex itself
+write the fix.
+
+Böckeler's forward-looking observation: harnesses may become **the new service templates**
+— teams pick from pre-built harnesses for common application topologies, then shape them
+over time. She also notes that increasing agent trust required **constraining the solution
+space** — giving up "generate anything" flexibility for specific patterns, enforced
+boundaries, and standardized structures.
 
 ### E2. Overlap Analysis
 
@@ -2398,6 +2413,10 @@ Martin Fowler categorizes their "harness" into three components:
 | "Corrections are cheap, waiting is expensive" (minimal blocking gates) | Not covered | **New philosophy** — challenges our conventional approach of blocking CI gates |
 | "Invariants over micromanagement" | §D5 (three-tier boundary system) | **Overlap** — different framing of the same principle (encode what matters, let agents decide how) |
 | Mechanical enforcement (linters + CI validate knowledge base structure) | §7a, §10 Phase 5 | **Overlap** — we propose the same with structural CI checks |
+| "Anything not in-context doesn't exist" (repo-local versioned artifacts only) | §5c (modular docs), §8 (project_knowledge symlinks) | **Partial overlap** — we formalize knowledge paths but haven't stated the principle this starkly. Knowledge in chat, docs, or people's heads is invisible to agents |
+| "Constraining the solution space" increases trust (Böckeler) | §D5 (three-tier boundaries), §7f (defense in depth) | **Overlap** — different framing of the same insight: restrict what agents *can* do to increase confidence in what they *do* do |
+| "Harnesses as the new service templates" (Böckeler) | Not covered | **Forward-looking** — pre-built harnesses for common app topologies; relevant if workspace infrastructure is generalized for other ROS 2 teams |
+| "When the agent struggles, treat it as a signal" — fix the environment, not the prompt | Not covered | **New philosophy** — failures are feedback about the harness, not about the agent. Always feed improvements back via agent-written fixes |
 
 ### E3. Borrowable Ideas (Actionable for This Workspace)
 
@@ -2511,7 +2530,7 @@ This is **not** a recommendation to weaken CI — it's a recommendation to make 
 | Container isolation for agent sandboxing (#229) | Not discussed (likely handled by Codex platform) |
 | Project-level vs. workspace-level instruction separation (§8) | Monorepo — no separation needed |
 | Three-tier boundary taxonomy with enforcement layer mapping (§D5) | Implicit in their approach but not formalized as a reusable pattern |
-| Instruction regression testing / conformance suites (Appendix A, C5) | Martin Fowler notes this gap: "what he is missing in the write-up is *verification of functionality and behaviour*" — the harness enforces structure but doesn't verify agent output meets specs |
+| Instruction regression testing / conformance suites (Appendix A, C5) | Böckeler notes this gap: "what [she] is missing in the write-up is *verification of functionality and behaviour*" — the harness enforces structure but doesn't verify agent output meets specs |
 
 ### E5. Key Takeaway
 
@@ -2534,7 +2553,7 @@ For our workspace, the most actionable ideas in order of impact-to-effort:
 
 - [Harness engineering: leveraging Codex in an agent-first world — OpenAI Blog (Ryan Lopopolo)](https://openai.com/index/harness-engineering/)
 - [Unlocking the Codex harness: how we built the App Server — OpenAI Blog](https://openai.com/index/unlocking-the-codex-harness/)
-- [Martin Fowler's Harness Engineering analysis](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html)
+- [Harness Engineering — Birgitta Böckeler (martinfowler.com)](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html)
 - [OpenAI Introduces Harness Engineering — InfoQ](https://www.infoq.com/news/2026/02/openai-harness-engineering-codex/)
 - [Harness Engineering Is Not Context Engineering — mtrajan/Substack](https://mtrajan.substack.com/p/harness-engineering-is-not-context)
 - [Custom instructions with AGENTS.md — OpenAI Codex Docs](https://developers.openai.com/codex/guides/agents-md/)
