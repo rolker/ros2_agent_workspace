@@ -1,4 +1,4 @@
-.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature pr-triage
+.PHONY: help bootstrap setup-core setup-all build test clean status status-quick lock unlock format lint setup-dev health-check sync validate revert-feature pr-triage agent-build agent-run agent-shell push-gateway
 
 VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
@@ -28,6 +28,12 @@ help:
 	@echo "  lint          - Run pre-commit hooks on all files"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
+	@echo ""
+	@echo "Agent container:"
+	@echo "  agent-build   - Build the sandboxed agent Docker image"
+	@echo "  agent-run ISSUE=<number> - Launch agent container for a worktree"
+	@echo "  agent-shell ISSUE=<number> - Launch agent container with bash (debug)"
+	@echo "  push-gateway  - Process pending push requests from containers"
 	@echo ""
 
 health-check:
@@ -116,3 +122,32 @@ setup-dev: $(PRE_COMMIT)
 
 lint: $(PRE_COMMIT)
 	@$(PRE_COMMIT) run --all-files
+
+# --- Agent container targets ---
+
+agent-build:
+	@docker build \
+		--build-arg USER_UID=$$(id -u) \
+		--build-arg USER_GID=$$(id -g) \
+		-t ros2-agent-workspace-agent:latest \
+		-f .devcontainer/agent/Dockerfile \
+		.devcontainer/agent/
+
+agent-run:
+	@if [ -z "$(ISSUE)" ]; then \
+		echo "Error: ISSUE parameter required"; \
+		echo "Usage: make agent-run ISSUE=<number>"; \
+		exit 1; \
+	fi
+	@./.agent/scripts/docker_run_agent.sh --issue $(ISSUE)
+
+agent-shell:
+	@if [ -z "$(ISSUE)" ]; then \
+		echo "Error: ISSUE parameter required"; \
+		echo "Usage: make agent-shell ISSUE=<number>"; \
+		exit 1; \
+	fi
+	@./.agent/scripts/docker_run_agent.sh --issue $(ISSUE) --shell
+
+push-gateway:
+	@./.agent/scripts/push_gateway.sh
