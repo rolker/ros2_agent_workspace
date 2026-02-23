@@ -37,6 +37,7 @@ get_description() {
     local target="$1"
     local desc
     # Match: "  target_name ... - Description" (extra text like "ISSUE=<number>" may appear before the dash)
+    # Note: grep -oP requires GNU grep (standard on Ubuntu/ROS 2 targets)
     desc=$(grep -oP "\"  ${target}\b[^-]*- \K[^\"]*" "$MAKEFILE" 2>/dev/null || true)
     if [[ -z "$desc" ]]; then
         # Fallback: use the target name itself
@@ -50,6 +51,7 @@ unchanged=0
 removed=0
 
 # Generate skills for each target
+# Word splitting on $PHONY_TARGETS is intentional — targets are newline/space-separated
 for target in $PHONY_TARGETS; do
     skill_name="make_${target}"
     skill_dir="$SKILLS_DIR/$skill_name"

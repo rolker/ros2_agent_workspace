@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # .agent/scripts/tests/test_generate_make_skills.sh
 # Tests for the generate_make_skills.sh skill generator
 
@@ -59,10 +59,10 @@ output=$(run_generator)
 if [[ -f "$TEST_DIR/.claude/skills/make_build/SKILL.md" ]] && \
    [[ -f "$TEST_DIR/.claude/skills/make_test/SKILL.md" ]] && \
    [[ -f "$TEST_DIR/.claude/skills/make_lint/SKILL.md" ]]; then
-    echo "  PASS: Expected skill files created"
+    echo "  ✅ PASS: Expected skill files created"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: Missing expected skill files"
+    echo "  ❌ FAIL: Missing expected skill files"
     echo "  Output: $output"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
@@ -83,10 +83,10 @@ build:
 MAKEFILE
 run_generator > /dev/null
 if [[ ! -d "$TEST_DIR/.claude/skills/make_help" ]]; then
-    echo "  PASS: 'help' target correctly excluded"
+    echo "  ✅ PASS: 'help' target correctly excluded"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: 'help' target should not generate a skill"
+    echo "  ❌ FAIL: 'help' target should not generate a skill"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
 cleanup_workspace
@@ -111,7 +111,7 @@ run_generator > /dev/null
 # Verify both exist
 if [[ ! -f "$TEST_DIR/.claude/skills/make_build/SKILL.md" ]] || \
    [[ ! -f "$TEST_DIR/.claude/skills/make_test/SKILL.md" ]]; then
-    echo "  FAIL: Initial generation did not create expected skills"
+    echo "  ❌ FAIL: Initial generation did not create expected skills"
     TEST_FAIL=$((TEST_FAIL + 1))
     cleanup_workspace
 else
@@ -128,10 +128,10 @@ MAKEFILE
     run_generator > /dev/null
     if [[ -f "$TEST_DIR/.claude/skills/make_build/SKILL.md" ]] && \
        [[ ! -d "$TEST_DIR/.claude/skills/make_test" ]]; then
-        echo "  PASS: Stale skill pruned, remaining skill kept"
+        echo "  ✅ PASS: Stale skill pruned, remaining skill kept"
         TEST_PASS=$((TEST_PASS + 1))
     else
-        echo "  FAIL: Pruning did not work correctly"
+        echo "  ❌ FAIL: Pruning did not work correctly"
         echo "  make_build exists: $(test -f "$TEST_DIR/.claude/skills/make_build/SKILL.md" && echo yes || echo no)"
         echo "  make_test exists: $(test -d "$TEST_DIR/.claude/skills/make_test" && echo yes || echo no)"
         TEST_FAIL=$((TEST_FAIL + 1))
@@ -155,10 +155,10 @@ MAKEFILE
 run_generator > /dev/null
 content=$(cat "$TEST_DIR/.claude/skills/make_build/SKILL.md")
 if echo "$content" | grep -q "make_build" && echo "$content" | grep -q "Build all layers"; then
-    echo "  PASS: Skill content has correct name and description"
+    echo "  ✅ PASS: Skill content has correct name and description"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: Skill content missing expected name or description"
+    echo "  ❌ FAIL: Skill content missing expected name or description"
     echo "  Content: $content"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
@@ -183,10 +183,10 @@ MAKEFILE
 run_generator > /dev/null
 output=$(run_generator)
 if echo "$output" | grep -q "0 created" && echo "$output" | grep -q "unchanged"; then
-    echo "  PASS: Second run reports no changes"
+    echo "  ✅ PASS: Second run reports no changes"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: Second run should report 0 created"
+    echo "  ❌ FAIL: Second run should report 0 created"
     echo "  Output: $output"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
@@ -202,10 +202,10 @@ build:
 MAKEFILE
 output=$(run_generator 2>&1 || true)
 if echo "$output" | grep -q "No .PHONY targets found"; then
-    echo "  PASS: Friendly error shown for missing .PHONY"
+    echo "  ✅ PASS: Friendly error shown for missing .PHONY"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: Expected 'No .PHONY targets found' error message"
+    echo "  ❌ FAIL: Expected 'No .PHONY targets found' error message"
     echo "  Output: $output"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
@@ -218,10 +218,10 @@ setup_workspace
 # Don't create a Makefile
 output=$(run_generator 2>&1 || true)
 if echo "$output" | grep -q "Makefile not found"; then
-    echo "  PASS: Error shown for missing Makefile"
+    echo "  ✅ PASS: Error shown for missing Makefile"
     TEST_PASS=$((TEST_PASS + 1))
 else
-    echo "  FAIL: Expected 'Makefile not found' error message"
+    echo "  ❌ FAIL: Expected 'Makefile not found' error message"
     echo "  Output: $output"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
@@ -238,9 +238,9 @@ echo "Failed: $TEST_FAIL"
 echo "========================================"
 
 if [ $TEST_FAIL -eq 0 ]; then
-    echo "All tests passed!"
+    echo "✅ All tests passed!"
     exit 0
 else
-    echo "Some tests failed"
+    echo "❌ Some tests failed"
     exit 1
 fi
