@@ -105,9 +105,9 @@ rm "$BODY_FILE"
 - This is a link rule only; summary structure remains flexible.
 
 Examples:
-- `[Issue #129](https://github.com/rolker/ros2_agent_workspace/issues/129)`
-- `[PR #68](https://github.com/rolker/unh_marine_autonomy/pull/68)`
-- `[e8c32bc](https://github.com/rolker/unh_marine_autonomy/commit/e8c32bc)`
+- `[Issue #129: Clickable GitHub references](https://github.com/rolker/ros2_agent_workspace/issues/129)`
+- `[PR #68: Example pull request](https://github.com/rolker/unh_marine_autonomy/pull/68)`
+- `[e8c32bc](https://github.com/rolker/unh_marine_autonomy/commit/<full-sha>)`
 
 ## Build & Test
 
