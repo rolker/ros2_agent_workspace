@@ -194,6 +194,10 @@ make status-quick  # Quick local-only status (no sync, no GitHub)
 make lint          # Run linters
 ```
 
+**Claude Code users**: All `.PHONY` Makefile targets (except `help`) are available as `/make_*` slash commands
+(e.g., `/make_build`, `/make_test`, `/make_status`). Run `make generate-skills` to
+regenerate them after Makefile changes.
+
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
 - `status_report.sh`: Comprehensive workspace status with `--quick` and `--pr-triage` flags.
