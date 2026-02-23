@@ -24,7 +24,7 @@ if [[ ! -f "$MAKEFILE" ]]; then
 fi
 
 # Extract .PHONY targets, skip "help" (it's the default target, not useful as a skill)
-PHONY_TARGETS=$(grep -m1 '^\.PHONY:' "$MAKEFILE" | sed 's/^\.PHONY://' | tr ' ' '\n' | grep -v '^$' | grep -v '^help$' | sort)
+PHONY_TARGETS=$(grep -m1 '^\.PHONY:' "$MAKEFILE" | sed 's/^\.PHONY://' | tr ' ' '\n' | grep -v '^$' | grep -v '^help$' | sort || true)
 
 if [[ -z "$PHONY_TARGETS" ]]; then
     echo "Error: No .PHONY targets found in Makefile" >&2

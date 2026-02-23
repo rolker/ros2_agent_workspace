@@ -194,7 +194,7 @@ make status-quick  # Quick local-only status (no sync, no GitHub)
 make lint          # Run linters
 ```
 
-**Claude Code users**: All Makefile targets are available as `/make_*` slash commands
+**Claude Code users**: All `.PHONY` Makefile targets (except `help`) are available as `/make_*` slash commands
 (e.g., `/make_build`, `/make_test`, `/make_status`). Run `make generate-skills` to
 regenerate them after Makefile changes.
 
