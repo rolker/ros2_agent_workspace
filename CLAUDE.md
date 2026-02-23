@@ -108,6 +108,19 @@ gh pr create --title "Title" --body-file "$BODY_FILE"
 rm "$BODY_FILE"
 ```
 
+## GitHub Reference Links in Summaries
+
+- When referencing any GitHub issue, PR, commit, or repository in summaries
+  or reports, include a clickable markdown link on every mention.
+- Workspace repo: `rolker/ros2_agent_workspace`. For project repos, derive
+  the slug from the git remote (`git remote get-url origin`).
+- This is a link rule only; summary structure remains flexible.
+
+Examples:
+- `[Issue #129: Clickable GitHub references](https://github.com/rolker/ros2_agent_workspace/issues/129)`
+- `[PR #68: Example pull request](https://github.com/rolker/unh_marine_autonomy/pull/68)`
+- `[e8c32bc](https://github.com/rolker/unh_marine_autonomy/commit/<full-sha>)`
+
 ## Build & Test
 
 ```bash
