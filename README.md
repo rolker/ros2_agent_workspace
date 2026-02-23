@@ -1,10 +1,26 @@
 # ROS 2 Agent Workspace
 
+## Vision
+
+This workspace exists to help develop robust, well-documented, and well-tested ROS 2 packages using AI agent assistance.
+
+The immediate goal is practical: build reliable autonomous marine systems — starting with uncrewed surface vessels that can safely survey an area of the seafloor without operator intervention. That demands software that is robust in the face of real-world conditions, reliable enough to operate without intervention, and easy to deploy.
+
+Agent-assisted development is the means, not the end. The workspace provides the infrastructure — worktree isolation, build tooling, agent instructions, quality enforcement — that makes AI agents effective contributors to ROS 2 projects. The workspace should improve over time, informed both by experience from real project use and by evolving practices in the agentic coding domain. The measure of improvement is whether projects get better faster — not whether the workspace itself is more sophisticated.
+
+What "better packages" means in practice:
+- Well-documented — useful to teammates, contributors, and the broader ROS 2 community
+- Well-tested — reliable enough for real-world deployment
+- Maintainable — clear code and documentation that others can work with
+- Distribution-ready — packageable for rosdep installation, visible in the ROS ecosystem
+
+The workspace infrastructure is project-agnostic by design. While its primary project is UNH marine autonomy, the tooling generalizes to any ROS 2 project. This is intentional — it makes the workspace useful beyond its origin, encourages contributions from other domains, and ensures the infrastructure doesn't become coupled to any single project.
+
+## About
+
 This repository provides management of multiple layered ROS 2 workspaces, configured for use with AI agents. It is developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH) -- a national center of expertise in ocean mapping and hydrographic sciences.
 
-**The workspace is pre-configured to host the UNH Marine Autonomy Framework.**
-
-The workspace automatically imports repositories from the project's manifest repository (`unh_marine_autonomy`):
+As currently configured, the workspace hosts the **UNH Marine Autonomy Framework**, automatically importing repositories from the project's manifest repository (`unh_marine_autonomy`):
 - **Project11**: Main autonomy system.
 - **Marine AIS**: AIS message decoding and handling.
 - **UNH Marine Navigation**: Navigation tools and utilities.

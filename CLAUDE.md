@@ -203,7 +203,10 @@ layers/main/
 
 ## References (Read When Needed, Not Upfront)
 
+- [`README.md` Vision section](README.md#vision) — Workspace purpose and goals; consult
+  when making design decisions or planning architectural changes
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — System design and layering
+- [`docs/decisions/`](docs/decisions/) — Architecture Decision Records
 - [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) — Detailed worktree patterns
 - [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`.agent/WORKFORCE_PROTOCOL.md`](.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
