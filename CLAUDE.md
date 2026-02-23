@@ -87,7 +87,7 @@ Check `$AGENT_NAME` / `$AGENT_MODEL` environment variables if unsure.
 
 The local directory name may not match the GitHub repo name.
 **Never construct GitHub URLs from directory names or assumptions.** Always use `gh` to
-retrieve URLs:
+retrieve URLs. Run from within the target repo, or pass `--repo <owner/repo>` explicitly:
 
 ```bash
 gh issue view <N> --json url --jq '.url'
