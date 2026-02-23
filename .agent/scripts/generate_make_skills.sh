@@ -37,8 +37,8 @@ get_description() {
     local target="$1"
     local desc
     # Match: "  target_name ... - Description" (extra text like "ISSUE=<number>" may appear before the dash)
-    # Note: grep -oP requires GNU grep (standard on Ubuntu/ROS 2 targets)
-    desc=$(grep -oP "\"  ${target}\b[^-]*- \K[^\"]*" "$MAKEFILE" 2>/dev/null || true)
+    # Uses grep + sed instead of grep -oP for portability across GNU and BSD grep.
+    desc=$(grep "\"  ${target}[[:space:]]" "$MAKEFILE" 2>/dev/null | sed -n 's/.*- \([^"]*\)".*/\1/p' || true)
     if [[ -z "$desc" ]]; then
         # Fallback: use the target name itself
         desc="Run 'make ${target}' in the workspace."
@@ -51,7 +51,10 @@ unchanged=0
 removed=0
 
 # Generate skills for each target
-# Word splitting on $PHONY_TARGETS is intentional — targets are newline/space-separated
+# shellcheck disable=SC2086
+# Word splitting on $PHONY_TARGETS is intentional and safe here:
+# Make target names cannot contain spaces, so each whitespace-separated
+# token is exactly one target. Quoting would treat the whole list as one item.
 for target in $PHONY_TARGETS; do
     skill_name="make_${target}"
     skill_dir="$SKILLS_DIR/$skill_name"
@@ -59,7 +62,9 @@ for target in $PHONY_TARGETS; do
     desc=$(get_description "$target")
 
     # Build the SKILL.md content
-    if [[ "$target" == "revert-feature" ]]; then
+    # Targets that require ISSUE=<number> get an argument-hint and $ARGUMENTS substitution
+    case "$target" in
+        revert-feature|agent-run|agent-shell)
         content=$(cat <<HEREDOC
 ---
 name: ${skill_name}
@@ -69,11 +74,12 @@ allowed-tools: Bash
 argument-hint: "<issue-number>"
 ---
 
-Run \`make revert-feature ISSUE=\$ARGUMENTS\` from the workspace root (\`${WORKSPACE_ROOT}\`).
+Run \`make ${target} ISSUE=\$ARGUMENTS\` from the workspace root (\`${WORKSPACE_ROOT}\`).
 Report the result to the user.
 HEREDOC
 )
-    else
+        ;;
+        *)
         content=$(cat <<HEREDOC
 ---
 name: ${skill_name}
@@ -86,7 +92,8 @@ Run \`make ${target}\` from the workspace root (\`${WORKSPACE_ROOT}\`).
 Report the result to the user.
 HEREDOC
 )
-    fi
+        ;;
+    esac
 
     # Check if skill already exists with identical content
     if [[ -f "$skill_file" ]] && [[ "$(cat "$skill_file")" == "$content" ]]; then
