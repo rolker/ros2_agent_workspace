@@ -9,36 +9,30 @@ Workspace infrastructure is generic ROS 2 tooling; project-specific content belo
 project repos. The workspace should be useful to any ROS 2 project, not coupled to a
 single one.
 
-## 2. Per-framework instruction files are intentional
-
-Different agent frameworks benefit from different instruction layouts. Don't consolidate
-framework-specific files (e.g., `CLAUDE.md`, `AGENTS.md`) into a single file — each
-serves its framework's strengths.
-
-## 3. Primary framework first, portability where free
+## 2. Primary framework first, portability where free
 
 Use the full capabilities of the active framework (currently Claude Code). Where rules
 are naturally framework-agnostic — build commands, coding conventions, architecture —
 express them portably. Don't hobble the primary tool for the sake of frameworks that
 aren't in use.
 
-## 4. Capture decisions, not just implementations
+## 3. Capture decisions, not just implementations
 
 Use ADRs or equivalent so future agents and humans know *why*, not just *what*. Design
 decisions buried in issue comments or commit history get accidentally reverted.
 
-## 5. Enforcement over documentation
+## 4. Enforcement over documentation
 
 Rules that matter must be enforced mechanically — CI, hooks, branch protection — not
 just written down. Documentation tells you what to do; enforcement ensures it happens.
 
-## 6. Radical simplicity
+## 5. Radical simplicity
 
 Resist adding process, files, or tools unless the pain they solve is concrete and
 demonstrated. The right amount of complexity is the minimum needed for the current
 situation.
 
-## 7. Workspace improvements cascade to projects
+## 6. Workspace improvements cascade to projects
 
 When we invest in improving workflow quality — PR templates, CI patterns, hooks,
 documentation standards — the benefit shouldn't stop at the workspace repo boundary.
