@@ -26,8 +26,12 @@ pattern** (draft spec, then execute incrementally). Appendix E analyzes OpenAI's
 documenting production-scale agent-first development (~1M LOC, zero human code, 3.5
 PRs/engineer/day). Key borrowable ideas: **CLAUDE.md as ~150-line map** (not encyclopedia),
 **lint error messages as agent teaching**, **garbage collection agents** for continuous
-drift correction, and **quality grading** per package/layer. All findings are integrated
-into §10.
+drift correction, and **quality grading** per package/layer. Appendix F incorporates a
+February 2026 landscape scan and GitHub's engineering analysis of multi-agent failure modes.
+Key additions: **Claude Code Agent Teams**, **MCP as industry standard** (with ROS 2-specific
+servers), **ROS 2 agent frameworks** (ROSA, RAI), the **distributed systems mental model**
+for multi-agent workflows, and three concrete engineering patterns — **typed schemas**,
+**action schemas**, and **MCP as enforcement layer**. All findings are integrated into §10.
 
 ---
 
@@ -2557,6 +2561,457 @@ For our workspace, the most actionable ideas in order of impact-to-effort:
 - [OpenAI Introduces Harness Engineering — InfoQ](https://www.infoq.com/news/2026/02/openai-harness-engineering-codex/)
 - [Harness Engineering Is Not Context Engineering — mtrajan/Substack](https://mtrajan.substack.com/p/harness-engineering-is-not-context)
 - [Custom instructions with AGENTS.md — OpenAI Codex Docs](https://developers.openai.com/codex/guides/agents-md/)
+
+---
+
+## Appendix F: Agentic Coding Landscape Scan and Multi-Agent Engineering Patterns
+
+**Sources**:
+- Landscape scan comment on [Issue #249](https://github.com/rolker/ros2_agent_workspace/issues/249)
+  (February 23, 2026) — survey of blogs, repos, and emerging developments
+- GitHub Engineering, "[Multi-agent workflows often fail — here's how to engineer ones
+  that don't](https://github.blog/ai-and-ml/generative-ai/multi-agent-workflows-often-fail-heres-how-to-engineer-ones-that-dont/)"
+  (February 2026)
+
+> **Note**: Where Appendix C is a systematic tool-by-tool scan and Appendix E documents
+> one team's production experience, this appendix captures the **broader industry
+> trajectory** as of February 2026 — new platform capabilities, ROS 2-specific agent
+> frameworks, and a critical engineering paper on why multi-agent systems fail.
+
+### F1. Industry Context
+
+The agentic coding market grew from $550M to $4B in one year. 57% of companies now run
+AI agents in production (January 2026). Gartner reports a 1,445% surge in multi-agent
+system inquiries between Q1 2024 and Q2 2025.
+
+However, the picture is not uniformly positive:
+
+- Engineers integrate AI into 60% of their work, but fully delegate only 0–20% of tasks
+- A **40% quality deficit** is projected — more code enters the pipeline than reviewers
+  can validate
+- Google DORA 2025 (cited in §C4) found that 90% AI adoption increase correlates with
+  9% higher bug rates, 91% more code review time, and 154% larger PRs
+
+These numbers validate two themes from this report: (1) the harness matters more than
+the agent (§E5), and (2) coordination quality matters more than parallelism throughput
+(§C4, finding 6).
+
+### F2. Platform Capabilities: What's New Since the Research Was Written
+
+#### F2.1 Claude Code Agent Teams (Experimental)
+
+Multiple Claude Code instances can now coordinate as a team. A lead agent spawns
+teammates, each gets its own context window, and they communicate via a mailbox system.
+Enable with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+**Coordination patterns**: Leader/swarm/pipeline/watchdog. Best suited for parallel
+work on separate packages where agents don't need to modify the same files.
+
+**Fit for this workspace**: Our worktree infrastructure already provides the isolation
+layer that Agent Teams assumes. Each teammate could work in its own worktree. The
+mailbox system adds the coordination layer that §C4 identified as missing — advisory
+communication between isolated agents. This is more lightweight than MCP Agent Mail
+(§C4) since it's built into Claude Code itself.
+
+**Relationship to §C4**: Agent Teams is a first-party alternative to the third-party
+orchestrators evaluated there (ccswarm, Claude-Flow, CCManager). It has the advantage
+of native integration but the disadvantage of being experimental and Claude-only.
+For a multi-vendor future (Claude + Copilot + Codex), the MCP-based coordination
+tools remain more portable.
+
+**Action**: **Evaluate** — try on a non-critical multi-package feature with one agent
+per package in separate worktrees. Monitor stability before relying on it.
+
+#### F2.2 GitHub Agent HQ and Agentic Workflows
+
+GitHub now lets you run Claude, Codex, and Copilot side-by-side on the same issue.
+Agentic Workflows (technical preview) let you define automation in **Markdown** instead
+of YAML — AI agents figure out the execution.
+
+**Use cases**: automated issue triage, CI failure investigation, documentation sync,
+test coverage improvement.
+
+**Fit for this workspace**: Our issue-first, PR-based workflow maps directly to this
+model. Agentic Workflows could automate patterns we currently do manually:
+- When a new issue is filed, auto-classify it (workspace vs. project repo, which layer)
+- When CI fails, auto-investigate and post a diagnostic comment
+- When a PR merges, check if ARCHITECTURE.md or ADRs need updating (§7a)
+
+**Relationship to existing research**: GitHub Agentic Workflows implement the
+"garbage collection" pattern from Appendix E (Idea 3) using GitHub's own
+infrastructure rather than requiring custom agent orchestration. They also
+validate the file-change-triggered enforcement pattern from Amazon Kiro (§D4).
+
+**Action**: **Monitor** — currently in technical preview. When stable, evaluate for
+issue triage and CI failure investigation. Low effort to adopt since our workflow
+already fits the model.
+
+#### F2.3 Model Context Protocol (MCP) — Now Industry Standard
+
+MCP was donated to the Linux Foundation's **Agentic AI Foundation** in December 2025.
+It is now the universal protocol for connecting AI agents to tools and data sources.
+Thousands of community servers exist.
+
+The research report mentions MCP in passing (§C2 for Amazon Kiro hooks, §C4 for MCP
+Agent Mail), but underweights its significance as a platform trend. MCP is no longer
+an Anthropic-specific protocol — it's the cross-vendor standard that OpenAI, Google,
+and others are adopting.
+
+**ROS 2-specific MCP servers** (not covered in the original research):
+
+| Server | What It Does | Source | Action |
+|--------|-------------|--------|--------|
+| **ROSBag MCP Server** | Natural language queries over ROS bag files | [arXiv:2511.03497](https://arxiv.org/abs/2511.03497) | **Evaluate** — if we work with bag files, this enables log analysis directly from Claude Code sessions |
+| **ROS 2 Robot Control MCP Server** | Standardized agent access to ROS 2 topics, services, and actions | Community | **Evaluate** — could give agents runtime inspection capabilities during development |
+| **Custom workspace MCP server** (hypothetical) | Expose colcon commands, topic inspection, and workspace validation as MCP tools | Would need to build | **Consider** — would let any MCP-compatible agent (not just Claude Code) interact with our workspace infrastructure |
+
+**MCP as enforcement layer** (from the GitHub blog post — see §F4.3):
+
+Beyond connecting agents to tools, MCP adds a **validation layer** above typed schemas.
+It can validate tool inputs and outputs before execution, preventing agents from
+inventing undeclared fields, omitting required parameters, or causing interface drift.
+This is relevant to §C2 (guardrails): MCP servers can enforce contracts that soft
+instruction rules cannot.
+
+**Relationship to existing research**: The `just-mcp` integration noted in §1a
+(command runner evaluation) becomes more significant in this context — it's not just
+a convenience feature but a way to expose workspace commands to any MCP-compatible
+agent. Similarly, the MCP ADR Analysis Server in §C1 gains weight as part of a
+broader MCP-native tooling ecosystem.
+
+**Action**: **Elevate MCP from "mentioned" to "strategic"** in the recommendations.
+Specifically:
+1. Evaluate ROSBag and ROS 2 Robot Control MCP servers for development workflows
+2. When choosing between `just` and Make (§1), factor in `just-mcp` as a pathway
+   to agent-accessible workspace commands
+3. Consider MCP as the enforcement layer for inter-agent contracts if Agent Teams
+   or multi-agent workflows are adopted
+
+### F3. ROS 2 Agent Frameworks
+
+The original research (§6) covers standard ROS 2 development practices but does not
+survey the emerging ecosystem of AI agent frameworks built specifically for ROS 2.
+These are distinct from the general-purpose coding agent tools in §C4 — they operate
+on running ROS 2 systems rather than on source code.
+
+| Framework | Source | What It Does | Maturity | Action |
+|-----------|--------|-------------|----------|--------|
+| **ROSA** | NASA JPL ([github](https://github.com/nasa-jpl/rosa)) | Natural language interaction with ROS 1/2 systems — inspect nodes, query topics, diagnose issues, operate robots. Built on LangChain with ROS tool adapters | Active, published (IROS 2024) | **Evaluate** — valuable for operators who aren't developers. Could be exposed as an MCP server for agent access to running systems |
+| **RAI** | RobotecAI ([github](https://github.com/RobotecAI/rai)) | Vendor-agnostic agentic framework for Physical AI. Integrates with ROS 2 navigation, manipulation, and perception stacks | Active | **Monitor** — more ambitious than ROSA; relevant if we need agents that interact with the full robot stack |
+| **ROS-LLM** | Auromix ([github](https://github.com/Auromix/ROS-LLM)) | LLM-based code generation for robot behaviors — sequences, behavior trees, state machines. Translates natural language commands into executable robot programs | Active | **Monitor** — interesting for behavior authoring but orthogonal to workspace infrastructure |
+| **EmbodiedAgents** | Automatika ([docs](https://automatika-robotics.github.io/embodied-agents/)) | Production-grade framework for deploying Physical AI on real robots via ROS 2. Supports multiple LLM backends | Active | **Monitor** — production deployment focus makes it more relevant than research prototypes |
+
+**Key observation**: These frameworks operate at a different level than our workspace
+tooling. Our workspace helps agents write and maintain ROS 2 *code*. These frameworks
+help agents *operate* ROS 2 systems at runtime. They're complementary, not competing:
+
+```
+┌──────────────────────────────────────────────┐
+│  Development-time agents (our workspace)     │  Write code, run tests, manage PRs
+│  Claude Code, Copilot, Codex                 │
+├──────────────────────────────────────────────┤
+│  Runtime agents (ROSA, RAI, etc.)            │  Inspect, diagnose, operate robots
+│  Connected to live ROS 2 systems             │
+└──────────────────────────────────────────────┘
+```
+
+The bridge between these layers is MCP: a development-time agent could invoke a ROSA
+MCP server to inspect the running system while debugging code. This is speculative
+but architecturally coherent.
+
+**Fit for this workspace**: ROSA is the most immediately relevant — it could help
+diagnose integration issues by querying a running simulation from within a Claude
+Code session. The others are worth monitoring but don't change our workspace design.
+
+### F4. Multi-Agent Engineering Patterns (from the GitHub Blog Post)
+
+The [GitHub engineering blog post](https://github.blog/ai-and-ml/generative-ai/multi-agent-workflows-often-fail-heres-how-to-engineer-ones-that-dont/)
+provides the most technically concrete guidance on multi-agent failure modes we've
+encountered. Its core thesis: **"Most multi-agent workflow failures come down to
+missing structure, not model capability."** This echoes the harness-over-agent
+principle from Appendix E but focuses specifically on inter-agent interfaces rather
+than single-agent environments.
+
+The key insight: **treat agents as distributed system components**, not chat
+interfaces. Design expecting failures upfront. Validate at every agent boundary.
+Constrain actions before expanding agent count. Log intermediate state persistently.
+Anticipate retries and partial failures.
+
+#### F4.1 Typed Schemas for Inter-Agent Data Reliability
+
+**The problem**: When agents exchange data using natural language or unstructured JSON,
+inconsistencies accumulate — variable field names, ambiguous types, missing fields. Each
+agent interprets the data slightly differently, and errors compound across the workflow.
+
+**The pattern**: Establish machine-checkable contracts using typed interfaces (TypeScript
+types, Zod schemas, JSON Schema, or equivalent). Agents must produce and consume data
+conforming to these contracts. Payloads that violate the schema fail fast with clear
+error messages rather than propagating ambiguity.
+
+**Relevance to this workspace**: Currently, inter-agent coordination in this workspace
+is minimal — agents work in isolated worktrees and communicate via git (PRs, commits,
+issue comments). These are untyped, natural-language interfaces. If we adopt Agent
+Teams (§F2.1) or multi-agent orchestration (§C4), the mailbox messages between agents
+should be structured. For example:
+
+```typescript
+// Agent task assignment schema
+type TaskAssignment = {
+  issue_number: number;
+  worktree_path: string;
+  packages: string[];
+  layer: "core" | "platforms" | "sensors" | "simulation" | "ui";
+  acceptance_criteria: string[];
+};
+
+// Agent completion report schema
+type CompletionReport = {
+  issue_number: number;
+  status: "completed" | "blocked" | "needs_review";
+  commits: string[];       // SHA list
+  files_changed: string[];
+  tests_passed: boolean;
+  blockers?: string[];     // If status is "blocked"
+};
+```
+
+**Connection to existing research**: The typed schema pattern strengthens several
+existing recommendations:
+- The conformance suite concept (§B-ext.3, Idea 4) — conformance checks are
+  effectively schema validation applied to instruction compliance
+- The `/analyze` consistency checker from Spec Kit (§D3) — schema validation is
+  the mechanical implementation of consistency checking
+- The "action schemas" pattern below (§F4.2) — typed schemas for data, action
+  schemas for intent
+
+**Action**: **Adopt pattern when multi-agent is implemented.** No immediate action
+needed for single-agent workflows, but when designing Agent Teams experiments or
+multi-agent orchestration, start with typed schemas for inter-agent messages.
+
+#### F4.2 Action Schemas for Intent Clarity
+
+**The problem**: Vague instructions like "analyze this issue and help" allow agents to
+independently choose divergent actions — one closes the issue, another assigns it,
+a third escalates it. Without constraints on the action space, multi-agent systems
+produce unpredictable and sometimes contradictory outcomes.
+
+**The pattern**: Define a constrained set of permitted actions using discriminated
+unions. Each action type has defined parameters. Agents must select from the
+predefined action set rather than inventing arbitrary responses.
+
+```typescript
+type IssueAction =
+  | { type: "assign"; assignee: string; reason: string }
+  | { type: "label"; labels: string[]; reason: string }
+  | { type: "comment"; body: string }
+  | { type: "escalate"; to: "maintainer" | "architect"; reason: string };
+  // Note: "close" is intentionally omitted — agents can't close issues
+```
+
+**Relevance to this workspace**: This pattern is a **typed implementation** of the
+three-tier boundary system (§D5). The "Never" tier maps to actions excluded from the
+union type entirely. The "Ask first" tier maps to actions that require an additional
+approval field. The "Always" tier maps to actions the agent can emit freely.
+
+The blog post documents a specific failure mode relevant to our multi-agent future:
+**agents closing issues that another agent just opened**, or **shipping changes that
+fail downstream checks**. These aren't model capability failures — they're missing
+constraints on what agents are allowed to *do*.
+
+**Connection to existing research**:
+- §D5.3 maps tiers to enforcement layers (instruction → hook → CI → container).
+  Action schemas add a new column: **type system** — violations are caught at
+  schema validation time before any enforcement layer is even reached
+- §C2 (guardrails) — OPA/Rego policies (evaluated as "worth evaluating") could
+  serve as the runtime enforcement for action schemas
+
+**Action**: **Adopt pattern for multi-agent workflows.** Define permitted action
+types before expanding the number of agents working concurrently. This is design
+work, not implementation — create the action type definitions when designing the
+orchestration layer.
+
+#### F4.3 MCP as Interface Enforcement Layer
+
+**The problem**: Even with typed schemas and action constraints, agents can drift from
+the contract — inventing undeclared fields, omitting required parameters, or subtly
+changing field semantics. Schemas define the contract; something needs to *enforce* it.
+
+**The pattern**: MCP servers add a validation layer between agents and the tools they
+invoke. Before an agent's tool call reaches the underlying system, the MCP server
+validates the request against the contract. Invalid requests are rejected with
+descriptive error messages (following the "lint errors as agent teaching" pattern
+from §E3, Idea 2). Bad state never reaches production systems.
+
+**Relevance to this workspace**: This reframes MCP from a convenience protocol (§F2.3)
+into an enforcement mechanism. A workspace MCP server could:
+- Validate that `colcon build` commands target the correct layer
+- Reject `git commit` calls that don't include the AI signature
+- Enforce that worktree-isolated agents only modify files within their worktree
+- Validate inter-agent messages against the typed schemas from §F4.1
+
+This is the **typed enforcement** complement to the **instruction-based** boundaries
+in CLAUDE.md and AGENTS.md. Instructions say "never commit to main"; an MCP
+enforcement layer makes it mechanically impossible.
+
+**Connection to existing research**:
+- §7g (agent compliance) identifies the gap between writing rules and verifying
+  compliance. MCP enforcement closes this gap for tool-mediated actions
+- §C2 (guardrails) — Claude Code hooks (PreToolUse/PostToolUse) are the current
+  enforcement mechanism. MCP enforcement is the cross-agent equivalent: hooks work
+  for Claude Code only, MCP works for any MCP-compatible agent
+- §D5.3 (tier-to-enforcement mapping) gains a new column:
+
+| Tier | Instruction | Hook | **MCP** | CI | Container |
+|------|-------------|------|---------|----|-----------|
+| Always | Listed | PostToolUse validates | MCP validates inputs | CI checks | N/A |
+| Ask first | Listed | PreToolUse prompts | MCP requires approval field | PR review | N/A |
+| Never | Listed | PreToolUse blocks | **MCP rejects request** | CI fails | Filesystem prevents |
+
+**Action**: **Design consideration for multi-agent.** When building Agent Teams
+experiments or orchestration, use MCP servers as the enforcement boundary between
+agents and shared workspace resources. This is higher effort than hooks but
+provides cross-agent enforcement.
+
+#### F4.4 The Distributed Systems Mental Model
+
+The blog post's overarching framework: multi-agent systems **are** distributed systems.
+They exhibit the same failure modes — network partitions (agent context windows are
+isolated), race conditions (concurrent edits), Byzantine failures (agents misinterpret
+instructions), and cascading failures (one agent's bad output corrupts another's input).
+
+The engineering principles that follow:
+
+| Distributed Systems Principle | Multi-Agent Application | Workspace Relevance |
+|------------------------------|------------------------|---------------------|
+| **Design for failure** | Expect agents to misinterpret, produce bad output, or fail mid-task | Already practiced — worktree isolation limits blast radius (§4, §C4) |
+| **Validate at boundaries** | Check every inter-agent message against typed schemas | New — not yet needed (single-agent), critical for Agent Teams |
+| **Constrain before scaling** | Get one agent working reliably before adding more | Validates our approach — single-agent workflows first, multi-agent later |
+| **Log intermediate state** | Persist progress so failed agents can be restarted or replaced | Already practiced — draft PRs, work plans, git commits as progress markers |
+| **Anticipate retries** | Design for idempotent operations; an agent may re-execute a task | Partially practiced — worktree isolation helps, but no explicit idempotency design |
+| **Avoid chat-like assumptions** | Don't assume agents share context or remember previous interactions | Already enforced — each worktree is a clean context. Agents communicate via artifacts (PRs, commits, issues), not shared memory |
+
+**Key failure scenarios from the blog post** (mapped to this workspace):
+
+1. **Agent A closes an issue that Agent B just opened**: In our workflow, this would
+   manifest as one agent closing a sub-issue that another agent's worktree depends on.
+   Mitigation: issue state changes should be in the "Ask first" tier (§D5).
+
+2. **Agent ships changes that fail downstream**: One agent's commit in `core_ws` breaks
+   a package in `platforms_ws`. Mitigation: the layer boundary checker (§C3, §10 Phase 5)
+   would catch dependency violations. CI across all layers (not just the changed package)
+   catches runtime breakage.
+
+3. **Agents working on related tasks without explicit coordination**: Two agents modify
+   adjacent files in the same package. Worktree isolation prevents direct conflicts, but
+   logical conflicts (incompatible design choices) require the advisory lock pattern
+   (§C4, finding 1) or the Clash conflict detector (§C4).
+
+**Assessment**: The distributed systems framing doesn't introduce new recommendations
+but provides a **stronger theoretical foundation** for decisions already made in this
+report. The workspace's existing architecture (worktree isolation, artifact-based
+communication, CI enforcement) maps well to distributed systems best practices. The
+gap is in the **inter-agent protocol** layer — when we scale to multiple agents, we
+need the typed schemas (§F4.1), action constraints (§F4.2), and MCP enforcement
+(§F4.3) that the blog post describes.
+
+### F5. Trending Repositories and Tools
+
+Landscape snapshot of notable open-source projects as of February 2026. Tools already
+covered in §C1–C6 are omitted; this section captures what's new.
+
+| Repo | Stars | What It Does | Relationship to This Workspace |
+|------|-------|-------------|-------------------------------|
+| **OpenHands** (formerly OpenDevin) | 65k+ | Leading open-source AI coding agent, LLM-agnostic | **Monitor** — general-purpose agent; no workspace/ROS-specific features |
+| **Claude Code** | 51.7k | Our primary tool — now with hooks, skills marketplace (1,341 skills), agent teams | **Already in use** — hooks and Agent Teams are the actionable features |
+| **OpenCode** | 50k | Open-source alternative gaining fast (+1,852 stars/day at peak) | **Monitor** — if it supports AGENTS.md, our cross-platform instruction strategy (§3) covers it automatically |
+| **mini-swe-agent** | Active | 100 lines of Python, achieves 65–74% on SWE-bench Verified | **Notable** — validates the "radical simplicity" theme (§A4, theme 2). A minimal harness with good context engineering outperforms complex frameworks |
+| **awesome-claude-code** | Community | 75+ repos covering skills, hooks, plugins, orchestrators | **Reference** — useful for discovering hooks and skills relevant to our workflow |
+| **ccswarm** | Active | Multi-agent orchestration using Claude Code + git worktree isolation | Already in §C4 — our worktree infrastructure is compatible |
+| **agentree** | Active | Git worktree-based agent isolation | Validates our approach — more tools converging on worktree isolation |
+| **git-worktree-runner** | Active | Utility for running commands in isolated worktrees | Validates our approach — the pattern is becoming standardized |
+
+**Key signal**: The convergence of multiple independent projects on git worktree
+isolation (ccswarm, agentree, git-worktree-runner, Cursor 2.0, OpenAI Codex) confirms
+that our workspace's worktree-first architecture anticipated an industry standard.
+This is not a niche choice — it's becoming the default.
+
+### F6. Claude Code Hooks — Expanded Assessment
+
+The landscape scan identified Claude Code hooks as "underutilized by us." The research
+report covers hooks in §C2 but focuses on the enforcement angle. This section expands
+with specific hook implementations informed by the landscape scan's suggestions and the
+blog post's engineering patterns.
+
+**Currently implemented**:
+- `env.sh` guardrail blocks `git checkout` (functions as a pseudo-hook)
+
+**Recommended additions** (ordered by value/effort):
+
+| Hook Type | Trigger | What It Does | Effort | Value |
+|-----------|---------|-------------|--------|-------|
+| **PreToolUse** (Write/Edit) | Agent edits a file | Verify the file is inside a worktree, not the main tree. Defense-in-depth for the worktree-only rule | Low | High — catches violations before they happen |
+| **PostToolUse** (Bash: git commit) | Agent commits | Verify AI signature is in the commit message. Verify branch name matches `feature/issue-*` pattern | Low | Medium — CI catches this too, but early feedback is better |
+| **PostToolUse** (Write/Edit) | Agent modifies `package.xml` | Run `colcon list` to verify package graph is still valid | Medium | Medium — catches dependency errors early |
+| **PostToolUse** (Bash: gh pr create) | Agent creates a PR | Verify PR body contains AI signature block and issue reference | Low | Medium — enforces PR quality at creation time |
+| **Stop** | Agent session ends | Remind agent to check for uncommitted work, stale worktrees | Low | Low — convenience, not enforcement |
+
+**Connection to §F4.3**: Claude Code hooks are the single-agent equivalent of MCP
+enforcement. For multi-agent scenarios, the same validation logic should be promoted
+from hooks (Claude Code only) to MCP servers (any agent).
+
+### F7. Integration into §10 Recommendations
+
+This appendix adds or modifies the following items in the main recommendations:
+
+**Phase 2 (Simplify Interface) — additions:**
+- When evaluating `just` vs. Make (§1), factor in `just-mcp` as a pathway to
+  MCP-accessible workspace commands (§F2.3)
+
+**Phase 4 (Align Agent Instructions) — additions:**
+- When designing multi-agent instruction files, include typed schema definitions for
+  inter-agent messages (§F4.1) and constrained action types (§F4.2)
+- Add "distributed systems principles" as a reference in the multi-agent section of
+  AGENTS.md (§F4.4)
+
+**Phase 5 (Architecture Documentation Lifecycle) — modifications:**
+- The Claude Code hooks in §F6 should be implemented alongside the CI checks already
+  recommended. Hooks provide fast feedback; CI provides enforcement
+- MCP enforcement (§F4.3) becomes relevant when multi-agent workflows are adopted
+
+**Phase 6 (Agent Compliance and User Trust) — additions:**
+- Action schemas (§F4.2) formalize the three-tier boundary system (§D5) at the type
+  level. When the tier mapping is implemented, consider expressing it as typed
+  constraints in addition to instruction-level rules
+
+**New recommendation — Phase 7 (ROS 2 Agent Integration):**
+
+| Priority | Action | Effort | Dependency |
+|----------|--------|--------|------------|
+| 1 | Evaluate Claude Code hooks from §F6 (worktree enforcement, commit validation) | Low | None |
+| 2 | Evaluate ROSBag MCP Server for bag file analysis in development workflows | Low | MCP setup |
+| 3 | Experiment with Claude Code Agent Teams on a multi-package feature | Medium | Stable Agent Teams release |
+| 4 | Evaluate ROSA for runtime system inspection during development | Medium | Running simulation |
+| 5 | Design typed schemas and action constraints for multi-agent coordination | Medium | Agent Teams or orchestrator |
+| 6 | Monitor GitHub Agentic Workflows for issue triage and CI investigation automation | Low | GA release |
+| 7 | Consider custom workspace MCP server exposing colcon/worktree commands | High | MCP ecosystem maturity |
+
+### F8. Sources
+
+- [Multi-agent workflows often fail — here's how to engineer ones that don't (GitHub Blog)](https://github.blog/ai-and-ml/generative-ai/multi-agent-workflows-often-fail-heres-how-to-engineer-ones-that-dont/)
+- [Claude Code Agent Teams documentation](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/agent-teams)
+- [GitHub Agent HQ announcement](https://github.blog/news-insights/product-news/agent-hq/)
+- [Agentic AI Foundation (Linux Foundation)](https://www.linuxfoundation.org/press/linux-foundation-launches-the-agentic-ai-foundation)
+- [ROSBag MCP Server (arXiv:2511.03497)](https://arxiv.org/abs/2511.03497)
+- [ROSA — Robot Operating System Agent (NASA JPL)](https://github.com/nasa-jpl/rosa)
+- [RAI — ROS 2 Agentic AI Framework (RobotecAI)](https://github.com/RobotecAI/rai)
+- [ROS-LLM (Auromix)](https://github.com/Auromix/ROS-LLM)
+- [EmbodiedAgents (Automatika Robotics)](https://automatika-robotics.github.io/embodied-agents/)
+- [Model Context Protocol specification](https://spec.modelcontextprotocol.io/)
+- [Anthropic Engineering — Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
+- [OpenHands (formerly OpenDevin)](https://github.com/All-Hands-AI/OpenHands)
+- [awesome-claude-code](https://github.com/anthropics/awesome-claude-code)
+- [ccswarm](https://github.com/nicobailon/ccswarm)
+- [mini-swe-agent](https://github.com/princeton-nlp/SWE-agent)
 
 ---
 
