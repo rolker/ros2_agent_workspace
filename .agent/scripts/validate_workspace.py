@@ -141,7 +141,7 @@ def validate_workspace(verbose=False):
     root = get_workspace_root()
 
     # Get configured repos using shared library
-    configured_list = get_overlay_repos(include_underlay=False)
+    configured_list = get_overlay_repos(include_underlay=True)
     # Convert list to dict for easy lookup
     config_repos = {item["name"]: item for item in configured_list}
 
