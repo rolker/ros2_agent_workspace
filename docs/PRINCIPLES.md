@@ -32,7 +32,14 @@ Resist adding process, files, or tools unless the pain they solve is concrete an
 demonstrated. The right amount of complexity is the minimum needed for the current
 situation.
 
-## 6. Workspace improvements cascade to projects
+## 6. Test what breaks
+
+Test logic and interfaces, not framework glue. Prioritize tests that catch
+regressions which matter — sensor failures, timing issues, degraded conditions.
+Don't chase coverage targets; focus on the failure modes that are hard to
+find in the field.
+
+## 7. Workspace improvements cascade to projects
 
 When we invest in improving workflow quality — PR templates, CI patterns, hooks,
 documentation standards — the benefit shouldn't stop at the workspace repo boundary.
