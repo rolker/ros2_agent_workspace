@@ -39,7 +39,13 @@ regressions which matter — sensor failures, timing issues, degraded conditions
 Don't chase coverage targets; focus on the failure modes that are hard to
 find in the field.
 
-## 7. Workspace improvements cascade to projects
+## 7. Improve incrementally
+
+Deliver small, reviewed changes rather than large rework efforts. Each change
+should leave the workspace better than it found it without requiring a
+comprehensive redesign.
+
+## 8. Workspace improvements cascade to projects
 
 When we invest in improving workflow quality — PR templates, CI patterns, hooks,
 documentation standards — the benefit shouldn't stop at the workspace repo boundary.
