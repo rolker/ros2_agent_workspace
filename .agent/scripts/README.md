@@ -549,22 +549,6 @@ Remove a worktree and clean up.
 
 ---
 
-### `doc_analyzer.py`
-
-Analyze documentation quality of ROS 2 packages.
-
-**Usage:**
-```bash
-python3 ./.agent/scripts/doc_analyzer.py
-```
-
-**Outputs:**
-- Documentation coverage report
-- Missing documentation warnings
-- Quality metrics
-
----
-
 ## Utility Scripts
 
 ### `build_report_generator.py`
