@@ -87,14 +87,15 @@ Using the consequences map from the review guide:
 
 - Does this PR change something listed in the "If you change..." column?
 - If so, are the corresponding "Also update..." items addressed in the PR?
-- List any missing consequence updates.
+- List all affected consequence mappings, marking each as Done or Missing.
 
 ### 6. Check for existing review comments
 
 ```bash
-# Copilot and human review comments (use gh repo view --json nameWithOwner --jq .nameWithOwner for the slug)
-gh api repos/<owner>/<repo>/pulls/<N>/comments --jq '.[] | {user: .user.login, body: .body, path: .path}'
-gh api repos/<owner>/<repo>/pulls/<N>/reviews --jq '.[] | {user: .user.login, state: .state, body: .body}'
+# Copilot and human review comments (derive repo slug dynamically)
+REPO_SLUG="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
+gh api "repos/${REPO_SLUG}/pulls/<N>/comments" --jq '.[] | {user: .user.login, body: .body, path: .path}'
+gh api "repos/${REPO_SLUG}/pulls/<N>/reviews" --jq '.[] | {user: .user.login, state: .state, body: .body}'
 ```
 
 Note:
