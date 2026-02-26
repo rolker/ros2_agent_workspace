@@ -69,11 +69,7 @@ def get_actual_repos(workspace_root):
                 if d.startswith("."):
                     continue
                 # Only treat worktrees as an ephemeral area at layers/worktrees
-                if (
-                    d == "worktrees"
-                    and search_dir.name == "layers"
-                    and depth == 0
-                ):
+                if d == "worktrees" and search_dir.name == "layers" and depth == 0:
                     continue
                 filtered_dirs.append(d)
             dirs[:] = filtered_dirs

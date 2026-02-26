@@ -1,9 +1,10 @@
 #!/bin/bash
 # discover_governance.sh — Scan workspace and project repos for governance documents.
 #
-# Outputs a TSV inventory: path<tab>type<tab>size_bytes<tab>scope
+# Outputs a TSV inventory: path<tab>type<tab>size<tab>scope
 #   scope: "workspace" or the project repo directory name
-#   type:  principles | adr | agent-guide | architecture | agents-config
+#   type:  principles | adr | agent-guide | architecture | agents-config | workspace-context
+#   size:  bytes for files, file count for workspace-context directories
 #
 # Usage:
 #   .agent/scripts/discover_governance.sh [--json]
@@ -51,6 +52,15 @@ check_dir() {
     fi
 }
 
+check_directory() {
+    local dir="$1" type="$2" scope="$3"
+    if [[ -d "$dir" ]]; then
+        local count
+        count=$(find "$dir" -type f 2>/dev/null | wc -l)
+        emit "$dir" "$type" "$count" "$scope"
+    fi
+}
+
 scan_scope() {
     local dir="$1" scope="$2"
 
@@ -60,6 +70,7 @@ scan_scope() {
     check_file "$dir/AGENTS.md"           agents-config "$scope"
     check_file "$dir/.agents/README.md"   agent-guide   "$scope"
     check_dir  "$dir/docs/decisions"      adr           "$scope"
+    check_directory "$dir/.agents/workspace-context" workspace-context "$scope"
 }
 
 # Header (TSV only)
