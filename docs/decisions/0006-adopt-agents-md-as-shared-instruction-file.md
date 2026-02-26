@@ -96,4 +96,4 @@ both over-cautious behavior and unauthorized actions.
 - ADR-0003: Workspace infrastructure is project-agnostic
 - ADR-0004: Enforcement hierarchy for agent compliance
 - ADR-0005: Layered enforcement — framework-agnostic backbone
-- [AGENTS.md convention](https://github.com/anthropics/agents-md)
+- [AGENTS.md convention](https://github.com/agentsmd/agents.md)
