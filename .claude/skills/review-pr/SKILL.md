@@ -29,7 +29,7 @@ gh pr view <N> --json title,body,baseRefName,headRefName,files,additions,deletio
 gh pr diff <N>
 
 # Get the linked issue (if any)
-gh pr view <N> --json body --jq '.body' | grep -oP '#\d+'
+gh pr view <N> --json body --jq '.body' | grep -o '#[0-9]*'
 ```
 
 Identify:
@@ -92,9 +92,9 @@ Using the consequences map from the review guide:
 ### 6. Check for existing review comments
 
 ```bash
-# Copilot and human review comments
-gh api repos/{owner}/{repo}/pulls/<N>/comments --jq '.[] | {user: .user.login, body: .body, path: .path}'
-gh api repos/{owner}/{repo}/pulls/<N>/reviews --jq '.[] | {user: .user.login, state: .state, body: .body}'
+# Copilot and human review comments (use gh repo view --json nameWithOwner --jq .nameWithOwner for the slug)
+gh api repos/<owner>/<repo>/pulls/<N>/comments --jq '.[] | {user: .user.login, body: .body, path: .path}'
+gh api repos/<owner>/<repo>/pulls/<N>/reviews --jq '.[] | {user: .user.login, state: .state, body: .body}'
 ```
 
 Note:
