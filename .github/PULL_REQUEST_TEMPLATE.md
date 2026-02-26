@@ -19,6 +19,16 @@ Closes #
 
 -
 
+## Documentation and test impact
+
+<!-- Consider what else needs updating as a consequence of this change. -->
+
+- [ ] No impact (no behavior, API, or interface changes)
+- [ ] Impact considered (check all that apply below):
+  - [ ] Tests added or updated
+  - [ ] Documentation updated (README, package docs, `.agents/README.md`)
+  - [ ] Dependent references updated (callers, message definitions, config files)
+
 ## Architecture impact
 
 - [ ] No architecture impact (routine change within existing patterns)
