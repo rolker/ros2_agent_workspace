@@ -10,18 +10,16 @@
 #   --quick          Quick local-only status (alias for --skip-sync --skip-github)
 #   --skip-sync      Skip repository fetch step (faster, may show stale data)
 #   --skip-github    Skip GitHub PR/issue queries (offline mode)
-#   --pr-triage      Classify PR review comments as critical/minor (extra API calls)
 #   --help           Show this help message
 #
 # EXAMPLES:
 #   status_report.sh                    # Full status with sync and GitHub
 #   status_report.sh --quick            # Fast local-only check
 #   status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
-#   status_report.sh --pr-triage        # Full status + PR comment classification
 #
 # DEPENDENCIES:
 #   Required: vcs, git, python3, jq
-#   Optional: gh (GitHub CLI) - for PR/issue tracking and --pr-triage
+#   Optional: gh (GitHub CLI) - for PR/issue tracking
 
 # Note: do not use 'set -e' here; many status checks are best-effort and may fail.
 
@@ -34,8 +32,6 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 # Parse command-line arguments
 SKIP_SYNC=false
 SKIP_GITHUB=false
-PR_TRIAGE=false
-
 while [[ $# -gt 0 ]]; do
     case $1 in
         --quick)
@@ -49,10 +45,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-github)
             SKIP_GITHUB=true
-            shift
-            ;;
-        --pr-triage)
-            PR_TRIAGE=true
             shift
             ;;
         --help)
@@ -394,123 +386,6 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo ""
     fi
 
-    echo "---"
-    echo ""
-fi
-
-#######################################
-# STEP 3b: PR TRIAGE (optional)
-#######################################
-
-if [ "$PR_TRIAGE" = true ] && [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null && command -v jq &> /dev/null && gh auth status &> /dev/null; then
-    STEP_NUM=$((STEP_NUM + 1))
-    echo "## Step $STEP_NUM: PR Comment Triage"
-    echo ""
-
-    # classify_comment: keyword-based critical/minor classification
-    # Ported from pr_status.sh for behavioral parity
-    classify_comment() {
-        local comment_body=$1
-        if echo "$comment_body" | grep -iE "(security|vulnerability|bug|error|critical|dangerous|unsafe|leak)" > /dev/null; then
-            echo "critical"
-            return
-        fi
-        if echo "$comment_body" | grep -iE "(style|formatting|typo|naming|convention|prefer|consider|suggestion)" > /dev/null; then
-            echo "minor"
-            return
-        fi
-        echo "minor"
-    }
-
-    TRIAGE_OUTPUT=""
-    TRIAGE_TOTAL=0
-    TRIAGE_NEED_REVIEW=0
-    TRIAGE_CRITICAL=0
-    TRIAGE_MINOR=0
-    TRIAGE_READY=0
-
-    for repo in $REPOS; do
-        if [ -z "$repo" ]; then
-            continue
-        fi
-
-        # Get open PRs for this repo
-        prs=$(gh pr list --repo "$repo" --json number,title,reviewDecision --limit 100 2>/dev/null || echo "[]")
-        if [ "$prs" = "[]" ] || [ -z "$prs" ]; then
-            continue
-        fi
-
-        while read -r pr_line; do
-            if [ -z "$pr_line" ]; then
-                continue
-            fi
-
-            pr_number=$(echo "$pr_line" | jq -r '.number')
-            pr_title=$(echo "$pr_line" | jq -r '.title')
-            review_decision=$(echo "$pr_line" | jq -r '.reviewDecision // "PENDING"')
-
-            # Truncate title
-            if [ ${#pr_title} -gt 50 ]; then
-                pr_title="${pr_title:0:47}..."
-            fi
-
-            # Fetch review comments for this PR (2 API calls: reviews + comments)
-            reviews_count=$(gh api "repos/$repo/pulls/$pr_number/reviews" --jq 'length' 2>/dev/null || echo "0")
-            comments=$(gh api "repos/$repo/pulls/$pr_number/comments" 2>/dev/null | jq -c '.[]' 2>/dev/null || true)
-
-            critical_count=0
-            minor_count=0
-
-            if [ -n "$comments" ]; then
-                while IFS= read -r comment; do
-                    if [ -z "$comment" ]; then
-                        continue
-                    fi
-                    body=$(echo "$comment" | jq -r '.body // ""')
-                    severity=$(classify_comment "$body")
-                    if [ "$severity" = "critical" ]; then
-                        critical_count=$((critical_count + 1))
-                    else
-                        minor_count=$((minor_count + 1))
-                    fi
-                done <<< "$comments"
-            fi
-
-            # Determine category
-            category=""
-            if [ "$reviews_count" -eq 0 ] 2>/dev/null; then
-                category="needs_review"
-                TRIAGE_NEED_REVIEW=$((TRIAGE_NEED_REVIEW + 1))
-            elif [ "$critical_count" -gt 0 ]; then
-                category="critical"
-                TRIAGE_CRITICAL=$((TRIAGE_CRITICAL + 1))
-            elif [ "$minor_count" -gt 0 ]; then
-                category="minor"
-                TRIAGE_MINOR=$((TRIAGE_MINOR + 1))
-            elif [ "$review_decision" = "APPROVED" ]; then
-                category="ready"
-                TRIAGE_READY=$((TRIAGE_READY + 1))
-            else
-                category="needs_review"
-                TRIAGE_NEED_REVIEW=$((TRIAGE_NEED_REVIEW + 1))
-            fi
-
-            repo_name=$(basename "$repo")
-            TRIAGE_OUTPUT+="| $repo_name | #$pr_number | $pr_title | $category | $critical_count | $minor_count |"$'\n'
-            TRIAGE_TOTAL=$((TRIAGE_TOTAL + 1))
-        done < <(echo "$prs" | jq -c '.[]' 2>/dev/null)
-    done
-
-    if [ "$TRIAGE_TOTAL" -gt 0 ]; then
-        echo "| Repository | PR | Title | Category | Critical | Minor |"
-        echo "|---|---|---|---|---|---|"
-        printf '%s' "$TRIAGE_OUTPUT"
-        echo ""
-        echo "**Summary**: $TRIAGE_TOTAL PRs — $TRIAGE_NEED_REVIEW need review, $TRIAGE_CRITICAL critical, $TRIAGE_MINOR minor, $TRIAGE_READY ready"
-    else
-        echo "✅ No open PRs to triage"
-    fi
-    echo ""
     echo "---"
     echo ""
 fi

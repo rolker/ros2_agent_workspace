@@ -197,7 +197,7 @@ Before marking a task complete or opening a PR:
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
-| `.agent/scripts/status_report.sh` | Workspace status (supports `--quick`, `--pr-triage`) |
+| `.agent/scripts/status_report.sh` | Workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |
 | `.agent/scripts/gh_create_issue.sh` | Create issue with label validation |
