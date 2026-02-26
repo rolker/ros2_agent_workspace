@@ -110,7 +110,7 @@ undecided (optional tool vs every workflow).
 | `checkout_default_branch.sh` | Switch to default branch. | **Deprecated**: conflicts with ADR-0002 |
 | `start_issue_work.sh` | Older workflow entry point with branch-based path (`git checkout -b`). Worktree path grafted on later. | **Superseded** by `worktree_create.sh` + `worktree_enter.sh` |
 | `update_issue_plan.sh` | Commit changes to work plan files. Part of older branch workflow. Underlying intents (handoff to other agents, audit trail) still valid but mechanism is superseded. | **Superseded** |
-| `generate_knowledge.sh` | Originally populated project knowledge via symlinks. Now a no-op stub. Intent (aggregate project-specific knowledge into a discoverable location) still needs proper design. | **No-op**, intent unresolved |
+| `generate_knowledge.sh` | Originally populated project knowledge via symlinks. Removed in #274, replaced by `discover_governance.sh` (governance document inventory) and `gather-project-knowledge` skill (#275). | **Removed** (#274) |
 | `revert_feature.sh` | Revert all commits for an issue by number. Part of conductor pattern ideas. | **Never tested**, manual revert suffices for rare cases |
 | `doc_analyzer.py` | Documentation quality scorer. References stale paths. Tested a few times early on before the workspace used its present layout. | **Likely broken**, valuable intent |
 

@@ -440,19 +440,18 @@ python3 ./.agent/scripts/validate_repos.py
 
 ## Documentation & Knowledge
 
-### `generate_knowledge.sh`
+### `discover_governance.sh`
 
-Index ROS 2 packages and generate knowledge files.
+Scan workspace and project repos for governance documents (principles, ADRs,
+agent guides, architecture docs). Outputs a machine-readable inventory.
 
 **Usage:**
 ```bash
-./.agent/scripts/generate_knowledge.sh
+./.agent/scripts/discover_governance.sh          # TSV output
+./.agent/scripts/discover_governance.sh --json   # JSON lines output
 ```
 
-**Outputs:**
-- Knowledge index in `.agent/knowledge/`
-- Package documentation summaries
-- API reference files
+**Output columns:** `path`, `type`, `size`, `scope`
 
 ---
 
