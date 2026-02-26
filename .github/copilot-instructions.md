@@ -3,6 +3,19 @@
 Read and follow all rules in [`AGENTS.md`](../AGENTS.md) at the repository root.
 That file contains the shared workspace rules for all AI agents.
 
+## Code Review Guidelines
+
+This repository uses a plan-first workflow. The first commit on a feature branch
+is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. When reviewing:
+
+- If the PR contains only a plan file, review the plan for clarity, completeness,
+  and alignment with the principles in `docs/PRINCIPLES.md`.
+- If the PR contains implementation, review code against the plan and principles.
+- Reference `docs/PRINCIPLES.md` for workspace guiding principles.
+- Reference `docs/decisions/` for Architecture Decision Records.
+- The principle "Radical simplicity" was renamed to "Only what's needed" — use the
+  current name from `docs/PRINCIPLES.md`, not historical references.
+
 ## Environment Setup
 
 ```bash
