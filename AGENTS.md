@@ -183,7 +183,8 @@ Before marking a task complete or opening a PR:
 
 1. Re-read issue description and work plan
 2. Compare changes against requirements
-3. List any gaps; complete them or explain in PR description
+3. Check consequences: do tests, docs, or dependent references need updating?
+4. List any gaps; complete them or explain in PR description
 
 ## Script Reference
 
