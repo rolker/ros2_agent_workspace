@@ -72,7 +72,7 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ### `status_report.sh` ⭐ Recommended
 
-**Comprehensive workspace status** — repository sync, git status, GitHub PRs/issues, test results, and optional PR comment triage.
+**Comprehensive workspace status** — repository sync, git status, GitHub PRs/issues, and test results.
 
 **Usage:**
 ```bash
@@ -80,7 +80,6 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 ./.agent/scripts/status_report.sh --quick            # Fast local-only (no sync, no GitHub)
 ./.agent/scripts/status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
 ./.agent/scripts/status_report.sh --skip-github      # Local status only (offline)
-./.agent/scripts/status_report.sh --pr-triage        # Full status + PR comment classification
 ./.agent/scripts/status_report.sh --help             # Show all flags
 ```
 
@@ -98,7 +97,6 @@ make status-quick  # Equivalent to --quick
 | `--quick` | Alias for `--skip-sync --skip-github` |
 | `--skip-sync` | Skip git fetch |
 | `--skip-github` | Skip GitHub API calls |
-| `--pr-triage` | Add PR comment classification (critical/minor) |
 | `--help` | Usage |
 
 **What it shows:**
@@ -106,19 +104,17 @@ make status-quick  # Equivalent to --quick
 - All sub-repository statuses per workspace layer (clean vs. attention)
 - Branch tracking (ahead/behind, wrong branch)
 - Open GitHub Pull Requests and Issues (unless `--skip-github`)
-- PR comment triage table with critical/minor counts (with `--pr-triage`)
 - Latest test results (if available)
 
 **When to use:**
 - Daily morning status check (`make status`)
 - Quick check before committing (`make status-quick`)
-- PR pipeline overview (`--pr-triage`)
 
 **Dependencies:**
 - Required: `vcs`, `git`, `python3`, `jq`
-- Optional: `gh` CLI authenticated (`gh auth login`) — for GitHub PR/issue/triage features
+- Optional: `gh` CLI authenticated (`gh auth login`) — for GitHub PR/issue features
 
-**Note:** `--pr-triage` makes 2 API calls per open PR, which can be slow with many PRs.
+For principles-aware PR review, use the `review-pr` skill instead.
 
 ---
 
