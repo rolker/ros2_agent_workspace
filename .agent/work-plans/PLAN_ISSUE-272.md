@@ -10,9 +10,9 @@ for evaluating work against them. Lifecycle skills (triage-issue, review-pr,
 plan-task, etc.) need a shared, framework-agnostic guide they can read to
 produce consistent evaluations.
 
-The [triage comment](https://github.com/rolker/ros2_agent_workspace/issues/272#issuecomment-3967255272)
-flagged size risk: a per-principle prose checklist could easily hit 300+ lines,
-defeating the "Only what's needed" principle it's supposed to enforce.
+The triage comment on issue #272 flagged size risk: a per-principle prose
+checklist could easily hit 300+ lines, defeating the "Only what's needed"
+principle it's supposed to enforce.
 
 ## Proposed Approach
 
