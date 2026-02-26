@@ -139,7 +139,7 @@ rm "$BODY_FILE"
 
 ## Guidelines
 
-- **Comment, don't edit** — the issue body is the authoritative spec. Triage
+- **Comment, don't edit** — the issue body is the authoritative spec. Review
   findings are advisory input posted as a comment with their own timestamp.
 - **Be actionable** — "Watch: might be too large for a single PR" is useful.
   "Looks fine" without specifics is not.
