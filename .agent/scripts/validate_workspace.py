@@ -63,8 +63,8 @@ def get_actual_repos(workspace_root):
                 dirs[:] = []  # Stop descending
                 continue
 
-            # Skip .agent, .git, and hidden directories
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            # Skip hidden directories and worktrees (ephemeral agent work areas)
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "worktrees"]
             if ".agent" in root_path_obj.parts:
                 continue
 
