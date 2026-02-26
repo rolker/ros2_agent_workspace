@@ -16,8 +16,8 @@ feature branch — often in a draft PR before implementation begins.
 - **Scope**: Does the plan address the linked issue? Are there gaps or overreach?
 - **Principle alignment**: Check against `docs/PRINCIPLES.md`. Key principles:
   - "Only what's needed" — is the plan adding unnecessary complexity?
-  - "Human in the loop" — does the plan preserve human oversight?
-  - "Observable behavior" — will the result be testable/verifiable?
+  - "Human control and transparency" — does the plan preserve human oversight?
+  - "Test what breaks" — will the result be testable/verifiable?
 - **ADR compliance**: Check `docs/decisions/` for relevant Architecture Decision Records.
 - **Consequences**: Does the plan account for downstream effects (tests, docs, references)?
 - **Feasibility**: Are the proposed steps concrete enough to implement?
