@@ -39,9 +39,9 @@ humans use it as a checklist.
 | `AGENTS.md` | Framework adapters if affected (`.github/copilot-instructions.md`, etc.) |
 | A script in `.agent/scripts/` | Script reference table in `AGENTS.md`; `Makefile` if it has a target |
 | A template in `.agent/templates/` | Docs that reference the template; skills that use it |
-| A skill in `.claude/skills/` | `CLAUDE.md` references if applicable; regenerate skills if needed |
+| A framework skill (e.g., `.claude/skills/`) | That framework's adapter file; regenerate skills if needed |
 | Package interfaces (`.msg`/`.srv`) | Downstream packages, documentation, tests |
-| Worktree scripts | `WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
+| Worktree scripts | `.agent/WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
 
 ## Governance Layering
 
