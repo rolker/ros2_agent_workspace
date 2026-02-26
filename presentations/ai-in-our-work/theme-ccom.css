@@ -1,0 +1,245 @@
+/* @theme ccom */
+
+@import 'default';
+
+/* ============================================================
+   UNH CCOM/JHC Marp Theme
+   Brand colors and typography per institutional guidelines.
+   ============================================================ */
+
+:root {
+  /* UNH Institutional */
+  --unh-blue: #003594;
+  --unh-dark-navy: #001D52;
+  --white: #FFFFFF;
+
+  /* CCOM/JHC Ocean/Coastal Palette */
+  --ocean-blue: #4A90D9;
+  --coastal-teal: #2E8B8B;
+  --deep-sea: #1B4F72;
+  --sand: #C2B280;
+  --seafoam: #A8D8D8;
+
+  /* Marp theme variables */
+  --color-background: var(--white);
+  --color-foreground: #333333;
+  --color-highlight: var(--unh-blue);
+}
+
+/* --- Base slide --- */
+section {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  color: #333333;
+  background-color: var(--white);
+  padding: 50px 60px;
+  line-height: 1.5;
+}
+
+/* --- Headings --- */
+section h1,
+section h2,
+section h3,
+section h4,
+section h5,
+section h6 {
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--unh-blue);
+  font-weight: bold;
+  letter-spacing: -0.02em;
+}
+
+section h1 {
+  font-size: 2.0em;
+  border-bottom: 3px solid var(--ocean-blue);
+  padding-bottom: 0.2em;
+}
+
+section h2 {
+  font-size: 1.5em;
+  color: var(--deep-sea);
+}
+
+section h3 {
+  font-size: 1.2em;
+  color: var(--coastal-teal);
+}
+
+/* --- Links --- */
+section a {
+  color: var(--ocean-blue);
+  text-decoration: none;
+}
+
+section a:hover {
+  text-decoration: underline;
+}
+
+/* --- Code --- */
+section code {
+  font-family: 'Courier New', Courier, monospace;
+  background-color: #F0F4F8;
+  color: var(--deep-sea);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+section pre {
+  background-color: var(--deep-sea);
+  border-radius: 8px;
+  padding: 1em;
+  border-left: 4px solid var(--ocean-blue);
+}
+
+section pre code {
+  background-color: transparent;
+  color: #E8EEF4;
+  font-size: 0.8em;
+}
+
+/* --- Lists --- */
+section ul,
+section ol {
+  margin-left: 0.5em;
+}
+
+section li {
+  margin-bottom: 0.3em;
+}
+
+section li::marker {
+  color: var(--coastal-teal);
+}
+
+/* --- Blockquotes --- */
+section blockquote {
+  border-left: 4px solid var(--sand);
+  background-color: #FAF8F3;
+  padding: 0.5em 1em;
+  margin: 1em 0;
+  font-style: italic;
+  color: #555555;
+}
+
+/* --- Tables --- */
+section table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+section th {
+  background-color: var(--unh-blue);
+  color: var(--white);
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: bold;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+section td {
+  border-bottom: 1px solid #DDE3EA;
+  padding: 0.4em 0.8em;
+}
+
+section tr:nth-child(even) td {
+  background-color: #F7F9FB;
+}
+
+/* --- Strong/emphasis --- */
+section strong {
+  color: var(--unh-blue);
+}
+
+section em {
+  color: var(--coastal-teal);
+}
+
+/* --- Horizontal rule (used as visual separator) --- */
+section hr {
+  border: none;
+  border-top: 2px solid var(--seafoam);
+  margin: 1.5em 0;
+}
+
+/* ============================================================
+   Scoped slide classes — use with <!-- _class: classname -->
+   ============================================================ */
+
+/* Title slide: dark navy background */
+section.title {
+  background-color: var(--unh-dark-navy);
+  color: var(--white);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+section.title h1 {
+  color: var(--white);
+  border-bottom: 3px solid var(--ocean-blue);
+  font-size: 2.4em;
+}
+
+section.title h2 {
+  color: var(--seafoam);
+  font-weight: normal;
+  font-size: 1.2em;
+}
+
+section.title p {
+  color: var(--sand);
+}
+
+/* Section divider: ocean blue background */
+section.divider {
+  background-color: var(--unh-blue);
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+section.divider h1,
+section.divider h2 {
+  color: var(--white);
+  border-bottom: none;
+}
+
+section.divider p {
+  color: var(--seafoam);
+  font-size: 1.1em;
+}
+
+/* Emphasis slide: seafoam background for callouts */
+section.callout {
+  background-color: #F0FAFA;
+  border-left: 6px solid var(--coastal-teal);
+}
+
+section.callout h2 {
+  color: var(--coastal-teal);
+}
+
+/* Two-column layout helper */
+section.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2em;
+  align-items: start;
+}
+
+section.columns h1 {
+  grid-column: 1 / -1;
+}
+
+/* --- Footer / slide number --- */
+section::after {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  color: #999999;
+}
