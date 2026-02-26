@@ -128,7 +128,7 @@ This workspace can be configured to bootstrap from a **manifest repository** of 
      ```
    - `config/repos/`: Directory containing `.repos` files (e.g., `core.repos`, `ui.repos`).
    - `config/layers.txt`: Layer names in source order (one per line).
-   - `config/agent_context/` (optional): Project-specific AI agent knowledge.
+   - `.agents/workspace-context/` (optional): Project-specific AI agent knowledge (at repo root, not under config/).
 
 3. Run `./.agent/scripts/setup.sh` to import all repositories defined in your manifest repo.
 

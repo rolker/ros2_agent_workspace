@@ -144,9 +144,11 @@ bootstrap_manifest_repo() {
     ln -sfn "$SYMLINK_TARGET" "$MANIFEST_SYMLINK"
     echo "Created symlink: $MANIFEST_SYMLINK -> $SYMLINK_TARGET"
 
-    # Create .agent/project_knowledge symlink if agent_context/ exists in config
-    if [ -d "${MANIFEST_CONFIG_DIR}/agent_context" ]; then
-        KNOWLEDGE_TARGET=$(relative_path "${MANIFEST_CONFIG_DIR}/agent_context" ".agent")
+    # Create .agent/project_knowledge symlink if .agents/workspace-context/ exists
+    # in the manifest repo (unified .agents/ convention per #284)
+    MANIFEST_AGENTS_DIR="${MANIFEST_CLONE_DIR}/.agents/workspace-context"
+    if [ -d "$MANIFEST_AGENTS_DIR" ]; then
+        KNOWLEDGE_TARGET=$(relative_path "$MANIFEST_AGENTS_DIR" ".agent")
         ln -sfn "$KNOWLEDGE_TARGET" ".agent/project_knowledge"
         echo "Created symlink: .agent/project_knowledge -> $KNOWLEDGE_TARGET"
     fi

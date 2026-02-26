@@ -8,7 +8,7 @@
 #
 # Project-specific agent context is now accessed via the
 # .agent/project_knowledge symlink, which setup.sh creates pointing to
-# the manifest repo's agent_context/ directory (if it exists).
+# the manifest repo's .agents/workspace-context/ directory (if it exists).
 #
 # This script is retained as a no-op for backward compatibility with
 # any automation that calls it.
@@ -25,8 +25,8 @@ elif [ -d "$ROOT_DIR/.agent/project_knowledge" ]; then
     echo "Project-specific knowledge available at .agent/project_knowledge/"
 else
     echo "No project-specific knowledge found (.agent/project_knowledge does not exist)."
-    echo "The manifest repo can provide project knowledge by creating an agent_context/"
-    echo "directory inside its config path."
+    echo "The manifest repo can provide project knowledge by creating a"
+    echo ".agents/workspace-context/ directory at its repo root."
 fi
 
 echo "Done."

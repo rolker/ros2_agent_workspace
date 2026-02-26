@@ -57,7 +57,7 @@ ros2_agent_workspace/
 │   ├── knowledge/            # ROS 2 patterns and CLI best practices
 │   ├── hooks/                # Git hooks (pre-commit)
 │   ├── instructions/         # Framework-specific instruction files
-│   └── project_knowledge     # -> manifest repo's agent_context/ (symlink, gitignored)
+│   └── project_knowledge     # -> manifest repo's .agents/workspace-context/ (symlink, gitignored)
 │
 ├── configs/                   # Configuration and bootstrap
 │   ├── project_bootstrap.url # URL to the manifest repo's bootstrap.yaml
@@ -137,7 +137,7 @@ Agent knowledge is split into workspace-level and project-level tiers:
 
 1. **Workspace knowledge** (`.agent/knowledge/`): Version-controlled files that apply to all projects using this workspace. Contains ROS 2 development patterns, CLI best practices, and documentation verification workflows.
 
-2. **Project knowledge** (`.agent/project_knowledge`): A symlink (gitignored) pointing to the manifest repo's `agent_context/` directory, if it exists. Contains project-specific conventions, architecture documentation, and component guides. This is created automatically by `setup.sh` during bootstrap.
+2. **Project knowledge** (`.agent/project_knowledge`): A symlink (gitignored) pointing to the manifest repo's `.agents/workspace-context/` directory, if it exists. Contains project-specific conventions, architecture documentation, and component guides. This is created automatically by `setup.sh` during bootstrap.
 
 ## Coordination & Locking
 
