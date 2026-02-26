@@ -26,11 +26,13 @@ Modifying code, configuration, or interfaces isn't done until tests, documentati
 and dependent references reflect the change. Stale docs and broken tests fail quietly —
 treat them as part of the same work, not a follow-up task.
 
-## Radical simplicity
+## Only what's needed
 
-Resist adding process, files, or tools unless the pain they solve is concrete and
-demonstrated. The right amount of complexity is the minimum needed for the current
-situation.
+Resist adding process, files, or tools unless the pain they solve is concrete.
+Context windows, token budgets, build times, and robot resources are finite —
+load only what's relevant, build only what changed, summarize rather than
+duplicate. The right amount of complexity is the minimum needed for the
+current situation.
 
 ## Improve incrementally
 
