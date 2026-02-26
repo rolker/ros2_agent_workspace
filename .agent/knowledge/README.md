@@ -18,9 +18,9 @@ checked out in `layers/`.
 ## Project-Specific Knowledge
 
 Project-specific conventions and architecture docs are available via
-`.agent/project_knowledge/` (a symlink to the manifest repo's `agent_context/`
-directory, created by `setup.sh`). This symlink may not exist if the manifest
-repo does not provide an `agent_context/` directory.
+`.agent/project_knowledge/` (a symlink to the manifest repo's
+`.agents/workspace-context/` directory, created by `setup.sh`). This symlink
+may not exist if the manifest repo has not set up `.agents/workspace-context/`.
 
 ## Project-Level Agent Guides
 

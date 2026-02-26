@@ -69,6 +69,22 @@ Known build issues or special requirements:
 4. **Omit** any section that does not apply (e.g., if there are no cross-layer
    dependencies, remove that section entirely). Do not leave empty tables.
 
+## .agents/ Directory Structure
+
+The `.agents/` directory at a project repo root can contain:
+
+```
+.agents/
+├── README.md               # This file — agent onboarding guide
+├── work-plans/             # Plans for work in this repo (optional)
+└── workspace-context/      # Content symlinked into the workspace (optional)
+```
+
+- `README.md` and `work-plans/` are standalone — useful with or without the workspace.
+- `workspace-context/` is only relevant if this repo participates in a
+  [ROS 2 Agent Workspace](https://github.com/rolker/ros2_agent_workspace).
+  The workspace symlinks this directory to `.agent/project_knowledge/`.
+
 ## Verification Checklist
 
 - [ ] Every package listed has a `package.xml` in the repo
