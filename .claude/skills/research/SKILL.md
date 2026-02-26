@@ -52,7 +52,7 @@ Topics specific to the project domain:
 # Research Digest: <scope>
 
 <!-- Last updated: YYYY-MM-DD -->
-<!-- If older than 30 days, consider running /research --refresh -->
+<!-- If older than 30 days, consider running /research --refresh; entries older than 90 days should be flagged for review -->
 
 ## <Topic Title>
 
