@@ -99,13 +99,17 @@ The `layer` field in `bootstrap.yaml` controls the pattern: present for Pattern 
 
 ### Framework Instruction Files
 
-Each AI agent framework has a self-contained instruction file:
-- **`CLAUDE.md`**: Claude Code (auto-loaded every conversation)
-- **`.github/copilot-instructions.md`**: GitHub Copilot
-- **`.agent/instructions/gemini-cli.instructions.md`**: Gemini CLI
-- **`.agent/AI_RULES.md`**: Universal fallback for unknown agents
+Shared workspace rules live in **`AGENTS.md`** at the repo root (see ADR-0006). Each
+AI agent framework has a thin adapter file that imports `AGENTS.md` and adds only
+framework-specific configuration:
 
-These files inline all operational rules (git hygiene, identity, signatures, build commands) so agents read one file instead of many.
+- **`CLAUDE.md`**: Claude Code adapter (auto-loaded, imports `AGENTS.md` via `@` syntax)
+- **`.github/copilot-instructions.md`**: GitHub Copilot adapter
+- **`.agent/instructions/gemini-cli.instructions.md`**: Gemini CLI adapter
+- **`.agent/AGENT_ONBOARDING.md`**: Onboarding for unknown/containerized agents
+
+Rules in `AGENTS.md` are organized using a three-tier boundary system
+(Always / Ask First / Never) to make agent autonomy boundaries explicit.
 
 ## Build System
 

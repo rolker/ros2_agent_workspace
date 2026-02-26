@@ -27,7 +27,7 @@ See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity d
 
 ## Core Rules
 
-See [`AI_RULES.md`](AI_RULES.md) for the 9 universal rules all agents must follow.
+See [`AGENTS.md`](../AGENTS.md) for the shared workspace rules all agents must follow.
 
 Key points:
 - Never commit to `main` — use worktrees for isolation
@@ -46,9 +46,9 @@ source .agent/scripts/worktree_enter.sh --issue <N>
 
 ## References
 
-- [`AI_RULES.md`](AI_RULES.md) — Universal rules
+- [`AGENTS.md`](../AGENTS.md) — Shared workspace rules (all agents)
 - [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) — Identity configuration
 - [`WORKFORCE_PROTOCOL.md`](WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`WORKTREE_GUIDE.md`](WORKTREE_GUIDE.md) — Worktree patterns
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — System design
-- Project repo `.agents/README.md` — Per-repo agent guide: package inventory, code layout, pitfalls (if present)
+- Project repo `.agents/README.md` — Per-repo agent guide (if present)
