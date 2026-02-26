@@ -553,8 +553,6 @@ Remove a worktree and clean up.
 
 ---
 
----
-
 ## Utility Scripts
 
 ### `build_report_generator.py`

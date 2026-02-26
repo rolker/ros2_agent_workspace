@@ -112,7 +112,7 @@ undecided (optional tool vs every workflow).
 | `update_issue_plan.sh` | Commit changes to work plan files. Part of older branch workflow. Underlying intents (handoff to other agents, audit trail) still valid but mechanism is superseded. | **Superseded** |
 | `generate_knowledge.sh` | Originally populated project knowledge via symlinks. Removed in #274, replaced by `discover_governance.sh` (governance document inventory) and `gather-project-knowledge` skill (#275). | **Removed** (#274) |
 | `revert_feature.sh` | Revert all commits for an issue by number. Part of conductor pattern ideas. | **Never tested**, manual revert suffices for rare cases |
-| `doc_analyzer.py` | Documentation quality scorer. Removed in #280, replaced by `audit-workspace` and `audit-project` skills (#280, #281). | **Removed** (#280) |
+| `doc_analyzer.py` | Documentation quality scorer. Removed in #280, replaced by `audit-workspace` skill (#280) and `audit-project` skill (#281, pending merge). | **Removed** (#280) |
 
 ### Test Suite
 
