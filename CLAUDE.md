@@ -14,20 +14,9 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 
 ## Claude-Specific Notes
 
-- **Branch naming**: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`.
 - Makefile `.PHONY` targets (excluding `help`) are available as `/make_*` slash commands
   (e.g., `/make_build`, `/make_test`, `/make_status`). After adding or removing eligible
   `.PHONY` targets, run `make generate-skills` to regenerate the slash commands.
-
-## GitHub Reference Links
-
-- Workspace repo: `rolker/ros2_agent_workspace`. For project repos, derive
-  the slug from the git remote (`git remote get-url origin`).
-
-Examples:
-- `[Issue #129: Clickable GitHub references](https://github.com/rolker/ros2_agent_workspace/issues/129)`
-- `[PR #68: Example pull request](https://github.com/rolker/unh_marine_autonomy/pull/68)`
-- `[e8c32bc](https://github.com/rolker/unh_marine_autonomy/commit/<full-sha>)`
 
 ## References
 

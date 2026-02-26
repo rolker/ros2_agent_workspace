@@ -18,7 +18,7 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 - **Native GitHub access**: Use `gh` CLI for fast PR/issue operations.
 - **ROS 2**: Jazzy, Kilted, and Rolling (multi-distro support).
 - **Build system**: colcon. **VCS tool**: vcstool. **Python**: 3.10+.
-- **Branch naming**: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`.
+
 
 ## References
 

@@ -26,6 +26,8 @@ setup (environment, identity, features), see your framework's adapter file:
 - Build in layer directories only — never `colcon build` from workspace root
 - Verify documentation claims against source code
 - Atomic commits: one logical change per commit
+- Branch naming: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`
+- All changes via Pull Requests
 
 ### Ask First (get human approval)
 

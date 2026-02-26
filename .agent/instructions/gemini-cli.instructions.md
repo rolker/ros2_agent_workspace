@@ -17,7 +17,7 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 
 - **Google Cloud**: If Gemini CLI has access to Google Cloud services, check your environment for available integrations.
 - If `gh` CLI is installed, use it for GitHub operations.
-- **Branch naming**: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`.
+
 
 ## References
 
