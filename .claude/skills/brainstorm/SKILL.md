@@ -27,7 +27,7 @@ an issue exists. Can also be used mid-task to explore alternatives.
 Read available knowledge sources:
 
 - `.agent/knowledge/research_digest.md` — workspace research (if exists)
-- `.agent/project_knowledge/research_digest.md` — project research (if exists)
+- `.agent/project_knowledge/research_digest.md` — project research (workspace symlink into the manifest repo; may not exist)
 - `.agent/project_knowledge/` — aggregated project knowledge (if exists)
 - `docs/PRINCIPLES.md` — workspace principles (for feasibility checks)
 - Project governance docs if the topic is project-specific
