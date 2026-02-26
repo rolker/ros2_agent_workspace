@@ -19,7 +19,7 @@ planning system. Use EnterPlanMode for general codebase exploration and
 approach design; use this skill to ensure the plan accounts for workspace
 principles, ADR compliance, and downstream consequences.
 
-**Lifecycle position**: `review-issue → **plan-task** → implement → review-pr`
+**Lifecycle position**: review-issue → **plan-task** → implement → review-pr
 
 ## Steps
 
@@ -56,7 +56,7 @@ Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md`:
 
 ## Issue
 
-<link to issue>
+<issue URL from: gh issue view <N> --json url --jq '.url'>
 
 ## Context
 
@@ -117,8 +117,12 @@ Push the branch and create a draft PR with the plan as the body. This
 allows Copilot and humans to review the plan before implementation.
 
 ```bash
-git push -u origin feature/issue-<N>
-gh pr create --draft --title "<issue-title>" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
+# Push current branch (name may vary: feature/issue-<N> or feature/ISSUE-<N>-<desc>)
+git push -u origin HEAD
+
+# Create draft PR (use --body-file for title safety)
+ISSUE_TITLE=$(gh issue view <N> --json title --jq '.title')
+gh pr create --draft --title "$ISSUE_TITLE" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
 ```
 
 ### 7. Report to user
