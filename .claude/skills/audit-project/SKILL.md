@@ -101,8 +101,8 @@ Report test existence and pass/fail, not test quality.
 
 - Is this repo listed in a `.repos` config file?
 - Is it in the expected layer?
-- Does the workspace's `project_knowledge` symlink include content
-  from this repo?
+- Does the workspace's `.agent/project_knowledge/` symlink (pointing to
+  `.agents/workspace-context/`) include content from this repo?
 
 ## Report Format
 

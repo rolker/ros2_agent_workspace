@@ -55,7 +55,7 @@ Read the governance docs:
 For project repo PRs, also check:
 - The project repo's `PRINCIPLES.md` or `docs/PRINCIPLES.md`
 - The project repo's `.agents/README.md`
-- `.agent/project_knowledge/` if the symlink exists (aggregated knowledge)
+- `.agent/project_knowledge/` if the symlink exists (points to manifest repo's `.agents/workspace-context/`)
 
 ### 3. Evaluate against principles
 

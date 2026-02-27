@@ -39,10 +39,11 @@ Separation mechanism:
   and optionally project-level agent context. The manifest repo may be an independent
   repo or part of one of the project repos — this is the project owner's choice about
   whether to include workspace metadata in their repo.
-- `.agent/project_knowledge/` is a gitignored symlink that aggregates project-level
-  knowledge into the workspace. It complements `.agent/knowledge/` (which holds generic
-  ROS 2 and non-project-specific knowledge) by making project-specific knowledge
-  accessible in a parallel location without the workspace owning it.
+- Project-specific knowledge is stored in `.agents/workspace-context/` inside the
+  manifest repo (git-tracked there). The workspace accesses it via a gitignored symlink
+  `.agent/project_knowledge/` → `.agents/workspace-context/`, created by `setup.sh`.
+  This complements `.agent/knowledge/` (which holds generic ROS 2 and non-project-specific
+  knowledge) by making project-specific knowledge accessible without the workspace owning it.
 
 Reusability test: someone should be able to fork this workspace for a different ROS 2
 project by changing the bootstrap configuration and running setup, without needing
@@ -63,6 +64,6 @@ repo should be fully functional without this workspace.
 
 **Negative:**
 - Requires ongoing discipline to keep project-specific content out of workspace files
-- The symlink-based knowledge aggregation (`.agent/project_knowledge/`) adds a layer of
-  indirection that can be confusing
+- The symlink-based knowledge aggregation (`.agent/project_knowledge/` →
+  `.agents/workspace-context/`) adds a layer of indirection that can be confusing
 - Some convenience is lost — you can't just put everything in one place

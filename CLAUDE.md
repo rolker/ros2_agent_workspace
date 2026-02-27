@@ -28,5 +28,5 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 - [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`.agent/WORKFORCE_PROTOCOL.md`](.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`.agent/knowledge/`](.agent/knowledge/) — ROS 2 development patterns, CLI best practices, and skill workflows
-- [`.agent/project_knowledge/`](.agent/project_knowledge/) — Project-specific conventions (symlink, may not exist)
+- [`.agent/project_knowledge/`](.agent/project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup.sh`; may not exist)
 - [`.agent/templates/`](.agent/templates/) — Issue and test templates
