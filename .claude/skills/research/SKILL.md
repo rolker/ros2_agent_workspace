@@ -16,6 +16,9 @@ description: Survey external sources on a topic and maintain living research dig
 
 ## Overview
 
+**Lifecycle position**: Utility — not tied to the per-issue lifecycle. Use any
+time to survey external sources or maintain research digests.
+
 Maintain living research digests that capture external best practices, emerging
 techniques, and relevant developments. This is **external research** — surveying
 sources outside the workspace. For project introspection, use

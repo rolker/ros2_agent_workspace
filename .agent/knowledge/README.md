@@ -12,6 +12,7 @@ checked out in `layers/`.
 - **[VS Code Setup Guide](vscode_setup.md)**: Multi-root workspace configuration, Makefile tasks, C++/Python IntelliSense, and Claude Code extension integration.
 
 ## Agent Workflows
+- **[Skill Workflows](skill_workflows.md)**: Per-issue lifecycle sequence, governance skill index, and utility skill catalog.
 - **[Principles Review Guide](principles_review_guide.md)**: Evaluation criteria for workspace principles and ADRs. Used by lifecycle skills (triage, planning, review) and as a manual checklist.
 - **[Documentation Verification](documentation_verification.md)**: Mandatory verification workflow for writing accurate ROS 2 package documentation. Includes command cookbook and hallucination anti-patterns.
 
