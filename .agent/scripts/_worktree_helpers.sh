@@ -64,3 +64,28 @@ wt_layer_is_dirty() {
 
     return 1  # clean
 }
+
+# Find the most recent skill worktree matching a skill name.
+# Skill worktree dirs are named: skill-{REPO_SLUG}-{SKILL}-{TIMESTAMP}
+# Usage: path=$(find_worktree_by_skill "$base_dir" "$skill_name")
+find_worktree_by_skill() {
+    local base_dir="$1"
+    local skill="$2"
+
+    local matches=()
+    for path in "$base_dir"/skill-*-"${skill}"-*; do
+        if [ -d "$path" ] && [ "$path" != "$base_dir/skill-*-${skill}-*" ]; then
+            matches+=( "$path" )
+        fi
+    done
+
+    if [ "${#matches[@]}" -eq 0 ]; then
+        return 1
+    fi
+
+    # Return the most recent (last in sorted order, since timestamp is in the name)
+    local sorted
+    sorted=$(printf '%s\n' "${matches[@]}" | sort)
+    echo "$sorted" | tail -n1
+    return 0
+}

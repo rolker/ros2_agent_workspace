@@ -65,7 +65,8 @@ extract_issue_repo() {
     WT_SKILL=""
 
     # Skill format: skill-{REPO_SLUG}-{SKILL_NAME}-{TIMESTAMP}
-    if [[ "$basename" =~ ^skill-([a-zA-Z0-9_]+)-([a-zA-Z0-9_-]+)-([0-9]{8}-[0-9]{6})$ ]]; then
+    # Timestamp may be YYYYMMDD-HHMMSS or YYYYMMDD-HHMMSS-NNNNNNNNN
+    if [[ "$basename" =~ ^skill-([a-zA-Z0-9_]+)-([a-zA-Z0-9_-]+)-([0-9]{8}-[0-9]{6}(-[0-9]+)?)$ ]]; then
         WT_REPO="${BASH_REMATCH[1]}"
         WT_SKILL="${BASH_REMATCH[2]}"
     # New format: issue-{REPO_SLUG}-{NUMBER}

@@ -162,29 +162,6 @@ find_worktree() {
 WORKTREE_DIR=""
 WORKTREE_TYPE=""
 
-# Find the most recent skill worktree matching a skill name.
-find_worktree_by_skill() {
-    local base_dir="$1"
-    local skill="$2"
-
-    local matches=()
-    for path in "$base_dir"/skill-*-"${skill}"-*; do
-        if [ -d "$path" ] && [ "$path" != "$base_dir/skill-*-${skill}-*" ]; then
-            matches+=( "$path" )
-        fi
-    done
-
-    if [ "${#matches[@]}" -eq 0 ]; then
-        return 1
-    fi
-
-    # Return the most recent (last in sorted order, since timestamp is in the name)
-    local sorted
-    sorted=$(printf '%s\n' "${matches[@]}" | sort)
-    echo "$sorted" | tail -n1
-    return 0
-}
-
 if [ -n "$SKILL_NAME" ]; then
     # Skill mode
     if FOUND=$(find_worktree_by_skill "$ROOT_DIR/layers/worktrees" "$SKILL_NAME"); then

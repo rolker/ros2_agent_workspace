@@ -179,8 +179,8 @@ if [ -n "$SKILL_NAME" ]; then
         echo "Allowed skills: ${ALLOWED_SKILLS[*]}"
         exit 1
     fi
-    # Generate synthetic ID
-    SYNTHETIC_ID="${SKILL_NAME}-$(date +"%Y%m%d-%H%M%S")"
+    # Generate synthetic ID (nanosecond precision to avoid collisions)
+    SYNTHETIC_ID="${SKILL_NAME}-$(date +"%Y%m%d-%H%M%S-%N")"
 fi
 
 # Validate worktree type
@@ -733,8 +733,10 @@ PREOF
                 PKG_REPO_SLUG=$(extract_gh_slug "$PKG_REMOTE_URL")
             fi
 
-            # Build issue reference — use cross-repo format when PR repo != issue repo
-            if [ -n "$GH_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$GH_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
+            # Build issue reference — skip in skill mode (no issue to close)
+            if [ -n "$SKILL_NAME" ]; then
+                ISSUE_REF=""
+            elif [ -n "$GH_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$GH_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
                 ISSUE_REF="$GH_REPO_SLUG#$ISSUE_NUM"
             else
                 ISSUE_REF="#$ISSUE_NUM"
