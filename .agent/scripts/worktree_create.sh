@@ -184,8 +184,16 @@ if [ -n "$SKILL_NAME" ]; then
         echo "Allowed skills: ${ALLOWED_SKILLS[*]}"
         exit 1
     fi
-    # Generate synthetic ID (nanosecond precision to avoid collisions)
-    SYNTHETIC_ID="${SKILL_NAME}-$(date +"%Y%m%d-%H%M%S-%N")"
+    # Generate synthetic ID with timestamp + collision-resistant suffix
+    # %N is GNU-specific (nanoseconds); on BSD/macOS it outputs literal "N"
+    _SKILL_TS=$(date +"%Y%m%d-%H%M%S")
+    _SKILL_NANO=$(date +"%N" 2>/dev/null)
+    if [ -z "$_SKILL_NANO" ] || [ "$_SKILL_NANO" = "N" ] || [ "$_SKILL_NANO" = "%N" ]; then
+        # Fallback: use $RANDOM (0-32767) for uniqueness on non-GNU systems
+        _SKILL_NANO=$RANDOM
+    fi
+    SYNTHETIC_ID="${SKILL_NAME}-${_SKILL_TS}-${_SKILL_NANO}"
+    unset _SKILL_TS _SKILL_NANO
 fi
 
 # Validate worktree type

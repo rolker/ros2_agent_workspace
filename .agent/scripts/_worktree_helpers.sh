@@ -75,14 +75,16 @@ find_worktree_by_skill() {
     local repo_slug="${3:-}"
 
     local matches=()
-    local pattern
+    # Use an array for the glob to avoid word-splitting issues
+    local -a glob_patterns
     if [ -n "$repo_slug" ]; then
-        pattern="$base_dir/skill-${repo_slug}-${skill}-*"
+        glob_patterns=( "$base_dir"/skill-"${repo_slug}"-"${skill}"-* )
     else
-        pattern="$base_dir/skill-*-${skill}-*"
+        glob_patterns=( "$base_dir"/skill-*-"${skill}"-* )
     fi
-    for path in $pattern; do
-        if [ -d "$path" ] && [ "$path" != "$pattern" ]; then
+    for path in "${glob_patterns[@]}"; do
+        # When glob doesn't match, bash returns the literal pattern
+        if [ -d "$path" ]; then
             matches+=( "$path" )
         fi
     done
@@ -95,9 +97,20 @@ find_worktree_by_skill() {
         echo "Warning: multiple skill worktrees found for '$skill'; using most recent" >&2
     fi
 
-    # Return the most recent (last in sorted order, since timestamp is in the name)
-    local sorted
-    sorted=$(printf '%s\n' "${matches[@]}" | sort)
-    echo "$sorted" | tail -n1
+    # Find the most recent by comparing the timestamp suffix in the basename,
+    # not the full path (which includes repo_slug and can sort incorrectly)
+    local latest_path="" latest_ts=""
+    for path in "${matches[@]}"; do
+        local basename="${path##*/}"
+        # Basename format: skill-{REPO_SLUG}-{SKILL}-{TIMESTAMP}
+        # Extract timestamp: everything after the last occurrence of -{skill}-
+        local ts="${basename##*-"${skill}"-}"
+        if [ -z "$latest_ts" ] || [[ "$ts" > "$latest_ts" ]]; then
+            latest_ts="$ts"
+            latest_path="$path"
+        fi
+    done
+
+    echo "$latest_path"
     return 0
 }

@@ -647,6 +647,35 @@ test_find_worktree_by_skill_no_match() {
 }
 run_test "find_worktree_by_skill returns failure when no match" test_find_worktree_by_skill_no_match
 
+# Test 20: find_worktree_by_skill picks newest timestamp across repo slugs
+test_find_worktree_by_skill_cross_repo_sort() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # "zebra" sorts lexicographically after "alpha" but has an older timestamp
+    mkdir -p "$tmpdir/skill-zebra-research-20260101-120000-000000000"
+    mkdir -p "$tmpdir/skill-alpha-research-20260301-120000-000000000"
+
+    local result
+    result=$(find_worktree_by_skill "$tmpdir" "research" 2>/dev/null)
+    local rc=$?
+
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected find_worktree_by_skill to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"alpha"*"20260301"* ]]; then
+        echo "    Expected most recent by timestamp (alpha/20260301), got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "find_worktree_by_skill picks newest timestamp across repo slugs" test_find_worktree_by_skill_cross_repo_sort
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"
