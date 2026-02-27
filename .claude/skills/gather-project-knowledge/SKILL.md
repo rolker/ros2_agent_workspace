@@ -43,15 +43,42 @@ cd <layer>_ws/src/<target-repo>
 This produces a JSON-lines inventory of all governance documents across the
 workspace and project repos.
 
-### 2. Scan project repos for package metadata
+### 2. Scan project repos and build the package inventory
 
 For every project repo under `layers/main/*/src/`:
 
-- List directories to identify packages
-- Read `package.xml` files for package names, descriptions, and dependencies
+- Glob for all `package.xml` files in the repo
+- Extract the `<name>` element from each `package.xml` — this is the only
+  authoritative source for package names (not directory names, not repo names)
+- Read `<description>`, `<depend>`, `<build_depend>`, and `<exec_depend>`
+  elements for dependencies
+- Detect language: `CMakeLists.txt` → C++, `setup.py`/`setup.cfg` → Python,
+  both → mixed
 - Read `.agents/README.md` if it exists (curated agent guide)
 - Read `.agents/workspace-context/` contents if they exist (existing knowledge provider)
 - Note the layer each repo belongs to
+
+After scanning, produce a **structured inventory table** in your context. This
+table is the single source of truth for all subsequent profile and overview
+writing. Do not paraphrase or summarize it — copy package names verbatim.
+
+```markdown
+| Repo | Layer | Packages (from `<name>` in `package.xml`) | Language | Key Dependencies |
+|------|-------|-------------------------------------------|----------|-----------------|
+| repo_name | layer_name | `pkg_a`, `pkg_b`, `pkg_c` | C++ | dep1, dep2 |
+```
+
+> **Why this matters**: The first run of this skill produced errors in all
+> spot-checked profiles because directory names were used instead of `<name>`
+> elements, and multi-hop summarization lost fidelity. See
+> [#320](https://github.com/rolker/ros2_agent_workspace/issues/320) for details.
+
+**Important constraints**:
+- Never use directory names as package names — a directory may contain multiple
+  packages, or the directory name may differ from the package name.
+- Write profiles one at a time, referencing the inventory table directly.
+  Do not delegate profile writing to a subagent that works from a natural
+  language summary of the scan results.
 
 ### 3. Generate summaries
 
@@ -105,7 +132,26 @@ A single profile of the current repo, using the same format as the manifest
 repo's `project_profiles/<repo>.md` above. This allows the repo to provide
 its own knowledge to the workspace without depending on a central scan.
 
-### 4. Add frontmatter to generated files
+### 4. Validate profiles against source
+
+Before adding frontmatter or committing, validate every generated profile:
+
+For each profile, glob for `package.xml` files in the corresponding repo and
+extract `<name>` elements. Compare this list against the packages listed in the
+profile. If there is any mismatch — missing packages, extra packages, or wrong
+names — fix the profile before proceeding.
+
+Quick validation approach:
+```bash
+# In the repo directory, list all actual package names:
+find . -name package.xml -not -path '*/build/*' -not -path '*/install/*' \
+  -exec grep -oP '<name>\K[^<]+' {} \;
+```
+
+Compare the output against what the profile claims. Every name must match
+exactly. Do not proceed to step 5 until all profiles pass validation.
+
+### 5. Add frontmatter to generated files
 
 Every generated file should start with:
 
@@ -116,7 +162,7 @@ Every generated file should start with:
 <!-- Generated: {date} -->
 ```
 
-### 5. Commit the changes
+### 6. Commit the changes
 
 Stage all files in `.agents/workspace-context/` and commit with a message like:
 
@@ -143,6 +189,12 @@ Report what was generated and what changed compared to the previous version.
 
 ## Guidelines
 
+- **Package names come from `package.xml` only** — repo directory names,
+  subdirectory names, and ROS package names are different things. The only
+  authoritative source for a package name is the `<name>` element in
+  `package.xml`. A repo named `s57_tools` may contain packages named
+  `marine_charts`, `s57_layer`, etc. A directory named `vrx_urdf` may contain
+  multiple packages with different names.
 - **Verify against source** — every claim must come from actual files read during
   the scan. Do not guess package descriptions or dependencies.
 - **Keep summaries concise** — the point is to save context window. A profile
