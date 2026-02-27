@@ -143,7 +143,8 @@ make validate                                    # Validate workspace
 
 # Single package
 cd layers/main/<layer>_ws && colcon build --packages-select <package>
-colcon test --packages-select <package> && colcon test-result --verbose
+# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
+source .agent/scripts/env.sh && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 
 make lint                                        # Lint + hooks (uses venv pre-commit)
 ```
