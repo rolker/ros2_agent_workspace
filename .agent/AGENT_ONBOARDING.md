@@ -44,6 +44,17 @@ Key points:
 source .agent/scripts/worktree_enter.sh --issue <N>
 ```
 
+## Workflow Skills
+
+Reusable workflow procedures are documented in `.claude/skills/*/SKILL.md`.
+These are plain markdown — not Claude Code-specific. When asked to review an
+issue, plan a task, review a PR, brainstorm, or run research, read the
+corresponding SKILL.md and follow its steps.
+
+Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
+`brainstorm`, `research`, `audit-workspace`, `audit-project`,
+`gather-project-knowledge`, `brand-guidelines`.
+
 ## References
 
 - [`AGENTS.md`](../AGENTS.md) — Shared workspace rules (all agents)
