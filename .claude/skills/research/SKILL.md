@@ -44,8 +44,8 @@ Topics relevant to any project using this workspace:
 
 **Write path**: `.agents/workspace-context/research_digest.md` (in the manifest repo,
 where the file is git-tracked — commit there)
-**Read path**: `.agent/project_knowledge/research_digest.md` (workspace symlink into
-the manifest repo; may not exist until the manifest provides `.agents/workspace-context/`)
+**Read path**: `.agent/project_knowledge/research_digest.md` (workspace symlink to
+manifest repo's `.agents/workspace-context/`; may not exist until `setup.sh` creates the symlink)
 
 Topics specific to the project domain:
 - ROS 2 ecosystem developments (new packages, API changes)

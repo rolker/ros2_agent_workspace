@@ -38,5 +38,5 @@ Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
 - [`../AI_IDENTITY_STRATEGY.md`](../AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`../WORKFORCE_PROTOCOL.md`](../WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`../knowledge/`](../knowledge/) — ROS 2 development patterns and CLI best practices
-- [`../project_knowledge/`](../project_knowledge/) — Project-specific conventions (symlink, may not exist)
+- [`../project_knowledge/`](../project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup.sh`; may not exist)
 - [`../templates/`](../templates/) — Issue and test templates

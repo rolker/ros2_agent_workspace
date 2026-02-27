@@ -50,7 +50,7 @@ Read the governance docs:
 
 If the issue targets a project repo, also check:
 - The project repo's `PRINCIPLES.md`
-- `.agent/project_knowledge/` if available
+- `.agent/project_knowledge/` if available (symlink to manifest repo's `.agents/workspace-context/`)
 
 ### 3. Assess scope
 
