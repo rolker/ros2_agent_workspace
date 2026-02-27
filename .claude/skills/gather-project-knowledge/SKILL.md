@@ -144,8 +144,8 @@ names — fix the profile before proceeding.
 Quick validation approach:
 ```bash
 # In the repo directory, list all actual package names:
-find . -name package.xml -not -path '*/build/*' -not -path '*/install/*' \
-  -exec grep -oP '<name>\K[^<]+' {} \;
+find . -name package.xml -not -path '*/build/*' -not -path '*/install/*' -print0 \
+  | xargs -0 sed -n 's/.*<name>\([^<]*\)<\/name>.*/\1/p'
 ```
 
 Compare the output against what the profile claims. Every name must match
