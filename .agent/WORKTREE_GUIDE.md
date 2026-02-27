@@ -124,7 +124,8 @@ source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
-colcon test --packages-select my_package
+# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
+source .agent/scripts/env.sh && cd core_ws && colcon test --packages-select my_package
 
 # Commit and push
 git add .

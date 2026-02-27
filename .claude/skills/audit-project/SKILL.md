@@ -84,8 +84,8 @@ For each package:
 - If available, run or report last known test results:
 
 ```bash
-cd layers/main/<layer>_ws
-colcon test --packages-select <package> && colcon test-result --verbose
+# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
+source .agent/scripts/env.sh && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 ```
 
 Report test existence and pass/fail, not test quality.

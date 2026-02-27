@@ -104,7 +104,7 @@ rosdep install --from-paths src --ignore-src -r -y
 
 ### Running Tests
 ```bash
-# Build with tests (from layer directory)
+# Build with tests (from repo root)
 cd layers/main/<layer>_ws && colcon build --packages-select <package_name>
 
 # Run tests for a package — env.sh must be sourced in the same shell
@@ -112,7 +112,7 @@ cd layers/main/<layer>_ws && colcon build --packages-select <package_name>
 source .agent/scripts/env.sh && cd layers/main/<layer>_ws && colcon test --packages-select <package_name>
 
 # Show test results
-colcon test-result --all
+colcon test-result --verbose
 
 # Full workspace test (env is handled automatically)
 make test

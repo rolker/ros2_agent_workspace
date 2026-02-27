@@ -39,6 +39,6 @@ source ../../.agent/scripts/env.sh
 
 **Running tests for a package:**
 ```bash
-colcon test --packages-select my_package
-colcon test-result --verbose
+# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
+source ../../.agent/scripts/env.sh && colcon test --packages-select my_package && colcon test-result --verbose
 ```
