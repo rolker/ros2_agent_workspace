@@ -78,7 +78,7 @@ TARGET_PACKAGES=""  # Comma-separated list of packages to modify
 PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 
 # Skills allowed to create worktrees without a GitHub issue
-ALLOWED_SKILLS=("research" "gather-project-knowledge")
+ALLOWED_SKILLS=("research")
 
 # Available layers (same order as env.sh)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")

@@ -105,8 +105,7 @@ source .agent/scripts/worktree_enter.sh --skill research
 .agent/scripts/worktree_remove.sh --skill research
 ```
 
-**Allowed skills**: `research`, `gather-project-knowledge` (enforced by an allowlist
-in `worktree_create.sh`).
+**Allowed skills**: `research` (enforced by an allowlist in `worktree_create.sh`).
 
 **Branch naming**: `skill/{name}-{YYYYMMDD-HHMMSS-NNNNNNNNN}` (e.g., `skill/research-20260227-143022-123456789`).
 

@@ -78,41 +78,56 @@ Key takeaways:
 
 ## Workflow
 
+### Worktree setup
+
+The worktree type depends on the scope:
+
+- **Workspace scope** (default): use a `--skill research` worktree — no issue needed.
+  ```bash
+  .agent/scripts/worktree_create.sh --skill research --type workspace
+  source .agent/scripts/worktree_enter.sh --skill research
+  ```
+
+- **Project scope** (`--scope project`): the project digest lives in the manifest
+  repo, so you need a GitHub issue and a layer worktree targeting that repo.
+  ```bash
+  .agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <manifest-repo>
+  source .agent/scripts/worktree_enter.sh --issue <N>
+  cd <layer>_ws/src/<manifest-repo>
+  ```
+
 ### Adding research (`/research <topic>`)
 
-1. Create a skill worktree (if not already in one):
-   `.agent/scripts/worktree_create.sh --skill research --type workspace`
-2. Enter the worktree:
-   `source .agent/scripts/worktree_enter.sh --skill research`
-3. Search the web for current information on the topic
-4. Read and synthesize relevant sources
-5. Check the existing digest for related entries — update rather than duplicate
-6. Append or update the entry in the appropriate digest
-7. Update the "Last updated" timestamp
-8. Commit in the correct repo: workspace digest commits go in the workspace
+1. Set up the worktree for the appropriate scope (see above)
+2. Search the web for current information on the topic
+3. Read and synthesize relevant sources
+4. Check the existing digest for related entries — update rather than duplicate
+5. Append or update the entry in the appropriate digest
+6. Update the "Last updated" timestamp
+7. Commit in the correct repo: workspace digest commits go in the workspace
    repo; project digest commits go in the manifest repo (not the workspace)
-9. Push and create a PR: `git push -u origin HEAD && gh pr create --fill`
-10. Clean up: `.agent/scripts/worktree_remove.sh --skill research`
+8. Push and create a PR: `git push -u origin HEAD && gh pr create --fill`
+9. Clean up the worktree when done
 
 ### Ingesting a URL (`/research --ingest <url>`)
 
-1. Create/enter a skill worktree (steps 1-2 from "Adding research" above)
+1. Set up the worktree for the appropriate scope (see above)
 2. Fetch and read the URL content
 3. Extract key takeaways relevant to the workspace or project
 4. Determine scope (workspace or project) from content — or ask if unclear
 5. Append to the appropriate digest
-6. Commit, push, create PR, and clean up (steps 8-10 from "Adding research")
+6. Commit, push, create PR, and clean up
 
 ### Refreshing (`/research --refresh`)
 
-1. Create/enter a skill worktree (steps 1-2 from "Adding research" above)
+1. Set up the worktree for the appropriate scope (see above)
 2. Read both digests
 3. For each entry, check if it's still current:
    - Search for updates on the topic
    - Update findings if new information exists
    - Mark as stale or remove if no longer relevant
 4. Update timestamps
-5. Commit, push, create PR, and clean up (steps 8-10 from "Adding research")
+5. Commit, push, create PR, and clean up
 
 ## Guidelines
 
