@@ -80,31 +80,39 @@ Key takeaways:
 
 ### Adding research (`/research <topic>`)
 
-1. Search the web for current information on the topic
-2. Read and synthesize relevant sources
-3. Check the existing digest for related entries — update rather than duplicate
-4. Append or update the entry in the appropriate digest
-5. Update the "Last updated" timestamp
-6. Commit in the correct repo: workspace digest commits go in the workspace
+1. Create a skill worktree (if not already in one):
+   `.agent/scripts/worktree_create.sh --skill research --type workspace`
+2. Enter the worktree:
+   `source .agent/scripts/worktree_enter.sh --skill research`
+3. Search the web for current information on the topic
+4. Read and synthesize relevant sources
+5. Check the existing digest for related entries — update rather than duplicate
+6. Append or update the entry in the appropriate digest
+7. Update the "Last updated" timestamp
+8. Commit in the correct repo: workspace digest commits go in the workspace
    repo; project digest commits go in the manifest repo (not the workspace)
+9. Push and create a PR: `git push -u origin HEAD && gh pr create --fill`
+10. Clean up: `.agent/scripts/worktree_remove.sh --skill research`
 
 ### Ingesting a URL (`/research --ingest <url>`)
 
-1. Fetch and read the URL content
-2. Extract key takeaways relevant to the workspace or project
-3. Determine scope (workspace or project) from content — or ask if unclear
-4. Append to the appropriate digest
-5. Commit in the correct repo (see "Adding research" step 6)
+1. Create/enter a skill worktree (steps 1-2 from "Adding research" above)
+2. Fetch and read the URL content
+3. Extract key takeaways relevant to the workspace or project
+4. Determine scope (workspace or project) from content — or ask if unclear
+5. Append to the appropriate digest
+6. Commit, push, create PR, and clean up (steps 8-10 from "Adding research")
 
 ### Refreshing (`/research --refresh`)
 
-1. Read both digests
-2. For each entry, check if it's still current:
+1. Create/enter a skill worktree (steps 1-2 from "Adding research" above)
+2. Read both digests
+3. For each entry, check if it's still current:
    - Search for updates on the topic
    - Update findings if new information exists
    - Mark as stale or remove if no longer relevant
-3. Update timestamps
-4. Commit in the correct repo for each digest (see "Adding research" step 6)
+4. Update timestamps
+5. Commit, push, create PR, and clean up (steps 8-10 from "Adding research")
 
 ## Guidelines
 

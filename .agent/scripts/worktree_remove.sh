@@ -4,11 +4,13 @@
 #
 # Usage:
 #   ./worktree_remove.sh --issue <number> [--repo-slug <slug>] [--force]
+#   ./worktree_remove.sh --skill <name> [--repo-slug <slug>] [--force]
 #
 # Examples:
 #   ./worktree_remove.sh --issue 123
 #   ./worktree_remove.sh --issue 123 --force
 #   ./worktree_remove.sh --issue 5 --repo-slug marine_msgs
+#   ./worktree_remove.sh --skill research
 #
 # This will:
 #   1. Check for uncommitted changes (unless --force)
@@ -31,15 +33,17 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$SCRIPT_DIR/_worktree_helpers.sh"
 
 ISSUE_NUM=""
+SKILL_NAME=""
 FORCE=false
 REPO_SLUG=""
 
 show_usage() {
-    echo "Usage: $0 --issue <number> [--repo-slug <slug>] [--force]"
+    echo "Usage: $0 (--issue <number> | --skill <name>) [--repo-slug <slug>] [--force]"
     echo "   or: $0 <number> [--force]"
     echo ""
     echo "Options:"
-    echo "  --issue <number>        Issue number (required)"
+    echo "  --issue <number>        Issue number (required, unless --skill is used)"
+    echo "  --skill <name>          Skill name (alternative to --issue)"
     echo "  <number>                Issue number as positional argument"
     echo "  --repo-slug <slug>      Repository slug (optional, for disambiguation)"
     echo "  --force                 Force removal even with uncommitted changes"
@@ -48,6 +52,7 @@ show_usage() {
     echo "  $0 --issue 123"
     echo "  $0 123"
     echo "  $0 123 --force"
+    echo "  $0 --skill research"
     echo "  $0 --issue 5 --repo-slug marine_msgs"
 }
 
@@ -56,6 +61,15 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --issue)
             ISSUE_NUM="$2"
+            shift 2
+            ;;
+        --skill)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --skill requires a skill name"
+                show_usage
+                exit 1
+            fi
+            SKILL_NAME="$2"
             shift 2
             ;;
         --repo-slug)
@@ -88,8 +102,13 @@ if [ -n "$REPO_SLUG" ]; then
     REPO_SLUG=$(echo "$REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
 fi
 
-if [ -z "$ISSUE_NUM" ]; then
-    echo "Error: Issue number is required"
+if [ -n "$ISSUE_NUM" ] && [ -n "$SKILL_NAME" ]; then
+    echo "Error: --issue and --skill are mutually exclusive"
+    show_usage
+    exit 1
+fi
+if [ -z "$ISSUE_NUM" ] && [ -z "$SKILL_NAME" ]; then
+    echo "Error: either --issue or --skill is required"
     show_usage
     exit 1
 fi
@@ -148,29 +167,51 @@ find_worktree() {
 WORKTREE_DIR=""
 WORKTREE_TYPE=""
 
-# Check layer worktrees
-if FOUND=$(find_worktree "$ROOT_DIR/layers/worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
-    WORKTREE_DIR="$FOUND"
-    WORKTREE_TYPE="layer"
-# Check workspace worktrees
-elif FOUND=$(find_worktree "$ROOT_DIR/.workspace-worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
-    WORKTREE_DIR="$FOUND"
-    WORKTREE_TYPE="workspace"
-else
-    echo "Error: No worktree found for issue #$ISSUE_NUM"
-    echo ""
-    echo "Checked locations:"
-    if [ -n "$REPO_SLUG" ]; then
-        echo "  - $ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
-        echo "  - $ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    # Skill mode
+    if FOUND=$(find_worktree_by_skill "$ROOT_DIR/layers/worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="layer"
+    elif FOUND=$(find_worktree_by_skill "$ROOT_DIR/.workspace-worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="workspace"
     else
-        echo "  - $ROOT_DIR/layers/worktrees/issue-*-$ISSUE_NUM"
-        echo "  - $ROOT_DIR/.workspace-worktrees/issue-*-$ISSUE_NUM"
+        echo "Error: No worktree found for skill '$SKILL_NAME'"
+        echo ""
+        echo "Checked locations:"
+        echo "  - $ROOT_DIR/layers/worktrees/skill-*-${SKILL_NAME}-*"
+        echo "  - $ROOT_DIR/.workspace-worktrees/skill-*-${SKILL_NAME}-*"
+        echo ""
+        echo "List worktrees with:"
+        echo "  ./.agent/scripts/worktree_list.sh"
+        exit 1
     fi
-    echo ""
-    echo "List worktrees with:"
-    echo "  ./.agent/scripts/worktree_list.sh"
-    exit 1
+else
+    # Issue mode
+    # Check layer worktrees
+    if FOUND=$(find_worktree "$ROOT_DIR/layers/worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="layer"
+    # Check workspace worktrees
+    elif FOUND=$(find_worktree "$ROOT_DIR/.workspace-worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="workspace"
+    else
+        echo "Error: No worktree found for issue #$ISSUE_NUM"
+        echo ""
+        echo "Checked locations:"
+        if [ -n "$REPO_SLUG" ]; then
+            echo "  - $ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+            echo "  - $ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+        else
+            echo "  - $ROOT_DIR/layers/worktrees/issue-*-$ISSUE_NUM"
+            echo "  - $ROOT_DIR/.workspace-worktrees/issue-*-$ISSUE_NUM"
+        fi
+        echo ""
+        echo "List worktrees with:"
+        echo "  ./.agent/scripts/worktree_list.sh"
+        exit 1
+    fi
 fi
 
 # Get branch name
@@ -184,7 +225,11 @@ fi
 echo "========================================"
 echo "Removing Worktree"
 echo "========================================"
-echo "  Issue:  #$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    echo "  Skill:  $SKILL_NAME"
+else
+    echo "  Issue:  #$ISSUE_NUM"
+fi
 echo "  Type:   $WORKTREE_TYPE"
 echo "  Path:   $WORKTREE_DIR"
 echo "  Branch: ${BRANCH_NAME:-detached HEAD}"
@@ -208,7 +253,11 @@ if [[ "$CALLER_PWD" == "$WORKTREE_DIR" || "$CALLER_PWD" == "$WORKTREE_DIR/"* ]];
     echo "❌ Error: Your shell is currently inside this worktree."
     echo ""
     echo "   Run this first:  cd $ROOT_DIR"
-    echo "   Then re-run:     $0 --issue $ISSUE_NUM"
+    if [ -n "$SKILL_NAME" ]; then
+        echo "   Then re-run:     $0 --skill $SKILL_NAME"
+    else
+        echo "   Then re-run:     $0 --issue $ISSUE_NUM"
+    fi
     exit 1
 fi
 

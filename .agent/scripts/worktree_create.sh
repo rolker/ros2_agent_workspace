@@ -11,6 +11,7 @@
 #   ./worktree_create.sh --issue 123 --type workspace
 #   ./worktree_create.sh --issue 123 --type workspace --plan-file /tmp/plan.md
 #   ./worktree_create.sh --issue 123 --type layer --layer core --packages sonar_driver --plan-file /tmp/plan.md
+#   ./worktree_create.sh --skill research --type workspace
 #
 # Worktree Types:
 #   layer     - For ROS package development
@@ -68,6 +69,7 @@ if v and v != 'unknown': print(v)
 
 # Defaults
 ISSUE_NUM=""
+SKILL_NAME=""       # Skill name (alternative to --issue)
 WORKTREE_TYPE="layer"
 BRANCH_NAME=""
 TARGET_LAYER=""
@@ -75,27 +77,32 @@ REPO_SLUG=""
 TARGET_PACKAGES=""  # Comma-separated list of packages to modify
 PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 
+# Skills allowed to create worktrees without a GitHub issue
+ALLOWED_SKILLS=("research" "gather-project-knowledge")
+
 # Available layers (same order as env.sh)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
 
 show_usage() {
-    echo "Usage: $0 --issue <number> --type <layer|workspace> [options]"
+    echo "Usage: $0 (--issue <number> | --skill <name>) --type <layer|workspace> [options]"
     echo ""
     echo "Options:"
-    echo "  --issue <number>      Issue number (required)"
+    echo "  --issue <number>      Issue number (required, unless --skill is used)"
+    echo "  --skill <name>        Skill name (alternative to --issue; allowed: ${ALLOWED_SKILLS[*]})"
     echo "  --type <type>         Worktree type: 'layer' or 'workspace' (required)"
     echo "  --layer <name>        Layer to work on (required for layer type)"
     echo "                        Available: ${AVAILABLE_LAYERS[*]}"
     echo "  --packages <pkg,...>  Package(s) to modify (required for layer type)"
     echo "                        Comma-separated list for multiple packages"
     echo "  --repo-slug <slug>    Repository slug for naming (auto-detected if not provided)"
-    echo "  --branch <name>       Custom branch name (default: feature/issue-<N>)"
+    echo "  --branch <name>       Custom branch name (default: feature/issue-<N> or skill/<id>)"
     echo "  --plan-file <path>    Path to approved plan file; creates draft PR and posts plan as comment"
     echo ""
     echo "Examples:"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy"
     echo "  $0 --issue 123 --type layer --layer core --packages unh_marine_autonomy,camp"
     echo "  $0 --issue 123 --type workspace"
+    echo "  $0 --skill research --type workspace"
     echo "  $0 --issue 5 --type layer --layer sensors --packages sonar_driver --repo-slug marine_msgs"
 }
 
@@ -104,6 +111,15 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --issue)
             ISSUE_NUM="$2"
+            shift 2
+            ;;
+        --skill)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --skill requires a skill name"
+                show_usage
+                exit 1
+            fi
+            SKILL_NAME="$2"
             shift 2
             ;;
         --type)
@@ -142,11 +158,42 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate required arguments
-if [ -z "$ISSUE_NUM" ]; then
-    echo "Error: --issue is required"
+# Validate required arguments: --issue XOR --skill
+if [ -n "$ISSUE_NUM" ] && [ -n "$SKILL_NAME" ]; then
+    echo "Error: --issue and --skill are mutually exclusive"
     show_usage
     exit 1
+fi
+if [ -z "$ISSUE_NUM" ] && [ -z "$SKILL_NAME" ]; then
+    echo "Error: either --issue or --skill is required"
+    show_usage
+    exit 1
+fi
+
+# Validate skill name against allowlist
+if [ -n "$SKILL_NAME" ]; then
+    VALID_SKILL=false
+    for allowed in "${ALLOWED_SKILLS[@]}"; do
+        if [ "$allowed" == "$SKILL_NAME" ]; then
+            VALID_SKILL=true
+            break
+        fi
+    done
+    if [ "$VALID_SKILL" = false ]; then
+        echo "Error: Skill '$SKILL_NAME' is not in the allowlist"
+        echo "Allowed skills: ${ALLOWED_SKILLS[*]}"
+        exit 1
+    fi
+    # Generate synthetic ID with timestamp + collision-resistant suffix
+    # %N is GNU-specific (nanoseconds); on BSD/macOS it outputs literal "N"
+    _SKILL_TS=$(date +"%Y%m%d-%H%M%S")
+    _SKILL_NANO=$(date +"%N" 2>/dev/null)
+    if [ -z "$_SKILL_NANO" ] || [ "$_SKILL_NANO" = "N" ] || [ "$_SKILL_NANO" = "%N" ]; then
+        # Fallback: use $RANDOM (0-32767) for uniqueness on non-GNU systems
+        _SKILL_NANO=$RANDOM
+    fi
+    SYNTHETIC_ID="${SKILL_NAME}-${_SKILL_TS}-${_SKILL_NANO}"
+    unset _SKILL_TS _SKILL_NANO
 fi
 
 # Validate worktree type
@@ -256,47 +303,66 @@ else
 fi
 
 # Validate issue exists and fetch title (after GH_REPO_SLUG is resolved)
+# Skip in skill mode — there is no issue to validate
 ISSUE_TITLE=""
 ISSUE_STATE=""
-if command -v gh &>/dev/null; then
-    if [ -n "$GH_REPO_SLUG" ]; then
-        _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+if [ -n "$ISSUE_NUM" ]; then
+    if command -v gh &>/dev/null; then
+        if [ -n "$GH_REPO_SLUG" ]; then
+            _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+        else
+            _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+        fi
+        if [[ "$_ISSUE_INFO" == *"||"* ]]; then
+            ISSUE_TITLE="${_ISSUE_INFO%||*}"
+            ISSUE_STATE="${_ISSUE_INFO##*||}"
+        fi
+    fi
+    if [ -n "$ISSUE_TITLE" ]; then
+        echo "📋 Issue #$ISSUE_NUM: $ISSUE_TITLE"
+        if [ "$ISSUE_STATE" = "CLOSED" ]; then
+            echo "   ⚠️  Warning: Issue #$ISSUE_NUM is CLOSED"
+        fi
     else
-        _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
-    fi
-    if [[ "$_ISSUE_INFO" == *"||"* ]]; then
-        ISSUE_TITLE="${_ISSUE_INFO%||*}"
-        ISSUE_STATE="${_ISSUE_INFO##*||}"
-    fi
-fi
-if [ -n "$ISSUE_TITLE" ]; then
-    echo "📋 Issue #$ISSUE_NUM: $ISSUE_TITLE"
-    if [ "$ISSUE_STATE" = "CLOSED" ]; then
-        echo "   ⚠️  Warning: Issue #$ISSUE_NUM is CLOSED"
+        echo "⚠️  Could not fetch issue #$ISSUE_NUM title (offline or issue does not exist)"
+        echo "   Proceeding anyway — verify the issue number is correct."
     fi
 else
-    echo "⚠️  Could not fetch issue #$ISSUE_NUM title (offline or issue does not exist)"
-    echo "   Proceeding anyway — verify the issue number is correct."
+    echo "🔧 Skill worktree: $SKILL_NAME (ID: $SYNTHETIC_ID)"
 fi
 echo ""
 
 # Set default branch name if not provided
 if [ -z "$BRANCH_NAME" ]; then
-    BRANCH_NAME="feature/issue-${ISSUE_NUM}"
+    if [ -n "$SKILL_NAME" ]; then
+        BRANCH_NAME="skill/${SYNTHETIC_ID}"
+    else
+        BRANCH_NAME="feature/issue-${ISSUE_NUM}"
+    fi
 fi
 
-# Determine worktree path based on type
-if [ "$WORKTREE_TYPE" == "layer" ]; then
-    WORKTREE_DIR="$ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
+# Determine worktree path based on type and mode (issue vs skill)
+if [ -n "$SKILL_NAME" ]; then
+    DIR_PREFIX="skill-${REPO_SLUG}-${SYNTHETIC_ID}"
 else
-    WORKTREE_DIR="$ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
+    DIR_PREFIX="issue-${REPO_SLUG}-${ISSUE_NUM}"
+fi
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    WORKTREE_DIR="$ROOT_DIR/layers/worktrees/${DIR_PREFIX}"
+else
+    WORKTREE_DIR="$ROOT_DIR/.workspace-worktrees/${DIR_PREFIX}"
 fi
 
 # Check if worktree already exists
 if [ -d "$WORKTREE_DIR" ]; then
     echo "Error: Worktree already exists at $WORKTREE_DIR"
-    echo "Use 'worktree_enter.sh --issue $ISSUE_NUM' to enter it"
-    echo "Or 'worktree_remove.sh --issue $ISSUE_NUM' to remove it"
+    if [ -n "$SKILL_NAME" ]; then
+        echo "Use 'worktree_enter.sh --skill $SKILL_NAME' to enter it"
+        echo "Or 'worktree_remove.sh --skill $SKILL_NAME' to remove it"
+    else
+        echo "Use 'worktree_enter.sh --issue $ISSUE_NUM' to enter it"
+        echo "Or 'worktree_remove.sh --issue $ISSUE_NUM' to remove it"
+    fi
     exit 1
 fi
 
@@ -305,7 +371,12 @@ cd "$ROOT_DIR"
 echo "========================================"
 echo "Creating Worktree"
 echo "========================================"
-echo "  Issue:      #$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    echo "  Skill:      $SKILL_NAME"
+    echo "  ID:         $SYNTHETIC_ID"
+else
+    echo "  Issue:      #$ISSUE_NUM"
+fi
 echo "  Repository: $REPO_SLUG"
 echo "  Type:       $WORKTREE_TYPE"
 [ -n "$TARGET_LAYER" ] && echo "  Layer:      $TARGET_LAYER"
@@ -342,7 +413,17 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
 
     # Create scratchpad for this worktree
     mkdir -p "$WORKTREE_DIR/.scratchpad"
-    cat > "$WORKTREE_DIR/.scratchpad/README.md" << EOF
+    if [ -n "$SKILL_NAME" ]; then
+        cat > "$WORKTREE_DIR/.scratchpad/README.md" << EOF
+# Task Scratchpad for Skill: $SKILL_NAME ($SYNTHETIC_ID)
+
+This directory is for temporary files specific to this task.
+Files here are gitignored and isolated from other worktrees.
+
+**Working layer**: ${TARGET_LAYER}_ws
+EOF
+    else
+        cat > "$WORKTREE_DIR/.scratchpad/README.md" << EOF
 # Task Scratchpad for Issue #$ISSUE_NUM
 
 This directory is for temporary files specific to this task.
@@ -350,6 +431,7 @@ Files here are gitignored and isolated from other worktrees.
 
 **Working layer**: ${TARGET_LAYER}_ws
 EOF
+    fi
 
     # Create symlinks to main for all layers except target
     echo "Creating symlinks to main layers..."
@@ -490,18 +572,26 @@ echo ""
 echo "========================================"
 echo "✅ Worktree Created Successfully"
 echo "========================================"
-if [ -n "$ISSUE_TITLE" ]; then
+if [ -n "$SKILL_NAME" ]; then
+    echo "  Skill: $SKILL_NAME (ID: $SYNTHETIC_ID)"
+elif [ -n "$ISSUE_TITLE" ]; then
     echo "  Issue #$ISSUE_NUM: $ISSUE_TITLE"
 fi
 echo ""
 
 # --plan-file: push branch, create draft PR, post plan as comment
 if [ -n "$PLAN_FILE" ]; then
-    echo "Creating draft PR for issue #$ISSUE_NUM..."
+    if [ -n "$SKILL_NAME" ]; then
+        echo "Creating draft PR for skill: $SKILL_NAME..."
+    else
+        echo "Creating draft PR for issue #$ISSUE_NUM..."
+    fi
     echo ""
 
     # Use issue title fetched earlier; fall back to generic
-    if [ -z "$ISSUE_TITLE" ]; then
+    if [ -n "$SKILL_NAME" ]; then
+        ISSUE_TITLE="Skill update: $SKILL_NAME"
+    elif [ -z "$ISSUE_TITLE" ]; then
         echo "  ⚠️  Could not fetch issue title; using generic title"
         ISSUE_TITLE="Issue #$ISSUE_NUM"
     fi
@@ -550,7 +640,11 @@ if [ -n "$PLAN_FILE" ]; then
 
         # Push branch (empty commit if needed to create the remote ref)
         if ! git rev-parse --verify "origin/$BRANCH_NAME" &>/dev/null; then
-            git commit --allow-empty -m "chore: start work on $issue_ref" || true
+            if [ -n "$issue_ref" ]; then
+                git commit --allow-empty -m "chore: start work on $issue_ref" || true
+            else
+                git commit --allow-empty -m "chore: start skill update ($SKILL_NAME)" || true
+            fi
         fi
         if ! git push -u origin "$BRANCH_NAME" 2>/dev/null; then
             echo "  ⚠️  Push failed — skipping draft PR (non-fatal)"
@@ -577,7 +671,20 @@ if [ -n "$PLAN_FILE" ]; then
 
         # Create draft PR
         BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-        cat > "$BODY_FILE" << PREOF
+        if [ -n "$SKILL_NAME" ]; then
+            cat > "$BODY_FILE" << PREOF
+## Summary
+
+$ISSUE_TITLE
+
+Automated update from the \`$SKILL_NAME\` skill.
+
+---
+**Authored-By**: \`${DRAFT_AGENT_NAME}\`
+**Model**: \`${DRAFT_AGENT_MODEL}\`
+PREOF
+        else
+            cat > "$BODY_FILE" << PREOF
 ## Summary
 
 $ISSUE_TITLE
@@ -588,6 +695,7 @@ Closes $issue_ref
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
+        fi
 
         local gh_args=(pr create --draft --title "$ISSUE_TITLE" --body-file "$BODY_FILE")
         [ -n "$repo_flag" ] && gh_args+=(--repo "$repo_flag")
@@ -615,7 +723,11 @@ PREOF
     }
 
     if [ "$WORKTREE_TYPE" == "workspace" ]; then
-        create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM"
+        if [ -n "$SKILL_NAME" ]; then
+            create_draft_pr "$WORKTREE_DIR" ""
+        else
+            create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM"
+        fi
         cd "$ROOT_DIR"
 
     elif [ "$WORKTREE_TYPE" == "layer" ]; then
@@ -634,8 +746,10 @@ PREOF
                 PKG_REPO_SLUG=$(extract_gh_slug "$PKG_REMOTE_URL")
             fi
 
-            # Build issue reference — use cross-repo format when PR repo != issue repo
-            if [ -n "$GH_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$GH_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
+            # Build issue reference — skip in skill mode (no issue to close)
+            if [ -n "$SKILL_NAME" ]; then
+                ISSUE_REF=""
+            elif [ -n "$GH_REPO_SLUG" ] && [ -n "$PKG_REPO_SLUG" ] && [ "$GH_REPO_SLUG" != "$PKG_REPO_SLUG" ]; then
                 ISSUE_REF="$GH_REPO_SLUG#$ISSUE_NUM"
             else
                 ISSUE_REF="#$ISSUE_NUM"
@@ -652,17 +766,34 @@ PREOF
     echo ""
 fi
 
-echo "To enter this worktree:"
-echo "  source $SCRIPT_DIR/worktree_enter.sh --issue $ISSUE_NUM"
-echo ""
-echo "Or manually:"
-echo "  cd $WORKTREE_DIR"
-if [ "$WORKTREE_TYPE" == "layer" ]; then
-    echo "  source .agent/scripts/env.sh"
+if [ -n "$SKILL_NAME" ]; then
+    echo "To enter this worktree:"
+    echo "  source $SCRIPT_DIR/worktree_enter.sh --skill $SKILL_NAME"
     echo ""
-    echo "To build the $TARGET_LAYER layer:"
-    echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"
+    echo "Or manually:"
+    echo "  cd $WORKTREE_DIR"
+    if [ "$WORKTREE_TYPE" == "layer" ]; then
+        echo "  source .agent/scripts/env.sh"
+        echo ""
+        echo "To build the $TARGET_LAYER layer:"
+        echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"
+    fi
+    echo ""
+    echo "When done, remove with:"
+    echo "  $SCRIPT_DIR/worktree_remove.sh --skill $SKILL_NAME"
+else
+    echo "To enter this worktree:"
+    echo "  source $SCRIPT_DIR/worktree_enter.sh --issue $ISSUE_NUM"
+    echo ""
+    echo "Or manually:"
+    echo "  cd $WORKTREE_DIR"
+    if [ "$WORKTREE_TYPE" == "layer" ]; then
+        echo "  source .agent/scripts/env.sh"
+        echo ""
+        echo "To build the $TARGET_LAYER layer:"
+        echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"
+    fi
+    echo ""
+    echo "When done, remove with:"
+    echo "  $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM"
 fi
-echo ""
-echo "When done, remove with:"
-echo "  $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM"

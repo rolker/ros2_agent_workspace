@@ -56,15 +56,21 @@ WORKTREES=$(git worktree list --porcelain)
 LAYER_COUNT=0
 WORKSPACE_COUNT=0
 
-# Helper: extract issue/repo from worktree directory basename
-# Sets variables: WT_ISSUE, WT_REPO
+# Helper: extract issue/repo/skill from worktree directory basename
+# Sets variables: WT_ISSUE, WT_REPO, WT_SKILL
 extract_issue_repo() {
     local basename="$1"
     WT_ISSUE=""
     WT_REPO=""
+    WT_SKILL=""
 
+    # Skill format: skill-{REPO_SLUG}-{SKILL_NAME}-{TIMESTAMP}
+    # Timestamp may be YYYYMMDD-HHMMSS or YYYYMMDD-HHMMSS-NNNNNNNNN
+    if [[ "$basename" =~ ^skill-([a-zA-Z0-9_]+)-([a-zA-Z0-9_-]+)-([0-9]{8}-[0-9]{6}(-[0-9]+)?)$ ]]; then
+        WT_REPO="${BASH_REMATCH[1]}"
+        WT_SKILL="${BASH_REMATCH[2]}"
     # New format: issue-{REPO_SLUG}-{NUMBER}
-    if [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
+    elif [[ "$basename" =~ ^issue-([a-zA-Z0-9_]+)-([0-9]+)$ ]]; then
         WT_REPO="${BASH_REMATCH[1]}"
         WT_ISSUE="${BASH_REMATCH[2]}"
     # Legacy format: issue-{NUMBER}
@@ -85,11 +91,13 @@ print_worktree() {
     local issue=""
     local repo=""
 
+    local skill=""
     if [[ "$path" == *"/.workspace-worktrees/"* ]]; then
         type="workspace"
         extract_issue_repo "$(basename "$path")"
         issue="$WT_ISSUE"
         repo="$WT_REPO"
+        skill="$WT_SKILL"
         ((WORKSPACE_COUNT++)) || true
     fi
 
@@ -107,6 +115,15 @@ print_worktree() {
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
+    elif [ -n "$skill" ]; then
+        echo "🔧 Skill: $skill ($type) - Repository: $repo"
+        echo "   Path:   $path"
+        echo "   Branch: ${branch:-detached at $head}"
+        echo "   Status: $status"
+
+        if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
+            echo "   Files changed: $(git -C "$path" status --porcelain 2>/dev/null | wc -l)"
+        fi
     else
         echo "🔧 Issue #$issue ($type) - Repository: $repo"
         echo "   Path:   $path"
@@ -150,12 +167,13 @@ fi
 # Layer worktrees are plain directories (not git worktrees) after the fix for #193
 LAYER_WT_DIR="$ROOT_DIR/layers/worktrees"
 if [ -d "$LAYER_WT_DIR" ]; then
-    for layer_wt in "$LAYER_WT_DIR"/issue-*; do
+    for layer_wt in "$LAYER_WT_DIR"/issue-* "$LAYER_WT_DIR"/skill-*; do
         [ -d "$layer_wt" ] || continue
 
         extract_issue_repo "$(basename "$layer_wt")"
         local_issue="$WT_ISSUE"
         local_repo="$WT_REPO"
+        local_skill="$WT_SKILL"
 
         # Get branch from inner package worktree
         local_branch=$(wt_layer_branch "$layer_wt" 2>/dev/null || echo "")
@@ -166,7 +184,11 @@ if [ -d "$LAYER_WT_DIR" ]; then
             local_status="dirty"
         fi
 
-        echo "📦 Issue #$local_issue (layer) - Repository: $local_repo"
+        if [ -n "$local_skill" ]; then
+            echo "📦 Skill: $local_skill (layer) - Repository: $local_repo"
+        else
+            echo "📦 Issue #$local_issue (layer) - Repository: $local_repo"
+        fi
         echo "   Path:   $layer_wt"
         echo "   Branch: ${local_branch:-unknown}"
         echo "   Status: $local_status"

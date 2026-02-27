@@ -64,3 +64,53 @@ wt_layer_is_dirty() {
 
     return 1  # clean
 }
+
+# Find the most recent skill worktree matching a skill name.
+# Skill worktree dirs are named: skill-{REPO_SLUG}-{SKILL}-{TIMESTAMP}
+# Usage: path=$(find_worktree_by_skill "$base_dir" "$skill_name" ["$repo_slug"])
+# Optional repo_slug filters to a specific repository.
+find_worktree_by_skill() {
+    local base_dir="$1"
+    local skill="$2"
+    local repo_slug="${3:-}"
+
+    local matches=()
+    # Use an array for the glob to avoid word-splitting issues
+    local -a glob_patterns
+    if [ -n "$repo_slug" ]; then
+        glob_patterns=( "$base_dir"/skill-"${repo_slug}"-"${skill}"-* )
+    else
+        glob_patterns=( "$base_dir"/skill-*-"${skill}"-* )
+    fi
+    for path in "${glob_patterns[@]}"; do
+        # When glob doesn't match, bash returns the literal pattern
+        if [ -d "$path" ]; then
+            matches+=( "$path" )
+        fi
+    done
+
+    if [ "${#matches[@]}" -eq 0 ]; then
+        return 1
+    fi
+
+    if [ "${#matches[@]}" -gt 1 ]; then
+        echo "Warning: multiple skill worktrees found for '$skill'; using most recent" >&2
+    fi
+
+    # Find the most recent by comparing the timestamp suffix in the basename,
+    # not the full path (which includes repo_slug and can sort incorrectly)
+    local latest_path="" latest_ts=""
+    for path in "${matches[@]}"; do
+        local basename="${path##*/}"
+        # Basename format: skill-{REPO_SLUG}-{SKILL}-{TIMESTAMP}
+        # Extract timestamp: everything after the last occurrence of -{skill}-
+        local ts="${basename##*-"${skill}"-}"
+        if [ -z "$latest_ts" ] || [[ "$ts" > "$latest_ts" ]]; then
+            latest_ts="$ts"
+            latest_path="$path"
+        fi
+    done
+
+    echo "$latest_path"
+    return 0
+}

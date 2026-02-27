@@ -446,6 +446,236 @@ test_offline_fallback_message() {
 }
 run_test "Offline fallback message when gh fails" test_offline_fallback_message
 
+# ===== Skill worktree tests =====
+
+# Test 12: Skill mode creates worktree with correct naming
+test_skill_creates_workspace_worktree() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --skill research --type workspace 2>&1) || true
+
+    if [[ "$output" != *"Worktree Created Successfully"* ]]; then
+        echo "    Expected worktree creation success message"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Verify directory was created with skill- prefix
+    local found_dir=""
+    for d in "$WORKSPACE_DIR"/.workspace-worktrees/skill-*-research-*; do
+        if [ -d "$d" ]; then
+            found_dir="$d"
+            break
+        fi
+    done
+    if [ -z "$found_dir" ]; then
+        echo "    Expected skill worktree directory matching skill-*-research-*"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Verify branch name starts with skill/
+    if [[ "$output" != *"skill/research-"* ]]; then
+        echo "    Expected branch name starting with skill/research-"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    cleanup_mock_workspace
+    return 0
+}
+run_test "Skill mode creates workspace worktree with correct naming" test_skill_creates_workspace_worktree
+
+# Test 13: Invalid skill name is rejected
+test_invalid_skill_rejected() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --skill nonexistent --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"not in the allowlist"* ]]; then
+        echo "    Expected allowlist error message"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Invalid skill name is rejected" test_invalid_skill_rejected
+
+# Test 14: Both --issue and --skill produces error
+test_issue_and_skill_mutual_exclusivity() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --issue 123 --skill research --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"mutually exclusive"* ]]; then
+        echo "    Expected mutual exclusivity error"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Both --issue and --skill produces error" test_issue_and_skill_mutual_exclusivity
+
+# Test 15: Neither --issue nor --skill produces error
+test_neither_issue_nor_skill() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"either --issue or --skill is required"* ]]; then
+        echo "    Expected missing argument error"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Neither --issue nor --skill produces error" test_neither_issue_nor_skill
+
+# Test 16: --skill without a name produces error
+test_skill_missing_name() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --skill --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"--skill requires a skill name"* ]]; then
+        echo "    Expected missing skill name error"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "--skill without a name produces error" test_skill_missing_name
+
+# ===== find_worktree_by_skill tests =====
+
+# Test 17: find_worktree_by_skill finds the most recent match
+test_find_worktree_by_skill_most_recent() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Create two skill worktree directories with different timestamps
+    mkdir -p "$tmpdir/skill-workspace-research-20260101-120000-000000000"
+    mkdir -p "$tmpdir/skill-workspace-research-20260201-120000-000000000"
+
+    local result
+    result=$(find_worktree_by_skill "$tmpdir" "research" 2>/dev/null)
+    local rc=$?
+
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected find_worktree_by_skill to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"20260201"* ]]; then
+        echo "    Expected most recent worktree (20260201), got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "find_worktree_by_skill finds the most recent match" test_find_worktree_by_skill_most_recent
+
+# Test 18: find_worktree_by_skill filters by repo slug
+test_find_worktree_by_skill_repo_filter() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    mkdir -p "$tmpdir/skill-workspace-research-20260101-120000-000000000"
+    mkdir -p "$tmpdir/skill-myrepo-research-20260201-120000-000000000"
+
+    local result
+    result=$(find_worktree_by_skill "$tmpdir" "research" "workspace" 2>/dev/null)
+    local rc=$?
+
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected find_worktree_by_skill to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"skill-workspace-research"* ]]; then
+        echo "    Expected workspace worktree, got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "find_worktree_by_skill filters by repo slug" test_find_worktree_by_skill_repo_filter
+
+# Test 19: find_worktree_by_skill returns failure when no match
+test_find_worktree_by_skill_no_match() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    local result
+    result=$(find_worktree_by_skill "$tmpdir" "nonexistent" 2>/dev/null)
+    local rc=$?
+
+    rm -rf "$tmpdir"
+
+    if [ $rc -eq 0 ]; then
+        echo "    Expected find_worktree_by_skill to fail with no matches"
+        return 1
+    fi
+    return 0
+}
+run_test "find_worktree_by_skill returns failure when no match" test_find_worktree_by_skill_no_match
+
+# Test 20: find_worktree_by_skill picks newest timestamp across repo slugs
+test_find_worktree_by_skill_cross_repo_sort() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # "zebra" sorts lexicographically after "alpha" but has an older timestamp
+    mkdir -p "$tmpdir/skill-zebra-research-20260101-120000-000000000"
+    mkdir -p "$tmpdir/skill-alpha-research-20260301-120000-000000000"
+
+    local result
+    result=$(find_worktree_by_skill "$tmpdir" "research" 2>/dev/null)
+    local rc=$?
+
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected find_worktree_by_skill to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"alpha"*"20260301"* ]]; then
+        echo "    Expected most recent by timestamp (alpha/20260301), got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "find_worktree_by_skill picks newest timestamp across repo slugs" test_find_worktree_by_skill_cross_repo_sort
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"

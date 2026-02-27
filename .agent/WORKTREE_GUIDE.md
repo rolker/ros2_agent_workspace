@@ -17,6 +17,12 @@ git add . && git commit -m "feat: my changes"
 
 # When done, clean up
 .agent/scripts/worktree_remove.sh 42
+
+# Skill worktrees (no GitHub issue needed)
+.agent/scripts/worktree_create.sh --skill research --type workspace
+source .agent/scripts/worktree_enter.sh --skill research
+# ... make changes, commit, push, create PR ...
+.agent/scripts/worktree_remove.sh --skill research
 ```
 
 ## Why Worktrees?
@@ -164,6 +170,45 @@ git commit -m "docs: update agent workflows"
 git push -u origin feature/ISSUE-99-description
 ```
 
+### Skill Worktrees (`--skill <name>`)
+
+Some skills (e.g., `research`, `gather-project-knowledge`) maintain living documents
+that need worktree isolation and PR review but don't warrant a dedicated GitHub issue
+for each recurring update. These use `--skill <name>` instead of `--issue <N>`.
+
+**Location**: Same as issue worktrees — `.workspace-worktrees/skill-{REPO_SLUG}-{ID}/`
+or `layers/worktrees/skill-{REPO_SLUG}-{ID}/`
+
+**Allowed skills**: Only skills in the allowlist (defined in `worktree_create.sh`) can
+create skill worktrees. Currently: `research`, `gather-project-knowledge`.
+
+**Naming**: `skill-{REPO_SLUG}-{SKILL_NAME}-{TIMESTAMP}` (e.g.,
+`skill-workspace-research-20260227-143022-123456789`)
+
+**Branch naming**: `skill/{SKILL_NAME}-{TIMESTAMP}` (e.g.,
+`skill/research-20260227-143022-123456789`)
+
+**Environment variables**: `WORKTREE_SKILL` is set instead of `WORKTREE_ISSUE`.
+
+**Example workflow**:
+```bash
+# Create skill worktree
+.agent/scripts/worktree_create.sh --skill research --type workspace
+
+# Enter it
+source .agent/scripts/worktree_enter.sh --skill research
+
+# Work, commit, push, create PR
+git add . && git commit -m "docs: update research digest"
+git push -u origin HEAD && gh pr create --fill
+
+# Clean up
+.agent/scripts/worktree_remove.sh --skill research
+```
+
+**Note**: `--issue` and `--skill` are mutually exclusive. All other worktree rules
+(atomic commits, AI signature, pre-commit hooks, PR review) still apply.
+
 ## Commands Reference
 
 ### Create Worktree
@@ -174,15 +219,19 @@ git push -u origin feature/ISSUE-99-description
 
 # For workspace worktrees
 .agent/scripts/worktree_create.sh --issue <N> --type workspace [--branch <name>]
+
+# For skill worktrees (no issue needed)
+.agent/scripts/worktree_create.sh --skill <name> --type workspace
 ```
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `--issue <N>` | Yes | Issue number (used for directory name) |
+| `--issue <N>` | Yes (unless `--skill`) | Issue number (used for directory name) |
+| `--skill <name>` | Yes (unless `--issue`) | Skill name from allowlist (alternative to `--issue`) |
 | `--type <type>` | Yes | `layer` or `workspace` |
 | `--layer <name>` | For layer type | Which layer to work on (core, sensors, etc.) |
 | `--packages <pkg1,pkg2,...>` | For layer type | Comma-separated list of packages to include as worktrees |
-| `--branch <name>` | No | Custom branch name (default: `feature/ISSUE-<N>`) |
+| `--branch <name>` | No | Custom branch name (default: `feature/ISSUE-<N>` or `skill/<id>`) |
 
 ### List Worktrees
 
@@ -200,6 +249,7 @@ Shows all active worktrees with:
 
 ```bash
 source .agent/scripts/worktree_enter.sh <issue_number>
+source .agent/scripts/worktree_enter.sh --skill <name>
 ```
 
 **Must be sourced** (not executed) because it:
@@ -208,7 +258,8 @@ source .agent/scripts/worktree_enter.sh <issue_number>
 - Sources ROS environment for the worktree
 
 Sets these variables:
-- `WORKTREE_ISSUE` - The issue number
+- `WORKTREE_ISSUE` - The issue number (issue mode only)
+- `WORKTREE_SKILL` - The skill name (skill mode only)
 - `WORKTREE_TYPE` - "layer" or "workspace"
 - `WORKTREE_ROOT` - Path to worktree directory
 
@@ -216,6 +267,7 @@ Sets these variables:
 
 ```bash
 .agent/scripts/worktree_remove.sh <issue_number> [--force]
+.agent/scripts/worktree_remove.sh --skill <name> [--force]
 ```
 
 | Option | Description |
@@ -415,4 +467,4 @@ source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 - [AI Rules](AI_RULES.md) - Universal agent rules
 - [Workforce Protocol](WORKFORCE_PROTOCOL.md) - Multi-agent coordination
 
-**Last Updated**: 2026-02-03
+**Last Updated**: 2026-02-27

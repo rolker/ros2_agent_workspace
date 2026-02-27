@@ -3,7 +3,8 @@
 # Enter a worktree and set up the environment
 #
 # Usage:
-#   source ./worktree_enter.sh --issue <number>
+#   source ./worktree_enter.sh --issue <number> [--repo-slug <slug>]
+#   source ./worktree_enter.sh --skill <name> [--repo-slug <slug>]
 #
 # This script should be SOURCED (not executed) to affect the current shell.
 # It will:
@@ -13,6 +14,7 @@
 #
 # Examples:
 #   source ./.agent/scripts/worktree_enter.sh --issue 123
+#   source ./.agent/scripts/worktree_enter.sh --skill research
 
 # Don't use set -e since we're sourced
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,14 +23,16 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$SCRIPT_DIR/_worktree_helpers.sh"
 
 ISSUE_NUM=""
+SKILL_NAME=""
 REPO_SLUG=""
 
 show_usage() {
-    echo "Usage: source $0 --issue <number> [--repo-slug <slug>]"
+    echo "Usage: source $0 (--issue <number> | --skill <name>) [--repo-slug <slug>]"
     echo "   or: source $0 <number>"
     echo ""
     echo "Options:"
-    echo "  --issue <number>        Issue number (required)"
+    echo "  --issue <number>        Issue number (required, unless --skill is used)"
+    echo "  --skill <name>          Skill name (alternative to --issue)"
     echo "  --repo-slug <slug>      Repository slug (optional, for disambiguation)"
     echo "  <number>                Issue number as positional argument"
     echo ""
@@ -37,6 +41,7 @@ show_usage() {
     echo "Examples:"
     echo "  source $0 --issue 123"
     echo "  source $0 123"
+    echo "  source $0 --skill research"
     echo "  source $0 --issue 5 --repo-slug marine_msgs"
 }
 
@@ -45,6 +50,15 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --issue)
             ISSUE_NUM="$2"
+            shift 2
+            ;;
+        --skill)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --skill requires a skill name"
+                show_usage
+                return 1 2>/dev/null || exit 1
+            fi
+            SKILL_NAME="$2"
             shift 2
             ;;
         --repo-slug)
@@ -68,8 +82,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "$ISSUE_NUM" ]; then
-    echo "Error: Issue number is required"
+if [ -n "$ISSUE_NUM" ] && [ -n "$SKILL_NAME" ]; then
+    echo "Error: --issue and --skill are mutually exclusive"
+    show_usage
+    return 1 2>/dev/null || exit 1
+fi
+if [ -z "$ISSUE_NUM" ] && [ -z "$SKILL_NAME" ]; then
+    echo "Error: either --issue or --skill is required"
     show_usage
     return 1 2>/dev/null || exit 1
 fi
@@ -136,35 +155,61 @@ find_worktree() {
     return 1
 }
 
-# Check layer worktrees
-if FOUND=$(find_worktree "$ROOT_DIR/layers/worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
-    WORKTREE_DIR="$FOUND"
-    WORKTREE_TYPE="layer"
-# Check workspace worktrees
-elif FOUND=$(find_worktree "$ROOT_DIR/.workspace-worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
-    WORKTREE_DIR="$FOUND"
-    WORKTREE_TYPE="workspace"
-else
-    echo "Error: No worktree found for issue #$ISSUE_NUM"
-    echo ""
-    echo "Checked locations:"
-    if [ -n "$REPO_SLUG" ]; then
-        echo "  - $ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
-        echo "  - $ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    # Skill mode: search for skill worktrees
+    if FOUND=$(find_worktree_by_skill "$ROOT_DIR/layers/worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="layer"
+    elif FOUND=$(find_worktree_by_skill "$ROOT_DIR/.workspace-worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="workspace"
     else
-        echo "  - $ROOT_DIR/layers/worktrees/issue-*-$ISSUE_NUM"
-        echo "  - $ROOT_DIR/.workspace-worktrees/issue-*-$ISSUE_NUM"
+        echo "Error: No worktree found for skill '$SKILL_NAME'"
+        echo ""
+        echo "Checked locations:"
+        echo "  - $ROOT_DIR/layers/worktrees/skill-*-${SKILL_NAME}-*"
+        echo "  - $ROOT_DIR/.workspace-worktrees/skill-*-${SKILL_NAME}-*"
+        echo ""
+        echo "Create one with:"
+        echo "  .agent/scripts/worktree_create.sh --skill $SKILL_NAME --type workspace"
+        return 1 2>/dev/null || exit 1
     fi
-    echo ""
-    echo "Create one with:"
-    echo "  ./.agent/scripts/start_issue_work.sh $ISSUE_NUM"
-    return 1 2>/dev/null || exit 1
+else
+    # Issue mode: existing logic
+    # Check layer worktrees
+    if FOUND=$(find_worktree "$ROOT_DIR/layers/worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="layer"
+    # Check workspace worktrees
+    elif FOUND=$(find_worktree "$ROOT_DIR/.workspace-worktrees" "$ISSUE_NUM" "$REPO_SLUG"); then
+        WORKTREE_DIR="$FOUND"
+        WORKTREE_TYPE="workspace"
+    else
+        echo "Error: No worktree found for issue #$ISSUE_NUM"
+        echo ""
+        echo "Checked locations:"
+        if [ -n "$REPO_SLUG" ]; then
+            echo "  - $ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+            echo "  - $ROOT_DIR/.workspace-worktrees/issue-${REPO_SLUG}-$ISSUE_NUM"
+        else
+            echo "  - $ROOT_DIR/layers/worktrees/issue-*-$ISSUE_NUM"
+            echo "  - $ROOT_DIR/.workspace-worktrees/issue-*-$ISSUE_NUM"
+        fi
+        echo ""
+        echo "Create one with:"
+        echo "  ./.agent/scripts/start_issue_work.sh $ISSUE_NUM"
+        return 1 2>/dev/null || exit 1
+    fi
 fi
 
 echo "========================================"
 echo "Entering Worktree"
 echo "========================================"
-echo "  Issue:  #$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    echo "  Skill: $SKILL_NAME"
+else
+    echo "  Issue:  #$ISSUE_NUM"
+fi
 echo "  Type:   $WORKTREE_TYPE"
 echo "  Path:   $WORKTREE_DIR"
 echo ""
@@ -173,36 +218,45 @@ echo ""
 cd "$WORKTREE_DIR" || { echo "Error: Failed to cd to $WORKTREE_DIR"; return 1 2>/dev/null || exit 1; }
 
 # Set environment variables
-export WORKTREE_ISSUE="$ISSUE_NUM"
 export WORKTREE_TYPE="$WORKTREE_TYPE"
 export WORKTREE_ROOT="$WORKTREE_DIR"
 
-# Fetch and display issue title so agents can verify they're on the right issue
-_ISSUE_TITLE=""
-if command -v gh &>/dev/null; then
-    _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
-    # Layer worktrees cd into package repos where gh context may differ;
-    # retry with the workspace repo if the first attempt fails
-    if [ -z "$_ISSUE_TITLE" ]; then
-        _WS_REMOTE=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
-        if [[ -n "$_WS_REMOTE" && "$_WS_REMOTE" == *"github.com"* ]]; then
-            _WS_SLUG=$(echo "$_WS_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
-            if [[ "$_WS_SLUG" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
-                _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+if [ -n "$SKILL_NAME" ]; then
+    export WORKTREE_SKILL="$SKILL_NAME"
+    unset WORKTREE_ISSUE WORKTREE_ISSUE_TITLE
+    echo "  Skill worktree — no issue to verify"
+    echo ""
+else
+    export WORKTREE_ISSUE="$ISSUE_NUM"
+    unset WORKTREE_SKILL
+
+    # Fetch and display issue title so agents can verify they're on the right issue
+    _ISSUE_TITLE=""
+    if command -v gh &>/dev/null; then
+        _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
+        # Layer worktrees cd into package repos where gh context may differ;
+        # retry with the workspace repo if the first attempt fails
+        if [ -z "$_ISSUE_TITLE" ]; then
+            _WS_REMOTE=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
+            if [[ -n "$_WS_REMOTE" && "$_WS_REMOTE" == *"github.com"* ]]; then
+                _WS_SLUG=$(echo "$_WS_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+                if [[ "$_WS_SLUG" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
+                    _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+                fi
             fi
         fi
     fi
-fi
-export WORKTREE_ISSUE_TITLE="$_ISSUE_TITLE"
+    export WORKTREE_ISSUE_TITLE="$_ISSUE_TITLE"
 
-if [ -n "$_ISSUE_TITLE" ]; then
-    echo "  Title: $_ISSUE_TITLE"
-    echo "  >>> Verify this matches your task <<<"
-    echo ""
-else
-    echo "  Title: (could not fetch)"
-    echo "  Run: gh issue view $ISSUE_NUM --json title --jq '.title'"
-    echo ""
+    if [ -n "$_ISSUE_TITLE" ]; then
+        echo "  Title: $_ISSUE_TITLE"
+        echo "  >>> Verify this matches your task <<<"
+        echo ""
+    else
+        echo "  Title: (could not fetch)"
+        echo "  Run: gh issue view $ISSUE_NUM --json title --jq '.title'"
+        echo ""
+    fi
 fi
 
 # For layer worktrees, also set up scratchpad path
@@ -224,7 +278,11 @@ else
     CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
 fi
 echo ""
-echo "✅ Now in worktree for issue #$ISSUE_NUM"
+if [ -n "$SKILL_NAME" ]; then
+    echo "✅ Now in worktree for skill: $SKILL_NAME"
+else
+    echo "✅ Now in worktree for issue #$ISSUE_NUM"
+fi
 echo "   Branch: $CURRENT_BRANCH"
 echo "   PWD:    $(pwd)"
 echo ""
@@ -237,4 +295,8 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
     echo "  colcon build                  # Build packages"
     echo "  colcon test                   # Run tests"
 fi
-echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" $ISSUE_NUM  # Remove worktree"
+if [ -n "$SKILL_NAME" ]; then
+    echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" --skill $SKILL_NAME  # Remove worktree"
+else
+    echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" $ISSUE_NUM  # Remove worktree"
+fi
