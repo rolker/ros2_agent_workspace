@@ -446,6 +446,108 @@ test_offline_fallback_message() {
 }
 run_test "Offline fallback message when gh fails" test_offline_fallback_message
 
+# ===== Skill worktree tests =====
+
+# Test 12: Skill mode creates worktree with correct naming
+test_skill_creates_workspace_worktree() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --skill research --type workspace 2>&1) || true
+
+    if [[ "$output" != *"Worktree Created Successfully"* ]]; then
+        echo "    Expected worktree creation success message"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Verify directory was created with skill- prefix
+    local found_dir=""
+    for d in "$WORKSPACE_DIR"/.workspace-worktrees/skill-*-research-*; do
+        if [ -d "$d" ]; then
+            found_dir="$d"
+            break
+        fi
+    done
+    if [ -z "$found_dir" ]; then
+        echo "    Expected skill worktree directory matching skill-*-research-*"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # Verify branch name starts with skill/
+    if [[ "$output" != *"skill/research-"* ]]; then
+        echo "    Expected branch name starting with skill/research-"
+        echo "    Output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    cleanup_mock_workspace
+    return 0
+}
+run_test "Skill mode creates workspace worktree with correct naming" test_skill_creates_workspace_worktree
+
+# Test 13: Invalid skill name is rejected
+test_invalid_skill_rejected() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --skill nonexistent --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"not in the allowlist"* ]]; then
+        echo "    Expected allowlist error message"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Invalid skill name is rejected" test_invalid_skill_rejected
+
+# Test 14: Both --issue and --skill produces error
+test_issue_and_skill_mutual_exclusivity() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --issue 123 --skill research --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"mutually exclusive"* ]]; then
+        echo "    Expected mutual exclusivity error"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Both --issue and --skill produces error" test_issue_and_skill_mutual_exclusivity
+
+# Test 15: Neither --issue nor --skill produces error
+test_neither_issue_nor_skill() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"either --issue or --skill is required"* ]]; then
+        echo "    Expected missing argument error"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Neither --issue nor --skill produces error" test_neither_issue_nor_skill
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"

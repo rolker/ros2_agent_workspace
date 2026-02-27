@@ -92,6 +92,28 @@ your task: `gh issue view $WORKTREE_ISSUE --json title --jq '.title'`
 If the title does not match, stop — you may be in the wrong worktree or have the
 wrong issue number.
 
+### Skill Worktree Exception
+
+Some skills maintain living documents (research digests, project knowledge summaries)
+that need worktree isolation and PR review but don't warrant a dedicated GitHub issue
+for each recurring update. These skills may use `--skill <name>` instead of
+`--issue <N>` across the worktree scripts:
+
+```bash
+.agent/scripts/worktree_create.sh --skill research --type workspace
+source .agent/scripts/worktree_enter.sh --skill research
+.agent/scripts/worktree_remove.sh --skill research
+```
+
+**Allowed skills**: `research`, `gather-project-knowledge` (enforced by an allowlist
+in `worktree_create.sh`).
+
+**Branch naming**: `skill/{name}-{YYYYMMDD-HHMMSS}` (e.g., `skill/research-20260227-143022`).
+
+**Requirements**: Skill worktrees still require worktree isolation and PR review —
+the only exception is that no GitHub issue is needed. All other rules (atomic commits,
+AI signature, pre-commit hooks) still apply.
+
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 
 ```markdown
