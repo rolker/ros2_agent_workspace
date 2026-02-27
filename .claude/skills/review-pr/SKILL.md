@@ -13,6 +13,8 @@ description: Evaluate a PR against workspace principles and ADRs. For project re
 
 ## Overview
 
+**Lifecycle position**: brainstorm → review-issue → plan-task → implement → **review-pr**
+
 Evaluate a pull request against workspace principles, ADRs, and (when applicable)
 project-level governance. Produces a structured report in the conversation. Does
 not post comments or modify the PR unless the user asks.

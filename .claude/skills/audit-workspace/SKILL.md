@@ -13,6 +13,9 @@ description: Check the workspace against its own standards. Find rules without e
 
 ## Overview
 
+**Lifecycle position**: Utility/periodic — run periodically to check workspace
+governance health. Not tied to the per-issue lifecycle.
+
 Periodic governance health check — the "garbage collection" pattern. Verifies
 that the workspace follows its own rules. Reports findings in the conversation.
 

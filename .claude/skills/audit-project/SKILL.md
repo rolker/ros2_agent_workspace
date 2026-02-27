@@ -16,6 +16,9 @@ If no repo name is given, audit the project repo in the current directory
 
 ## Overview
 
+**Lifecycle position**: Utility/periodic — run before or after repo work to
+check project-level governance. Not tied to the per-issue lifecycle.
+
 Check a project repo against workspace standards and its own governance docs.
 Reports what's present, what's missing, and what may have drifted. Useful
 for onboarding to a repo, identifying documentation gaps, or verifying

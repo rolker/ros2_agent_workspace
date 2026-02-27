@@ -7,6 +7,9 @@ description: Scan workspace repos and generate project knowledge summaries for `
 
 ## Overview
 
+**Lifecycle position**: Utility — run after repo changes to refresh project
+knowledge summaries. Not tied to the per-issue lifecycle.
+
 Scan all project repos in the workspace, gather governance docs, agent guides,
 and package metadata, then generate structured summaries. Output is written to
 `.agents/workspace-context/` in the current repo so it can be shared across the
