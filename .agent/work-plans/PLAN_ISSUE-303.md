@@ -2,7 +2,9 @@
 
 ## Issue
 
+**Issue**: #303
 https://github.com/rolker/ros2_agent_workspace/issues/303
+**Status**: Complete
 
 ## Context
 
