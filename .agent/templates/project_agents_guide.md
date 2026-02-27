@@ -41,7 +41,7 @@ Prioritized list for agents new to this repo:
 ```bash
 # From the layer workspace directory (e.g., layers/main/core_ws/)
 colcon build --packages-select pkg_name
-# Testing requires env.sh in the same shell — run from the workspace root
+# Testing requires env.sh in the same shell — run from the layer workspace directory
 source ../../.agent/scripts/env.sh && colcon test --packages-select pkg_name && colcon test-result --verbose
 ```
 
