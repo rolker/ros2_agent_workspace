@@ -23,7 +23,7 @@ Output is written to `.agents/workspace-context/` in the current repo.
 **Prerequisites**: This skill requires a GitHub issue and a layer worktree on the
 target repo. It does not create issues, worktrees, or PRs — it only generates and
 commits content. Use the
-[knowledge update issue template](../../.agent/templates/knowledge_update_issue.md)
+[knowledge update issue template](../../../.agent/templates/knowledge_update_issue.md)
 to create the issue, then:
 
 ```bash

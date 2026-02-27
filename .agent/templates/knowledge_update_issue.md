@@ -20,9 +20,12 @@ Update project knowledge summaries
 ```markdown
 ## Summary
 
-Regenerate project knowledge summaries in `.agents/workspace-context/` by
-scanning all workspace repos for governance docs, agent guides, and package
-metadata.
+Regenerate project knowledge summaries in `.agents/workspace-context/`.
+
+**Mode**: [manifest / non-manifest]
+- **Manifest repo**: Scans all workspace repos and generates full summaries
+  (`workspace_overview.md`, `governance_summary.md`, `project_profiles/`).
+- **Non-manifest repo**: Generates a self-profile only for this repo.
 
 ## Steps
 
@@ -36,7 +39,8 @@ metadata.
 2. Run the `gather-project-knowledge` skill (Claude Code) or follow its
    instructions manually:
    - Run `.agent/scripts/discover_governance.sh --json` from the workspace root
-   - Scan all project repos for package metadata
+   - Scan project repos for package metadata (all repos for manifest mode,
+     current repo only for non-manifest mode)
    - Generate/update summaries in `.agents/workspace-context/`
    - Commit the changes
 
