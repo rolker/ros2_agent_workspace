@@ -108,7 +108,7 @@ source .agent/scripts/worktree_enter.sh --skill research
 **Allowed skills**: `research`, `gather-project-knowledge` (enforced by an allowlist
 in `worktree_create.sh`).
 
-**Branch naming**: `skill/{name}-{YYYYMMDD-HHMMSS}` (e.g., `skill/research-20260227-143022`).
+**Branch naming**: `skill/{name}-{YYYYMMDD-HHMMSS-NNNNNNNNN}` (e.g., `skill/research-20260227-143022-123456789`).
 
 **Requirements**: Skill worktrees still require worktree isolation and PR review —
 the only exception is that no GitHub issue is needed. All other rules (atomic commits,

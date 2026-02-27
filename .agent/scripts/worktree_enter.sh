@@ -53,6 +53,11 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --skill)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --skill requires a skill name"
+                show_usage
+                return 1 2>/dev/null || exit 1
+            fi
             SKILL_NAME="$2"
             shift 2
             ;;
@@ -152,10 +157,10 @@ find_worktree() {
 
 if [ -n "$SKILL_NAME" ]; then
     # Skill mode: search for skill worktrees
-    if FOUND=$(find_worktree_by_skill "$ROOT_DIR/layers/worktrees" "$SKILL_NAME"); then
+    if FOUND=$(find_worktree_by_skill "$ROOT_DIR/layers/worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
         WORKTREE_DIR="$FOUND"
         WORKTREE_TYPE="layer"
-    elif FOUND=$(find_worktree_by_skill "$ROOT_DIR/.workspace-worktrees" "$SKILL_NAME"); then
+    elif FOUND=$(find_worktree_by_skill "$ROOT_DIR/.workspace-worktrees" "$SKILL_NAME" "$REPO_SLUG"); then
         WORKTREE_DIR="$FOUND"
         WORKTREE_TYPE="workspace"
     else

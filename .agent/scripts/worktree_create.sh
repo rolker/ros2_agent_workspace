@@ -114,6 +114,11 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --skill)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --skill requires a skill name"
+                show_usage
+                exit 1
+            fi
             SKILL_NAME="$2"
             shift 2
             ;;
