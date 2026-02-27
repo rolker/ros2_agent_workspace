@@ -2,7 +2,9 @@
 
 ## Issue
 
+**Issue**: #302
 https://github.com/rolker/ros2_agent_workspace/issues/302
+**Status**: Draft
 
 ## Context
 
@@ -23,14 +25,13 @@ location (`.agent/knowledge/`), not under `.claude/`.
    - A short note that `make_*` skills are auto-generated Makefile wrappers (not listed individually)
    - Distinction between lifecycle skills (per-issue) and utility skills (periodic/on-demand)
 
-2. **Add lifecycle labels to 4 skills** — Add a `**Lifecycle position**:` line to:
+2. **Add lifecycle labels to 6 skills** — Add a `**Lifecycle position**:` line to:
    - `review-issue/SKILL.md` — position: brainstorm → **review-issue** → plan-task
    - `review-pr/SKILL.md` — position: implement → **review-pr** → (done)
    - `research/SKILL.md` — utility, not per-issue
    - `gather-project-knowledge/SKILL.md` — utility, not per-issue
-
-   (`audit-workspace` and `audit-project` are clearly periodic from their descriptions;
-   adding labels there is optional but included for consistency.)
+   - `audit-workspace/SKILL.md` — utility/periodic
+   - `audit-project/SKILL.md` — utility/periodic
 
 3. **Add reference to `CLAUDE.md`** — Add the new doc to the References section.
 
@@ -72,6 +73,13 @@ location (`.agent/knowledge/`), not under `.claude/`.
 ## Open Questions
 
 None — scope is clear from issue + review comments.
+
+## Success Criteria
+
+- `.agent/knowledge/skill_workflows.md` exists with lifecycle sequence and skill index
+- All 8 governance skills have a `**Lifecycle position**:` label in their SKILL.md
+- `CLAUDE.md` references the new document
+- `.agent/knowledge/README.md` updated if it indexes knowledge files
 
 ## Estimated Scope
 
