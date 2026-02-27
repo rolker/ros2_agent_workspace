@@ -19,6 +19,17 @@ If stale, update the default in `.agent/scripts/framework_config.sh` and commit 
 - If `gh` CLI is installed, use it for GitHub operations.
 
 
+## Workflow Skills
+
+Reusable workflow procedures are documented (from the repo root) in `.claude/skills/*/SKILL.md`.
+These are plain markdown — not Claude Code-specific. When asked to review an
+issue, plan a task, review a PR, brainstorm, or run research, read the
+corresponding SKILL.md and follow its steps.
+
+Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
+`brainstorm`, `research`, `audit-workspace`, `audit-project`,
+`gather-project-knowledge`, `brand-guidelines`.
+
 ## References
 
 - [`AGENTS.md`](../../AGENTS.md) — Shared workspace rules (all agents)
