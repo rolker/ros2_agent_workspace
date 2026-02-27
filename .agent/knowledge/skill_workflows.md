@@ -2,7 +2,7 @@
 
 ## Per-Issue Lifecycle
 
-The governance skills follow a sequence from idea exploration through post-merge review:
+The governance skills follow a sequence from idea exploration through pre-merge PR review:
 
 ```
 brainstorm → review-issue → plan-task → implement → review-pr

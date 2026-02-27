@@ -17,7 +17,7 @@ Evaluate an issue before work begins. Checks scope, principle alignment, ADR
 relevance, repo placement, and dependencies. Posts findings as a comment on
 the issue — does not modify the issue body.
 
-**Lifecycle position**: brainstorm → **review-issue** → plan-task → implement → review-pr
+**Lifecycle position**: **review-issue** → plan-task → implement → review-pr
 
 **This skill evaluates the issue itself** (is it well-scoped? in the right
 repo? conflicting with ADRs?). For evaluating an implementation plan, use
