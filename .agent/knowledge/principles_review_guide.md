@@ -40,7 +40,7 @@ humans use it as a checklist.
 | A script in `.agent/scripts/` | Script reference table in `AGENTS.md`; `Makefile` if it has a target |
 | A template in `.agent/templates/` | Docs that reference the template; skills that use it |
 | A framework skill (e.g., `.claude/skills/`) | That framework's adapter file; regenerate skills if needed |
-| Workflow skill list (add/remove a skill) | Skill list in non-Claude adapters (Copilot, Gemini CLI, Onboarding) |
+| Workflow skill list (add/remove a skill) | Skill list in non-Claude adapters (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`) |
 | Package interfaces (`.msg`/`.srv`) | Downstream packages, documentation, tests |
 | Worktree scripts | `.agent/WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
 

@@ -2,7 +2,8 @@
 
 ## Issue
 
-https://github.com/rolker/ros2_agent_workspace/issues/305
+**Issue**: #305
+**Status**: Plan — approved
 
 ## Context
 
