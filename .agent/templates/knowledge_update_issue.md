@@ -1,8 +1,13 @@
 # Knowledge Update Issue Template
 
 Use this template to create issues for updating project knowledge summaries.
-Create the issue on the repo where summaries should be written (typically the
-manifest repo).
+Create the issue on the repo where summaries should be written.
+
+**Two modes**:
+- **Manifest repo**: Full workspace scan — generates `workspace_overview.md`,
+  `governance_summary.md`, and `project_profiles/` for all repos.
+- **Non-manifest repo**: Self-profile only — generates a single profile for the
+  current repo in its own `.agents/workspace-context/`.
 
 ## Issue Title
 
@@ -41,4 +46,5 @@ metadata.
 
 - Last updated: [date or "never"]
 - Trigger: [what prompted this update — new repo added, governance docs changed, periodic refresh]
+- Mode: [manifest / non-manifest]
 ```

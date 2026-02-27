@@ -172,15 +172,15 @@ git push -u origin feature/ISSUE-99-description
 
 ### Skill Worktrees (`--skill <name>`)
 
-Some skills (e.g., `research`, `gather-project-knowledge`) maintain living documents
-that need worktree isolation and PR review but don't warrant a dedicated GitHub issue
-for each recurring update. These use `--skill <name>` instead of `--issue <N>`.
+Some skills (e.g., `research`) maintain living documents that need worktree isolation
+and PR review but don't warrant a dedicated GitHub issue for each recurring update.
+These use `--skill <name>` instead of `--issue <N>`.
 
 **Location**: Same as issue worktrees — `.workspace-worktrees/skill-{REPO_SLUG}-{ID}/`
 or `layers/worktrees/skill-{REPO_SLUG}-{ID}/`
 
 **Allowed skills**: Only skills in the allowlist (defined in `worktree_create.sh`) can
-create skill worktrees. Currently: `research`, `gather-project-knowledge`.
+create skill worktrees. Currently: `research`.
 
 **Naming**: `skill-{REPO_SLUG}-{SKILL_NAME}-{TIMESTAMP}` (e.g.,
 `skill-workspace-research-20260227-143022-123456789`)
