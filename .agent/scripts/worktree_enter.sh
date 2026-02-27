@@ -3,8 +3,8 @@
 # Enter a worktree and set up the environment
 #
 # Usage:
-#   source ./worktree_enter.sh --issue <number>
-#   source ./worktree_enter.sh --skill <name>
+#   source ./worktree_enter.sh --issue <number> [--repo-slug <slug>]
+#   source ./worktree_enter.sh --skill <name> [--repo-slug <slug>]
 #
 # This script should be SOURCED (not executed) to affect the current shell.
 # It will:

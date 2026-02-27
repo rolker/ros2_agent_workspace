@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./worktree_remove.sh --issue <number> [--repo-slug <slug>] [--force]
-#   ./worktree_remove.sh --skill <name> [--force]
+#   ./worktree_remove.sh --skill <name> [--repo-slug <slug>] [--force]
 #
 # Examples:
 #   ./worktree_remove.sh --issue 123
