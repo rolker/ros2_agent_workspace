@@ -38,7 +38,7 @@ setup (environment, identity, features), see your framework's adapter file:
 ### Never (hard stops)
 
 - Commit to `main` — branch is protected; direct pushes are rejected
-- `git checkout <branch>` — `env.sh` blocks it; use worktrees
+- `git checkout <branch>` — `setup.bash` blocks it; use worktrees
 - Skip hooks with `--no-verify`
 - Commit secrets or credentials
 - Document from assumptions — verify against source code
@@ -164,8 +164,8 @@ make validate                                    # Validate workspace
 
 # Single package
 cd layers/main/<layer>_ws && colcon build --packages-select <package>
-# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
-source .agent/scripts/env.sh && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
+# setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
+source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 
 make lint                                        # Lint + hooks (uses venv pre-commit)
 ```
@@ -212,7 +212,7 @@ Before marking a task complete or opening a PR:
 
 | Script | Purpose |
 |--------|---------|
-| `.agent/scripts/env.sh` | Source ROS 2 env + checkout guardrail |
+| `.agent/scripts/setup.bash` | Source ROS 2 env + checkout guardrail |
 | `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) |
 | `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--plan-file` to create draft PR with plan) |
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
@@ -249,5 +249,5 @@ layers/main/
 - [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`.agent/WORKFORCE_PROTOCOL.md`](.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`.agent/knowledge/`](.agent/knowledge/) — ROS 2 development patterns and CLI best practices
-- [`.agent/project_knowledge/`](.agent/project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup.sh`; may not exist)
+- [`.agent/project_knowledge/`](.agent/project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup_layers.sh`; may not exist)
 - [`.agent/templates/`](.agent/templates/) — Issue and test templates

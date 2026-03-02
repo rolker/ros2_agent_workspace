@@ -56,11 +56,11 @@ if [ ! -f "$HISTORY_FILE" ]; then
     echo "timestamp,layer,result" > "$HISTORY_FILE"
 fi
 
-# Load Layers (this also sets LAYERS array and LAYERS_BASE via env.sh)
-if [ -f "$SCRIPT_DIR/env.sh" ]; then
-    source "$SCRIPT_DIR/env.sh" > /dev/null
+# Load Layers (this also sets LAYERS array and LAYERS_BASE via setup.bash)
+if [ -f "$SCRIPT_DIR/setup.bash" ]; then
+    source "$SCRIPT_DIR/setup.bash" > /dev/null
 else
-    # Fallback if env.sh missing
+    # Fallback if setup.bash missing
     LAYERS=("core")
 fi
 

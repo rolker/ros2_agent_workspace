@@ -19,7 +19,7 @@ is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. When reviewing:
 ## Environment Setup
 
 ```bash
-source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
+source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 
@@ -52,5 +52,5 @@ Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
 - [`.agent/AI_IDENTITY_STRATEGY.md`](../.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`.agent/WORKFORCE_PROTOCOL.md`](../.agent/WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`.agent/knowledge/`](../.agent/knowledge/) — ROS 2 development patterns and CLI best practices
-- [`.agent/project_knowledge/`](../.agent/project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup.sh`; may not exist)
+- [`.agent/project_knowledge/`](../.agent/project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup_layers.sh`; may not exist)
 - [`.agent/templates/`](../.agent/templates/) — Issue and test templates

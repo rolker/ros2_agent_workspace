@@ -17,7 +17,7 @@ The Center is committed to providing a welcoming and inclusive environment. All 
 3. **Set up the development environment**:
    ```bash
    ./.agent/scripts/bootstrap.sh
-   ./.agent/scripts/setup.sh core
+   ./.agent/scripts/setup_layers.sh core
    ```
 4. **Install development tools** (pre-commit hooks, linters):
    ```bash
@@ -161,7 +161,7 @@ To add a new workspace layer:
 1. Add a `<layer-name>.repos` file to the manifest repo's `config/repos/` directory
 2. Add the layer name to `config/layers.txt` in the manifest repo
 3. Document the layer in README.md
-4. Test setup: `./.agent/scripts/setup.sh <layer-name>`
+4. Test setup: `./.agent/scripts/setup_layers.sh <layer-name>`
 
 ## Reporting Infrastructure Friction
 

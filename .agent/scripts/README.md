@@ -4,21 +4,21 @@ Helper scripts in `.agent/scripts/` for workspace management. These scripts can 
 
 ## Setup & Initialization
 
-### `setup.sh`
+### `setup_layers.sh`
 
 Initialize workspace layers from project configuration.
 
 **Usage:**
 ```bash
-./.agent/scripts/setup.sh              # Auto-setup all layers (recommended)
-./.agent/scripts/setup.sh <layer_name> # Setup specific layer
+./.agent/scripts/setup_layers.sh              # Auto-setup all layers (recommended)
+./.agent/scripts/setup_layers.sh <layer_name> # Setup specific layer
 ```
 
 **Examples:**
 ```bash
-./.agent/scripts/setup.sh              # Setup all layers (underlay, core, platforms, etc.)
-./.agent/scripts/setup.sh core         # Setup only core layer
-./.agent/scripts/setup.sh underlay     # Setup only underlay layer
+./.agent/scripts/setup_layers.sh              # Setup all layers (underlay, core, platforms, etc.)
+./.agent/scripts/setup_layers.sh core         # Setup only core layer
+./.agent/scripts/setup_layers.sh underlay     # Setup only underlay layer
 ```
 
 **What it does:**
@@ -143,7 +143,7 @@ Build ROS 2 workspace layers with colcon.
 
 **Dependencies:**
 - ROS 2 Jazzy installed
-- All workspace layers initialized (see `setup.sh`)
+- All workspace layers initialized (see `setup_layers.sh`)
 - System packages installed (see `bootstrap.sh`)
 
 **Outputs:**
@@ -154,13 +154,13 @@ Build ROS 2 workspace layers with colcon.
 
 ## Environment Management
 
-### `env.sh`
+### `setup.bash` (`setup.sh`)
 
 Source the ROS 2 environment for all workspace layers in correct order.
 
 **Usage:**
 ```bash
-source ./.agent/scripts/env.sh
+source ./.agent/scripts/setup.bash
 ```
 
 **What it does:**
@@ -428,7 +428,7 @@ python3 ./.agent/scripts/validate_repos.py
 3. Reports any errors or warnings
 
 **When to use:**
-- Before running `setup.sh`
+- Before running `setup_layers.sh`
 - When modifying `.repos` files
 - Troubleshooting import failures
 
@@ -701,14 +701,14 @@ make status-quick                       # Fast local-only check
 ### Initialize workspace (first time)
 ```bash
 ./.agent/scripts/bootstrap.sh          # Install ROS 2 and tools
-./.agent/scripts/setup.sh               # Auto-setup all layers
-source ./.agent/scripts/env.sh          # Source environment
+./.agent/scripts/setup_layers.sh               # Auto-setup all layers
+source ./.agent/scripts/setup.bash          # Source environment
 ./.agent/scripts/build.sh               # Build all layers
 ```
 
 ### Daily development
 ```bash
-source ./.agent/scripts/env.sh         # Each new terminal
+source ./.agent/scripts/setup.bash         # Each new terminal
 ./.agent/scripts/status_report.sh --quick  # Quick workspace state check
 ./.agent/scripts/build.sh core         # Build changes
 ./.agent/scripts/test.sh core          # Run tests
@@ -741,7 +741,7 @@ sudo apt install python3-vcstool
 ### "ROS 2 Jazzy not found"
 ```bash
 ./.agent/scripts/bootstrap.sh
-source ./.agent/scripts/env.sh
+source ./.agent/scripts/setup.bash
 ```
 
 ### "Workspace is LOCKED"

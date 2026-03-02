@@ -63,7 +63,7 @@ This will check that all required tools are installed and the workspace is prope
 Import and setup all workspace layers:
 
 ```bash
-./.agent/scripts/setup.sh
+./.agent/scripts/setup_layers.sh
 ```
 
 Or using make:
@@ -105,13 +105,13 @@ This will:
 After building, source the workspace to use the packages:
 
 ```bash
-source .agent/scripts/env.sh
+source .agent/scripts/setup.bash
 ```
 
 You'll need to do this in every new terminal, or add it to your `~/.bashrc`:
 
 ```bash
-echo "source ~/ros2_agent_workspace/.agent/scripts/env.sh" >> ~/.bashrc
+echo "source ~/ros2_agent_workspace/.agent/scripts/setup.bash" >> ~/.bashrc
 ```
 
 ## Step 8: Verify Installation
@@ -134,10 +134,10 @@ configuration after your initial setup:
 
 ```bash
 # Re-setup a specific layer
-./.agent/scripts/setup.sh core
+./.agent/scripts/setup_layers.sh core
 
 # Or re-run auto-setup to get all layers
-./.agent/scripts/setup.sh
+./.agent/scripts/setup_layers.sh
 ```
 
 ### Run Tests
@@ -173,7 +173,7 @@ This workspace is designed for AI-assisted development. If using with an AI agen
 ### Add a New Repository
 
 1. Edit the appropriate `.repos` file in `configs/`
-2. Run `./.agent/scripts/setup.sh <layer>` to import the new repo
+2. Run `./.agent/scripts/setup_layers.sh <layer>` to import the new repo
 3. Build: `./.agent/scripts/build.sh`
 
 ### Clean Build Artifacts

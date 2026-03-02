@@ -20,7 +20,7 @@ checked out in `layers/`.
 
 Project-specific conventions and architecture docs are available via
 `.agent/project_knowledge/` (a symlink to the manifest repo's
-`.agents/workspace-context/` directory, created by `setup.sh`). This symlink
+`.agents/workspace-context/` directory, created by `setup_layers.sh`). This symlink
 may not exist if the manifest repo has not set up `.agents/workspace-context/`.
 
 ## Project-Level Agent Guides

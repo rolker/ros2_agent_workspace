@@ -42,7 +42,7 @@ Separation mechanism:
 - Project-specific knowledge, when used, is stored in `.agents/workspace-context/` inside
   the manifest repo (git-tracked there). When that directory is present, the workspace
   accesses it via a gitignored symlink `.agent/project_knowledge/` →
-  `.agents/workspace-context/`, which `setup.sh` creates if the manifest repo provides it.
+  `.agents/workspace-context/`, which `setup_layers.sh` creates if the manifest repo provides it.
   This complements `.agent/knowledge/` (which holds generic ROS 2 and non-project-specific
   knowledge) by making project-specific knowledge accessible without the workspace owning it.
 

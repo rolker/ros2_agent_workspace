@@ -44,24 +44,24 @@ bootstrap:
 	@./.agent/scripts/bootstrap.sh
 
 setup-core:
-	@./.agent/scripts/setup.sh core
+	@./.agent/scripts/setup_layers.sh core
 
 setup-all: setup-underlay setup-core setup-platforms setup-sensors setup-simulation setup-ui
 
 setup-underlay:
-	@./.agent/scripts/setup.sh underlay
+	@./.agent/scripts/setup_layers.sh underlay
 
 setup-platforms:
-	@./.agent/scripts/setup.sh platforms
+	@./.agent/scripts/setup_layers.sh platforms
 
 setup-sensors:
-	@./.agent/scripts/setup.sh sensors
+	@./.agent/scripts/setup_layers.sh sensors
 
 setup-simulation:
-	@./.agent/scripts/setup.sh simulation
+	@./.agent/scripts/setup_layers.sh simulation
 
 setup-ui:
-	@./.agent/scripts/setup.sh ui
+	@./.agent/scripts/setup_layers.sh ui
 
 build:
 	@./.agent/scripts/build.sh

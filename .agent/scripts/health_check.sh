@@ -253,7 +253,7 @@ if [ -d "$ROOT_DIR/layers/main" ]; then
             fi
         done
     else
-        check_warn "No layers set up. Run: ./.agent/scripts/setup.sh <layer>"
+        check_warn "No layers set up. Run: ./.agent/scripts/setup_layers.sh <layer>"
     fi
 else
     check_warn "layers/main/ directory not found (will be created on setup)"

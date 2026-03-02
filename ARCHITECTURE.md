@@ -36,7 +36,7 @@ The workspace uses a hierarchical overlay system where each layer builds upon pr
 
 ### Source Order
 
-The `.agent/scripts/env.sh` sources workspaces in this order:
+The `.agent/scripts/setup.bash` sources workspaces in this order:
 1. ROS 2 Jazzy base (`/opt/ros/jazzy`)
 2. Underlay workspace
 3. Core workspace
@@ -88,7 +88,7 @@ ros2_agent_workspace/
 
 ### Manifest Repo
 
-The **manifest repo** is the repository that provides layer definitions (`.repos` files) and `layers.txt`. It is referenced via `configs/project_bootstrap.url` and cloned during `setup.sh`. The workspace supports two patterns:
+The **manifest repo** is the repository that provides layer definitions (`.repos` files) and `layers.txt`. It is referenced via `configs/project_bootstrap.url` and cloned during `setup_layers.sh`. The workspace supports two patterns:
 
 - **Pattern A (standalone manifest)**: The manifest repo contains only configuration (no ROS packages). It is cloned to `configs/manifest_repo/<name>/` and `configs/manifest` symlinks to its config directory.
 - **Pattern B (manifest with ROS packages)**: The manifest repo also contains ROS packages (e.g., `unh_marine_autonomy`). It is cloned into a layer's `src/` directory (e.g., `layers/main/core_ws/src/`) so colcon discovers the packages. `configs/manifest` symlinks to the config subdirectory within that clone.
@@ -137,7 +137,7 @@ Agent knowledge is split into workspace-level and project-level tiers:
 
 1. **Workspace knowledge** (`.agent/knowledge/`): Version-controlled files that apply to all projects using this workspace. Contains ROS 2 development patterns, CLI best practices, and documentation verification workflows.
 
-2. **Project knowledge** (`.agent/project_knowledge`): A symlink (gitignored) pointing to the manifest repo's `.agents/workspace-context/` directory, if it exists. Contains project-specific conventions, architecture documentation, and component guides. This is created automatically by `setup.sh` during bootstrap.
+2. **Project knowledge** (`.agent/project_knowledge`): A symlink (gitignored) pointing to the manifest repo's `.agents/workspace-context/` directory, if it exists. Contains project-specific conventions, architecture documentation, and component guides. This is created automatically by `setup_layers.sh` during bootstrap.
 
 ## Coordination & Locking
 
@@ -206,8 +206,8 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 
 1. Add a `new_layer.repos` file to the manifest repo's config directory (default: `config/repos/`)
 2. Add the layer name to `config/layers.txt` in the manifest repo
-3. Run `./.agent/scripts/setup.sh new_layer`
-4. The layer will be automatically sourced by `env.sh`
+3. Run `./.agent/scripts/setup_layers.sh new_layer`
+4. The layer will be automatically sourced by `setup.bash`
 
 ### Bootstrapping from a Custom Project
 
@@ -219,7 +219,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
    # config_path: config  # Defaults to "config" if omitted
    ```
 2. Update `configs/project_bootstrap.url` to point to your `bootstrap.yaml`
-3. Run `./.agent/scripts/setup.sh`
+3. Run `./.agent/scripts/setup_layers.sh`
 
 ### Adding New Scripts
 

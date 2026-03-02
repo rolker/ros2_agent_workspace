@@ -6,7 +6,7 @@ That file contains the shared workspace rules for all AI agents.
 ## Environment Setup
 
 ```bash
-source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
+source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
 ```
 
@@ -38,5 +38,5 @@ Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
 - [`../AI_IDENTITY_STRATEGY.md`](../AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`../WORKFORCE_PROTOCOL.md`](../WORKFORCE_PROTOCOL.md) — Multi-agent coordination
 - [`../knowledge/`](../knowledge/) — ROS 2 development patterns and CLI best practices
-- [`../project_knowledge/`](../project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup.sh`; may not exist)
+- [`../project_knowledge/`](../project_knowledge/) — Symlink to manifest repo's `.agents/workspace-context/` (gitignored, created by `setup_layers.sh`; may not exist)
 - [`../templates/`](../templates/) — Issue and test templates
