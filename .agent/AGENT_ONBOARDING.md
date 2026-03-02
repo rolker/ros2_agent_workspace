@@ -11,7 +11,7 @@ For agents without a framework-specific instruction file.
 
 ```bash
 # 1. Source ROS 2 environment
-source .agent/scripts/env.sh
+source .agent/scripts/setup.bash
 
 # 2. Configure git identity
 # Host-based (shared workspace):
@@ -31,7 +31,7 @@ See [`AGENTS.md`](../AGENTS.md) for the shared workspace rules all agents must f
 
 Key points:
 - Never commit to `main` — use worktrees for isolation
-- Never `git checkout <branch>` — `env.sh` blocks it
+- Never `git checkout <branch>` — `setup.bash` blocks it
 - AI signature required on all GitHub Issues/PRs/Comments
 - Use `--body-file` for `gh` CLI, not inline `--body`
 - Build in layer directories only

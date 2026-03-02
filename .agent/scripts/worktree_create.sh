@@ -80,7 +80,7 @@ PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 # Skills allowed to create worktrees without a GitHub issue
 ALLOWED_SKILLS=("research")
 
-# Available layers (same order as env.sh)
+# Available layers (same order as setup.bash)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
 
 show_usage() {
@@ -773,7 +773,7 @@ if [ -n "$SKILL_NAME" ]; then
     echo "Or manually:"
     echo "  cd $WORKTREE_DIR"
     if [ "$WORKTREE_TYPE" == "layer" ]; then
-        echo "  source .agent/scripts/env.sh"
+        echo "  source .agent/scripts/setup.bash"
         echo ""
         echo "To build the $TARGET_LAYER layer:"
         echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"
@@ -788,7 +788,7 @@ else
     echo "Or manually:"
     echo "  cd $WORKTREE_DIR"
     if [ "$WORKTREE_TYPE" == "layer" ]; then
-        echo "  source .agent/scripts/env.sh"
+        echo "  source .agent/scripts/setup.bash"
         echo ""
         echo "To build the $TARGET_LAYER layer:"
         echo "  cd ${TARGET_LAYER}_ws && colcon build --symlink-install"

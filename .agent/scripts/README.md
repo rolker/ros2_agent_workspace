@@ -154,13 +154,13 @@ Build ROS 2 workspace layers with colcon.
 
 ## Environment Management
 
-### `env.sh`
+### `setup.bash` (`setup.sh`)
 
 Source the ROS 2 environment for all workspace layers in correct order.
 
 **Usage:**
 ```bash
-source ./.agent/scripts/env.sh
+source ./.agent/scripts/setup.bash
 ```
 
 **What it does:**
@@ -702,13 +702,13 @@ make status-quick                       # Fast local-only check
 ```bash
 ./.agent/scripts/bootstrap.sh          # Install ROS 2 and tools
 ./.agent/scripts/setup_layers.sh               # Auto-setup all layers
-source ./.agent/scripts/env.sh          # Source environment
+source ./.agent/scripts/setup.bash          # Source environment
 ./.agent/scripts/build.sh               # Build all layers
 ```
 
 ### Daily development
 ```bash
-source ./.agent/scripts/env.sh         # Each new terminal
+source ./.agent/scripts/setup.bash         # Each new terminal
 ./.agent/scripts/status_report.sh --quick  # Quick workspace state check
 ./.agent/scripts/build.sh core         # Build changes
 ./.agent/scripts/test.sh core          # Run tests
@@ -741,7 +741,7 @@ sudo apt install python3-vcstool
 ### "ROS 2 Jazzy not found"
 ```bash
 ./.agent/scripts/bootstrap.sh
-source ./.agent/scripts/env.sh
+source ./.agent/scripts/setup.bash
 ```
 
 ### "Workspace is LOCKED"

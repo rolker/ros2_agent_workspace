@@ -36,7 +36,7 @@ The workspace uses a hierarchical overlay system where each layer builds upon pr
 
 ### Source Order
 
-The `.agent/scripts/env.sh` sources workspaces in this order:
+The `.agent/scripts/setup.bash` sources workspaces in this order:
 1. ROS 2 Jazzy base (`/opt/ros/jazzy`)
 2. Underlay workspace
 3. Core workspace
@@ -207,7 +207,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 1. Add a `new_layer.repos` file to the manifest repo's config directory (default: `config/repos/`)
 2. Add the layer name to `config/layers.txt` in the manifest repo
 3. Run `./.agent/scripts/setup_layers.sh new_layer`
-4. The layer will be automatically sourced by `env.sh`
+4. The layer will be automatically sourced by `setup.bash`
 
 ### Bootstrapping from a Custom Project
 

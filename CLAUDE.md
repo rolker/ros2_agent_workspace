@@ -5,7 +5,7 @@
 ## Environment Setup
 
 ```bash
-source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
+source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude-code@ccom.unh.edu"
 ```
 

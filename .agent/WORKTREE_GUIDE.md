@@ -131,8 +131,8 @@ cd core_ws/src/my_package
 # ... make changes ...
 colcon build --packages-select my_package
 
-# Return to worktree root for testing — env.sh must be sourced in the same shell
-cd ../../../ && source .agent/scripts/env.sh && cd core_ws && colcon test --packages-select my_package
+# Return to worktree root for testing — setup.bash must be sourced in the same shell
+cd ../../../ && source .agent/scripts/setup.bash && cd core_ws && colcon test --packages-select my_package
 
 # Commit and push
 git add .

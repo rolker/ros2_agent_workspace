@@ -54,7 +54,7 @@ set +u
 echo "Sourcing ROS 2 environment..."
 cd "$WORKSPACE_ROOT"
 # shellcheck disable=SC1091
-source "$WORKSPACE_ROOT/.agent/scripts/env.sh"
+source "$WORKSPACE_ROOT/.agent/scripts/setup.bash"
 set -u
 
 # ---------- 4. Install rosdep dependencies (best-effort) ----------

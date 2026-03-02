@@ -6,7 +6,7 @@ That file contains the shared workspace rules for all AI agents.
 ## Environment Setup
 
 ```bash
-source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
+source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-cli@ccom.unh.edu"
 ```
 

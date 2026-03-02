@@ -10,7 +10,7 @@
 # 3. Generate a detailed build report
 # 4. Source each layer after successful build for cascading overlays
 #
-# The build order follows the layer hierarchy defined in scripts/env.sh:
+# The build order follows the layer hierarchy defined in scripts/setup.bash:
 #   underlay -> core -> platforms -> sensors -> simulation -> ui
 #
 # Worktree Support:
@@ -75,7 +75,7 @@ fi
 } > "$REPORT_FILE"
 
 # Load Layer Definitions (this also sets LAYERS array)
-source "$SCRIPT_DIR/env.sh" > /dev/null
+source "$SCRIPT_DIR/setup.bash" > /dev/null
 
 echo "========================================"
 echo "Starting Build Sequence"

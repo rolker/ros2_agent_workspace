@@ -264,10 +264,10 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
 
     # Source ROS 2 environment
-    # Layer worktrees share .agent/ via git worktree, so env.sh is in the root repo
-    if [ -f "$ROOT_DIR/.agent/scripts/env.sh" ]; then
+    # Layer worktrees share .agent/ via git worktree, so setup.bash is in the root repo
+    if [ -f "$ROOT_DIR/.agent/scripts/setup.bash" ]; then
         echo "Sourcing ROS 2 environment from main repository..."
-        source "$ROOT_DIR/.agent/scripts/env.sh"
+        source "$ROOT_DIR/.agent/scripts/setup.bash"
     fi
 fi
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# .agent/scripts/env.sh
+# .agent/scripts/setup.bash
 # Source ROS 2 environment for all workspace layers in correct order.
 #
 # This script is worktree-aware: when run from within a worktree,

@@ -96,7 +96,7 @@ This will:
 To source the layers in the correct order (Underlay -> ... -> Overlay):
 
 ```bash
-source .agent/scripts/env.sh
+source .agent/scripts/setup.bash
 ```
 
 ## Getting Started for Humans (Agentic Coding)
@@ -177,7 +177,7 @@ If you see "Workspace is LOCKED":
 #### Environment Not Sourced
 If ROS commands aren't working:
 ```bash
-source .agent/scripts/env.sh
+source .agent/scripts/setup.bash
 ```
 
 #### Permission Denied

@@ -105,13 +105,13 @@ This will:
 After building, source the workspace to use the packages:
 
 ```bash
-source .agent/scripts/env.sh
+source .agent/scripts/setup.bash
 ```
 
 You'll need to do this in every new terminal, or add it to your `~/.bashrc`:
 
 ```bash
-echo "source ~/ros2_agent_workspace/.agent/scripts/env.sh" >> ~/.bashrc
+echo "source ~/ros2_agent_workspace/.agent/scripts/setup.bash" >> ~/.bashrc
 ```
 
 ## Step 8: Verify Installation

@@ -184,7 +184,7 @@ if [ -z "$LAYER_NAME" ]; then
         echo "========================================="
         echo ""
         echo "Next steps:"
-        echo "  1. Source environment: source .agent/scripts/env.sh"
+        echo "  1. Source environment: source .agent/scripts/setup.bash"
         echo "  2. Build all layers:   .agent/scripts/build.sh"
         exit 0
     else

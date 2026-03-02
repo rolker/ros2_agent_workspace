@@ -19,7 +19,7 @@ is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. When reviewing:
 ## Environment Setup
 
 ```bash
-source .agent/scripts/env.sh                    # ROS 2 + checkout guardrail
+source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 

@@ -85,7 +85,7 @@ source layers/main/core_ws/install/setup.bash
 # ... additional layers
 ```
 
-The `.agent/scripts/env.sh` script handles this automatically.
+The `.agent/scripts/setup.bash` script handles this automatically.
 
 ## Dependencies
 
@@ -107,9 +107,9 @@ rosdep install --from-paths src --ignore-src -r -y
 # Build with tests (from repo root)
 cd layers/main/<layer>_ws && colcon build --packages-select <package_name>
 
-# Run tests for a package — env.sh must be sourced in the same shell
+# Run tests for a package — setup.bash must be sourced in the same shell
 # (agents run each command in a fresh subprocess, so colcon test alone will fail)
-source .agent/scripts/env.sh && cd layers/main/<layer>_ws && colcon test --packages-select <package_name>
+source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package_name>
 
 # Show test results
 colcon test-result --verbose

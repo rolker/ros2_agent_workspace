@@ -34,11 +34,11 @@ repositories:
 cd layers/main/core_ws
 colcon build --symlink-install --packages-select my_package
 # Source using the env script to get proper underlay and overlays
-source ../../.agent/scripts/env.sh
+source ../../.agent/scripts/setup.bash
 ```
 
 **Running tests for a package:**
 ```bash
-# env.sh must be sourced in the same shell — agents run each command in a fresh subprocess
-source ../../.agent/scripts/env.sh && colcon test --packages-select my_package && colcon test-result --verbose
+# setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
+source ../../.agent/scripts/setup.bash && colcon test --packages-select my_package && colcon test-result --verbose
 ```

@@ -24,7 +24,7 @@ humans use it as a checklist.
 | ADR | Triggered when | Key requirement |
 |---|---|---|
 | 0001 — Adopt ADRs | A design decision is made that future agents/humans need to understand | Record in `docs/decisions/` with context, decision, and consequences |
-| 0002 — Worktree isolation | Any feature work begins | Use worktree, not branch switch; enforced by `env.sh` guardrail |
+| 0002 — Worktree isolation | Any feature work begins | Use worktree, not branch switch; enforced by `setup.bash` guardrail |
 | 0003 — Project-agnostic workspace | Adding content to the workspace repo | Content must be generic ROS 2 infra, not project-specific |
 | 0004 — Enforcement hierarchy | A new compliance rule is proposed | Enforce at multiple layers (instructions → hooks → CI); no single layer sufficient |
 | 0005 — Layered enforcement | Adding or modifying enforcement | CI/branch protection is authoritative; pre-commit provides local feedback; framework hooks provide early feedback |
