@@ -79,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added detailed headers to setup.sh, build.sh, test.sh
 
 ### Changed
+- **Script Rename: env.sh → setup.bash, setup.sh → setup_layers.sh** (Issue #324):
+  - Renamed `.agent/scripts/env.sh` to `setup.bash` to mirror ROS 2 workspace conventions
+  - Renamed `setup.sh` to `setup_layers.sh` to avoid name collision and clarify purpose
+  - Updated all references across docs, scripts, and instruction files
 - **Status Script Consolidation** (Issue #203):
   - Consolidated `status_report.sh`, `status_full.sh`, and `check_full_status.py` into a single `status_report.sh`
   - Added `--quick` flag (alias for `--skip-sync --skip-github`) for fast local-only checks

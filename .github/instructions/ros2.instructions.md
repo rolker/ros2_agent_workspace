@@ -33,7 +33,7 @@ repositories:
 ```bash
 cd layers/main/core_ws
 colcon build --symlink-install --packages-select my_package
-# Source using the env script to get proper underlay and overlays
+# Source using the setup script to get proper underlay and overlays
 source ../../.agent/scripts/setup.bash
 ```
 
