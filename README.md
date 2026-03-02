@@ -81,10 +81,10 @@ To initialize workspace layers:
 
 ```bash
 # Auto-setup all layers (recommended)
-./.agent/scripts/setup.sh
+./.agent/scripts/setup_layers.sh
 
 # Or setup specific layer
-./.agent/scripts/setup.sh core
+./.agent/scripts/setup_layers.sh core
 ```
 
 This will:
@@ -130,14 +130,14 @@ This workspace can be configured to bootstrap from a **manifest repository** of 
    - `config/layers.txt`: Layer names in source order (one per line).
    - `.agents/workspace-context/` (optional): Project-specific AI agent knowledge (at repo root, not under config/).
 
-3. Run `./.agent/scripts/setup.sh` to import all repositories defined in your manifest repo.
+3. Run `./.agent/scripts/setup_layers.sh` to import all repositories defined in your manifest repo.
 
 **Pattern A vs Pattern B**: If your manifest repo is config-only (no ROS packages), omit the `layer` field. It will be cloned to `configs/manifest_repo/`. If it also contains ROS packages, set `layer` to the target layer (e.g., `core`) and it will be cloned into that layer's `src/` directory.
 
 ## Adding New Layers
 1. Create a `<new_layer>.repos` file in the manifest repo's `config/repos/` directory.
 2. Add the layer name to `config/layers.txt` in the manifest repo.
-3. Run `./.agent/scripts/setup.sh` to set up all layers (including the new one).
+3. Run `./.agent/scripts/setup_layers.sh` to set up all layers (including the new one).
 
 ## Troubleshooting
 

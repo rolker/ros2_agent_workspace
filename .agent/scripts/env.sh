@@ -47,7 +47,7 @@ export ROS2_LAYERS_BASE="$LAYERS_BASE"
 
 # 2. Workspace Layers
 # Define the order of layers to source. Order determines overlay priority (last one is top).
-# Primary: use the configs/manifest symlink (created by setup.sh)
+# Primary: use the configs/manifest symlink (created by setup_layers.sh)
 LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
 
 # For worktrees, the configs/manifest symlink may not exist (gitignored).

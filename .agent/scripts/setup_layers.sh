@@ -1,12 +1,12 @@
 #!/bin/bash
-# .agent/scripts/setup.sh
+# .agent/scripts/setup_layers.sh
 # Sets up a ROS2 layer by importing repositories from a .repos file
 #
 # Usage:
-#   ./.agent/scripts/setup.sh              # Auto-setup all layers from manifest repo
-#   ./.agent/scripts/setup.sh <layer_name> # Setup a specific layer
+#   ./.agent/scripts/setup_layers.sh              # Auto-setup all layers from manifest repo
+#   ./.agent/scripts/setup_layers.sh <layer_name> # Setup a specific layer
 #
-# Example: ./.agent/scripts/setup.sh core
+# Example: ./.agent/scripts/setup_layers.sh core
 #
 # This script will:
 # 1. Bootstrap the manifest repository (if needed)
