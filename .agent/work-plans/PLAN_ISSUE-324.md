@@ -1,4 +1,4 @@
-# Plan: Rename env.sh to setup.sh to mirror ROS workspace conventions
+# Plan: Rename env.sh to setup.bash and setup.sh to setup_layers.sh
 
 **Issue**: #324
 **Status**: Draft
@@ -62,6 +62,9 @@ Decisions from issue thread:
 | `.agent/scripts/health_check.sh` | 1 reference |
 | `.agent/scripts/env.sh` | 1 internal comment reference |
 | `.agent/knowledge/README.md` | 1 reference |
+| `ARCHITECTURE.md` | ~2 references |
+| `.claude/skills/research/SKILL.md` | 1 reference |
+| `docs/decisions/0003-workspace-infrastructure-is-project-agnostic.md` | 1 reference |
 
 ### Phase 2 — `env.sh` → `setup.bash` + `setup.sh` symlink
 
@@ -74,6 +77,22 @@ Decisions from issue thread:
 | `.github/copilot-instructions.md` | Environment setup section |
 | `.agent/instructions/gemini-cli.instructions.md` | Environment setup section |
 | `QUICKSTART.md` | 2 references (lines 108, 114) |
+| `ARCHITECTURE.md` | 2 references |
+| `README.md` | References |
+| `.agent/AGENT_ONBOARDING.md` | References |
+| `.agent/WORKTREE_GUIDE.md` | References |
+| `.agent/knowledge/principles_review_guide.md` | 1 reference |
+| `.agent/knowledge/ros2_development_patterns.md` | ~3 references |
+| `.agent/scripts/README.md` | References (also updated in Phase 1) |
+| `.agent/scripts/build.sh` | References |
+| `.agent/scripts/setup_layers.sh` | 1 internal comment reference |
+| `.agent/scripts/test.sh` | References |
+| `.agent/scripts/worktree_create.sh` | References |
+| `.agent/scripts/worktree_enter.sh` | References |
+| `.agent/templates/project_agents_guide.md` | References |
+| `.claude/skills/audit-project/SKILL.md` | References |
+| `.devcontainer/agent/agent-entrypoint.sh` | References |
+| `.github/instructions/ros2.instructions.md` | References |
 
 ## Principles Self-Check
 
@@ -95,8 +114,8 @@ Decisions from issue thread:
 
 | If we change... | Also update... | Included? |
 |---|---|---|
-| `setup.sh` (layer script) | Makefile, README, QUICKSTART, CONTRIBUTING, AGENTS.md, CLAUDE.md, all 3 adapters, `.agent/scripts/README.md`, bootstrap.sh, health_check.sh, env.sh comment, knowledge/README.md | Yes — Phase 1 |
-| `env.sh` (env script) | AGENTS.md table, CLAUDE.md, copilot-instructions.md, gemini-cli.instructions.md, QUICKSTART.md | Yes — Phase 2 |
+| `setup.sh` (layer script) | Makefile, README, QUICKSTART, CONTRIBUTING, AGENTS.md, CLAUDE.md, all 3 adapters, `.agent/scripts/README.md`, bootstrap.sh, health_check.sh, env.sh comment, knowledge/README.md, ARCHITECTURE.md, `.claude/skills/research/SKILL.md`, `docs/decisions/0003-...` | Yes — Phase 1 |
+| `env.sh` (env script) | AGENTS.md, CLAUDE.md, copilot-instructions.md, gemini-cli.instructions.md, QUICKSTART.md, ARCHITECTURE.md, README.md, AGENT_ONBOARDING.md, WORKTREE_GUIDE.md, principles_review_guide.md, ros2_development_patterns.md, build.sh, test.sh, worktree_create.sh, worktree_enter.sh, project_agents_guide.md, audit-project/SKILL.md, agent-entrypoint.sh, ros2.instructions.md | Yes — Phase 2 |
 | `.agent/work-plans/PLAN_ISSUE-303.md` | References `setup.sh` (2x) | No — historical artifact, not updated |
 
 ## Open Questions
@@ -105,4 +124,4 @@ Decisions from issue thread:
 
 ## Estimated Scope
 
-Single PR — all changes are mechanical text substitutions and file renames across ~16 files.
+Single PR — all changes are mechanical text substitutions and file renames across ~32 files.
