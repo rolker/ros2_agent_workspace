@@ -33,9 +33,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build test lint clean setup-all dashboard validate sync \
-        lock unlock revert-feature pr-triage generate-skills \
-        agent-build agent-run agent-shell push-gateway
+.PHONY: help build test lint clean setup-all dashboard validate sync lock unlock revert-feature pr-triage generate-skills agent-build agent-run agent-shell push-gateway
 
 # =============================================================================
 # Tier 2 — Developer workflow
