@@ -29,6 +29,7 @@ humans use it as a checklist.
 | 0004 — Enforcement hierarchy | A new compliance rule is proposed | Enforce at multiple layers (instructions → hooks → CI); no single layer sufficient |
 | 0005 — Layered enforcement | Adding or modifying enforcement | CI/branch protection is authoritative; pre-commit provides local feedback; framework hooks provide early feedback |
 | 0006 — Shared AGENTS.md | Changing agent instructions | Shared rules in `AGENTS.md`; framework adapters are thin wrappers |
+| 0007 — Retain Make with dependency tracking | Changing the Makefile or proposing a different task runner | Keep Make; use stamp-file dependencies for incremental setup and build |
 
 ## Consequences Map
 
