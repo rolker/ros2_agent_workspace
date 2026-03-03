@@ -1,4 +1,7 @@
 #!/bin/bash
+# DEPRECATED: Use dashboard.sh instead. This script is kept for backwards
+# compatibility and will be removed in a future release.
+#
 # scripts/health_check.sh
 # Comprehensive health check for ROS2 Agent Workspace
 #
