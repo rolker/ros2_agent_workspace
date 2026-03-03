@@ -1,0 +1,85 @@
+# CI Workflow Template for ROS 2 Project Repos
+#
+# Usage: Copy to .github/workflows/ci.yml in the project repo.
+# Customize the items marked TODO below.
+#
+# Based on the pattern established in s57_tools.
+# See ADR-0004/0005 for the enforcement hierarchy rationale.
+
+name: CI
+
+on:
+  push:
+    branches: [PLACEHOLDER_DEFAULT_BRANCH]  # TODO: replace with repo's default branch (e.g., jazzy, main)
+  pull_request:
+    branches: [PLACEHOLDER_DEFAULT_BRANCH]  # TODO: replace with repo's default branch
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    container:
+      image: ros:jazzy-ros-core  # TODO: update if targeting a different distro
+
+    steps:
+      - name: Update apt
+        run: apt-get update
+
+      - name: Install ros dev tools
+        run: DEBIAN_FRONTEND=noninteractive apt-get -y install ros-dev-tools
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init rosdep
+        run: rosdep init
+
+      - name: Update rosdep
+        run: rosdep update
+
+      - name: Create workspace
+        run: mkdir -p ../ws/src && ln -s $GITHUB_WORKSPACE ../ws/src/repo
+        # TODO: replace 'repo' with the project repo directory name
+
+      # TODO: If the repo has dependencies not yet in rosdep, clone them here.
+      # Example:
+      # - name: Clone extra dependency
+      #   run: >
+      #     git clone --depth 1 -b jazzy
+      #     https://github.com/org/dependency.git
+      #     ../ws/src/dependency
+
+      - name: Install ROS dependencies
+        working-directory: ../ws
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Build
+        working-directory: ../ws
+        run: >
+          bash -c 'source /opt/ros/jazzy/setup.bash &&
+          colcon build --packages-up-to
+          PLACEHOLDER_PACKAGE_LIST
+          --cmake-args -DBUILD_TESTING=ON'
+        # TODO: replace PLACEHOLDER_PACKAGE_LIST with space-separated package names
+        # Discover with: find . -name package.xml -exec grep -h '<name>' {} \; | sed 's/.*<name>\(.*\)<\/name>/\1/'
+
+      - name: Test
+        working-directory: ../ws
+        run: >
+          bash -c 'source /opt/ros/jazzy/setup.bash &&
+          source install/setup.bash &&
+          colcon test --packages-select
+          PLACEHOLDER_PACKAGE_LIST
+          --event-handlers console_direct+
+          --return-code-on-test-failure'
+        # TODO: replace PLACEHOLDER_PACKAGE_LIST (same list as build)
+
+      - name: Test results
+        working-directory: ../ws
+        run: >
+          bash -c 'source /opt/ros/jazzy/setup.bash &&
+          colcon test-result --verbose'
+        if: always()
