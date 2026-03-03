@@ -55,19 +55,86 @@ vcs pull src
 vcs export src > snapshot.repos
 ```
 
-## ROS2 Conventions
+## ROS 2 Conventions
+
+This workspace follows ROS 2 official conventions by default (ADR-0008).
+Conventions target Rolling; when working in a different distro, exceptions are
+allowed where a newer convention is not yet feasible. Deliberate deviations from
+any convention below require their own ADR.
+
+When in doubt, match the existing code in the project repo rather than
+introducing a mix.
 
 ### Naming
-- **Packages**: Use lowercase with underscores (e.g., `marine_autonomy`)
-- **Nodes**: Descriptive names, lowercase with underscores
-- **Topics**: Use namespaces, lowercase with slashes (e.g., `/sensors/gps`)
-- **Launch files**: Descriptive with `.launch.py` extension
 
-### Message/Service Types
-- Use standard ROS2 message types when possible
+- **Packages**: lowercase with underscores (e.g., `marine_autonomy`). At least
+  two characters. Avoid catchall names like `utils`. Don't prefix with `ros`.
+  See [REP-144](https://ros.org/reps/rep-0144.html).
+- **Nodes**: descriptive, lowercase with underscores
+- **Topics / services**: use namespaces, lowercase with slashes (e.g.,
+  `/sensors/gps`). See [topic and service name design](https://design.ros2.org/articles/topic_and_service_names.html).
+
+### Launch Files
+
+- **Python**: use `*_launch.py` suffix (e.g., `simulator_launch.py`). The
+  filename must end in `launch.py` for `ros2 launch` autocomplete to work.
+  See [launch system tutorial](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-system.html).
+- **XML / YAML**: use `*_launch.xml` or `*_launch.yaml` suffix
+- Place all launch files in the `<package>/launch/` directory
+- **Wrong**: `simulator.launch.py`, `my_launch.py`, `start.py`
+- **Right**: `simulator_launch.py`, `robot_bringup_launch.py`
+
+### Licensing
+
+- **New packages**: Apache 2.0 is the ROS 2 recommendation. See [migration
+  guide](https://docs.ros.org/en/jazzy/How-To-Guides/Migrating-from-ROS1/Migrating-Packages.html).
+- **Existing packages**: preserve the declared license. Changing a license
+  requires permission from all contributors.
+- **Before writing code in a project repo**, check the license:
+  1. Read the `LICENSE` file at the repo root
+  2. Check `<license>` in `package.xml`
+  3. Look at existing source file headers for the pattern in use
+  4. Match that pattern exactly in new files
+- **Copyright headers are required** in every source file. Include year, author,
+  and institution. Example (BSD 2-Clause):
+  ```python
+  # Copyright 2026 Author Name, Institution
+  # All rights reserved.
+  #
+  # Software License Agreement (BSD 2-Clause Simplified License)
+  # [full license text]
+  ```
+- Use [SPDX license identifiers](https://spdx.org/licenses/) in `package.xml`
+  (e.g., `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `MIT`)
+
+### Package Manifest (`package.xml`)
+
+- Use format 3: `<package format="3">`
+- Use the correct dependency tag for each situation:
+  - `<depend>` — needed at build time and run time (most common)
+  - `<build_depend>` — needed only at build time
+  - `<exec_depend>` — needed only at run time (e.g., Python packages,
+    launch-only dependencies)
+  - `<test_depend>` — needed only for testing
+  - `<buildtool_depend>` — build system tools (e.g., `ament_cmake`,
+    `rosidl_default_generators`)
+- Include a `<license>` tag with an SPDX identifier
+- Include a `<description>` that explains what the package does
+- See [REP-140](https://reps.openrobotics.org/rep-0140/) for the full format spec
+
+### Message / Service / Action Types
+
+- Use standard ROS 2 message types when possible
 - Custom messages go in `<package>/msg/` directory
 - Custom services go in `<package>/srv/` directory
-- Follow CamelCase for message type names
+- Custom actions go in `<package>/action/` directory
+- Follow CamelCase for type names (e.g., `LaserScan`, `MissionPlan`)
+
+### Code Style
+
+- **C++**: follow the [ROS 2 C++ style guide](https://docs.ros.org/en/rolling/The-ROS2-Project/Contributing/Code-Style-Language-Versions.html)
+- **Python**: follow PEP 8, max 100 characters per line
+- **CMake**: lowercase command names, snake_case for variables and functions
 
 ## Workspace Overlaying
 
