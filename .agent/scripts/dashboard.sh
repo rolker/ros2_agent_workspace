@@ -66,14 +66,15 @@ done
 WORKTREE_INFO=""
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     WORKTREE_INFO="layer worktree"
-    LAYERS_DIR="$ROOT_DIR"
+    MAIN_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
+    LAYERS_DIR="$MAIN_ROOT/layers/main"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     WORKTREE_INFO="workspace worktree"
-    LAYERS_DIR="$ROOT_DIR/layers/main"
     MAIN_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
+    LAYERS_DIR="$MAIN_ROOT/layers/main"
 else
-    LAYERS_DIR="$ROOT_DIR/layers/main"
     MAIN_ROOT="$ROOT_DIR"
+    LAYERS_DIR="$ROOT_DIR/layers/main"
 fi
 
 # Color codes
@@ -182,10 +183,10 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # Layers
-if [ -d "$ROOT_DIR/layers/main" ]; then
-    LAYER_COUNT=$(ls -d "$ROOT_DIR/layers/main"/*_ws 2>/dev/null | wc -l)
+if [ -d "$LAYERS_DIR" ]; then
+    LAYER_COUNT=$(ls -d "$LAYERS_DIR"/*_ws 2>/dev/null | wc -l)
     BUILT_COUNT=0
-    for layer_dir in "$ROOT_DIR/layers/main"/*_ws; do
+    for layer_dir in "$LAYERS_DIR"/*_ws; do
         [ -f "$layer_dir/install/setup.bash" ] && ((BUILT_COUNT++))
     done
     check_pass "$LAYER_COUNT layer(s), $BUILT_COUNT built"
@@ -520,7 +521,7 @@ fi
 # SECTION: LATEST TEST STATUS
 #######################################
 
-SUMMARY_JSON="$ROOT_DIR/.agent/scratchpad/test_summary.json"
+SUMMARY_JSON="${MAIN_ROOT:-$ROOT_DIR}/.agent/scratchpad/test_summary.json"
 if [ -f "$SUMMARY_JSON" ]; then
     SECTION=$((SECTION + 1))
     echo "## $SECTION. Latest Test Results"

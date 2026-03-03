@@ -5,6 +5,7 @@
 # Usage:
 #   ./.agent/scripts/setup_layers.sh              # Auto-setup all layers from manifest repo
 #   ./.agent/scripts/setup_layers.sh <layer_name> # Setup a specific layer
+#   ./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest repo only (no layers)
 #
 # Example: ./.agent/scripts/setup_layers.sh core
 #
@@ -153,6 +154,13 @@ bootstrap_manifest_repo() {
         echo "Created symlink: .agent/project_knowledge -> $KNOWLEDGE_TARGET"
     fi
 }
+
+# Handle --manifest-only flag: bootstrap manifest repo and exit
+if [ "$LAYER_NAME" = "--manifest-only" ]; then
+    bootstrap_manifest_repo
+    echo "Manifest bootstrap complete."
+    exit 0
+fi
 
 # If no layer specified, auto-setup all layers from project config
 if [ -z "$LAYER_NAME" ]; then

@@ -12,13 +12,14 @@ Initialize workspace layers from project configuration.
 ```bash
 ./.agent/scripts/setup_layers.sh              # Auto-setup all layers (recommended)
 ./.agent/scripts/setup_layers.sh <layer_name> # Setup specific layer
+./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest repo only (no layers)
 ```
 
 **Examples:**
 ```bash
 ./.agent/scripts/setup_layers.sh              # Setup all layers (underlay, core, platforms, etc.)
 ./.agent/scripts/setup_layers.sh core         # Setup only core layer
-./.agent/scripts/setup_layers.sh underlay     # Setup only underlay layer
+./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest only (used by Makefile)
 ```
 
 **What it does:**
@@ -70,23 +71,23 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ## Status & Reporting
 
-### `status_report.sh` ⭐ Recommended
+### `dashboard.sh` ⭐ Recommended
 
-**Comprehensive workspace status** — repository sync, git status, GitHub PRs/issues, and test results.
+**Unified workspace dashboard** — health checks, repository sync, git status, worktrees, GitHub PRs/issues, and test results.
 
 **Usage:**
 ```bash
-./.agent/scripts/status_report.sh                    # Full status (sync + GitHub)
-./.agent/scripts/status_report.sh --quick            # Fast local-only (no sync, no GitHub)
-./.agent/scripts/status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
-./.agent/scripts/status_report.sh --skip-github      # Local status only (offline)
-./.agent/scripts/status_report.sh --help             # Show all flags
+./.agent/scripts/dashboard.sh                    # Full dashboard (sync + GitHub)
+./.agent/scripts/dashboard.sh --quick            # Fast local-only (no sync, no GitHub)
+./.agent/scripts/dashboard.sh --skip-sync        # Skip fetch, keep GitHub queries
+./.agent/scripts/dashboard.sh --skip-github      # Local status only (offline)
+./.agent/scripts/dashboard.sh --help             # Show all flags
 ```
 
 **Makefile shortcuts:**
 ```bash
-make status        # Full status
-make status-quick  # Equivalent to --quick
+make dashboard        # Full dashboard
+make dashboard QUICK=1  # Equivalent to --quick
 ```
 
 **Flags:**
@@ -276,8 +277,6 @@ Lock/unlock the workspace to prevent accidental modifications.
 **When to use:**
 - `lock.sh`: Before long operations or to pause work
 - `unlock.sh`: When resuming work or if locked unexpectedly
-
----
 
 ---
 
@@ -676,8 +675,8 @@ python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
 
 ### Daily status check
 ```bash
-make status                             # Full morning report (sync + GitHub)
-make status-quick                       # Fast local-only check
+make dashboard                          # Full morning report (sync + GitHub)
+make dashboard QUICK=1                  # Fast local-only check
 ```
 
 ### Initialize workspace (first time)
@@ -691,14 +690,14 @@ source ./.agent/scripts/setup.bash          # Source environment
 ### Daily development
 ```bash
 source ./.agent/scripts/setup.bash         # Each new terminal
-./.agent/scripts/status_report.sh --quick  # Quick workspace state check
+./.agent/scripts/dashboard.sh --quick  # Quick workspace state check
 ./.agent/scripts/build.sh core         # Build changes
 ./.agent/scripts/test.sh core          # Run tests
 ```
 
 ### Before committing
 ```bash
-./.agent/scripts/status_report.sh --quick  # Verify clean state
+./.agent/scripts/dashboard.sh --quick  # Verify clean state
 # Commit changes to feature branch
 ```
 

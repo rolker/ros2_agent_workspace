@@ -9,10 +9,14 @@
 #   Tier 3 — Agent/maintenance (container + utilities)
 
 # --- Workspace root resolution ---
-# Stamps are workspace-global. When running from a workspace worktree,
-# resolve back to the main workspace root so stamps are shared.
-ifeq ($(findstring /.workspace-worktrees/,$(CURDIR)),/.workspace-worktrees/)
-  MAIN_ROOT := $(abspath $(dir $(CURDIR)))
+# Stamps are workspace-global. When running from a worktree, resolve back
+# to the main workspace root so stamps are shared.
+#   .workspace-worktrees/<name>/  → 2 levels up
+#   layers/worktrees/<name>/      → 3 levels up
+ifneq ($(findstring /layers/worktrees/,$(CURDIR)),)
+  MAIN_ROOT := $(abspath $(CURDIR)/../../..)
+else ifneq ($(findstring /.workspace-worktrees/,$(CURDIR)),)
+  MAIN_ROOT := $(abspath $(CURDIR)/../..)
 else
   MAIN_ROOT := $(CURDIR)
 endif
@@ -24,9 +28,9 @@ VENV_BIN := $(VENV_DIR)/bin
 PRE_COMMIT := $(VENV_BIN)/pre-commit
 
 # --- Layer list (read from manifest config if available) ---
-LAYERS_FILE := $(CURDIR)/configs/manifest/layers.txt
+LAYERS_FILE := $(MAIN_ROOT)/configs/manifest/layers.txt
 ifneq ($(wildcard $(LAYERS_FILE)),)
-  LAYERS := $(shell cat $(LAYERS_FILE))
+  LAYERS := $(shell grep -v '^\s*\#' $(LAYERS_FILE) | tr '\n' ' ')
 else
   LAYERS := underlay core platforms sensors simulation ui
 endif
@@ -118,7 +122,7 @@ $(STAMP)/bootstrap.done:
 		echo ""; \
 		read -r -p "Continue? [Y/n] " response; \
 		case "$$response" in \
-			[nN]*) echo "Aborted. Run 'make bootstrap' when ready."; exit 1 ;; \
+			[nN]*) echo "Aborted. Run 'make build' when ready."; exit 1 ;; \
 		esac; \
 	fi
 	@mkdir -p $(STAMP)
@@ -135,21 +139,20 @@ $(STAMP)/setup-dev.done: $(STAMP)/bootstrap.done
 	@echo "Dev-tools venv ready at $(VENV_DIR)/. Git hooks installed."
 	@touch $@
 
-# Manifest stamp: setup_layers.sh with no args bootstraps the manifest repo
-# and sets up all layers from layers.txt. Guard: if configs/manifest symlink
-# is missing, the stamp is stale — delete it so Make re-runs.
+# Manifest stamp: bootstrap manifest repo only. Guard: if configs/manifest
+# symlink is missing, the stamp is stale — delete it so Make re-runs.
 $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 	@mkdir -p $(STAMP)
-	@if [ -f "$(STAMP)/manifest.done" ] && [ ! -L "configs/manifest" ]; then \
+	@if [ -f "$(STAMP)/manifest.done" ] && [ ! -L "$(MAIN_ROOT)/configs/manifest" ]; then \
 		echo "Manifest symlink missing — re-running setup..."; \
 		rm -f "$(STAMP)/manifest.done"; \
 	fi
-	@./.agent/scripts/setup_layers.sh
+	@./.agent/scripts/setup_layers.sh --manifest-only
 	@touch $@
 
 # Per-layer stamps: re-run setup for a layer when its .repos file changes.
 # Depends on manifest being bootstrapped first.
-$(STAMP)/layer-%.done: $(STAMP)/manifest.done configs/manifest/repos/%.repos
+$(STAMP)/layer-%.done: $(STAMP)/manifest.done $(MAIN_ROOT)/configs/manifest/repos/%.repos
 	@mkdir -p $(STAMP)
 	@./.agent/scripts/setup_layers.sh $*
 	@touch $@
