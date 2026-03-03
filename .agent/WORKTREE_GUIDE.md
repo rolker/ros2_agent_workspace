@@ -278,14 +278,16 @@ Sets these variables:
 
 ### Starting Issue Work
 
-The `start_issue_work.sh` script now supports worktrees:
+Use the worktree scripts to start work on an issue:
 
 ```bash
-# Traditional branch workflow
-.agent/scripts/start_issue_work.sh 42 "Agent Name"
+# Workspace infrastructure work
+.agent/scripts/worktree_create.sh --issue 42 --type workspace
+source .agent/scripts/worktree_enter.sh --issue 42
 
-# Worktree workflow
-.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+# ROS package work
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages <pkg>
+source .agent/scripts/worktree_enter.sh --issue 42
 ```
 
 ### Build System

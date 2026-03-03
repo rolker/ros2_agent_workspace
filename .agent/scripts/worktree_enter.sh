@@ -197,7 +197,7 @@ else
         fi
         echo ""
         echo "Create one with:"
-        echo "  ./.agent/scripts/start_issue_work.sh $ISSUE_NUM"
+        echo "  ./.agent/scripts/worktree_create.sh --issue $ISSUE_NUM --type workspace"
         return 1 2>/dev/null || exit 1
     fi
 fi

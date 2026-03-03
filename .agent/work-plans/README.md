@@ -15,21 +15,12 @@ Work plans make agent work-in-progress visible on GitHub through draft PRs. Each
 
 ### Starting Work on an Issue
 
-**Manual approach:**
-1. Create feature branch: `git checkout -b feature/ISSUE-<number>-<description>`
-2. Copy plan template: `cp .agent/templates/ISSUE_PLAN.md .agent/work-plans/PLAN_ISSUE-<number>.md`
-3. Fill in the plan with your approach
-4. Commit: `git add .agent/work-plans/ && git commit -m "docs: Add work plan for Issue #<number>"`
+1. Create worktree: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`
+2. Enter worktree: `source .agent/scripts/worktree_enter.sh --issue <N>`
+3. Create plan: write `.agent/work-plans/PLAN_ISSUE-<N>.md`
+4. Commit: `git add .agent/work-plans/ && git commit -m "Add work plan for #<N>"`
 5. Push: `git push -u origin HEAD`
-6. Create draft PR: `gh pr create --draft --title "..." --body "Closes #<number>"`
-
-**Helper script approach:**
-```bash
-# Creates branch, generates plan from template
-.agent/scripts/start_issue_work.sh <issue_number> "Agent Name"
-
-# Then edit the plan file and commit it
-```
+6. Create draft PR: `gh pr create --draft --title "..." --body-file .agent/work-plans/PLAN_ISSUE-<N>.md`
 
 ### Updating Plans
 
@@ -41,12 +32,8 @@ As work progresses, update the plan to:
 
 Commit plan updates regularly:
 ```bash
-# Helper script
-.agent/scripts/update_issue_plan.sh <issue_number> "Optional commit message"
-
-# Or manually
 git add .agent/work-plans/PLAN_ISSUE-<number>.md
-git commit -m "docs: Update work plan - completed Phase 1"
+git commit -m "Update work plan for #<number>"
 git push
 ```
 
