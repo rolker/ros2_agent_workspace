@@ -29,6 +29,7 @@ Each step is optional — simple issues can skip straight to `plan-task` or impl
 | `gather-project-knowledge` | After repo changes | Scan repos and generate project knowledge summaries |
 | `audit-workspace` | Periodically | Check workspace governance health: enforcement, drift, staleness |
 | `audit-project` | Before or after repo work | Check a project repo against workspace and project conventions |
+| `onboard-project` | When onboarding a repo | Interactive audit + fix: add CI, pre-commit, agent guide, GitHub settings |
 
 ### Makefile skills
 
