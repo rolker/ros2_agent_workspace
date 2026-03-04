@@ -140,7 +140,11 @@ if ! ALL_COMMENTS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/co
 fi
 
 # Build the final output by matching comments to their review IDs
-OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --argjson comments "$ALL_COMMENTS" --arg pr "$PR_NUMBER" --arg repo "$REPO_SLUG" --arg head_timestamp "$HEAD_TIMESTAMP" '
+# Use --slurpfile instead of --argjson to avoid "Argument list too long" on large responses
+COMMENTS_TMPFILE="$(mktemp /tmp/copilot_comments.XXXXXX.json)"
+echo "$ALL_COMMENTS" > "$COMMENTS_TMPFILE"
+
+OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" --arg pr "$PR_NUMBER" --arg repo "$REPO_SLUG" --arg head_timestamp "$HEAD_TIMESTAMP" '
     {
         pr: ($pr | tonumber),
         repo: $repo,
@@ -152,7 +156,7 @@ OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --argjson comments "$ALL_COMMENTS" --
                 state: .state,
                 body: .body,
                 comments: [
-                    $comments[] | select(.pull_request_review_id == $review.review_id) | {
+                    $comments[0][] | select(.pull_request_review_id == $review.review_id) | {
                         path: .path,
                         line: (.line // .original_line // null),
                         side: (.side // null),
@@ -164,6 +168,8 @@ OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --argjson comments "$ALL_COMMENTS" --
         ]
     }
 ')"
+
+rm -f "$COMMENTS_TMPFILE"
 
 TOTAL_COMMENTS="$(echo "$OUTPUT" | jq '[.reviews_after_head[].comments | length] | add // 0')"
 echo "ℹ️  Total comments across reviews: ${TOTAL_COMMENTS}" >&2
