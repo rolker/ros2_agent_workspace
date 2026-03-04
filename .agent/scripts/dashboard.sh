@@ -396,7 +396,7 @@ echo ""
 WORKTREE_SCRIPT="$SCRIPT_DIR/worktree_list.sh"
 if [ -x "$WORKTREE_SCRIPT" ]; then
     # Count worktrees (exclude main)
-    WT_COUNT=$(git -C "$ROOT_DIR" worktree list 2>/dev/null | grep -v "(bare)\|$ROOT_DIR " | wc -l)
+    WT_COUNT=$(git -C "$ROOT_DIR" worktree list 2>/dev/null | grep -v "(bare)" | grep -vF "$ROOT_DIR " | wc -l)
     if [ "$WT_COUNT" -gt 0 ]; then
         # Show summary from worktree_list.sh output
         "$WORKTREE_SCRIPT" 2>/dev/null | grep -E "^(🔧|📦|📁|  )" || true
@@ -521,8 +521,16 @@ fi
 # SECTION: LATEST TEST STATUS
 #######################################
 
-SUMMARY_JSON="${MAIN_ROOT:-$ROOT_DIR}/.agent/scratchpad/test_summary.json"
-if [ -f "$SUMMARY_JSON" ]; then
+SUMMARY_JSON=""
+for _candidate in \
+    "${MAIN_ROOT:-$ROOT_DIR}/.agent/scratchpad/test_summary.json" \
+    "${MAIN_ROOT:-$ROOT_DIR}/.scratchpad/test_summary.json"; do
+    if [ -f "$_candidate" ]; then
+        SUMMARY_JSON="$_candidate"
+        break
+    fi
+done
+if [ -n "$SUMMARY_JSON" ]; then
     SECTION=$((SECTION + 1))
     echo "## $SECTION. Latest Test Results"
     python3 -c "

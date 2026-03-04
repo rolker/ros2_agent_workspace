@@ -108,8 +108,8 @@ make dashboard QUICK=1  # Equivalent to --quick
 - Latest test results (if available)
 
 **When to use:**
-- Daily morning status check (`make status`)
-- Quick check before committing (`make status-quick`)
+- Daily morning status check (`make dashboard`)
+- Quick check before committing (`make dashboard QUICK=1`)
 
 **Dependencies:**
 - Required: `vcs`, `git`, `python3`, `jq`
@@ -703,7 +703,7 @@ source ./.agent/scripts/setup.bash         # Each new terminal
 
 ### Troubleshooting
 ```bash
-./.agent/scripts/status_report.sh      # See what's wrong
+./.agent/scripts/dashboard.sh --quick  # See what's wrong
 python3 ./.agent/scripts/validate_repos.py  # Check configs
 ./.agent/scripts/build_report_generator.py  # Detailed errors
 ```

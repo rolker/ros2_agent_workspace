@@ -216,7 +216,7 @@ regenerate them after Makefile changes.
 
 ### Helper Scripts
 - `verify_change.sh`: Targeted verification (unit/lint) for a specific package.
-- `status_report.sh`: Comprehensive workspace status with `--quick` and `--pr-triage` flags.
+- `dashboard.sh`: Unified workspace status with `--quick`, `--skip-sync`, and `--skip-github` flags.
 
 ### IDE Setup
 - [VS Code Setup Guide](.agent/knowledge/vscode_setup.md): Multi-root workspace, build tasks, C++/Python IntelliSense configuration.

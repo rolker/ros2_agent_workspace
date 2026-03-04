@@ -302,11 +302,11 @@ Build and test scripts automatically detect worktree context:
 cat .scratchpad/build_report.md
 ```
 
-### Status Report
+### Dashboard
 
 ```bash
-.agent/scripts/status_report.sh          # Full status (sync + GitHub)
-.agent/scripts/status_report.sh --quick  # Fast local-only check
+.agent/scripts/dashboard.sh              # Full status (sync + GitHub)
+.agent/scripts/dashboard.sh --quick      # Fast local-only check
 ```
 
 When run in a worktree, shows context:

@@ -30,7 +30,7 @@ PRE_COMMIT := $(VENV_BIN)/pre-commit
 # --- Layer list (read from manifest config if available) ---
 LAYERS_FILE := $(MAIN_ROOT)/configs/manifest/layers.txt
 ifneq ($(wildcard $(LAYERS_FILE)),)
-  LAYERS := $(shell grep -v '^\s*\#' $(LAYERS_FILE) | tr '\n' ' ')
+  LAYERS := $(shell awk '!/^[[:space:]]*($$|#)/ {$$1=$$1; print}' $(LAYERS_FILE) | tr '\n' ' ')
 else
   LAYERS := underlay core platforms sensors simulation ui
 endif
@@ -152,7 +152,7 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 
 # Per-layer stamps: re-run setup for a layer when its .repos file changes.
 # Depends on manifest being bootstrapped first.
-$(STAMP)/layer-%.done: $(STAMP)/manifest.done $(MAIN_ROOT)/configs/manifest/repos/%.repos
+$(STAMP)/layer-%.done: $(STAMP)/manifest.done | $(MAIN_ROOT)/configs/manifest/repos/%.repos
 	@mkdir -p $(STAMP)
 	@./.agent/scripts/setup_layers.sh $*
 	@touch $@
