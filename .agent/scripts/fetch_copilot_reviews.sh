@@ -108,7 +108,7 @@ FILTERED_REVIEWS="$(echo "$ALL_REVIEWS" | jq -c --arg cutoff "$HEAD_TIMESTAMP" '
         ((.submitted_at | to_epoch) > $cutoff_epoch) and
         (
             (.user.login | test("copilot"; "i")) or
-            (.user.login == "github-actions[bot]")
+            (.user.login == "github-actions[bot]" and .state == "COMMENTED")
         )
     ) | {review_id: .id, submitted_at: .submitted_at, state: .state, body: .body}]
 ')"
