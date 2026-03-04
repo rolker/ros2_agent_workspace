@@ -200,3 +200,19 @@ Key takeaways:
 - The main online dependencies are: initial `rosdep init/update`, `apt install` for new packages, and `git clone` for source dependencies not yet in rosdep
 
 **Relevance**: ROS 2 development is inherently local-friendly. The workspace's build/test workflow (`make build`, `make test`) works offline once dependencies are installed. The gap is in the governance layer (issues, PRs, reviews), not the build layer.
+
+---
+
+## Lightweight Self-Hosted Git Forges (Forgejo / Gitea)
+
+**Added**: 2026-03-04 | **Sources**: [Self-hosted git platforms 2026](https://dasroot.net/posts/2026/01/self-hosted-git-platforms-gitlab-gitea-forgejo-2026/), [Forgejo comparison](https://forgejo.org/compare/), [Forgejo vs Gitea](https://forgejo.org/compare-to-gitea/), [Gitea comparison](https://docs.gitea.com/installation/comparison)
+
+Key takeaways:
+- **Gitea** and **Forgejo** (community fork of Gitea) are functionally near-identical: ~200MB RAM, single binary or Docker one-liner, run on Raspberry Pi
+- Both offer: repo hosting, built-in issue tracker, web UI, wiki, Actions-compatible CI runners
+- **GitLab CE** requires 4-8GB+ RAM — roughly 40x heavier for the same core git hosting role
+- Forgejo is community-governed (no corporate entity); Gitea has Gitea Ltd behind it. Forgejo is the safer long-term bet for governance stability
+- Forgejo Actions are GitHub Actions–compatible but not identical — minor workflow tweaks typically needed
+- Both support offline runner registration for CI in disconnected environments
+
+**Relevance**: The workspace uses a GitLab instance on the robot network for repo sync. Forgejo/Gitea could replace it at a fraction of the resource cost while adding a built-in issue tracker and web UI. Combined with git-bug for distributed issue sync, this enables a fully local-first development workflow where GitHub becomes a publication channel rather than a dependency. See [#345](https://github.com/rolker/ros2_agent_workspace/issues/345).
