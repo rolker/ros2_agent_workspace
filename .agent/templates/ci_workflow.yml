@@ -30,10 +30,13 @@ jobs:
         run: DEBIAN_FRONTEND=noninteractive apt-get -y install ros-dev-tools
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Init rosdep
-        run: rosdep init 2>/dev/null || true
+        run: |
+          if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+            rosdep init
+          fi
 
       - name: Update rosdep
         run: rosdep update

@@ -143,7 +143,7 @@ ISSUE_NUM=$(echo "$ISSUE_URL" | grep -o '[0-9]*$')
 **Create a layer worktree** on the project repo using the new issue number:
 ```bash
 .agent/scripts/worktree_create.sh --issue "$ISSUE_NUM" --type layer --layer <layer> --packages <repo-name>
-source .agent/scripts/worktree_enter.sh --issue <N>
+source .agent/scripts/worktree_enter.sh --issue "$ISSUE_NUM"
 cd <layer>_ws/src/<repo-name>
 ```
 
