@@ -87,9 +87,9 @@ lint: $(STAMP)/setup-dev.done
 
 clean:
 	@echo "Cleaning build artifacts..."
-	@find layers -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
-	@find layers -type d -name "install" -exec rm -rf {} + 2>/dev/null || true
-	@find layers -type d -name "log" -exec rm -rf {} + 2>/dev/null || true
+	@find $(MAIN_ROOT)/layers -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+	@find $(MAIN_ROOT)/layers -type d -name "install" -exec rm -rf {} + 2>/dev/null || true
+	@find $(MAIN_ROOT)/layers -type d -name "log" -exec rm -rf {} + 2>/dev/null || true
 	@echo "Resetting setup stamps..."
 	@rm -rf $(STAMP)
 	@echo "Done. Run 'make build' to re-setup and rebuild."
@@ -153,13 +153,16 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 	@./.agent/scripts/setup_layers.sh --manifest-only
 	@touch $@
 
+# Enable secondary expansion for the layer stamp rule below.
+.SECONDEXPANSION:
+
 # Per-layer stamps: re-run setup for a layer when its .repos file changes.
-# Depends on manifest being bootstrapped first. Uses $(wildcard) so a missing
-# .repos file on fresh clones doesn't hard-fail, but once present, changes
-# to the file will re-trigger setup.
-$(STAMP)/layer-%.done: $(STAMP)/manifest.done $(wildcard $(MAIN_ROOT)/configs/manifest/repos/%.repos)
+# Depends on manifest being bootstrapped first. Uses secondary expansion +
+# $(wildcard) so a missing .repos file on fresh clones doesn't hard-fail,
+# but once present, changes to the file will re-trigger setup.
+$(STAMP)/layer-%.done: $(STAMP)/manifest.done $$(wildcard $(MAIN_ROOT)/configs/manifest/repos/$$*.repos)
 	@mkdir -p $(STAMP)
-	@./.agent/scripts/setup_layers.sh $*
+	@./.agent/scripts/setup_layers.sh "$*"
 	@touch $@
 
 # =============================================================================

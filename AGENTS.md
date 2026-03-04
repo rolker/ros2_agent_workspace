@@ -157,10 +157,11 @@ include a clickable markdown link on every mention.
 
 ## Build & Test
 
-`make build` handles the full setup chain automatically — on a fresh clone it
-runs bootstrap, dev-tools setup, manifest import, and layer setup before
-building. On subsequent runs it skips already-completed steps (stamp files in
-`.make/`). Use `make clean` to reset stamps and force a full re-setup.
+`make build` handles the core setup chain automatically — on a fresh clone it
+runs bootstrap, manifest import, and layer setup before building. On subsequent
+runs it skips already-completed steps (stamp files in `.make/`). Dev-tools
+(pre-commit, venv) are installed separately via `make lint`. Use `make clean`
+to reset stamps and force a full re-setup.
 
 ```bash
 make build                                       # Build all layers (auto-setup on first run)
