@@ -24,16 +24,24 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Detect if we're in a worktree and adjust paths accordingly
 # Main builds live in layers/main/, worktree builds in layers/worktrees/issue-N/
-LAYERS_BASE="$ROOT_DIR/layers/main"
+#
+# Callers (e.g., worktree_enter.sh) may pre-set ROS2_LAYERS_BASE to override the
+# default. When set, it takes precedence over both the default and auto-detection.
+LAYERS_BASE="${ROS2_LAYERS_BASE:-$ROOT_DIR/layers/main}"
 WORKTREE_CONTEXT=""
 
 # Check if we're in a layer worktree (layers/worktrees/issue-N/)
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
-    # We're in a layer worktree - this directory IS the layers base
-    # It contains the working layer + symlinks to main for others
     WORKTREE_CONTEXT="layer"
-    LAYERS_BASE="$ROOT_DIR"
+    # Only override LAYERS_BASE if the caller didn't pre-set it
+    if [ -z "${ROS2_LAYERS_BASE:-}" ]; then
+        LAYERS_BASE="$ROOT_DIR"
+    fi
     echo "  ℹ Worktree detected: layer worktree"
+elif [[ "${ROS2_LAYERS_BASE:-}" == *"/layers/worktrees/"* ]]; then
+    # Caller set LAYERS_BASE to a layer worktree path (e.g., worktree_enter.sh)
+    WORKTREE_CONTEXT="layer"
+    echo "  ℹ Worktree detected: layer worktree (via ROS2_LAYERS_BASE)"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     # We're in a workspace worktree - uses symlinked layers/main
     WORKTREE_CONTEXT="workspace"

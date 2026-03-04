@@ -264,9 +264,13 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
 
     # Source ROS 2 environment
-    # Layer worktrees share .agent/ via git worktree, so setup.bash is in the root repo
+    # Layer worktrees share .agent/ via git worktree, so setup.bash is in the root repo.
+    # Export ROS2_LAYERS_BASE so setup.bash sources from the worktree's layers
+    # (modified layer's install/ plus symlinks to main for others) instead of
+    # always defaulting to layers/main/.
     if [ -f "$ROOT_DIR/.agent/scripts/setup.bash" ]; then
         echo "Sourcing ROS 2 environment from main repository..."
+        export ROS2_LAYERS_BASE="$WORKTREE_DIR"
         source "$ROOT_DIR/.agent/scripts/setup.bash"
     fi
 fi
