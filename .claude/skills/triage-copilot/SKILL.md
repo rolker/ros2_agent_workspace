@@ -62,7 +62,19 @@ The script:
 If the result has zero comments, report "No new Copilot comments since last commit"
 and stop.
 
-### 4. Evaluate each comment
+### 4. Load governance context
+
+Read the evaluation criteria (only if comments exist):
+
+- `.agent/knowledge/principles_review_guide.md` — principle quick reference,
+  ADR applicability, and consequences map
+- `docs/PRINCIPLES.md` — workspace principles
+- `docs/decisions/*.md` — ADRs (scan titles, read those relevant to the flagged issues)
+
+For project repo PRs, also check:
+- The project repo's `.agents/README.md`
+
+### 5. Evaluate each comment
 
 For each comment in the JSON output:
 
@@ -75,18 +87,6 @@ c. **Check governance context** — does the comment align with or contradict:
    - Workspace principles (`docs/PRINCIPLES.md`)
    - Relevant ADRs (`docs/decisions/`)
    - Project-level governance (`.agents/README.md` in the project repo, if applicable)
-
-### 5. Load governance context
-
-Read the evaluation criteria (only if comments exist):
-
-- `.agent/knowledge/principles_review_guide.md` — principle quick reference,
-  ADR applicability, and consequences map
-- `docs/PRINCIPLES.md` — workspace principles
-- `docs/decisions/*.md` — ADRs (scan titles, read those relevant to the flagged issues)
-
-For project repo PRs, also check:
-- The project repo's `.agents/README.md`
 
 ### 6. Classify and present plan
 

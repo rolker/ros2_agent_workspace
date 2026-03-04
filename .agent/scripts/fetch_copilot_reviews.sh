@@ -27,6 +27,15 @@ PR_NUMBER=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --pr)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                echo "Usage: $0 --pr <number>" >&2
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --pr value must be a positive integer, got: '$2'" >&2
+                exit 1
+            fi
             PR_NUMBER="$2"
             shift 2
             ;;
@@ -63,6 +72,11 @@ REPO_SLUG="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
 # Use committer date (ISO 8601) — reflects most recent action on the branch.
 HEAD_TIMESTAMP="$(git log -1 --format='%cI' 2>/dev/null || true)"
 
+# Normalize to UTC so comparisons work regardless of local timezone
+if [ -n "$HEAD_TIMESTAMP" ]; then
+    HEAD_TIMESTAMP="$(date -u -d "$HEAD_TIMESTAMP" '+%Y-%m-%dT%H:%M:%SZ')"
+fi
+
 if [ -z "$HEAD_TIMESTAMP" ]; then
     echo "Error: No commits found on current branch" >&2
     exit 1
@@ -74,7 +88,10 @@ echo "ℹ️  HEAD timestamp (committer date): ${HEAD_TIMESTAMP}" >&2
 
 # --- Fetch all reviews on the PR ---
 
-ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/reviews" 2>/dev/null || echo '[]')"
+if ! ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/reviews")"; then
+    echo "Error: Failed to fetch reviews for PR #${PR_NUMBER}" >&2
+    exit 1
+fi
 
 # --- Filter to Copilot reviews submitted after HEAD ---
 
@@ -82,12 +99,13 @@ ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/reviews"
 # We filter by user.login containing "copilot" (case-insensitive) or the app slug.
 # Also include "github-actions[bot]" reviews that have COMMENTED state (common for Copilot).
 #
-# The timestamp comparison uses ISO 8601 string comparison which works correctly
-# for dates in the same format.
+# Compare timestamps by converting to epoch seconds for reliable cross-timezone comparison.
 
 FILTERED_REVIEWS="$(echo "$ALL_REVIEWS" | jq -c --arg cutoff "$HEAD_TIMESTAMP" '
+    def to_epoch: sub("\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%Z") | mktime;
+    ($cutoff | to_epoch) as $cutoff_epoch |
     [.[] | select(
-        (.submitted_at > $cutoff) and
+        ((.submitted_at | to_epoch) > $cutoff_epoch) and
         (
             (.user.login | test("copilot"; "i")) or
             (.user.login == "github-actions[bot]")
@@ -116,7 +134,10 @@ fi
 # --- Fetch comments for each matching review ---
 
 # Fetch all review comments on the PR (paginated)
-ALL_COMMENTS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/comments" 2>/dev/null || echo '[]')"
+if ! ALL_COMMENTS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/comments")"; then
+    echo "Error: Failed to fetch review comments for PR #${PR_NUMBER}" >&2
+    exit 1
+fi
 
 # Build the final output by matching comments to their review IDs
 OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --argjson comments "$ALL_COMMENTS" --arg pr "$PR_NUMBER" --arg repo "$REPO_SLUG" --arg head_timestamp "$HEAD_TIMESTAMP" '

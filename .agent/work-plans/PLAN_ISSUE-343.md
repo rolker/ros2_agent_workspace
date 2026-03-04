@@ -1,8 +1,7 @@
 # Plan: Add triage-copilot skill for evaluating Copilot review feedback
 
-## Issue
-
-https://github.com/rolker/ros2_agent_workspace/issues/343
+**Issue**: [#343](https://github.com/rolker/ros2_agent_workspace/issues/343)
+**Status**: In Progress
 
 ## Context
 
@@ -24,7 +23,7 @@ confirms the scope and flags consequences (adapter skill lists, script reference
 
 ## Approach
 
-1. **Create helper script** — `.agent/scripts/fetch_copilot_reviews.sh <PR-number>`
+1. **Create helper script** — `.agent/scripts/fetch_copilot_reviews.sh --pr <N>`
    - Accepts `--pr <N>` (required)
    - Gets HEAD commit timestamp via `git log`
    - Fetches Copilot review IDs and timestamps via `gh api`
