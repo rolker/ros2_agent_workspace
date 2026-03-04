@@ -39,7 +39,7 @@ if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     fi
     echo "  ℹ Worktree detected: layer worktree"
 elif [[ "${ROS2_LAYERS_BASE:-}" == *"/layers/worktrees/"* ]]; then
-    # Caller set LAYERS_BASE to a layer worktree path (e.g., worktree_enter.sh)
+    # Caller set ROS2_LAYERS_BASE to a layer worktree path (e.g., worktree_enter.sh)
     WORKTREE_CONTEXT="layer"
     echo "  ℹ Worktree detected: layer worktree (via ROS2_LAYERS_BASE)"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
