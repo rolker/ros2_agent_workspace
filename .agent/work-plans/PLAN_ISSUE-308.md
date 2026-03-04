@@ -2,6 +2,9 @@
 
 ## Issue
 
+**Issue**: #308
+**Status**: In Progress
+
 https://github.com/rolker/ros2_agent_workspace/issues/308
 
 ## Context
@@ -29,7 +32,7 @@ All "fix now" items go into a single PR on the target project repo.
    - Parameterized: protected branch names (discovered from repo's default branch)
 
 3. **Create the `onboard-project` skill** (`.claude/skills/onboard-project/SKILL.md`)
-   - **Input**: repo name (directory under `layers/main/*/src/`)
+   - **Input**: repo name (directory under `layers/main/<layer>_ws/src/`)
    - **Audit phase**: run checks (reuse `audit-project` checklist categories):
      - `.pre-commit-config.yaml` exists?
      - CI workflow exists in `.github/workflows/`?
@@ -46,10 +49,11 @@ All "fix now" items go into a single PR on the target project repo.
      - For pre-commit: copy template, adjust protected branches
      - For CI: copy template, fill in package list from `package.xml` discovery,
        fill in default branch
-     - For `.agents/README.md`: delegate to `gather-project-knowledge` skill
-       logic (read packages, generate content)
-     - For GitHub settings: use `gh api` to configure branch protection and
-       Copilot auto-review (check admin permissions first)
+     - For `.agents/README.md`: generate from `.agent/templates/project_agents_guide.md`,
+       reusing the same package-discovery logic as `gather-project-knowledge` where helpful
+     - For GitHub settings: when credentials have admin/write scopes, use `gh api`
+       to configure branch protection and Copilot auto-review; if permissions are
+       insufficient, skip and report in the summary
      - For `pkg:` labels: create labels via `gh label create`
      - Commit all changes, open a single PR on the project repo
    - **Summary**: report what was fixed (PR link), deferred (issue links), skipped
@@ -98,6 +102,15 @@ All "fix now" items go into a single PR on the target project repo.
 ## Open Questions
 
 None — design decisions resolved in issue discussion.
+
+## Success Criteria
+
+- `.agent/templates/ci_workflow.yml` and `.agent/templates/pre-commit-config.yaml` exist
+  with parameterized placeholders (not hard-coded project names or branches).
+- `onboard-project` skill interactively detects missing CI/pre-commit/agent guide,
+  offers to apply templates, and stages changes into a single PR on the target repo.
+- Non-Claude adapters list the new skill so it is discoverable across frameworks.
+- Graceful handling of insufficient GitHub permissions (report, don't fail).
 
 ## Estimated Scope
 

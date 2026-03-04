@@ -56,5 +56,6 @@ repos:
     rev: v4.6.0
     hooks:
       - id: no-commit-to-branch
-        args: ['--branch', 'main', '--branch', 'jazzy', '--branch', 'rolling']
-        # TODO: adjust protected branches for this repo's branch strategy
+        args: ['--branch', 'PLACEHOLDER_DEFAULT_BRANCH']
+        # TODO: replace PLACEHOLDER_DEFAULT_BRANCH with the repo's default branch
+        # Add additional --branch args if the repo protects other branches
