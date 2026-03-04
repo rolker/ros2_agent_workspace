@@ -8,6 +8,9 @@
 #   Tier 2 — Developer workflow (what users type)
 #   Tier 3 — Agent/maintenance (container + utilities)
 
+# Bootstrap recipe uses bash-specific `read -r -p`.
+SHELL := /bin/bash
+
 # --- Workspace root resolution ---
 # Stamps are workspace-global. When running from a worktree, resolve back
 # to the main workspace root so stamps are shared.
@@ -151,8 +154,10 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 	@touch $@
 
 # Per-layer stamps: re-run setup for a layer when its .repos file changes.
-# Depends on manifest being bootstrapped first.
-$(STAMP)/layer-%.done: $(STAMP)/manifest.done | $(MAIN_ROOT)/configs/manifest/repos/%.repos
+# Depends on manifest being bootstrapped first. Uses $(wildcard) so a missing
+# .repos file on fresh clones doesn't hard-fail, but once present, changes
+# to the file will re-trigger setup.
+$(STAMP)/layer-%.done: $(STAMP)/manifest.done $(wildcard $(MAIN_ROOT)/configs/manifest/repos/%.repos)
 	@mkdir -p $(STAMP)
 	@./.agent/scripts/setup_layers.sh $*
 	@touch $@

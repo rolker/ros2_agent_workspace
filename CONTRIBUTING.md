@@ -21,7 +21,7 @@ The Center is committed to providing a welcoming and inclusive environment. All 
    ```
 4. **Install development tools** (pre-commit hooks, linters):
    ```bash
-   make setup-dev
+   make lint
    ```
 
 ## Agent Rules

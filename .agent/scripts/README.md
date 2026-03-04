@@ -327,7 +327,7 @@ $ ./.agent/scripts/check_branch_updates.sh
 ```
 
 **Integration:**
-- Runs automatically via pre-commit hook (when `make setup-dev` has been run)
+- Runs automatically via pre-commit hook (when `make lint` has been run)
 - Recommended before creating a pull request
 
 **See also:**

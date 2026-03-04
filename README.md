@@ -104,7 +104,7 @@ source .agent/scripts/setup.bash
 This workspace is designed to be used with an AI Agent. If you are new to agentic coding, here is how you should interact with this repository:
 
 1.  **Just Ask**: The agent is capable of managing the entire lifecycle of the workspace. You can ask it to "add a repo", "build the workspace", or "fix this build error".
-2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`make status` or `make status-quick`).
+2.  **Agent Instructions**: Each agent framework has a self-contained instruction file (e.g., `CLAUDE.md`) with all rules and a script reference table. Common operations include building (`make build`), testing (`make test`), and status checking (`make dashboard`).
 3.  **Let the Agent Drive**: The agent is aware of the directory structure (layers in `layers/`, manifest config at `configs/manifest/`). Trust it to place files in the correct location.
 
 ## Using with Custom Projects
@@ -198,20 +198,19 @@ chmod +x .agent/scripts/*.sh
 ### Makefile
 Common operations are available via make:
 ```bash
-make help          # Show all available targets
-make health-check  # Run comprehensive health check
-make bootstrap     # Install ROS 2 and dependencies
-make setup-all     # Setup all workspace layers
-make build         # Build all layers
-make test          # Run all tests
-make clean         # Clean build artifacts
-make status        # Full status (sync + repos + GitHub PRs/issues)
-make status-quick  # Quick local-only status (no sync, no GitHub)
-make lint          # Run linters
+make help            # Show all available targets
+make build           # Build all layers (auto-setup on first run)
+make test            # Run all tests
+make lint            # Run pre-commit hooks on all files
+make clean           # Clean build artifacts and reset stamps
+make setup-all       # Run full setup without building
+make dashboard       # Unified workspace status (worktrees, PRs, health)
+make dashboard QUICK=1  # Quick local-only mode
+make validate        # Validate workspace config (CI-oriented)
 ```
 
 **Claude Code users**: All `.PHONY` Makefile targets (except `help`) are available as `/make_*` slash commands
-(e.g., `/make_build`, `/make_test`, `/make_status`). Run `make generate-skills` to
+(e.g., `/make_build`, `/make_test`, `/make_dashboard`). Run `make generate-skills` to
 regenerate them after Makefile changes.
 
 ### Helper Scripts
@@ -222,10 +221,9 @@ regenerate them after Makefile changes.
 - [VS Code Setup Guide](.agent/knowledge/vscode_setup.md): Multi-root workspace, build tasks, C++/Python IntelliSense configuration.
 
 ### Pre-commit Hooks
-Set up pre-commit hooks for automatic validation:
+Pre-commit hooks are auto-installed on first `make lint` (via the stamp chain):
 ```bash
-make setup-dev    # creates venv, installs pre-commit, activates git hooks
-make lint         # run all hooks manually
+make lint         # installs pre-commit if needed, then runs all hooks
 ```
 
 ### Validation

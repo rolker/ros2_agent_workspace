@@ -36,10 +36,10 @@ This will:
 ## Step 3: Set Up Development Tools
 
 ```bash
-make setup-dev
+make lint
 ```
 
-This creates a Python venv, installs pre-commit, and activates git hooks.
+This creates a Python venv, installs pre-commit, activates git hooks, and runs all hooks.
 
 **Note:** Requires `python3-venv` (`sudo apt install python3-venv` if not already present).
 
