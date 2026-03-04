@@ -1,6 +1,6 @@
 # Research Digest: Workspace
 
-<!-- Last updated: 2026-02-27 -->
+<!-- Last updated: 2026-03-04 -->
 <!-- If older than 30 days, consider running /research --refresh; entries older than 90 days should be flagged for review -->
 
 ## Command Runner Alternatives to Make
@@ -139,3 +139,64 @@ Key takeaways:
 - **GitHub Agentic Workflows** (technical preview): define CI automation in Markdown instead of YAML; AI agents figure out execution
 
 **Relevance**: The convergence on worktree isolation validates our architecture. The quality deficit numbers reinforce the importance of the harness (lints, CI, structural enforcement) over raw agent throughput. GitHub Agentic Workflows are worth monitoring for issue triage and CI failure investigation automation.
+
+---
+
+## GitHub Outage Resilience and Offline Development
+
+**Added**: 2026-03-04 | **Sources**: [SecureSlate: GitHub outage resilience](https://getsecureslate.com/blog/what-the-github-outage-taught-us-about-resilience-and-compliance-2026), [GitHub down Feb 2026](https://serenitiesai.com/articles/github-down-ai-coding-tools-dependency-2026), [GitHub June 2025 outage](https://www.webpronews.com/githubs-june-2025-outage-how-a-routine-database-migration-cascaded-into-a-platform-wide-crisis/), [Self-hosted git platforms 2026](https://dasroot.net/posts/2026/01/self-hosted-git-platforms-gitlab-gitea-forgejo-2026/)
+
+Key takeaways:
+- GitHub has had multiple major outages in 2025–2026, partly due to its ongoing datacenter-to-Azure migration; Feb 2026 outage blocked pushes, CI, and PR reviews globally
+- **Multi-remote strategy** is the most common resilience pattern: keep GitHub as primary, add a secondary remote (Forgejo, GitLab, Gitea) as failover — preserves existing integrations while enabling continued work during outages
+- **Forgejo** (community fork of Gitea) is lightweight, self-hostable, and has Forgejo Actions (GitHub Actions–compatible but not identical; some workflow tweaks needed). Supports offline runner registration.
+- **Gitea** offers a plugin-based microservices model; Gitea Actions provides closer GitHub Actions compatibility
+- Alternative workflows mentioned by developers during outages: `git-send-email`, Radicle (decentralized git protocol)
+- Core git operations (commit, branch, merge, diff, log) are fully local and unaffected by outages — the pain points are CI, PRs, issues, and code review
+
+**Relevance**: This workspace depends on GitHub for issues, PRs, CI, and Copilot reviews. During outages, local coding continues but the issue-first workflow, worktree scripts (which use `gh`), and the PR-based review process are blocked. A resilience strategy should address these specific dependencies.
+
+---
+
+## git-bug — Distributed Offline-First Issue Tracker
+
+**Added**: 2026-03-04 | **Sources**: [git-bug repo](https://github.com/git-bug/git-bug), [BrightCoding overview](https://www.blog.brightcoding.dev/2025/06/01/git-bug-a-distributed-offline-first-bug-tracker-embedded-in-git/), [HN discussion](https://news.ycombinator.com/item?id=43971620)
+
+Key takeaways:
+- Stores issues as git objects (under `refs/bugs`), not files — no clutter in the working tree, full version history, distributed by default
+- **Offline-first**: create, edit, comment on issues without network; syncs via `git push/pull` to any remote
+- **Bidirectional bridges**: GitHub, GitLab, Jira, Launchpad — can pull issues from GitHub and push local issues back
+- Multiple interfaces: CLI, terminal UI (TUI), and web UI (significantly improved in recent releases)
+- Latest release: v0.10.1 (May 2025), active development with 2,400+ commits
+- **git-issue** (Spinellis) is a simpler alternative storing issues as files in a dedicated branch
+
+**Relevance**: Could serve as a local issue cache that stays in sync with GitHub when online and continues working offline. The GitHub bridge would allow the workspace's issue-first workflow to continue during outages. The `refs/bugs` storage means no interference with the working tree or worktree isolation.
+
+---
+
+## Local CI with Act (nektos/act)
+
+**Added**: 2026-03-04 | **Sources**: [nektos/act repo](https://github.com/nektos/act), [CICube guide](https://cicube.io/blog/run-github-actions-locally/), [Microsoft guide](https://techcommunity.microsoft.com/blog/azureinfrastructureblog/using-act-to-test-github-workflows-locally-for-azure-deployments-cicd/4414310)
+
+Key takeaways:
+- Runs GitHub Actions workflows locally using Docker — reads `.github/workflows/` and spins up containers matching the GitHub environment
+- **Works offline** with cached Docker images; no GitHub connectivity needed for execution
+- Eliminates the commit-push-wait cycle for CI feedback; saves GitHub Actions minutes
+- Can serve as a local task runner alongside or instead of Make
+- Limitations: not 100% compatible with all GitHub Actions features (marketplace actions may need adaptation), requires Docker
+
+**Relevance**: The workspace already generates CI workflow templates (`.agent/templates/ci_workflow.yml`) for project repos. `act` could run these locally as a pre-push check or during outages. Combined with pre-commit hooks (already in place), this would provide full local CI coverage. The ROS 2 container images used in CI (`ros:jazzy-ros-core`) work with `act` since they're standard Docker images.
+
+---
+
+## ROS 2 Offline Development Patterns
+
+**Added**: 2026-03-04 | **Sources**: [rosdep offline mirror PR](https://github.com/ros-infrastructure/rosdep/pull/839), [ROS Answers: rosdep offline](https://answers.ros.org/question/276942/can-sudo-rosdep-init-and-rosdep-update-be-done-offline/), [rosdep mirror guide](https://answers.ros.org/question/338122/how-do-i-deploy-a-rosdep-mirror/)
+
+Key takeaways:
+- `rosdep` can work offline by setting `ROSDISTRO_INDEX_URL=file:///path/to/local/index-v4.yaml` — clone the `rosdistro` repo locally and point to it
+- All ROS 2 binary packages can be cached via a local apt mirror or pre-installed in Docker images
+- `colcon build` and `colcon test` are fully local — no network needed once dependencies are installed
+- The main online dependencies are: initial `rosdep init/update`, `apt install` for new packages, and `git clone` for source dependencies not yet in rosdep
+
+**Relevance**: ROS 2 development is inherently local-friendly. The workspace's build/test workflow (`make build`, `make test`) works offline once dependencies are installed. The gap is in the governance layer (issues, PRs, reviews), not the build layer.
