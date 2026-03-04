@@ -1,27 +1,30 @@
 #!/bin/bash
 
-# ROS2 Agent Workspace Status Report
-# Comprehensive workspace status: repository sync, git status, GitHub PRs/issues, tests.
+# ROS2 Agent Workspace Dashboard
+# Unified workspace status: health checks, repository sync, git status,
+# worktree status, GitHub PRs/issues, and test results.
+#
+# Replaces status_report.sh and health_check.sh with a single view.
 #
 # Usage:
-#   status_report.sh [OPTIONS]
+#   dashboard.sh [OPTIONS]
 #
 # OPTIONS:
-#   --quick          Quick local-only status (alias for --skip-sync --skip-github)
+#   --quick          Quick local-only mode (skip sync and GitHub API calls)
 #   --skip-sync      Skip repository fetch step (faster, may show stale data)
 #   --skip-github    Skip GitHub PR/issue queries (offline mode)
 #   --help           Show this help message
 #
 # EXAMPLES:
-#   status_report.sh                    # Full status with sync and GitHub
-#   status_report.sh --quick            # Fast local-only check
-#   status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
+#   dashboard.sh                    # Full dashboard with sync and GitHub
+#   dashboard.sh --quick            # Fast local-only check
+#   dashboard.sh --skip-sync        # Skip fetch, keep GitHub queries
 #
 # DEPENDENCIES:
-#   Required: vcs, git, python3, jq
-#   Optional: gh (GitHub CLI) - for PR/issue tracking
+#   Required: git, python3
+#   Optional: vcs (for layer sync), gh + jq (for GitHub data)
 
-# Note: do not use 'set -e' here; many status checks are best-effort and may fail.
+# Note: do not use 'set -e' here; many checks are best-effort and may fail.
 
 # Suppress Python deprecation warnings from vcstool
 export PYTHONWARNINGS="ignore::DeprecationWarning"
@@ -29,7 +32,7 @@ export PYTHONWARNINGS="ignore::DeprecationWarning"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-# Parse command-line arguments
+# --- Parse arguments ---
 SKIP_SYNC=false
 SKIP_GITHUB=false
 while [[ $# -gt 0 ]]; do
@@ -59,52 +62,170 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Worktree detection - adjust paths based on context
+# --- Worktree detection ---
 WORKTREE_INFO=""
 if [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     WORKTREE_INFO="layer worktree"
-    LAYERS_DIR="$ROOT_DIR"  # In layer worktree, ROOT_DIR contains *_ws dirs
+    MAIN_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
+    LAYERS_DIR="$MAIN_ROOT/layers/main"
 elif [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     WORKTREE_INFO="workspace worktree"
-    LAYERS_DIR="$ROOT_DIR/layers/main"
+    MAIN_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
+    LAYERS_DIR="$MAIN_ROOT/layers/main"
 else
+    MAIN_ROOT="$ROOT_DIR"
     LAYERS_DIR="$ROOT_DIR/layers/main"
 fi
 
-echo "# Workspace Status Report"
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+check_pass() { echo -e "  ${GREEN}✅ $1${NC}"; }
+check_fail() { echo -e "  ${RED}❌ $1${NC}"; }
+check_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
+
+# --- Header ---
+echo ""
+echo "# Workspace Dashboard"
 echo "**Date**: $(date)"
 if [ -n "$WORKTREE_INFO" ]; then
     echo "**Context**: Running in $WORKTREE_INFO"
 fi
 echo ""
 
+SECTION=0
+
 #######################################
-# STEP 1: SYNC REPOSITORIES
+# SECTION: HEALTH CHECKS
+#######################################
+
+SECTION=$((SECTION + 1))
+echo "## $SECTION. Health Checks"
+echo ""
+
+FAILED_CHECKS=0
+
+# ROS 2
+if [ -f "/opt/ros/jazzy/setup.bash" ]; then
+    check_pass "ROS 2 Jazzy installed"
+else
+    check_fail "ROS 2 Jazzy not found. Run: make build (auto-bootstraps)"
+    ((FAILED_CHECKS++))
+fi
+
+# Required tools
+for tool in vcs colcon rosdep python3; do
+    if command -v "$tool" &> /dev/null; then
+        check_pass "$tool found"
+    else
+        check_fail "$tool not found"
+        ((FAILED_CHECKS++))
+    fi
+done
+
+# Dev tools
+VENV_ROOT="${MAIN_ROOT:-$ROOT_DIR}"
+if [ -x "$VENV_ROOT/.venv/bin/pre-commit" ]; then
+    check_pass "pre-commit installed in .venv"
+
+    HOOK_FILE=$(git -C "$ROOT_DIR" rev-parse --path-format=absolute --git-path hooks/pre-commit 2>/dev/null || true)
+    if [ -n "$HOOK_FILE" ] && [ -f "$HOOK_FILE" ]; then
+        INSTALL_PYTHON=$(sed -n 's/^INSTALL_PYTHON=//p' "$HOOK_FILE" | tr -d "'" | tr -d '"')
+        if [ -n "$INSTALL_PYTHON" ] && [ -x "$INSTALL_PYTHON" ]; then
+            check_pass "pre-commit hook installed"
+        else
+            check_warn "pre-commit hook has invalid INSTALL_PYTHON. Run: make lint"
+        fi
+    elif [ -n "$HOOK_FILE" ]; then
+        check_warn "pre-commit hook not installed. Run: make lint (auto-installs)"
+    fi
+else
+    check_warn "pre-commit not found. Run: make lint (auto-installs)"
+fi
+
+# Workspace structure
+if [ -d "$ROOT_DIR/configs" ]; then
+    check_pass "configs/ directory exists"
+else
+    check_fail "configs/ directory not found"
+    ((FAILED_CHECKS++))
+fi
+
+# Configuration validation
+if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
+    if python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null; then
+        check_pass "Workspace matches .repos configuration"
+    else
+        check_warn "Workspace drift detected. Run: make validate"
+    fi
+fi
+
+# Lock status
+LOCK_FILE="$ROOT_DIR/.agent/scratchpad/workspace.lock"
+if [ -f "$LOCK_FILE" ]; then
+    check_warn "Workspace is LOCKED (run: make unlock)"
+else
+    check_pass "Workspace is unlocked"
+fi
+
+# Git status
+cd "$ROOT_DIR" || exit
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git branch --show-current)
+    if [ -n "$(git status --porcelain)" ]; then
+        check_warn "Root repo has uncommitted changes (branch: $BRANCH)"
+    else
+        check_pass "Root repo is clean (branch: $BRANCH)"
+    fi
+fi
+
+# Layers
+if [ -d "$LAYERS_DIR" ]; then
+    LAYER_COUNT=$(ls -d "$LAYERS_DIR"/*_ws 2>/dev/null | wc -l)
+    BUILT_COUNT=0
+    for layer_dir in "$LAYERS_DIR"/*_ws; do
+        [ -f "$layer_dir/install/setup.bash" ] && ((BUILT_COUNT++))
+    done
+    check_pass "$LAYER_COUNT layer(s), $BUILT_COUNT built"
+else
+    check_warn "layers/main/ not found (run: make build)"
+fi
+
+echo ""
+if [ $FAILED_CHECKS -eq 0 ]; then
+    echo -e "  ${GREEN}All critical checks passed.${NC}"
+else
+    echo -e "  ${RED}$FAILED_CHECKS critical check(s) failed.${NC}"
+fi
+echo ""
+
+#######################################
+# SECTION: SYNC REPOSITORIES
 #######################################
 
 if [ "$SKIP_SYNC" = false ]; then
-    echo "## Step 1: Syncing Repositories"
+    SECTION=$((SECTION + 1))
+    echo "## $SECTION. Syncing Repositories"
     echo ""
 
-    # Sync root repository (use subshell to avoid changing working directory)
     (
         cd "$ROOT_DIR" || exit 0
         echo -n "Syncing root repository... "
         if git fetch --quiet 2>/dev/null; then
             echo "✅"
         else
-            echo "⚠️ (fetch failed or skipped)"
+            echo "⚠️ (fetch failed)"
         fi
     )
 
-    # Sync layer repositories
     if command -v vcs &> /dev/null; then
         for ws_dir in "$LAYERS_DIR"/*; do
             if [ -d "$ws_dir/src" ]; then
                 ws_name=$(basename "$ws_dir" | sed 's/_ws//')
                 echo -n "Syncing $ws_name workspace... "
-
-                # Use subshell to avoid changing working directory
                 (
                     cd "$ws_dir/src" || exit 0
                     if vcs custom --git --args fetch --quiet >/dev/null 2>&1; then
@@ -120,23 +241,17 @@ if [ "$SKIP_SYNC" = false ]; then
     fi
 
     echo ""
-    echo "---"
-    echo ""
 fi
 
 #######################################
-# STEP 2: REPOSITORY STATUS
+# SECTION: REPOSITORY STATUS
 #######################################
 
-STEP_NUM=1
-if [ "$SKIP_SYNC" = false ]; then
-    STEP_NUM=2
-fi
-
-echo "## Step $STEP_NUM: Repository Status"
+SECTION=$((SECTION + 1))
+echo "## $SECTION. Repository Status"
 echo ""
 
-# Root Repository Status
+# Root repository
 echo "### Root Repository"
 cd "$ROOT_DIR" || exit
 if command -v git &> /dev/null; then
@@ -152,17 +267,11 @@ if command -v git &> /dev/null; then
         echo "- **Status**: ✅ Clean"
         echo "- **Branch**: $(git branch --show-current)"
     fi
-else
-    echo "- **Status**: ❓ Git not found"
 fi
 echo ""
 
-# Layer Repositories (VCS)
-if ! command -v vcs &> /dev/null; then
-    echo "### Layers"
-    echo "**Error**: \`vcs\` command not found. Please install \`python3-vcstool\`."
-else
-    # Fetch expected repositories (including underlay) for tracking checks
+# Layer repositories
+if command -v vcs &> /dev/null; then
     EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>/dev/null)
     if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
         EXPECTED_REPOS=""
@@ -173,18 +282,15 @@ else
             ws_name=$(basename "$ws_dir" | sed 's/_ws//')
 
             if ! cd "$ws_dir/src"; then
-                echo "Warning: could not enter workspace directory '$ws_dir/src'; skipping."
+                echo "Warning: could not enter '$ws_dir/src'; skipping."
                 continue
             fi
 
-            # Get status with branch info
             raw_output=$(vcs custom --git --args status --porcelain -b 2>/dev/null || echo "")
 
             clean_count=0
             modified_count=0
             modified_repos=()
-
-            # Process the output
             current_repo=""
             is_dirty=false
             sync_status=""
@@ -201,7 +307,6 @@ else
                         status_str="${status_str:+$status_str, }$sync_status"
                     fi
 
-                    # Fetch expected branch from config
                     if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
                         expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null)
                     else
@@ -209,18 +314,17 @@ else
                     fi
 
                     if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
-                         if [ "$branch" != "$expected_branch" ]; then
+                        if [ "$branch" != "$expected_branch" ]; then
                             warning="🔀 $branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"
-                         fi
+                        fi
                     else
-                        # Flag repos where expected branch couldn't be resolved from .repos config
                         status_str="${status_str:+$status_str, }❓ Expected branch unknown"
                     fi
 
                     if [ -n "$EXPECTED_REPOS" ]; then
                         if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
-                             status_str="${status_str:+$status_str, }❓ Untracked"
+                            status_str="${status_str:+$status_str, }❓ Untracked"
                         fi
                     fi
 
@@ -235,17 +339,13 @@ else
 
             while IFS= read -r line; do
                 if [[ "$line" == "="* ]]; then
-                    # Process previous repo
                     process_repo
-
-                    # Start new repo — use basename only (vcs outputs paths like ./src/repo_name)
                     current_repo=$(echo "$line" | sed 's/^=== \(.*\) (git) ===$/\1/')
                     current_repo=$(basename "$current_repo")
                     is_dirty=false
                     sync_status=""
                     branch=""
                 elif [[ "$line" =~ ^##[[:space:]](.*)$ ]]; then
-                    # Extract branch and sync status
                     branch_line="${BASH_REMATCH[1]}"
                     if [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+)\] ]]; then
                         sync_status="⬆️ Ahead ${BASH_REMATCH[1]}"
@@ -254,18 +354,15 @@ else
                     elif [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+),[[:space:]]behind[[:space:]]([0-9]+)\] ]]; then
                         sync_status="↕️ Ahead ${BASH_REMATCH[1]}, Behind ${BASH_REMATCH[2]}"
                     fi
-                    # Extract local branch name (strip tracking suffix like ...origin/jazzy)
                     branch=$(echo "$branch_line" | sed 's/\.\.\..*//')
                 elif [[ "$line" =~ ^[[:space:]]?[MADRCU?!] ]]; then
                     is_dirty=true
                 fi
             done <<< "$raw_output"
 
-            # Handle last repo
             process_repo
 
             total=$((clean_count + modified_count))
-
             echo "### Workspace: $ws_name (Total: $total, Clean: $clean_count, Attention: $modified_count)"
 
             if [ $modified_count -gt 0 ]; then
@@ -280,94 +377,95 @@ else
             echo ""
         fi
     done
+else
+    echo "⚠️ vcs command not found — cannot show layer status"
+    echo ""
 fi
 
 echo "---"
 echo ""
 
 #######################################
-# STEP 3: GITHUB PULL REQUESTS
+# SECTION: ACTIVE WORKTREES
 #######################################
 
-if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null; then
-    # Ensure jq is available for GitHub-related JSON parsing
-    if ! command -v jq &> /dev/null; then
-        echo "Error: 'jq' is required for GitHub status checks but is not installed."
-        echo "Install 'jq' (https://stedolan.github.io/jq/) or re-run this script with --skip-github to skip GitHub checks."
-        SKIP_GITHUB=true
-    fi
-fi
+SECTION=$((SECTION + 1))
+echo "## $SECTION. Active Worktrees"
+echo ""
 
-if [ "$SKIP_GITHUB" = false ] && command -v gh &> /dev/null && command -v jq &> /dev/null; then
-    # Generate repository list once for both PR and Issues sections.
-    # The sed filters are applied sequentially to normalize URLs to "owner/repo":
-    # - For overlay repos we expect HTTPS URLs; we strip the https:// prefix and trailing ".git".
-    REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-
-    # Add root repository, normalizing both SSH and HTTPS origin URLs to "owner/repo":
-    # - first sed removes SSH prefix "git@github.com:" if present
-    # - second sed removes HTTPS prefix "https://github.com/" if present
-    #   (for any given URL, only one of these prefixes will match)
-    # - third sed removes the trailing ".git"
-    ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
-
-    if [ -n "$ROOT_REPO" ]; then
-        REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
-    fi
-
-    # Remove duplicates and sort
-    REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
-fi
-
-if [ "$SKIP_GITHUB" = false ]; then
-    STEP_NUM=$((STEP_NUM + 1))
-    echo "## Step $STEP_NUM: GitHub Pull Requests"
-    echo ""
-
-    if ! command -v gh &> /dev/null; then
-        echo "⚠️ **GitHub CLI (\`gh\`) not found**"
-        echo ""
-        echo "Install with: \`sudo apt install gh\` or \`brew install gh\`"
-        echo "Then authenticate: \`gh auth login\`"
-        echo ""
-    elif ! gh auth status &> /dev/null; then
-        echo "⚠️ **GitHub CLI not authenticated**"
-        echo ""
-        echo "Please authenticate with: \`gh auth login\`"
-        echo "This is required to fetch PR and issue information."
+WORKTREE_SCRIPT="$SCRIPT_DIR/worktree_list.sh"
+if [ -x "$WORKTREE_SCRIPT" ]; then
+    # Count worktrees (exclude main)
+    WT_COUNT=$(git -C "$ROOT_DIR" worktree list 2>/dev/null | grep -v "(bare)" | grep -vF "$ROOT_DIR " | wc -l)
+    if [ "$WT_COUNT" -gt 0 ]; then
+        # Show summary from worktree_list.sh output
+        "$WORKTREE_SCRIPT" 2>/dev/null | grep -E "^(🔧|📦|📁|  )" || true
         echo ""
     else
-        # Repository list already generated above
+        echo "No active worktrees."
+        echo ""
+    fi
+else
+    echo "⚠️ worktree_list.sh not found"
+    echo ""
+fi
 
-        # Query PRs for each repository
+echo "---"
+echo ""
+
+#######################################
+# SECTION: GITHUB PULL REQUESTS & ISSUES
+#######################################
+
+if [ "$SKIP_GITHUB" = false ]; then
+    # Ensure required tools
+    if ! command -v gh &> /dev/null; then
+        SECTION=$((SECTION + 1))
+        echo "## $SECTION. GitHub Status"
+        echo ""
+        echo "⚠️ **GitHub CLI (\`gh\`) not found**"
+        echo "Install: \`sudo apt install gh\`, then: \`gh auth login\`"
+        echo ""
+    elif ! gh auth status &> /dev/null; then
+        SECTION=$((SECTION + 1))
+        echo "## $SECTION. GitHub Status"
+        echo ""
+        echo "⚠️ **GitHub CLI not authenticated**"
+        echo "Run: \`gh auth login\`"
+        echo ""
+    elif ! command -v jq &> /dev/null; then
+        SECTION=$((SECTION + 1))
+        echo "## $SECTION. GitHub Status"
+        echo ""
+        echo "⚠️ **jq not found** (required for GitHub queries)"
+        echo "Install: \`sudo apt install jq\`"
+        echo ""
+    else
+        # Build repo list
+        REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+        ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+        if [ -n "$ROOT_REPO" ]; then
+            REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
+        fi
+        REPOS=$(echo "$REPOS" | sort -u | grep -v '^$')
+
+        # Pull Requests
+        SECTION=$((SECTION + 1))
+        echo "## $SECTION. GitHub Pull Requests"
+        echo ""
+
         PR_COUNT=0
         PR_OUTPUT=""
-
         for repo in $REPOS; do
-            if [ -z "$repo" ]; then
-                continue
-            fi
-
-            # Query GitHub API for open PRs
+            [ -z "$repo" ] && continue
             prs=$(gh pr list --repo "$repo" --json number,title,url --limit 100 2>/dev/null || echo "[]")
-
             if [ -n "$prs" ] && [ "$prs" != "[]" ]; then
-                # Process each PR
                 while read -r pr_line; do
-                    if [ -z "$pr_line" ]; then
-                        continue
-                    fi
-
+                    [ -z "$pr_line" ] && continue
                     number=$(echo "$pr_line" | jq -r '.number')
                     title=$(echo "$pr_line" | jq -r '.title')
                     url=$(echo "$pr_line" | jq -r '.url')
-
-                    # Truncate title if too long
-                    if [ ${#title} -gt 60 ]; then
-                        title="${title:0:57}..."
-                    fi
-
-                    # Format as table row
+                    [ ${#title} -gt 60 ] && title="${title:0:57}..."
                     repo_name=$(basename "$repo")
                     PR_OUTPUT+="| $repo_name | [#$number]($url) | $title |"$'\n'
                     PR_COUNT=$((PR_COUNT + 1))
@@ -384,67 +482,33 @@ if [ "$SKIP_GITHUB" = false ]; then
             echo "✅ No open pull requests"
         fi
         echo ""
-    fi
 
-    echo "---"
-    echo ""
-fi
-
-#######################################
-# STEP 4: GITHUB ISSUES
-#######################################
-
-if [ "$SKIP_GITHUB" = false ]; then
-    STEP_NUM=$((STEP_NUM + 1))
-    echo "## Step $STEP_NUM: GitHub Issues"
-    echo ""
-
-    if ! command -v gh &> /dev/null; then
-        echo "⚠️ **GitHub CLI (\`gh\`) not found** (same as above)"
+        # Issues
+        SECTION=$((SECTION + 1))
+        echo "## $SECTION. GitHub Issues"
         echo ""
-    elif ! gh auth status &> /dev/null; then
-        echo "⚠️ **GitHub CLI (\`gh\`) is not authenticated**"
-        echo "   Run \`gh auth login\` to configure GitHub authentication."
-        echo ""
-    else
-        # Check if REPOS variable is set (should be from PR section above)
-        if [ -z "${REPOS:-}" ]; then
-            echo "ℹ️  No repositories available for GitHub issue query."
-            echo ""
-        else
-            # Query issues for each repository
-            ISSUE_COUNT=0
-            ISSUE_OUTPUT=""
 
-            for repo in $REPOS; do
-                if [ -z "$repo" ]; then
-                    continue
-                fi
-
-                # Query GitHub API for open issue count using search API (accurate total_count)
-                count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
-
-                # Ensure count is a valid integer
-                if ! [[ "$count" =~ ^[0-9]+$ ]]; then
-                    count=0
-                fi
-
-                if [ "$count" -gt 0 ]; then
-                    repo_name=$(basename "$repo")
-                    issue_url="https://github.com/$repo/issues"
-                    ISSUE_OUTPUT+="| [$repo_name]($issue_url) | $count |"$'\n'
-                    ISSUE_COUNT=$((ISSUE_COUNT + count))
-                fi
-            done
-
-            if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
-                echo "| Repository | Open Issues |"
-                echo "|------------|-------------|"
-                printf '%s\n' "$ISSUE_OUTPUT"
-                echo "**Total Open Issues**: $ISSUE_COUNT"
-            else
-                echo "✅ No open issues"
+        ISSUE_COUNT=0
+        ISSUE_OUTPUT=""
+        for repo in $REPOS; do
+            [ -z "$repo" ] && continue
+            count=$(gh api -X GET search/issues -f q="repo:$repo is:issue is:open" --jq '.total_count' 2>/dev/null || echo "0")
+            [[ "$count" =~ ^[0-9]+$ ]] || count=0
+            if [ "$count" -gt 0 ]; then
+                repo_name=$(basename "$repo")
+                issue_url="https://github.com/$repo/issues"
+                ISSUE_OUTPUT+="| [$repo_name]($issue_url) | $count |"$'\n'
+                ISSUE_COUNT=$((ISSUE_COUNT + count))
             fi
+        done
+
+        if [ ${#ISSUE_OUTPUT} -gt 0 ]; then
+            echo "| Repository | Open Issues |"
+            echo "|------------|-------------|"
+            printf '%s\n' "$ISSUE_OUTPUT"
+            echo "**Total Open Issues**: $ISSUE_COUNT"
+        else
+            echo "✅ No open issues"
         fi
         echo ""
     fi
@@ -454,13 +518,21 @@ if [ "$SKIP_GITHUB" = false ]; then
 fi
 
 #######################################
-# STEP 5: LATEST TEST STATUS
+# SECTION: LATEST TEST STATUS
 #######################################
 
-SUMMARY_JSON="$ROOT_DIR/.agent/scratchpad/test_summary.json"
-if [ -f "$SUMMARY_JSON" ]; then
-    STEP_NUM=$((STEP_NUM + 1))
-    echo "## Step $STEP_NUM: Latest Test Status"
+SUMMARY_JSON=""
+for _candidate in \
+    "${MAIN_ROOT:-$ROOT_DIR}/.agent/scratchpad/test_summary.json" \
+    "${MAIN_ROOT:-$ROOT_DIR}/.scratchpad/test_summary.json"; do
+    if [ -f "$_candidate" ]; then
+        SUMMARY_JSON="$_candidate"
+        break
+    fi
+done
+if [ -n "$SUMMARY_JSON" ]; then
+    SECTION=$((SECTION + 1))
+    echo "## $SECTION. Latest Test Results"
     python3 -c "
 import json, sys
 try:
@@ -488,7 +560,7 @@ except Exception as e:
 fi
 
 #######################################
-# COMPLETION
+# DONE
 #######################################
 
-echo "✅ **Status report complete**"
+echo "✅ **Dashboard complete**"

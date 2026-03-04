@@ -157,20 +157,31 @@ include a clickable markdown link on every mention.
 
 ## Build & Test
 
+`make build` handles the core setup chain automatically — on a fresh clone it
+runs bootstrap, manifest import, and layer setup before building. On subsequent
+runs it skips already-completed steps (stamp files in `.make/`). Dev-tools
+(pre-commit, venv) are installed separately via `make lint`. Use `make clean`
+to reset stamps and force a full re-setup.
+
 ```bash
-make build                                       # Build all layers
-make test                                        # Run all tests
-make validate                                    # Validate workspace
+make build                                       # Build all layers (auto-setup on first run)
+make test                                        # Run all tests (builds first if needed)
+make validate                                    # Validate workspace config (CI-oriented)
+make dashboard                                   # Unified workspace status
+make dashboard QUICK=1                           # Quick mode (skip sync + GitHub)
 
 # Single package
 cd layers/main/<layer>_ws && colcon build --packages-select <package>
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 
-make lint                                        # Lint + hooks (uses venv pre-commit)
+make lint                                        # Lint + hooks (auto-installs pre-commit)
 ```
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
+
+Set `NONINTERACTIVE=1` to suppress all interactive prompts (e.g., the first-run
+bootstrap confirmation). `CI` is also recognized for CI environments.
 
 ## Documentation Accuracy
 
@@ -219,7 +230,7 @@ Before marking a task complete or opening a PR:
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
-| `.agent/scripts/status_report.sh` | Workspace status (supports `--quick`) |
+| `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |
 | `.agent/scripts/gh_create_issue.sh` | Create issue with label validation |

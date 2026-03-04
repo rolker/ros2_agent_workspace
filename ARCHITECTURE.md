@@ -182,14 +182,13 @@ The workspace supports a locking mechanism (`.agent/scripts/lock.sh`, `.agent/sc
 
 ### Status Reporting
 
-`.agent/scripts/status_report.sh` generates a comprehensive report using `vcs` and `gh` to show:
+`.agent/scripts/dashboard.sh` generates a unified workspace dashboard using `vcs` and `gh` to show:
+- Health checks (ROS 2, tools, workspace structure)
 - Root repository status
-- All sub-repository statuses
-- Modified files
-- Branch information
-- Ahead/behind tracking
+- All sub-repository statuses per layer
+- Branch tracking (ahead/behind, wrong branch)
+- Active worktrees
 - Open GitHub PRs and issues (use `--skip-github` or `--quick` for offline mode)
-- PR comment triage (with `--pr-triage`)
 
 ## VCS Tool Integration
 

@@ -36,10 +36,10 @@ This will:
 ## Step 3: Set Up Development Tools
 
 ```bash
-make setup-dev
+make lint
 ```
 
-This creates a Python venv, installs pre-commit, and activates git hooks.
+This creates a Python venv, installs pre-commit, activates git hooks, and runs all hooks.
 
 **Note:** Requires `python3-venv` (`sudo apt install python3-venv` if not already present).
 
@@ -48,12 +48,7 @@ This creates a Python venv, installs pre-commit, and activates git hooks.
 Verify your setup:
 
 ```bash
-./.agent/scripts/health_check.sh
-```
-
-Or using make:
-```bash
-make health-check
+make dashboard QUICK=1
 ```
 
 This will check that all required tools are installed and the workspace is properly configured.
@@ -155,9 +150,9 @@ make test
 See the status of all repositories:
 
 ```bash
-./.agent/scripts/status_report.sh
-# or
-make status
+make dashboard
+# or for quick local-only check:
+make dashboard QUICK=1
 ```
 
 ## Working with AI Agents
@@ -204,7 +199,7 @@ git commit -am "Add new feature"
 If you encounter issues, see the [Troubleshooting](README.md#troubleshooting) section in the main README or run:
 
 ```bash
-./.agent/scripts/health_check.sh
+make dashboard QUICK=1
 ```
 
 ## Getting Help

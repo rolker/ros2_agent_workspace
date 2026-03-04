@@ -12,13 +12,14 @@ Initialize workspace layers from project configuration.
 ```bash
 ./.agent/scripts/setup_layers.sh              # Auto-setup all layers (recommended)
 ./.agent/scripts/setup_layers.sh <layer_name> # Setup specific layer
+./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest repo only (no layers)
 ```
 
 **Examples:**
 ```bash
 ./.agent/scripts/setup_layers.sh              # Setup all layers (underlay, core, platforms, etc.)
 ./.agent/scripts/setup_layers.sh core         # Setup only core layer
-./.agent/scripts/setup_layers.sh underlay     # Setup only underlay layer
+./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest only (used by Makefile)
 ```
 
 **What it does:**
@@ -70,23 +71,23 @@ Install ROS 2 Jazzy and system dependencies on Ubuntu 24.04.
 
 ## Status & Reporting
 
-### `status_report.sh` ⭐ Recommended
+### `dashboard.sh` ⭐ Recommended
 
-**Comprehensive workspace status** — repository sync, git status, GitHub PRs/issues, and test results.
+**Unified workspace dashboard** — health checks, repository sync, git status, worktrees, GitHub PRs/issues, and test results.
 
 **Usage:**
 ```bash
-./.agent/scripts/status_report.sh                    # Full status (sync + GitHub)
-./.agent/scripts/status_report.sh --quick            # Fast local-only (no sync, no GitHub)
-./.agent/scripts/status_report.sh --skip-sync        # Skip fetch, keep GitHub queries
-./.agent/scripts/status_report.sh --skip-github      # Local status only (offline)
-./.agent/scripts/status_report.sh --help             # Show all flags
+./.agent/scripts/dashboard.sh                    # Full dashboard (sync + GitHub)
+./.agent/scripts/dashboard.sh --quick            # Fast local-only (no sync, no GitHub)
+./.agent/scripts/dashboard.sh --skip-sync        # Skip fetch, keep GitHub queries
+./.agent/scripts/dashboard.sh --skip-github      # Local status only (offline)
+./.agent/scripts/dashboard.sh --help             # Show all flags
 ```
 
 **Makefile shortcuts:**
 ```bash
-make status        # Full status
-make status-quick  # Equivalent to --quick
+make dashboard        # Full dashboard
+make dashboard QUICK=1  # Equivalent to --quick
 ```
 
 **Flags:**
@@ -107,8 +108,8 @@ make status-quick  # Equivalent to --quick
 - Latest test results (if available)
 
 **When to use:**
-- Daily morning status check (`make status`)
-- Quick check before committing (`make status-quick`)
+- Daily morning status check (`make dashboard`)
+- Quick check before committing (`make dashboard QUICK=1`)
 
 **Dependencies:**
 - Required: `vcs`, `git`, `python3`, `jq`
@@ -279,26 +280,6 @@ Lock/unlock the workspace to prevent accidental modifications.
 
 ---
 
-### `checkout_default_branch.sh`
-
-Automatically detect and switch to the remote default branch (e.g. `main` or `jazzy`).
- 
- **Usage:**
- ```bash
- ./.agent/scripts/checkout_default_branch.sh
- ```
- 
- **What it does:**
- 1. Detects `origin/HEAD`
- 2. Checks for uncommitted changes (Safeguard)
- 3. Switches to default branch
- 4. Pulls latest changes
- 
- **Safety:**
- - Will **EXIT with error** if you have uncommitted changes. This prevents accidental loss of work or "hiding" work in stashes.
- 
- ---
-
 ### `check_branch_updates.sh`
 
 Check if the default branch has new commits and provide merge/rebase recommendations.
@@ -346,7 +327,7 @@ $ ./.agent/scripts/check_branch_updates.sh
 ```
 
 **Integration:**
-- Runs automatically via pre-commit hook (when `make setup-dev` has been run)
+- Runs automatically via pre-commit hook (when `make lint` has been run)
 - Recommended before creating a pull request
 
 **See also:**
@@ -694,8 +675,8 @@ python3 ./.agent/scripts/read_feature_status.py --issue 139 --pretty
 
 ### Daily status check
 ```bash
-make status                             # Full morning report (sync + GitHub)
-make status-quick                       # Fast local-only check
+make dashboard                          # Full morning report (sync + GitHub)
+make dashboard QUICK=1                  # Fast local-only check
 ```
 
 ### Initialize workspace (first time)
@@ -709,20 +690,20 @@ source ./.agent/scripts/setup.bash          # Source environment
 ### Daily development
 ```bash
 source ./.agent/scripts/setup.bash         # Each new terminal
-./.agent/scripts/status_report.sh --quick  # Quick workspace state check
+./.agent/scripts/dashboard.sh --quick  # Quick workspace state check
 ./.agent/scripts/build.sh core         # Build changes
 ./.agent/scripts/test.sh core          # Run tests
 ```
 
 ### Before committing
 ```bash
-./.agent/scripts/status_report.sh --quick  # Verify clean state
+./.agent/scripts/dashboard.sh --quick  # Verify clean state
 # Commit changes to feature branch
 ```
 
 ### Troubleshooting
 ```bash
-./.agent/scripts/status_report.sh      # See what's wrong
+./.agent/scripts/dashboard.sh --quick  # See what's wrong
 python3 ./.agent/scripts/validate_repos.py  # Check configs
 ./.agent/scripts/build_report_generator.py  # Detailed errors
 ```

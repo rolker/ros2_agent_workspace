@@ -20,7 +20,7 @@ source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
 .agent/scripts/configure_git_identity.sh "<Agent Name>" "<email>"
 
 # 3. Check workspace status
-.agent/scripts/status_report.sh
+.agent/scripts/dashboard.sh --quick
 ```
 
 See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity decision tree.

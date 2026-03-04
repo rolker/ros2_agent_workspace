@@ -11,10 +11,10 @@ For parallel work by multiple agents, use **git worktrees** for complete isolati
 ### Quick Start
 ```bash
 # Create isolated worktree for an issue
-.agent/scripts/start_issue_work.sh 42 "Agent Name" --worktree layer
+.agent/scripts/worktree_create.sh --issue 42 --type layer --layer core --packages <pkg>
 
 # Enter the worktree (sets up ROS environment)
-source .agent/scripts/worktree_enter.sh 42
+source .agent/scripts/worktree_enter.sh --issue 42
 
 # Work in complete isolation - no conflicts with other agents
 # Build, test, commit, push - all isolated
@@ -55,7 +55,7 @@ To prevent duplicate work and enable collaboration, agents must make work-in-pro
 
 *   **During Work**:
     *   Update the work plan as you progress (check off tasks, document decisions)
-    *   Commit plan updates: `.agent/scripts/update_issue_plan.sh <issue_number>`
+    *   Commit plan updates regularly with atomic commits
     *   The plan serves as handover documentation if another agent needs to take over
 
 *   **Finishing**:
@@ -88,7 +88,7 @@ Every agent invocation is a "shift". When your shift ends (you call `notify_user
 
 *   **The Golden Rule**: *Leave the campsite cleaner than you found it.*
 *   **Requirement**:
-    *   Run `status_report.sh --quick` or `vcs status` before finishing.
+    *   Run `dashboard.sh --quick` or `vcs status` before finishing.
     *   **Alert**: If you see modifications in repositories you didn't touch, **WARN THE USER**. Do not commit them blindly.
     *   **Action**: Commit your own work to a `feature/` branch.
 

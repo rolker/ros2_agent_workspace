@@ -160,7 +160,7 @@ Pre-commit hooks are automatically configured via the `.pre-commit-config.yaml` 
 
 ```bash
 # Create venv, install pre-commit, and activate git hooks (one-time per clone)
-make setup-dev
+make lint
 ```
 
 ### Running Manually
@@ -240,7 +240,7 @@ pre-commit run --verbose --all-files
 
 ```bash
 # Reinstall hooks
-make setup-dev
+make lint
 ```
 
 ### Hooks are slow
