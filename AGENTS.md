@@ -227,6 +227,7 @@ Before marking a task complete or opening a PR:
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories |
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
+| `.agent/scripts/fetch_copilot_reviews.sh` | Fetch Copilot review comments after HEAD |
 
 ## Layered Architecture
 
