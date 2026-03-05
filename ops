@@ -1,1 +1,1 @@
-{"author":{"id":"b78c39e7b13f90a5827abfba043255fe7a4ede1499df23f110fffe5abfa44adc"},"ops":[{"type":4,"timestamp":1772728611,"nonce":"pOLs6H8BmrhYi73vsifHwIxkI0U=","status":2}]}
+{"author":{"id":"b78c39e7b13f90a5827abfba043255fe7a4ede1499df23f110fffe5abfa44adc"},"ops":[{"type":8,"timestamp":1772728637,"nonce":"XPSOyAlpbldIcQ3I5O7pAnui0Q0=","target":"8d09fbcf1d2f34873f2c458d407217446639700fcfbabeee40a263b1ab78a89d","new_metadata":{"github-id":"I_kwDOQ241x87wKy8c","github-url":"https://github.com/rolker/ros2_agent_workspace/issues/354"}}]}
