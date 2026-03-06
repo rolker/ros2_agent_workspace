@@ -40,26 +40,32 @@ Actually all comments could be considered with that caveat."
    `user_type` fields in both review and comment objects so the skill can
    distinguish human vs. bot sources.
 
-4. **Update skill instructions** — the triage-copilot skill should:
+4. **Rename skill** — `triage-copilot` → `triage-reviews`. Rename the
+   directory `.claude/skills/triage-copilot/` → `.claude/skills/triage-reviews/`.
+   Update the skill name, usage, and description in the SKILL.md.
+
+5. **Update skill instructions** — the triage-reviews skill should:
    - Process all review comments (not just Copilot)
    - Group output by source (human reviewers vs. Copilot)
    - For human comments: check if already addressed by recent commits
    - For Copilot comments: evaluate as before (valid issue vs. false positive)
    - Rename report header to "PR Review Triage" (not "Copilot Triage")
 
-5. **Update AGENTS.md script reference** — rename the script entry.
+6. **Update all references** — AGENTS.md script table, framework adapter
+   skill lists (`triage-copilot` → `triage-reviews`), and script name
+   (`fetch_copilot_reviews.sh` → `fetch_pr_reviews.sh`).
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
 | `.agent/scripts/fetch_copilot_reviews.sh` | Rename to `fetch_pr_reviews.sh`; remove user-login filter from jq; add `user_login`/`user_type` to output JSON |
-| `.agent/scripts/fetch_pr_reviews.sh` | (new name) See above |
-| `.claude/skills/triage-copilot/SKILL.md` | Update step 3 script reference; update step 5/6 to handle all comment sources; update report template |
-| `AGENTS.md` | Rename script in reference table |
-| `.github/copilot-instructions.md` | Update script reference if present |
-| `.agent/instructions/gemini-cli.instructions.md` | Update script reference if present |
-| `.agent/AGENT_ONBOARDING.md` | Update script reference if present |
+| `.claude/skills/triage-copilot/` | Rename directory to `.claude/skills/triage-reviews/` |
+| `.claude/skills/triage-reviews/SKILL.md` | Update name, usage, script reference; update steps 5/6 to handle all comment sources; update report template |
+| `AGENTS.md` | Rename script in reference table (`fetch_copilot_reviews.sh` → `fetch_pr_reviews.sh`) |
+| `.github/copilot-instructions.md` | `triage-copilot` → `triage-reviews` in skill list |
+| `.agent/instructions/gemini-cli.instructions.md` | `triage-copilot` → `triage-reviews` in skill list |
+| `.agent/AGENT_ONBOARDING.md` | `triage-copilot` → `triage-reviews` in skill list |
 
 ## Principles Self-Check
 
@@ -82,15 +88,13 @@ Actually all comments could be considered with that caveat."
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
 | Script name in `.agent/scripts/` | `AGENTS.md` script reference table | Yes |
+| Skill name and directory | Framework adapter skill lists | Yes |
 | Skill behavior | Skill file in `.claude/skills/` | Yes |
-| Script referenced in framework adapters | Non-Claude adapters | Yes |
+| Workflow skill list | Non-Claude adapters (copilot, gemini, onboarding) | Yes |
 
 ## Open Questions
 
-- Should the skill be renamed from `triage-copilot` to something broader
-  (e.g., `triage-reviews`)? The current name is misleading since it will
-  now triage all review comments. Renaming involves updating the skill
-  directory name, all adapter skill lists, and user muscle memory.
+None — skill rename to `triage-reviews` confirmed by owner.
 
 ## Estimated Scope
 
