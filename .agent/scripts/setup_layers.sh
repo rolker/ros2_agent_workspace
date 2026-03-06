@@ -240,7 +240,7 @@ mkdir -p "$LAYER_DIR/src"
 
 if command -v vcs &> /dev/null; then
     echo "Importing repositories into $LAYER_DIR/src..."
-    vcs import "$LAYER_DIR/src" < "$CONFIG_FILE"
+    vcs import --skip-existing "$LAYER_DIR/src" < "$CONFIG_FILE"
 else
     echo "Warning: 'vcs' command not found. Skipping repository import."
     echo "To install all necessary dependencies, run:"
