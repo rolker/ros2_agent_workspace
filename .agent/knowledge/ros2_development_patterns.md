@@ -83,6 +83,8 @@ introducing a mix.
 - Place all launch files in the `<package>/launch/` directory
 - **Wrong**: `simulator.launch.py`, `my_launch.py`, `start.py`
 - **Right**: `simulator_launch.py`, `robot_bringup_launch.py`
+- For programmatic launch management and GUI monitoring, see
+  [Launch Tooling for Agents](launch_tooling.md)
 
 ### Licensing
 
