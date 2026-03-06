@@ -33,15 +33,20 @@ Checks to add (extending the 3 existing ones to cover all sections):
 |---------|-------|-------------|
 | Locale (line 12) | Already has check | _(no change)_ |
 | `software-properties-common` (line 26) | `is_installed software-properties-common` | Skip install |
-| Universe repo (line 27) | `grep -q universe /etc/apt/sources.list` | Skip `add-apt-repository` |
+| Universe repo (line 27) | `grep -Rqs '^[^#].*universe' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null` | Skip `add-apt-repository` |
 | `curl` (line 30) | `is_installed curl` | Skip install |
 | ROS 2 apt source (line 46) | `ls /etc/apt/sources.list.d/ros2*.list 2>/dev/null` | Skip `.deb` download + install |
 | `apt update` (line 51) | Needed only if any apt install is pending | Conditional |
 | `ros-dev-tools` (line 52) | `is_installed ros-dev-tools` | Skip install |
 | `ros-jazzy-ros-base` (line 55) | Already has check | _(no change)_ |
-| `python3-pip` (line 64) | `is_installed python3-pip` | Skip install |
-| pip packages (line 65) | `python3 -c "import empy" 2>/dev/null` etc. | Skip pip install |
 | `rosdep init` (line 69) | Already has check | _(no change)_ |
+
+**Remove `python3-pip` install and bare pip install (lines 64–65).** Per
+ADR-0009, ROS build dependencies (`empy`, `catkin_pkg`, `lark`) must be
+resolved via `rosdep install` — never via bare `pip install`. The existing
+`rosdep update` + `rosdep install` at the end of bootstrap handles these
+when declared in `package.xml`. The `python3-pip` install and the
+`python3 -m pip install --user` line should be removed entirely.
 
 If all checks pass, print "All prerequisites already installed — nothing to
 do." and exit 0 without any `sudo` call.
@@ -121,7 +126,7 @@ skip-bootstrap: ## Skip bootstrap (system already configured)
 | Human control and transparency | Core driver. `--dry-run` in the Makefile prompt shows exact `sudo` commands before asking for confirmation. Users make an informed decision. |
 | Only what's needed | Idempotent checks skip already-installed packages, avoiding unnecessary `sudo` prompts and install time. |
 | Enforcement over documentation | `--dry-run` is generated from the same code path as the real install — can't drift from reality. |
-| A change includes its consequences | Makefile prompt updated alongside script. `make help` auto-updates via the `##` comment pattern. |
+| A change includes its consequences | Makefile prompt updated alongside script. `make help` echo list and `.PHONY` line updated manually (help target uses hardcoded echo, not `##` auto-pattern). |
 | Improve incrementally | Single PR with two files. Each improvement (checks, dry-run, skip target) is independently useful. |
 
 ## ADR Compliance
@@ -130,13 +135,14 @@ skip-bootstrap: ## Skip bootstrap (system already configured)
 |---|---|---|
 | 0007 — Retain Make with dependency tracking | Yes | `skip-bootstrap` uses the existing stamp-file pattern. Compatible with #332's refactor. |
 | 0004 — Enforcement hierarchy | No | No new compliance rules. |
+| 0009 — Python package management | Yes | Remove bare `pip install --user` from bootstrap; ROS build deps (`empy`, `catkin_pkg`, `lark`) resolved via `rosdep install` instead. |
 
 ## Consequences
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
 | `bootstrap.sh` interface (add `--dry-run`) | Makefile that calls it | Yes |
-| Add `skip-bootstrap` Make target | `make help` (auto via `##` comment) | Yes (automatic) |
+| Add `skip-bootstrap` Make target | `make help` echo list + `.PHONY` line | Yes — manual update required |
 | Add `skip-bootstrap` Make target | `make generate-skills` (new `.PHONY`) | Yes — run after adding target |
 
 ## Open Questions
