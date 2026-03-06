@@ -132,7 +132,7 @@ $(STAMP)/bootstrap.done:
 	@./.agent/scripts/bootstrap.sh
 	@touch $@
 
-$(STAMP)/setup-dev.done: $(STAMP)/bootstrap.done
+$(STAMP)/setup-dev.done: $(STAMP)/bootstrap.done $(MAIN_ROOT)/requirements.txt
 	@mkdir -p $(STAMP)
 	@python3 -m venv $(VENV_DIR) \
 		|| { echo "Error: python3-venv is required. Install with:"; \
