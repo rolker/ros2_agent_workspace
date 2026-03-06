@@ -18,7 +18,9 @@ lifecycle states. Useful when a human operator wants to watch what an
 agent-triggered launch is doing.
 
 > **Note**: The `-g` flag is provided by `ros2launch_gui`, not upstream ROS 2.
-> It will not be available unless `ros2launch_gui` is installed.
+> It will not be available unless `ros2launch_gui` is installed. It also
+> requires a display server (X11/Wayland) and will fail in headless
+> environments (CI, SSH without X forwarding, containers without a display).
 
 ## `ros2launch_session` API
 

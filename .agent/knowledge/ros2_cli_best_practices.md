@@ -90,7 +90,9 @@ This guide outlines how to use the `ros2` command-line interface (CLI) effective
     Shows a Qt window with process tree, output, and lifecycle states.
 
 > **Note**: The `-g` flag is provided by `ros2launch_gui`, not upstream ROS 2.
-> See [Launch Tooling for Agents](launch_tooling.md) for programmatic launch
+> It requires a display server (X11/Wayland) and will fail in headless
+> environments (CI, SSH without X forwarding). See
+> [Launch Tooling for Agents](launch_tooling.md) for programmatic launch
 > management with `ros2launch_session`.
 
 ## Troubleshooting
