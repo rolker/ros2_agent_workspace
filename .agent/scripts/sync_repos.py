@@ -85,7 +85,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
 
     # 2. Sync Logic
     if branch in ["main", "jazzy", "rolling"]:
-        print(f"  🚀 On default branch '{branch}'. Pulling updates...")
+        print(f"  On default branch '{branch}'. Pulling updates...")
         success, output = run_git_cmd(repo_path, ["pull", "--rebase"], dry_run)
         if success:
             if dry_run:
@@ -98,7 +98,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
             print(f"     ❌ Update failed: {output}")
 
     else:
-        print(f"  🌿 On feature branch '{branch}'. Fetching only...")
+        print(f"  On feature branch '{branch}'. Fetching only...")
         success, output = run_git_cmd(repo_path, ["fetch"], dry_run)
 
         if success:

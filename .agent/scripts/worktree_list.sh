@@ -111,12 +111,12 @@ print_worktree() {
 
     # Format output
     if [ "$type" == "main" ]; then
-        echo "📁 Main Workspace"
+        echo "[main] Main Workspace"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
     elif [ -n "$skill" ]; then
-        echo "🔧 Skill: $skill ($type) - Repository: $repo"
+        echo "[workspace] Skill: $skill ($type) - Repository: $repo"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
@@ -125,7 +125,7 @@ print_worktree() {
             echo "   Files changed: $(git -C "$path" status --porcelain 2>/dev/null | wc -l)"
         fi
     else
-        echo "🔧 Issue #$issue ($type) - Repository: $repo"
+        echo "[workspace] Issue #$issue ($type) - Repository: $repo"
         echo "   Path:   $path"
         echo "   Branch: ${branch:-detached at $head}"
         echo "   Status: $status"
@@ -185,9 +185,9 @@ if [ -d "$LAYER_WT_DIR" ]; then
         fi
 
         if [ -n "$local_skill" ]; then
-            echo "📦 Skill: $local_skill (layer) - Repository: $local_repo"
+            echo "[layer] Skill: $local_skill (layer) - Repository: $local_repo"
         else
-            echo "📦 Issue #$local_issue (layer) - Repository: $local_repo"
+            echo "[layer] Issue #$local_issue (layer) - Repository: $local_repo"
         fi
         echo "   Path:   $layer_wt"
         echo "   Branch: ${local_branch:-unknown}"

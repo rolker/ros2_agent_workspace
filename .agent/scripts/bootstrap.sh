@@ -1,4 +1,9 @@
 #!/bin/bash
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
 set -e
 
 # [TASK-003] Bootstrap Automation

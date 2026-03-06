@@ -19,13 +19,11 @@ ORANGE='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Emojis
-EMOJI_REVIEW="🟡"
-EMOJI_CRITICAL="🔴"
-EMOJI_MINOR="🟠"
-EMOJI_READY="🟢"
-EMOJI_SEARCH="🔍"
-EMOJI_CHART="📊"
+# Status labels
+EMOJI_REVIEW="[REVIEW]"
+EMOJI_CRITICAL="[CRITICAL]"
+EMOJI_MINOR="[MINOR]"
+EMOJI_READY="[READY]"
 
 # Discover all workspace repos (root + overlay + underlay)
 # Returns one owner/repo slug per line, deduplicated and sorted
@@ -347,7 +345,7 @@ display_analyzed_dashboard() {
     local analyzed_json=$1
     local title_suffix=${2:-""}
 
-    echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${title_suffix}${NC}"
+    echo -e "${BLUE}PR Status Dashboard${title_suffix}${NC}"
     echo "===================="
     echo ""
 
@@ -373,7 +371,7 @@ display_analyzed_dashboard() {
 
     local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
     echo ""
-    echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
+    echo -e "${BLUE}Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
     echo ""
 }
 

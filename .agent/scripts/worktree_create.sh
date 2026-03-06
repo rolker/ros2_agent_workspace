@@ -552,7 +552,7 @@ if [ -n "$ISSUE_NUM" ]; then
         fi
     fi
     if [ -n "$ISSUE_TITLE" ]; then
-        echo "📋 Issue #$ISSUE_NUM: $ISSUE_TITLE"
+        echo "Issue #$ISSUE_NUM: $ISSUE_TITLE"
         if [ "$ISSUE_STATE" = "CLOSED" ]; then
             echo "   ⚠️  Warning: Issue #$ISSUE_NUM is CLOSED"
         fi
@@ -561,7 +561,7 @@ if [ -n "$ISSUE_NUM" ]; then
         echo "   Proceeding anyway — verify the issue number is correct."
     fi
 else
-    echo "🔧 Skill worktree: $SKILL_NAME (ID: $SYNTHETIC_ID)"
+    echo "Skill worktree: $SKILL_NAME (ID: $SYNTHETIC_ID)"
 fi
 echo ""
 

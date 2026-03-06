@@ -23,4 +23,4 @@ echo "LOCKED_BY=\"$USER_ID\"" > "$LOCK_FILE"
 echo "REASON=\"$REASON\"" >> "$LOCK_FILE"
 echo "TIMESTAMP=\"$TIMESTAMP\"" >> "$LOCK_FILE"
 
-echo "🔒 Workspace locked by $USER_ID for: $REASON"
+echo "LOCKED: Workspace locked by $USER_ID for: $REASON"

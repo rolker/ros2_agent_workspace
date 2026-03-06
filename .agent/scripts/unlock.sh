@@ -14,4 +14,4 @@ fi
 # but for now we assume trust between agents/users.
 
 rm "$LOCK_FILE"
-echo "🔓 Workspace unlocked."
+echo "UNLOCKED: Workspace unlocked."

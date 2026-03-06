@@ -24,6 +24,11 @@
 #   Pattern B (manifest with ROS packages): layer field present in bootstrap.yaml
 #     -> cloned into layers/main/<layer>_ws/src/<repo_name>/ so colcon finds packages
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
 set -e
 
 LAYER_NAME=$1
