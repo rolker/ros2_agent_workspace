@@ -68,8 +68,9 @@ if v and v != 'unknown': print(v)
 }
 
 # Generate convenience scripts for layer worktrees.
-# Creates setup.bash, build.sh, test.sh, and colcon/defaults.yaml so users can
-# build and test without knowing about worktree_enter.sh or ROS2_LAYERS_BASE.
+# Creates setup.bash, build.sh, test.sh, and colcon_defaults.yaml in the
+# layer worktree so users can build and test without knowing about
+# worktree_enter.sh or ROS2_LAYERS_BASE.
 generate_worktree_scripts() {
     local wt_dir="$1"
     local main_root="$2"
@@ -270,9 +271,9 @@ TESTSH
         cat >> "$layer_dir/test.sh" << 'TESTSH_TEST'
 # Test
 if [ $# -gt 0 ]; then
-    colcon test --packages-select "$@"
+    colcon test --return-code-on-test-failure --packages-select "$@"
 else
-    colcon test
+    colcon test --return-code-on-test-failure
 fi
 colcon test-result --verbose
 TESTSH_TEST
