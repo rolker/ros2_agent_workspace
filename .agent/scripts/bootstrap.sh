@@ -47,9 +47,9 @@ if ! locale | grep -q 'LC_ALL=.*UTF-8'; then
     fi
     ensure_apt_updated
     run_or_collect sudo apt install -y locales
+    run_or_collect sudo locale-gen en_US en_US.UTF-8
+    run_or_collect sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
     if [ "$DRY_RUN" = false ]; then
-        sudo locale-gen en_US en_US.UTF-8
-        sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
         export LANG=en_US.UTF-8
         echo "Locale set to en_US.UTF-8"
     fi
@@ -100,6 +100,7 @@ if ! compgen -G "/etc/apt/sources.list.d/ros2*.list" >/dev/null 2>&1 \
             echo "Error: Failed to download ros2-apt-source .deb or file is empty." >&2
             exit 1
         fi
+        SOMETHING_INSTALLED=true
         sudo dpkg -i /tmp/ros2-apt-source.deb
         rm /tmp/ros2-apt-source.deb
         APT_UPDATED=false  # New source added, need fresh apt update
