@@ -38,7 +38,20 @@ Each framework has a self-contained instruction file with all rules inline:
 
 ### For Human Users
 
-Jump to [Usage](#usage) below, or see [ARCHITECTURE.md](ARCHITECTURE.md) for how the workspace is structured.
+**Prerequisites**: Ubuntu 22.04 or 24.04, Git, sudo access, SSH key on GitHub.
+
+```bash
+git clone git@github.com:rolker/ros2_agent_workspace.git
+cd ros2_agent_workspace
+make build          # bootstraps ROS 2, imports repos, and builds (first run ~15 min)
+make lint           # installs pre-commit hooks (needs python3-venv)
+source scripts/setup.bash
+```
+
+`make build` handles everything on a fresh clone — bootstrap, manifest import,
+layer setup, and build. On subsequent runs it skips completed steps.
+
+See [Usage](#usage) for details and [ARCHITECTURE.md](ARCHITECTURE.md) for how the workspace is structured.
 
 ### For Containerized/Custom Agents
 
