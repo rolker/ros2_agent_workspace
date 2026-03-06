@@ -105,7 +105,7 @@ if ! compgen -G "/etc/apt/sources.list.d/ros2*.list" >/dev/null 2>&1 \
         rm /tmp/ros2-apt-source.deb
         APT_UPDATED=false  # New source added, need fresh apt update
     else
-        PENDING_COMMANDS+=("sudo dpkg -i ros2-apt-source_<version>.deb")
+        PENDING_COMMANDS+=("sudo dpkg -i /tmp/ros2-apt-source.deb (version auto-detected from GitHub)")
         APT_UPDATED=false
     fi
 else
