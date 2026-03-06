@@ -40,7 +40,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build test lint clean setup-all dashboard validate sync lock unlock revert-feature pr-triage generate-skills agent-build agent-run agent-shell push-gateway
+.PHONY: help build test lint clean setup-all dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap agent-build agent-run agent-shell push-gateway
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -66,6 +66,7 @@ help:
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
+	@echo "  skip-bootstrap - Skip bootstrap (system already configured)"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo "  generate-skills - Regenerate Claude Code /make_* slash commands"
 	@echo ""
@@ -118,8 +119,7 @@ $(STAMP)/bootstrap.done:
 		echo "  First-run setup detected"; \
 		echo "========================================"; \
 		echo ""; \
-		echo "This will install system packages (ROS 2, colcon, etc.) via apt."; \
-		echo "You may be prompted for your sudo password."; \
+		./.agent/scripts/bootstrap.sh --dry-run; \
 		echo ""; \
 		echo "Set CI=1 or NONINTERACTIVE=1 to skip this message."; \
 		echo ""; \
@@ -168,6 +168,11 @@ $(STAMP)/layer-%.done: $(STAMP)/manifest.done $$(wildcard $(MAIN_ROOT)/configs/m
 # =============================================================================
 # Tier 3 — Maintenance & agent container targets
 # =============================================================================
+
+skip-bootstrap:
+	@mkdir -p $(STAMP)
+	@touch $(STAMP)/bootstrap.done
+	@echo "Bootstrap marked as done. Run 'make clean' to reset."
 
 sync:
 	@python3 ./.agent/scripts/sync_repos.py
