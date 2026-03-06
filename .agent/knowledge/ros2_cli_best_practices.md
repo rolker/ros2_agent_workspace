@@ -79,6 +79,22 @@ This guide outlines how to use the `ros2` command-line interface (CLI) effective
     ```
     *Output*: Shows the definition (e.g., `float32 x`, `float32 y`). Use this to construct your YAML input or understand `topic echo` output.
 
+### 6. Launching with GUI Monitoring
+
+**Goal**: Launch nodes with a visual process monitor.
+
+*   **Command**:
+    ```bash
+    ros2 launch -g <package_name> <launch_file>
+    ```
+    Shows a Qt window with process tree, output, and lifecycle states.
+
+> **Note**: The `-g` flag is provided by `ros2launch_gui`, not upstream ROS 2.
+> It requires a display server (X11/Wayland) and will fail in headless
+> environments (CI, SSH without X forwarding). See
+> [Launch Tooling for Agents](launch_tooling.md) for programmatic launch
+> management with `ros2launch_session`.
+
 ## Troubleshooting
 
 *   **Command not found?**: Ensure you source the environment: `source /opt/ros/jazzy/setup.bash`
