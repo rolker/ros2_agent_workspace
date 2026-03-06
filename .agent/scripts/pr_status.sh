@@ -20,10 +20,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Status labels
-EMOJI_REVIEW="[REVIEW]"
-EMOJI_CRITICAL="[CRITICAL]"
-EMOJI_MINOR="[MINOR]"
-EMOJI_READY="[READY]"
+LABEL_REVIEW="[REVIEW]"
+LABEL_CRITICAL="[CRITICAL]"
+LABEL_MINOR="[MINOR]"
+LABEL_READY="[READY]"
 
 # Discover all workspace repos (root + overlay + underlay)
 # Returns one owner/repo slug per line, deduplicated and sorted
@@ -364,10 +364,10 @@ display_analyzed_dashboard() {
         esac
     done < <(echo "$analyzed_json" | jq -c '.[]')
 
-    display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
-    display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
-    display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
-    display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
+    display_category "NEEDS REVIEW" "$LABEL_REVIEW" "$YELLOW" "${needs_review[@]}"
+    display_category "CRITICAL ISSUES" "$LABEL_CRITICAL" "$RED" "${critical[@]}"
+    display_category "MINOR ISSUES" "$LABEL_MINOR" "$ORANGE" "${minor[@]}"
+    display_category "READY TO MERGE" "$LABEL_READY" "$GREEN" "${ready[@]}"
 
     local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
     echo ""
