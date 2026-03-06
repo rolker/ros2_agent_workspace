@@ -67,8 +67,8 @@ cd <layer>_ws/src/<project_repo>   # work here, commit/push here
 # Alternative: set up manually using generated convenience scripts
 cd <worktree_path>                 # path printed by worktree_create.sh
 source setup.bash                  # set up ROS environment
-./<layer>_ws/build.sh [<package>]  # build (uses colcon with correct flags)
-./<layer>_ws/test.sh [<package>]   # test
+./<layer>_ws/build.sh [pkg ...]    # build (uses colcon with correct flags)
+./<layer>_ws/test.sh [pkg ...]     # test
 
 # Multiple project repos in one worktree
 .agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <repo1>,<repo2>
