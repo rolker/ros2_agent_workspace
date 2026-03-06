@@ -43,6 +43,7 @@ setup (environment, identity, features), see your framework's adapter file:
 - Commit secrets or credentials
 - Document from assumptions — verify against source code
 - Construct GitHub URLs from directory names — use `gh` CLI to look them up
+- Run bare `pip install` or use `--break-system-packages` — use `.venv` for dev tools (see ADR-0009)
 
 ## Worktree Workflow
 

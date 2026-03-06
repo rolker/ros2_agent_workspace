@@ -1,0 +1,3 @@
+# Workspace dev-tool dependencies — installed into .venv by `make lint`.
+# Keep minimal: only tools wired into Makefile targets or CI.
+pre-commit

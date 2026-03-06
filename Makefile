@@ -132,12 +132,12 @@ $(STAMP)/bootstrap.done:
 	@./.agent/scripts/bootstrap.sh
 	@touch $@
 
-$(STAMP)/setup-dev.done: $(STAMP)/bootstrap.done
+$(STAMP)/setup-dev.done: $(STAMP)/bootstrap.done $(MAIN_ROOT)/requirements.txt
 	@mkdir -p $(STAMP)
 	@python3 -m venv $(VENV_DIR) \
 		|| { echo "Error: python3-venv is required. Install with:"; \
 		     echo "  sudo apt install python3-venv"; exit 1; }
-	@$(VENV_BIN)/pip install --upgrade pip pre-commit
+	@$(VENV_BIN)/pip install --upgrade pip -r requirements.txt
 	@$(PRE_COMMIT) install
 	@echo "Dev-tools venv ready at $(VENV_DIR)/. Git hooks installed."
 	@touch $@
