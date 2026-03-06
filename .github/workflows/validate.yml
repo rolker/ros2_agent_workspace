@@ -33,7 +33,7 @@ jobs:
 
       - name: Check for required documentation
         run: |
-          required_files="README.md CONTRIBUTING.md SECURITY.md ARCHITECTURE.md"
+          required_files="README.md ARCHITECTURE.md"
           for file in $required_files; do
             if [ ! -f "$file" ]; then
               echo "Missing required file: $file"

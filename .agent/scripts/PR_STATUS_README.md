@@ -231,4 +231,4 @@ mode for single-repo workflows only.
 ## See Also
 
 - `make pr-triage` - Cross-repo PR triage via Makefile
-- `CONTRIBUTING.md` - Contribution guidelines
+- `AGENTS.md` - Workspace rules and development workflow

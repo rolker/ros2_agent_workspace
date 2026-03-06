@@ -233,12 +233,18 @@ Before marking a task complete or opening a PR:
 
 ## Script Reference
 
+`scripts/` at the repo root is a symlink to `.agent/scripts/` for convenience.
+
+Scripts marked **(source)** must be sourced (`source scripts/foo.sh`); all others
+should be executed (`./scripts/foo.sh` or `scripts/foo.sh`). Execute-only scripts
+include a guard that prints an error if accidentally sourced.
+
 | Script | Purpose |
 |--------|---------|
-| `.agent/scripts/setup.bash` | Source ROS 2 env + checkout guardrail |
-| `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) |
+| `.agent/scripts/setup.bash` | Source ROS 2 env + checkout guardrail **(source)** |
+| `.agent/scripts/set_git_identity_env.sh` | Ephemeral git identity (session-only) **(source)** |
 | `.agent/scripts/worktree_create.sh` | Create isolated worktree (`--plan-file` to create draft PR with plan) |
-| `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) |
+| `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) **(source)** |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |

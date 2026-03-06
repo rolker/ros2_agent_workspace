@@ -5,8 +5,8 @@
 ## Environment Setup
 
 ```bash
-source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
-source .agent/scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude-code@ccom.unh.edu"
+source scripts/setup.bash                    # ROS 2 + checkout guardrail
+source scripts/set_git_identity_env.sh "Claude Code Agent" "roland+claude-code@ccom.unh.edu"
 ```
 
 After sourcing, verify `$AGENT_MODEL` matches your actual model (from your system prompt).

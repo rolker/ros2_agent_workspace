@@ -225,7 +225,7 @@ The workspace heavily uses `vcstool` (`vcs` command) for managing multiple repos
 - Place in `.agent/scripts/` directory
 - Make executable: `chmod +x .agent/scripts/new_script.sh`
 - Follow existing patterns (lock checking, error handling)
-- Update CONTRIBUTING.md with usage
+- Update AGENTS.md with usage
 
 ## Design Principles
 
