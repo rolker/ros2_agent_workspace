@@ -63,8 +63,8 @@ source setup.bash                  # Set up ROS environment
 ./core_ws/test.sh my_package
 ```
 
-**Note**: `colcon/defaults.yaml` is placed per-layer so raw `colcon build` from the
-layer directory also picks up the correct flags.
+**Note**: `colcon_defaults.yaml` is placed in the target layer workspace so raw
+`colcon build` from that directory also picks up the correct flags.
 
 ## Why Worktrees?
 
