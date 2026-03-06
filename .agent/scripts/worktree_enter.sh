@@ -304,12 +304,18 @@ if [ "$WORKTREE_TYPE" == "layer" ]; then
             break
         fi
     done
-    if [ -n "$_TARGET_LAYER_WS" ]; then
+    if [ -f "$WORKTREE_DIR/setup.bash" ]; then
         echo "  source setup.bash             # Set up ROS environment"
-        echo "  ./${_TARGET_LAYER_WS}/build.sh [pkg]   # Build packages"
-        echo "  ./${_TARGET_LAYER_WS}/test.sh [pkg]    # Run tests"
+        if [ -n "$_TARGET_LAYER_WS" ] && [ -x "$WORKTREE_DIR/${_TARGET_LAYER_WS}/build.sh" ]; then
+            echo "  ./${_TARGET_LAYER_WS}/build.sh [pkg]   # Build packages"
+        fi
+        if [ -n "$_TARGET_LAYER_WS" ] && [ -x "$WORKTREE_DIR/${_TARGET_LAYER_WS}/test.sh" ]; then
+            echo "  ./${_TARGET_LAYER_WS}/test.sh [pkg]    # Run tests"
+        fi
     else
-        echo "  source setup.bash             # Set up ROS environment"
+        # Older worktrees without generated convenience scripts
+        echo "  colcon build                  # Build packages"
+        echo "  colcon test                   # Run tests"
     fi
     unset _TARGET_LAYER_WS _candidate
 fi

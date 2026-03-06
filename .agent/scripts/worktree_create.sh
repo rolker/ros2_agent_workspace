@@ -109,10 +109,10 @@ WORKTREE_DIR="$wt_dir"
 SETUP_VARS
 
     if [ -n "$ISSUE_NUM" ]; then
-        echo "export WORKTREE_ISSUE=\"$ISSUE_NUM\"" >> "$wt_dir/setup.bash"
+        printf 'export WORKTREE_ISSUE=%q\n' "$ISSUE_NUM" >> "$wt_dir/setup.bash"
     fi
     if [ -n "$SKILL_NAME" ]; then
-        echo "export WORKTREE_SKILL=\"$SKILL_NAME\"" >> "$wt_dir/setup.bash"
+        printf 'export WORKTREE_SKILL=%q\n' "$SKILL_NAME" >> "$wt_dir/setup.bash"
     fi
 
     cat >> "$wt_dir/setup.bash" << SETUP_VARS2
@@ -176,14 +176,15 @@ SETUP_FOOTER
         local layer_ws="${layer}_ws"
         local layer_dir="$wt_dir/$layer_ws"
 
+        # Skip symlinked layers — writing into them would modify the shared
+        # main workspace and embed worktree-specific paths in shared files.
+        if [ -L "$layer_dir" ]; then
+            continue
+        fi
+
         # Only generate for layers that have a src/ directory
-        if [ ! -d "$layer_dir/src" ] && [ ! -L "$layer_dir/src" ]; then
-            # Check if the layer is a symlink to main and main has src/
-            if [ -L "$layer_dir" ] && [ -d "$layer_dir/src" ]; then
-                : # symlink with src/ — generate scripts
-            else
-                continue
-            fi
+        if [ ! -d "$layer_dir/src" ]; then
+            continue
         fi
 
         # --- colcon/defaults.yaml ---

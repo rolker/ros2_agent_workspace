@@ -33,18 +33,19 @@ source .agent/scripts/worktree_enter.sh --skill research
 ## Generated Convenience Scripts
 
 When a **layer worktree** is created, `worktree_create.sh` generates self-contained
-scripts so you can build and test without knowing about `worktree_enter.sh` or
-`ROS2_LAYERS_BASE`. These are generated once at worktree creation time; only new
-worktrees get them.
+scripts in the **target (non-symlink) layer workspace** so you can build and test
+without knowing about `worktree_enter.sh` or `ROS2_LAYERS_BASE`. These are generated
+once at worktree creation time; only new worktrees get them. Symlinked layers (which
+point to `layers/main/`) are skipped to avoid polluting the shared workspace.
 
 ### What's generated
 
 | File | Purpose |
 |------|---------|
 | `setup.bash` | Sources ROS 2 base + all layer overlays, exports worktree env vars, installs git guardrails |
-| `<layer>_ws/build.sh` | Sources lower layers, runs `colcon build` (pass package names to build selectively) |
-| `<layer>_ws/test.sh` | Sources lower layers, runs `colcon test` + `colcon test-result --verbose` |
-| `<layer>_ws/colcon/defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands) |
+| `<target_layer>_ws/build.sh` | Sources lower layers, runs `colcon build` (pass package names to build selectively) |
+| `<target_layer>_ws/test.sh` | Sources lower layers, runs `colcon test` + `colcon test-result --verbose` |
+| `<target_layer>_ws/colcon/defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands) |
 
 ### Usage
 
