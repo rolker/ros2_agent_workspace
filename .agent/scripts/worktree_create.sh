@@ -285,13 +285,15 @@ $preamble
 TESTSH
 
         cat >> "$layer_dir/test.sh" << 'TESTSH_TEST'
-# Test
+# Test (capture exit code so colcon test-result always runs)
+test_exit_code=0
 if [ $# -gt 0 ]; then
-    colcon test --return-code-on-test-failure --packages-select "$@"
+    colcon test --return-code-on-test-failure --packages-select "$@" || test_exit_code=$?
 else
-    colcon test --return-code-on-test-failure
+    colcon test --return-code-on-test-failure || test_exit_code=$?
 fi
-colcon test-result --verbose
+colcon test-result --verbose || true
+exit "$test_exit_code"
 TESTSH_TEST
         chmod +x "$layer_dir/test.sh"
         echo "  ✓ $layer_ws/test.sh"

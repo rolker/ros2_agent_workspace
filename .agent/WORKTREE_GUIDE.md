@@ -389,7 +389,7 @@ Both agents can build, test, and commit without interference.
 ### Layer Worktree
 
 ```
-layers/worktrees/issue-42/
+layers/worktrees/issue-workspace-42/
 ├── setup.bash             # Generated: sources ROS env for this worktree
 ├── .scratchpad/           # Isolated scratchpad for this worktree
 │   ├── build_report.md
@@ -397,7 +397,8 @@ layers/worktrees/issue-42/
 ├── core_ws/
 │   ├── build.sh           # Generated: build this layer
 │   ├── test.sh            # Generated: test this layer
-│   ├── colcon_defaults.yaml # Generated: colcon flags (auto-discovered)
+│   ├── colcon/
+│   │   └── defaults.yaml  # Generated: colcon flags (auto-discovered)
 │   ├── src/
 │   ├── build/
 │   ├── install/
