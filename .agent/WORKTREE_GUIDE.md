@@ -11,8 +11,13 @@
 # Enter the worktree (sources ROS environment)
 source .agent/scripts/worktree_enter.sh 42
 
-# Work normally - build, test, commit
-cd core_ws && colcon build --packages-select my_package
+# Or set up manually (layer worktrees generate convenience scripts)
+cd layers/worktrees/issue-workspace-42/
+source setup.bash
+
+# Build and test
+./core_ws/build.sh my_package
+./core_ws/test.sh my_package
 git add . && git commit -m "feat: my changes"
 
 # When done, clean up
@@ -24,6 +29,42 @@ source .agent/scripts/worktree_enter.sh --skill research
 # ... make changes, commit, push, create PR ...
 .agent/scripts/worktree_remove.sh --skill research
 ```
+
+## Generated Convenience Scripts
+
+When a **layer worktree** is created, `worktree_create.sh` generates self-contained
+scripts in the **target (non-symlink) layer workspace** so you can build and test
+without knowing about `worktree_enter.sh` or `ROS2_LAYERS_BASE`. These are generated
+once at worktree creation time; only new worktrees get them. Symlinked layers (which
+point to `layers/main/`) are skipped to avoid polluting the shared workspace.
+
+### What's generated
+
+| File | Purpose |
+|------|---------|
+| `setup.bash` | Sources ROS 2 base + all layer overlays, exports worktree env vars, installs git guardrails |
+| `<target_layer>_ws/build.sh` | Sources lower layers, runs `colcon build` (pass package names to build selectively) |
+| `<target_layer>_ws/test.sh` | Sources lower layers, runs `colcon test` + `colcon test-result --verbose` |
+| `<target_layer>_ws/colcon/defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands); auto-discovered by colcon from `$PWD/colcon/defaults.yaml` |
+
+### Usage
+
+```bash
+cd layers/worktrees/issue-workspace-42/
+source setup.bash                  # Set up ROS environment
+
+# Build everything in the core layer
+./core_ws/build.sh
+
+# Build a specific package
+./core_ws/build.sh my_package
+
+# Test a specific package
+./core_ws/test.sh my_package
+```
+
+**Note**: `colcon_defaults.yaml` is placed in the target layer workspace so raw
+`colcon build` from that directory also picks up the correct flags.
 
 ## Why Worktrees?
 
@@ -129,10 +170,10 @@ source .agent/scripts/worktree_enter.sh --issue 42
 source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 cd core_ws/src/my_package
 # ... make changes ...
-colcon build --packages-select my_package
+cd ../.. && ./build.sh my_package
 
-# Test from the layer workspace — worktree_enter.sh already sourced setup.bash
-cd ../../ && colcon test --packages-select my_package
+# Test from the layer workspace
+./test.sh my_package
 
 # Commit and push
 git add .
@@ -348,11 +389,16 @@ Both agents can build, test, and commit without interference.
 ### Layer Worktree
 
 ```
-layers/worktrees/issue-42/
+layers/worktrees/issue-workspace-42/
+├── setup.bash             # Generated: sources ROS env for this worktree
 ├── .scratchpad/           # Isolated scratchpad for this worktree
 │   ├── build_report.md
 │   └── test_report.md
 ├── core_ws/
+│   ├── build.sh           # Generated: build this layer
+│   ├── test.sh            # Generated: test this layer
+│   ├── colcon/
+│   │   └── defaults.yaml  # Generated: colcon flags (auto-discovered)
 │   ├── src/
 │   ├── build/
 │   ├── install/
@@ -469,4 +515,4 @@ source .agent/scripts/worktree_enter.sh --issue 42 --repo-slug marine_msgs
 - [AI Rules](AI_RULES.md) - Universal agent rules
 - [Workforce Protocol](WORKFORCE_PROTOCOL.md) - Multi-agent coordination
 
-**Last Updated**: 2026-02-27
+**Last Updated**: 2026-03-06

@@ -296,8 +296,28 @@ echo "Helpful commands:"
 echo "  git status                    # Check changes"
 echo "  git diff                      # See what changed"
 if [ "$WORKTREE_TYPE" == "layer" ]; then
-    echo "  colcon build                  # Build packages"
-    echo "  colcon test                   # Run tests"
+    # Detect the target layer: the first *_ws directory that is NOT a symlink
+    _TARGET_LAYER_WS=""
+    for _candidate in "$WORKTREE_DIR"/*_ws; do
+        if [ -d "$_candidate" ] && [ ! -L "$_candidate" ]; then
+            _TARGET_LAYER_WS=$(basename "$_candidate")
+            break
+        fi
+    done
+    if [ -f "$WORKTREE_DIR/setup.bash" ]; then
+        echo "  source setup.bash             # Set up ROS environment"
+        if [ -n "$_TARGET_LAYER_WS" ] && [ -x "$WORKTREE_DIR/${_TARGET_LAYER_WS}/build.sh" ]; then
+            echo "  ./${_TARGET_LAYER_WS}/build.sh [pkg]   # Build packages"
+        fi
+        if [ -n "$_TARGET_LAYER_WS" ] && [ -x "$WORKTREE_DIR/${_TARGET_LAYER_WS}/test.sh" ]; then
+            echo "  ./${_TARGET_LAYER_WS}/test.sh [pkg]    # Run tests"
+        fi
+    else
+        # Older worktrees without generated convenience scripts
+        echo "  colcon build                  # Build packages"
+        echo "  colcon test                   # Run tests"
+    fi
+    unset _TARGET_LAYER_WS _candidate
 fi
 if [ -n "$SKILL_NAME" ]; then
     echo "  \"$ROOT_DIR/.agent/scripts/worktree_remove.sh\" --skill $SKILL_NAME  # Remove worktree"

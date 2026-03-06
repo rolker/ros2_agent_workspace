@@ -65,6 +65,12 @@ source .agent/scripts/worktree_enter.sh --issue <N>
 source .agent/scripts/worktree_enter.sh --issue <N>
 cd <layer>_ws/src/<project_repo>   # work here, commit/push here
 
+# Alternative: set up manually using generated convenience scripts
+cd <worktree_path>                 # path printed by worktree_create.sh
+source setup.bash                  # set up ROS environment
+./<layer>_ws/build.sh [pkg ...]    # build (uses colcon with correct flags)
+./<layer>_ws/test.sh [pkg ...]     # test
+
 # Multiple project repos in one worktree
 .agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <repo1>,<repo2>
 
@@ -180,6 +186,11 @@ make lint                                        # Lint + hooks (auto-installs p
 ```
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
+
+**In worktrees**: Layer worktrees generate `build.sh` and `test.sh` for the target
+(non-symlink) layer workspace. Use `./<layer>_ws/build.sh [pkg]` and
+`./<layer>_ws/test.sh [pkg]` instead of raw `colcon` commands — they handle
+sourcing lower layers automatically.
 
 Set `NONINTERACTIVE=1` to suppress all interactive prompts (e.g., the first-run
 bootstrap confirmation). `CI` is also recognized for CI environments.
