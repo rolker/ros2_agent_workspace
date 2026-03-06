@@ -45,7 +45,7 @@ point to `layers/main/`) are skipped to avoid polluting the shared workspace.
 | `setup.bash` | Sources ROS 2 base + all layer overlays, exports worktree env vars, installs git guardrails |
 | `<target_layer>_ws/build.sh` | Sources lower layers, runs `colcon build` (pass package names to build selectively) |
 | `<target_layer>_ws/test.sh` | Sources lower layers, runs `colcon test` + `colcon test-result --verbose` |
-| `<target_layer>_ws/colcon_defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands); auto-discovered by colcon |
+| `<target_layer>_ws/colcon/defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands); auto-discovered by colcon from `$PWD/colcon/defaults.yaml` |
 
 ### Usage
 

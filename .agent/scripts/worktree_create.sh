@@ -68,7 +68,7 @@ if v and v != 'unknown': print(v)
 }
 
 # Generate convenience scripts for layer worktrees.
-# Creates setup.bash, build.sh, test.sh, and colcon_defaults.yaml in the
+# Creates setup.bash, build.sh, test.sh, and colcon/defaults.yaml in the
 # layer worktree so users can build and test without knowing about
 # worktree_enter.sh or ROS2_LAYERS_BASE.
 generate_worktree_scripts() {
@@ -158,15 +158,24 @@ git() {
 }
 
 # 4. Expose pre-commit from .venv
-if [ -x "$main_root/.venv/bin/pre-commit" ]; then
-    pre-commit() { "$main_root/.venv/bin/pre-commit" "\$@"; }
+SETUP_FOOTER
+
+    # Emit pre-commit path safely (printf %q handles spaces/metacharacters)
+    local _escaped_main_root
+    printf -v _escaped_main_root '%q' "$main_root"
+    cat >> "$wt_dir/setup.bash" << SETUP_PRECOMMIT
+if [ -x ${_escaped_main_root}/.venv/bin/pre-commit ]; then
+    pre-commit() { ${_escaped_main_root}/.venv/bin/pre-commit "\$@"; }
 fi
+SETUP_PRECOMMIT
+
+    cat >> "$wt_dir/setup.bash" << 'SETUP_FOOTER2'
 
 # 5. Prevent interactive editor hangs
 export GIT_EDITOR=true
 
 echo "Environment ready."
-SETUP_FOOTER
+SETUP_FOOTER2
 
     echo "  ✓ setup.bash"
 
@@ -186,9 +195,11 @@ SETUP_FOOTER
             continue
         fi
 
-        # --- colcon_defaults.yaml ---
-        # colcon auto-discovers this file from cwd (build.sh cd's here first)
-        cat > "$layer_dir/colcon_defaults.yaml" << 'COLCON_DEFAULTS'
+        # --- colcon/defaults.yaml ---
+        # colcon auto-discovers defaults.yaml from $PWD/colcon/defaults.yaml
+        # (build.sh cd's into the layer_ws first)
+        mkdir -p "$layer_dir/colcon"
+        cat > "$layer_dir/colcon/defaults.yaml" << 'COLCON_DEFAULTS'
 build:
   symlink-install: true
   cmake-args:
@@ -196,12 +207,17 @@ build:
 test:
   {}
 COLCON_DEFAULTS
-        echo "  ✓ $layer_ws/colcon_defaults.yaml"
+        echo "  ✓ $layer_ws/colcon/defaults.yaml"
 
         # Build the sourcing preamble for this layer's scripts:
         # source /opt/ros/jazzy/setup.bash, then all layers BEFORE this one
         local preamble=""
-        preamble+="source /opt/ros/jazzy/setup.bash"$'\n'
+        preamble+="if [ -f /opt/ros/jazzy/setup.bash ]; then"$'\n'
+        preamble+="    source /opt/ros/jazzy/setup.bash"$'\n'
+        preamble+="else"$'\n'
+        preamble+="    echo \"ERROR: /opt/ros/jazzy/setup.bash not found. Please install ROS 2 Jazzy.\" 1>&2"$'\n'
+        preamble+="    exit 1"$'\n'
+        preamble+="fi"$'\n'
         for prev_layer in "${layers[@]}"; do
             if [ "$prev_layer" == "$layer" ]; then
                 break

@@ -30,8 +30,9 @@ that:
 
 ### 2. Generate `build.sh` per layer workspace
 
-Generate `<layer>_ws/build.sh` for each layer workspace directory that exists in the
-worktree (both the target layer and symlinked layers). Each script:
+Generate `<layer>_ws/build.sh` for each layer workspace directory in the worktree
+that is a real directory (not a symlink into `layers/main/`). Symlinked layer
+workspaces are intentionally skipped to avoid polluting `layers/main/`. Each script:
 - Sources the ROS 2 base + all lower layers' `install/setup.bash` in order
 - Runs `colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`
 - Accepts optional package names (`./build.sh pkg1 pkg2` → `--packages-select pkg1 pkg2`)
