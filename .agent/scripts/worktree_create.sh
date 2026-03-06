@@ -103,10 +103,9 @@ fi
 SETUP_HEADER
 
     # Worktree-specific variables (written with values resolved at generation time)
-    cat >> "$wt_dir/setup.bash" << SETUP_VARS
-# Worktree identity
-WORKTREE_DIR="$wt_dir"
-SETUP_VARS
+    # Use printf %q to safely handle paths with spaces or shell metacharacters
+    echo "# Worktree identity" >> "$wt_dir/setup.bash"
+    printf 'WORKTREE_DIR=%q\n' "$wt_dir" >> "$wt_dir/setup.bash"
 
     if [ -n "$ISSUE_NUM" ]; then
         printf 'export WORKTREE_ISSUE=%q\n' "$ISSUE_NUM" >> "$wt_dir/setup.bash"
@@ -115,13 +114,12 @@ SETUP_VARS
         printf 'export WORKTREE_SKILL=%q\n' "$SKILL_NAME" >> "$wt_dir/setup.bash"
     fi
 
-    cat >> "$wt_dir/setup.bash" << SETUP_VARS2
+    cat >> "$wt_dir/setup.bash" << 'SETUP_VARS2'
 export WORKTREE_TYPE="layer"
-export WORKTREE_ROOT="\$WORKTREE_DIR"
-export ROS2_LAYERS_BASE="\$WORKTREE_DIR"
-export ROS2_WORKSPACE_ROOT="$main_root"
-
+export WORKTREE_ROOT="$WORKTREE_DIR"
+export ROS2_LAYERS_BASE="$WORKTREE_DIR"
 SETUP_VARS2
+    printf 'export ROS2_WORKSPACE_ROOT=%q\n\n' "$main_root" >> "$wt_dir/setup.bash"
 
     # Source each layer's install/setup.bash
     cat >> "$wt_dir/setup.bash" << 'SETUP_LAYERS_HEADER'
@@ -187,9 +185,9 @@ SETUP_FOOTER
             continue
         fi
 
-        # --- colcon/defaults.yaml ---
-        mkdir -p "$layer_dir/colcon"
-        cat > "$layer_dir/colcon/defaults.yaml" << 'COLCON_DEFAULTS'
+        # --- colcon_defaults.yaml ---
+        # colcon auto-discovers this file from cwd (build.sh cd's here first)
+        cat > "$layer_dir/colcon_defaults.yaml" << 'COLCON_DEFAULTS'
 build:
   symlink-install: true
   cmake-args:
@@ -197,7 +195,7 @@ build:
 test:
   {}
 COLCON_DEFAULTS
-        echo "  ✓ $layer_ws/colcon/defaults.yaml"
+        echo "  ✓ $layer_ws/colcon_defaults.yaml"
 
         # Build the sourcing preamble for this layer's scripts:
         # source /opt/ros/jazzy/setup.bash, then all layers BEFORE this one
