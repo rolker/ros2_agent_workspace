@@ -15,8 +15,8 @@
 #   what reviewers saw. Comments may reference stale line numbers.
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    echo "Error: This script should be executed, not sourced."
-    echo "  Run: ${BASH_SOURCE[0]} $*"
+    echo "Error: This script should be executed, not sourced." >&2
+    echo "  Run: ${BASH_SOURCE[0]} $*" >&2
     return 1
 fi
 
