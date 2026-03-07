@@ -1,9 +1,9 @@
 #!/bin/bash
-# Fetch Copilot Review Comments
-# Retrieves GitHub Copilot review comments on a PR that were submitted after
+# Fetch PR Review Comments
+# Retrieves all review comments on a PR that were submitted after
 # the HEAD commit's timestamp. Outputs structured JSON to stdout.
 #
-# Usage: fetch_copilot_reviews.sh --pr <number>
+# Usage: fetch_pr_reviews.sh --pr <number>
 #
 # Designed to consolidate multiple gh api calls into a single script invocation,
 # reducing permission prompts when called from agent skills.
@@ -11,8 +11,14 @@
 # Limitations:
 # - Uses committer date (not author date) as the cutoff. Rebases can make these
 #   diverge; committer date reflects the most recent action on the branch.
-# - If the PR was force-pushed after Copilot reviewed, HEAD may not match what
-#   Copilot reviewed. Comments may reference stale line numbers.
+# - If the PR was force-pushed after reviews were submitted, HEAD may not match
+#   what reviewers saw. Comments may reference stale line numbers.
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced." >&2
+    echo "  Run: ${BASH_SOURCE[0]} $*" >&2
+    return 1
+fi
 
 set -euo pipefail
 
@@ -42,7 +48,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 --pr <number>"
             echo ""
-            echo "Fetch Copilot review comments submitted after the HEAD commit."
+            echo "Fetch PR review comments submitted after the HEAD commit."
             echo "Outputs structured JSON to stdout."
             echo ""
             echo "Options:"
@@ -83,8 +89,8 @@ if [ -z "$HEAD_TIMESTAMP" ]; then
 fi
 
 # Log to stderr so it doesn't pollute JSON output
-echo "ℹ️  PR: #${PR_NUMBER} in ${REPO_SLUG}" >&2
-echo "ℹ️  HEAD timestamp (committer date): ${HEAD_TIMESTAMP}" >&2
+echo "PR: #${PR_NUMBER} in ${REPO_SLUG}" >&2
+echo "HEAD timestamp (committer date): ${HEAD_TIMESTAMP}" >&2
 
 # --- Fetch all reviews on the PR ---
 
@@ -93,28 +99,23 @@ if ! ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/rev
     exit 1
 fi
 
-# --- Filter to Copilot reviews submitted after HEAD ---
+# --- Filter to reviews submitted after HEAD ---
 
-# Copilot's login is "github-actions[bot]" or "copilot" depending on integration.
-# We filter by user.login containing "copilot" (case-insensitive) or the app slug.
-# Also include "github-actions[bot]" reviews that have COMMENTED state (common for Copilot).
-#
-# Compare timestamps by converting to epoch seconds for reliable cross-timezone comparison.
+# Include all reviews regardless of author — the timestamp filter ensures we
+# only see reviews submitted after the most recent commit.
+# User attribution (login + type) is included so skills can distinguish
+# human reviewers from bots.
 
 FILTERED_REVIEWS="$(echo "$ALL_REVIEWS" | jq -c --arg cutoff "$HEAD_TIMESTAMP" '
     def to_epoch: sub("\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%Z") | mktime;
     ($cutoff | to_epoch) as $cutoff_epoch |
     [.[] | select(
-        ((.submitted_at | to_epoch) > $cutoff_epoch) and
-        (
-            (.user.login | test("copilot"; "i")) or
-            (.user.login == "github-actions[bot]" and .state == "COMMENTED")
-        )
-    ) | {review_id: .id, submitted_at: .submitted_at, state: .state, body: .body}]
+        (.submitted_at | to_epoch) > $cutoff_epoch
+    ) | {review_id: .id, submitted_at: .submitted_at, state: .state, body: .body, user_login: .user.login, user_type: .user.type}]
 ')"
 
 REVIEW_COUNT="$(echo "$FILTERED_REVIEWS" | jq 'length')"
-echo "ℹ️  Found ${REVIEW_COUNT} Copilot review(s) after HEAD" >&2
+echo "Found ${REVIEW_COUNT} review(s) after HEAD" >&2
 
 if [ "$REVIEW_COUNT" -eq 0 ]; then
     # Output empty result
@@ -141,7 +142,7 @@ fi
 
 # Build the final output by matching comments to their review IDs
 # Use --slurpfile instead of --argjson to avoid "Argument list too long" on large responses
-COMMENTS_TMPFILE="$(mktemp /tmp/copilot_comments.XXXXXX.json)"
+COMMENTS_TMPFILE="$(mktemp /tmp/pr_review_comments.XXXXXX.json)"
 echo "$ALL_COMMENTS" > "$COMMENTS_TMPFILE"
 
 OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" --arg pr "$PR_NUMBER" --arg repo "$REPO_SLUG" --arg head_timestamp "$HEAD_TIMESTAMP" '
@@ -155,13 +156,17 @@ OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFI
                 submitted_at: .submitted_at,
                 state: .state,
                 body: .body,
+                user_login: .user_login,
+                user_type: .user_type,
                 comments: [
                     $comments[0][] | select(.pull_request_review_id == $review.review_id) | {
                         path: .path,
                         line: (.line // .original_line // null),
                         side: (.side // null),
                         body: .body,
-                        diff_hunk: .diff_hunk
+                        diff_hunk: .diff_hunk,
+                        user_login: .user.login,
+                        user_type: .user.type
                     }
                 ]
             }
@@ -172,6 +177,6 @@ OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFI
 rm -f "$COMMENTS_TMPFILE"
 
 TOTAL_COMMENTS="$(echo "$OUTPUT" | jq '[.reviews_after_head[].comments | length] | add // 0')"
-echo "ℹ️  Total comments across reviews: ${TOTAL_COMMENTS}" >&2
+echo "Total comments across reviews: ${TOTAL_COMMENTS}" >&2
 
 echo "$OUTPUT"

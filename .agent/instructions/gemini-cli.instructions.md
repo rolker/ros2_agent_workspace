@@ -29,7 +29,7 @@ corresponding SKILL.md and follow its steps.
 Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
 `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
-`triage-copilot`.
+`triage-reviews`.
 
 ## References
 
