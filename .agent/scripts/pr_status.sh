@@ -248,7 +248,7 @@ display_dashboard() {
 # Function to display a category
 display_category() {
     local label=$1
-    local emoji=$2
+    local prefix=$2
     local color=$3
     shift 3
     local items=("$@")
@@ -257,7 +257,7 @@ display_category() {
         return
     fi
 
-    echo -e "${color}${emoji} ${label} (${#items[@]})${NC}"
+    echo -e "${color}${prefix} ${label} (${#items[@]})${NC}"
     for item in "${items[@]}"; do
         local number
         number=$(echo "$item" | jq -r '.number')
