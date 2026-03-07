@@ -60,8 +60,8 @@ The script:
 - Includes `user_login` and `user_type` for each review and comment
 - Outputs structured JSON with paths, line numbers, and comment bodies
 
-If the result has zero comments, report "No new review comments since last
-commit" and stop.
+If the result contains neither inline comments nor non-empty review bodies,
+report "No new review comments since last commit" and stop.
 
 ### 4. Load governance context
 
@@ -82,9 +82,10 @@ For each comment in the JSON output:
 a. **Read the local file** at the referenced path and line using the Read tool
 b. **Identify the source** — check `user_type` and `user_login`:
    - **Human reviewers** (`user_type: "User"`): these carry highest authority.
-     Check whether the comment has already been addressed by commits after the
-     comment was posted. If the code has changed to address the concern, note
-     it as "addressed". If not, treat as a valid issue.
+     Check whether the current code already addresses the concern raised
+     (e.g., the requested change is present or the issue no longer exists
+     at the referenced location). If so, note it as "addressed". If not,
+     treat as a valid issue.
    - **Copilot / bot reviewers** (`user_type: "Bot"`): evaluate as potential
      issues or false positives. Bots may compare against stale `main` or
      misunderstand intent.
