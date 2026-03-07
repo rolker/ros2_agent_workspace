@@ -3,6 +3,12 @@
 # Verification tool for agents to run targeted tests (Unit, Lint, etc.)
 # Usage: ./verify_change.sh --package <package_name> [--type <unit|lint|all>]
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")" # Go up to workspace root
 
@@ -50,7 +56,7 @@ if [ -d "$ROOT_DIR/layers/main" ]; then
 fi
 
 if [ -n "$FOUND_LAYER" ]; then
-    echo "📂 Located package in: $FOUND_LAYER"
+    echo "Located package in: $FOUND_LAYER"
     cd "$FOUND_LAYER" || exit 1
 
     # Source install if available to ensure environment is ready

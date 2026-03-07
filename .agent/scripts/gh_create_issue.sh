@@ -23,6 +23,11 @@
 #   2 - GitHub CLI error
 #   3 - Missing dependencies
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
 set -euo pipefail
 
 # Get repository root
