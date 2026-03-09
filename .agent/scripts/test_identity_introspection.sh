@@ -2,6 +2,11 @@
 # Test script to validate agent identity introspection system
 # This validates all components of the identity introspection strategy
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

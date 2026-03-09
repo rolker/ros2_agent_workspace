@@ -315,16 +315,16 @@ if command -v vcs &> /dev/null; then
 
                     if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
                         if [ "$branch" != "$expected_branch" ]; then
-                            warning="🔀 $branch (Want: $expected_branch)"
+                            warning="$branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"
                         fi
                     else
-                        status_str="${status_str:+$status_str, }❓ Expected branch unknown"
+                        status_str="${status_str:+$status_str, }Expected branch unknown"
                     fi
 
                     if [ -n "$EXPECTED_REPOS" ]; then
                         if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
-                            status_str="${status_str:+$status_str, }❓ Untracked"
+                            status_str="${status_str:+$status_str, }Untracked"
                         fi
                     fi
 
@@ -348,11 +348,11 @@ if command -v vcs &> /dev/null; then
                 elif [[ "$line" =~ ^##[[:space:]](.*)$ ]]; then
                     branch_line="${BASH_REMATCH[1]}"
                     if [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+)\] ]]; then
-                        sync_status="⬆️ Ahead ${BASH_REMATCH[1]}"
+                        sync_status="Ahead ${BASH_REMATCH[1]}"
                     elif [[ "$branch_line" =~ \.\.\..*\[behind[[:space:]]([0-9]+)\] ]]; then
-                        sync_status="⬇️ Behind ${BASH_REMATCH[1]}"
+                        sync_status="Behind ${BASH_REMATCH[1]}"
                     elif [[ "$branch_line" =~ \.\.\..*\[ahead[[:space:]]([0-9]+),[[:space:]]behind[[:space:]]([0-9]+)\] ]]; then
-                        sync_status="↕️ Ahead ${BASH_REMATCH[1]}, Behind ${BASH_REMATCH[2]}"
+                        sync_status="Ahead ${BASH_REMATCH[1]}, Behind ${BASH_REMATCH[2]}"
                     fi
                     branch=$(echo "$branch_line" | sed 's/\.\.\..*//')
                 elif [[ "$line" =~ ^[[:space:]]?[MADRCU?!] ]]; then
@@ -399,7 +399,7 @@ if [ -x "$WORKTREE_SCRIPT" ]; then
     WT_COUNT=$(git -C "$ROOT_DIR" worktree list 2>/dev/null | grep -v "(bare)" | grep -vF "$ROOT_DIR " | wc -l)
     if [ "$WT_COUNT" -gt 0 ]; then
         # Show summary from worktree_list.sh output
-        "$WORKTREE_SCRIPT" 2>/dev/null | grep -E "^(🔧|📦|📁|  )" || true
+        "$WORKTREE_SCRIPT" 2>/dev/null | grep -E "^(\[main\]|\[workspace\]|\[layer\]|  )" || true
         echo ""
     else
         echo "No active worktrees."

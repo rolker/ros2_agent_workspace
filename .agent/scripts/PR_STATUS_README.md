@@ -5,10 +5,10 @@ Provides visibility into PR pipeline status and interactive PR management.
 ## Features
 
 - **Status Categorization**: Automatically categorizes PRs by review state
-  - 🟡 Needs Review (unreviewed)
-  - 🔴 Critical Issues (blocking comments)
-  - 🟠 Minor Issues (non-blocking comments)
-  - 🟢 Ready to Merge (approved, no issues)
+  - [REVIEW] Needs Review (unreviewed)
+  - [CRITICAL] Critical Issues (blocking comments)
+  - [MINOR] Minor Issues (non-blocking comments)
+  - [READY] Ready to Merge (approved, no issues)
 
 - **Comment Classification**: Analyzes review comments for severity
   - Critical: security, bugs, errors, vulnerabilities
@@ -78,10 +78,10 @@ make pr-triage                                      # Convenience wrapper
 ```bash
 $ .agent/scripts/pr_status.sh
 
-🔍 PR Status Dashboard
+PR Status Dashboard
 ====================
 
-🔴 CRITICAL ISSUES (2)
+[CRITICAL] CRITICAL ISSUES (2)
   #159  Add Promptfoo framework    (last: 2h ago)
         → 4 critical comment(s)
         → 19 minor comment(s)
@@ -89,7 +89,7 @@ $ .agent/scripts/pr_status.sh
         → 2 critical comment(s)
         → 5 minor comment(s)
 
-📊 Summary: 5 open PRs | 0 need review | 5 need fixes | 0 ready
+Summary: 5 open PRs | 0 need review | 5 need fixes | 0 ready
 ```
 
 **Agent-friendly simple output:**
@@ -231,4 +231,4 @@ mode for single-repo workflows only.
 ## See Also
 
 - `make pr-triage` - Cross-repo PR triage via Makefile
-- `CONTRIBUTING.md` - Contribution guidelines
+- `AGENTS.md` - Workspace rules and development workflow

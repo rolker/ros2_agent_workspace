@@ -12,6 +12,12 @@
 #   ./configure_git_identity.sh --agent copilot
 #   ./configure_git_identity.sh --detect
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
+
 # Load framework identity lookup table from shared configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRAMEWORK_CONFIG="${SCRIPT_DIR}/framework_config.sh"

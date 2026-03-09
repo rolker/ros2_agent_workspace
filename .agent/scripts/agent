@@ -98,7 +98,7 @@ start_task() {
     fi
 
     echo "========================================="
-    echo "🤖 Agent Task Isolation"
+    echo "Agent Task Isolation"
     echo "========================================="
     echo "Issue: #$issue_num"
 

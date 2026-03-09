@@ -8,6 +8,11 @@
 #   1 - Script should never exit 1 in informational mode (reserved for strict mode)
 #   2 - Error occurred
 
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Error: This script should be executed, not sourced."
+    echo "  Run: ${BASH_SOURCE[0]} $*"
+    return 1
+fi
 set -e
 
 # Colors
@@ -46,7 +51,7 @@ fi
 
 # Fetch latest from origin (quietly)
 # For shallow clones, we may need to unshallow or fetch with depth
-echo "🔍 Checking for updates in default branch ($DEFAULT_BRANCH)..."
+echo "Checking for updates in default branch ($DEFAULT_BRANCH)..."
 
 # Check if this is a shallow clone
 IS_SHALLOW=$(git rev-parse --is-shallow-repository 2>/dev/null || echo "false")
@@ -102,25 +107,25 @@ echo ""
 DIVERGED=false
 if [ "$COMMITS_AHEAD" -gt 0 ] && [ "$COMMITS_BEHIND" -gt 0 ]; then
     DIVERGED=true
-    echo -e "${YELLOW}📊 Branches have diverged${NC}"
+    echo -e "${YELLOW}Branches have diverged${NC}"
     echo ""
 fi
 
 # Provide recommendations
-echo -e "${BLUE}📋 Recommendations:${NC}"
+echo -e "${BLUE}Recommendations:${NC}"
 echo ""
 
 if [ "$DIVERGED" == "true" ]; then
     echo "  Your branch has diverged from $DEFAULT_BRANCH."
     echo "  You have two options:"
     echo ""
-    echo "  1️⃣  MERGE (Recommended for collaborative work):"
+    echo "  1.  MERGE (Recommended for collaborative work):"
     echo "     ${GREEN}git merge origin/$DEFAULT_BRANCH${NC}"
     echo "     • Preserves complete history"
     echo "     • Creates a merge commit"
     echo "     • Safe and reversible"
     echo ""
-    echo "  2️⃣  REBASE (For cleaner history):"
+    echo "  2.  REBASE (For cleaner history):"
     echo "     ${YELLOW}git rebase origin/$DEFAULT_BRANCH${NC}"
     echo "     • Replays your commits on top of latest $DEFAULT_BRANCH"
     echo "     • Creates linear history"
@@ -137,14 +142,14 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}💡 After updating:${NC}"
+echo -e "${BLUE}After updating:${NC}"
 echo "   • Re-run your tests to ensure compatibility"
 echo "   • Review any merge conflicts carefully"
 echo "   • Consider rebasing only if you haven't pushed yet"
 echo ""
 
 # Show recent commits in default branch
-echo -e "${BLUE}📝 Recent commits in $DEFAULT_BRANCH:${NC}"
+echo -e "${BLUE}Recent commits in $DEFAULT_BRANCH:${NC}"
 git log --oneline --max-count=5 origin/"$DEFAULT_BRANCH" --not HEAD 2>/dev/null || echo "  (Could not retrieve commits)"
 echo ""
 

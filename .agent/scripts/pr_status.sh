@@ -19,13 +19,11 @@ ORANGE='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Emojis
-EMOJI_REVIEW="🟡"
-EMOJI_CRITICAL="🔴"
-EMOJI_MINOR="🟠"
-EMOJI_READY="🟢"
-EMOJI_SEARCH="🔍"
-EMOJI_CHART="📊"
+# Status labels
+LABEL_REVIEW="[REVIEW]"
+LABEL_CRITICAL="[CRITICAL]"
+LABEL_MINOR="[MINOR]"
+LABEL_READY="[READY]"
 
 # Discover all workspace repos (root + overlay + underlay)
 # Returns one owner/repo slug per line, deduplicated and sorted
@@ -250,7 +248,7 @@ display_dashboard() {
 # Function to display a category
 display_category() {
     local label=$1
-    local emoji=$2
+    local prefix=$2
     local color=$3
     shift 3
     local items=("$@")
@@ -259,7 +257,7 @@ display_category() {
         return
     fi
 
-    echo -e "${color}${emoji} ${label} (${#items[@]})${NC}"
+    echo -e "${color}${prefix} ${label} (${#items[@]})${NC}"
     for item in "${items[@]}"; do
         local number
         number=$(echo "$item" | jq -r '.number')
@@ -347,7 +345,7 @@ display_analyzed_dashboard() {
     local analyzed_json=$1
     local title_suffix=${2:-""}
 
-    echo -e "${BLUE}${EMOJI_SEARCH} PR Status Dashboard${title_suffix}${NC}"
+    echo -e "${BLUE}PR Status Dashboard${title_suffix}${NC}"
     echo "===================="
     echo ""
 
@@ -366,14 +364,14 @@ display_analyzed_dashboard() {
         esac
     done < <(echo "$analyzed_json" | jq -c '.[]')
 
-    display_category "NEEDS REVIEW" "$EMOJI_REVIEW" "$YELLOW" "${needs_review[@]}"
-    display_category "CRITICAL ISSUES" "$EMOJI_CRITICAL" "$RED" "${critical[@]}"
-    display_category "MINOR ISSUES" "$EMOJI_MINOR" "$ORANGE" "${minor[@]}"
-    display_category "READY TO MERGE" "$EMOJI_READY" "$GREEN" "${ready[@]}"
+    display_category "NEEDS REVIEW" "$LABEL_REVIEW" "$YELLOW" "${needs_review[@]}"
+    display_category "CRITICAL ISSUES" "$LABEL_CRITICAL" "$RED" "${critical[@]}"
+    display_category "MINOR ISSUES" "$LABEL_MINOR" "$ORANGE" "${minor[@]}"
+    display_category "READY TO MERGE" "$LABEL_READY" "$GREEN" "${ready[@]}"
 
     local total=$((${#needs_review[@]} + ${#critical[@]} + ${#minor[@]} + ${#ready[@]}))
     echo ""
-    echo -e "${BLUE}${EMOJI_CHART} Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
+    echo -e "${BLUE}Summary:${NC} $total open PRs | ${#needs_review[@]} need review | $((${#critical[@]} + ${#minor[@]})) need fixes | ${#ready[@]} ready"
     echo ""
 }
 

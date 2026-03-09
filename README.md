@@ -38,9 +38,20 @@ Each framework has a self-contained instruction file with all rules inline:
 
 ### For Human Users
 
-**New to this workspace?** See [QUICKSTART.md](QUICKSTART.md) for a step-by-step setup guide.
+**Prerequisites**: Ubuntu 22.04 or 24.04, Git, sudo access, SSH key on GitHub.
 
-**Experienced users?** Jump to [Usage](#usage) below.
+```bash
+git clone git@github.com:rolker/ros2_agent_workspace.git
+cd ros2_agent_workspace
+make build          # bootstraps ROS 2, imports repos, and builds (first run ~15 min)
+make lint           # installs pre-commit hooks (needs python3-venv)
+source scripts/setup.bash
+```
+
+`make build` handles everything on a fresh clone — bootstrap, manifest import,
+layer setup, and build. On subsequent runs it skips completed steps.
+
+See [Usage](#usage) for details and [ARCHITECTURE.md](ARCHITECTURE.md) for how the workspace is structured.
 
 ### For Containerized/Custom Agents
 
@@ -56,16 +67,14 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ## Documentation
 
 ### For AI Agents
-- 📋 [CLAUDE.md](CLAUDE.md) - Claude Code operational rules (auto-loaded)
-- 📋 [AI Rules](.agent/AI_RULES.md) - Universal fallback rules
-- 🌲 [Worktree Guide](.agent/WORKTREE_GUIDE.md) - Parallel development with git worktrees
-- 📚 [Agent Onboarding](.agent/AGENT_ONBOARDING.md) - Onboarding for containerized agents
+- [CLAUDE.md](CLAUDE.md)                             - Claude Code operational rules (auto-loaded)
+- [AI Rules](.agent/AI_RULES.md)                      - Universal fallback rules
+- [Worktree Guide](.agent/WORKTREE_GUIDE.md)          - Parallel development with git worktrees
+- [Agent Onboarding](.agent/AGENT_ONBOARDING.md)      - Onboarding for containerized agents
 
 ### For All Users
-- 📚 [Quick Start Guide](QUICKSTART.md) - Get up and running in minutes
-- 🏗️ [Architecture Guide](ARCHITECTURE.md) - Understanding the layered workspace system
-- 🤝 [Contributing Guide](CONTRIBUTING.md) - Development workflow and best practices
-- 🔒 [Security Policy](SECURITY.md) - Security guidelines and reporting
+- [Architecture Guide](ARCHITECTURE.md)               - Understanding the layered workspace system
+- [AGENTS.md](AGENTS.md)                              - Shared workspace rules and development workflow
 
 ## Structure
 
@@ -189,8 +198,7 @@ chmod +x .agent/scripts/*.sh
 ### Getting Help
 
 - Review [ARCHITECTURE.md](ARCHITECTURE.md) for system design
-- Check [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
-- See [SECURITY.md](SECURITY.md) for security policies
+- See [AGENTS.md](AGENTS.md) for development workflow and rules
 - Open an issue on GitHub for bugs or feature requests
 
 ## Development Tools
