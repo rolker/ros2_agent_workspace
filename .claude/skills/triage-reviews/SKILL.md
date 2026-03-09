@@ -22,19 +22,33 @@ structured plan. Does not auto-fix or post comments.
 
 ## Steps
 
-### 1. Confirm worktree
+### 1. Confirm worktree (auto-enter if needed)
 
 Verify the current worktree branch matches the PR's head branch:
 
 ```bash
 # Get PR head branch
-gh pr view <N> --json headRefName --jq '.headRefName'
+PR_BRANCH=$(gh pr view <N> --json headRefName --jq '.headRefName')
 
 # Compare with current branch
-git branch --show-current
+CURRENT_BRANCH=$(git branch --show-current)
 ```
 
-If they don't match, stop and inform the user.
+If they don't match:
+
+1. Extract the issue number from the PR branch name (pattern: `feature/issue-<N>`).
+2. Auto-enter the worktree:
+   ```bash
+   source .agent/scripts/worktree_enter.sh --issue <N>
+   ```
+3. After entering, verify the branch now matches. If it still doesn't (worktree
+   doesn't exist or branch mismatch), stop and inform the user with instructions
+   to create the worktree:
+   ```
+   Worktree for issue #<N> not found. Create it with:
+     .agent/scripts/worktree_create.sh --issue <N> --type workspace
+     source .agent/scripts/worktree_enter.sh --issue <N>
+   ```
 
 ### 2. Sync local branch
 
@@ -57,10 +71,12 @@ The script:
 - Fetches all reviews on the PR via `gh api` (no timestamp filter)
 - Includes `commit_id` on each review for timeline reasoning
 - Includes `user_login` and `user_type` for each review and comment
+- Fetches PR conversation comments (issue-level comments, not code review threads)
 - Fetches CI check-runs for the PR head SHA
-- Outputs structured JSON with `head_sha`, `reviews`, and `ci_checks`
+- Outputs structured JSON with `head_sha`, `reviews`, `conversation_comments`, and `ci_checks`
 
-If the result contains no reviews, report "No reviews on this PR" and stop.
+If the result contains no reviews and no conversation comments, report
+"No reviews or comments on this PR" and stop.
 
 ### 4. Load governance context
 
@@ -101,7 +117,15 @@ d. **Assess the comment** against the actual code:
    - Is the concern valid? Does the code actually have the issue flagged?
    - Is it a false positive? (e.g., comparing against stale `main`, or
      misunderstanding the intent)
-e. **Check governance context** — does the comment align with or contradict:
+e. **Evaluate conversation comments** — `conversation_comments` are PR-level
+   comments (not attached to specific files or lines). Treat them as general PR
+   feedback:
+   - **Human conversation comments** carry high authority — treat as actionable
+     feedback even though they lack file/line references.
+   - **Bot conversation comments** (CI bots, etc.) — evaluate for relevance.
+   - Look for requested changes, questions, or concerns that apply to the PR
+     as a whole.
+f. **Check governance context** — does the comment align with or contradict:
    - Workspace principles (`docs/PRINCIPLES.md`)
    - Relevant ADRs (`docs/decisions/`)
    - Project-level governance (`.agents/README.md` in the project repo, if applicable)
@@ -115,13 +139,19 @@ Output a structured report:
 
 **PR**: <url>
 **Head**: `<branch>` at `<short-sha>`
-**Reviews**: <total> review(s), <total> inline comment(s)
+**Reviews**: <total> review(s), <total> inline comment(s), <total> conversation comment(s)
 
 ### Human Reviewer Comments
 
 | # | Reviewer | File | Line | Comment | Status |
 |---|----------|------|------|---------|--------|
-| 1 | `user` | `path/to/file` | 42 | Summary of comment | Valid / Addressed / Needs discussion |
+| 1 | `user` | `path/to/file` | 42 | Summary of comment | Valid / Addressed / Likely addressed — verify / Needs discussion |
+
+### Conversation Comments
+
+| # | Author | Type | Comment | Status |
+|---|--------|------|---------|--------|
+| 1 | `user` | User | Summary of comment | Valid / Addressed / Needs discussion |
 
 ### Valid Issues (Bot)
 
