@@ -1,18 +1,12 @@
 #!/bin/bash
-# Fetch PR Review Comments
-# Retrieves all review comments on a PR that were submitted after
-# the HEAD commit's timestamp. Outputs structured JSON to stdout.
+# Fetch PR Reviews, Conversation Comments, and CI Status
+# Retrieves all reviews, conversation comments, and CI check status for a PR.
+# Outputs structured JSON to stdout.
 #
 # Usage: fetch_pr_reviews.sh --pr <number>
 #
 # Designed to consolidate multiple gh api calls into a single script invocation,
 # reducing permission prompts when called from agent skills.
-#
-# Limitations:
-# - Uses committer date (not author date) as the cutoff. Rebases can make these
-#   diverge; committer date reflects the most recent action on the branch.
-# - If the PR was force-pushed after reviews were submitted, HEAD may not match
-#   what reviewers saw. Comments may reference stale line numbers.
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     echo "Error: This script should be executed, not sourced." >&2
@@ -48,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 --pr <number>"
             echo ""
-            echo "Fetch PR review comments submitted after the HEAD commit."
+            echo "Fetch all PR reviews, conversation comments, and CI check status."
             echo "Outputs structured JSON to stdout."
             echo ""
             echo "Options:"
@@ -73,24 +67,18 @@ fi
 
 REPO_SLUG="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
 
-# --- Get HEAD commit timestamp ---
+# --- Get PR head SHA ---
 
-# Use committer date (ISO 8601) — reflects most recent action on the branch.
-HEAD_TIMESTAMP="$(git log -1 --format='%cI' 2>/dev/null || true)"
+HEAD_SHA="$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
 
-# Normalize to UTC so comparisons work regardless of local timezone
-if [ -n "$HEAD_TIMESTAMP" ]; then
-    HEAD_TIMESTAMP="$(date -u -d "$HEAD_TIMESTAMP" '+%Y-%m-%dT%H:%M:%SZ')"
-fi
-
-if [ -z "$HEAD_TIMESTAMP" ]; then
-    echo "Error: No commits found on current branch" >&2
+if [ -z "$HEAD_SHA" ]; then
+    echo "Error: Could not determine head SHA for PR #${PR_NUMBER}" >&2
     exit 1
 fi
 
 # Log to stderr so it doesn't pollute JSON output
 echo "PR: #${PR_NUMBER} in ${REPO_SLUG}" >&2
-echo "HEAD timestamp (committer date): ${HEAD_TIMESTAMP}" >&2
+echo "HEAD SHA: ${HEAD_SHA}" >&2
 
 # --- Fetch all reviews on the PR ---
 
@@ -99,63 +87,86 @@ if ! ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/rev
     exit 1
 fi
 
-# --- Filter to reviews submitted after HEAD ---
-
-# Include all reviews regardless of author — the timestamp filter ensures we
-# only see reviews submitted after the most recent commit.
-# User attribution (login + type) is included so skills can distinguish
-# human reviewers from bots.
-
-FILTERED_REVIEWS="$(echo "$ALL_REVIEWS" | jq -c --arg cutoff "$HEAD_TIMESTAMP" '
-    def to_epoch: sub("\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%Z") | mktime;
-    ($cutoff | to_epoch) as $cutoff_epoch |
-    [.[] | select(
-        (.submitted_at | to_epoch) > $cutoff_epoch
-    ) | {review_id: .id, submitted_at: .submitted_at, state: .state, body: .body, user_login: .user.login, user_type: .user.type}]
+# Extract all reviews with commit_id for timeline reasoning
+# --paginate returns concatenated JSON arrays; merge them before processing
+REVIEWS="$(echo "$ALL_REVIEWS" | jq -s 'add' | jq -c '
+    [.[] | {
+        review_id: .id,
+        submitted_at: .submitted_at,
+        state: .state,
+        body: .body,
+        commit_id: .commit_id,
+        user_login: .user.login,
+        user_type: .user.type
+    }]
 ')"
 
-REVIEW_COUNT="$(echo "$FILTERED_REVIEWS" | jq 'length')"
-echo "Found ${REVIEW_COUNT} review(s) after HEAD" >&2
+REVIEW_COUNT="$(echo "$REVIEWS" | jq 'length')"
+echo "Found ${REVIEW_COUNT} review(s)" >&2
 
-if [ "$REVIEW_COUNT" -eq 0 ]; then
-    # Output empty result
-    jq -n \
-        --arg pr "$PR_NUMBER" \
-        --arg repo "$REPO_SLUG" \
-        --arg head_timestamp "$HEAD_TIMESTAMP" \
-        '{
-            pr: ($pr | tonumber),
-            repo: $repo,
-            head_timestamp: $head_timestamp,
-            reviews_after_head: []
-        }'
-    exit 0
-fi
+# --- Fetch all review comments ---
 
-# --- Fetch comments for each matching review ---
-
-# Fetch all review comments on the PR (paginated)
 if ! ALL_COMMENTS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/comments")"; then
     echo "Error: Failed to fetch review comments for PR #${PR_NUMBER}" >&2
     exit 1
 fi
 
-# Build the final output by matching comments to their review IDs
+# --- Fetch conversation comments (issue-level comments on the PR) ---
+
+if ! ALL_CONVERSATION="$(gh api --paginate "repos/${REPO_SLUG}/issues/${PR_NUMBER}/comments")"; then
+    echo "Warning: Failed to fetch conversation comments for PR #${PR_NUMBER}" >&2
+    ALL_CONVERSATION="[]"
+fi
+
+CONVERSATION_COMMENTS="$(echo "$ALL_CONVERSATION" | jq -s 'add' | jq -c '
+    [.[] | {
+        comment_id: .id,
+        created_at: .created_at,
+        body: .body,
+        user_login: .user.login,
+        user_type: .user.type,
+        html_url: .html_url
+    }]
+')"
+
+echo "Found $(echo "$CONVERSATION_COMMENTS" | jq 'length') conversation comment(s)" >&2
+
+# --- Fetch CI check-runs ---
+
+if ! CI_CHECKS_RAW="$(gh api --paginate "repos/${REPO_SLUG}/commits/${HEAD_SHA}/check-runs")"; then
+    echo "Warning: Failed to fetch CI check-runs for PR #${PR_NUMBER}" >&2
+    CI_CHECKS="[]"
+else
+    CI_CHECKS="$(echo "$CI_CHECKS_RAW" | jq -s '[.[].check_runs[] | {name, conclusion, html_url}]')"
+fi
+
+echo "Found $(echo "$CI_CHECKS" | jq 'length') CI check(s)" >&2
+
+# --- Assemble JSON output ---
+
 # Use --slurpfile instead of --argjson to avoid "Argument list too long" on large responses
 COMMENTS_TMPFILE="$(mktemp /tmp/pr_review_comments.XXXXXX.json)"
-echo "$ALL_COMMENTS" > "$COMMENTS_TMPFILE"
+trap 'rm -f "$COMMENTS_TMPFILE"' EXIT
+# --paginate returns concatenated JSON arrays; merge them before writing
+echo "$ALL_COMMENTS" | jq -s 'add' > "$COMMENTS_TMPFILE"
 
-OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" --arg pr "$PR_NUMBER" --arg repo "$REPO_SLUG" --arg head_timestamp "$HEAD_TIMESTAMP" '
+OUTPUT="$(echo "$REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" \
+    --arg pr "$PR_NUMBER" \
+    --arg repo "$REPO_SLUG" \
+    --arg head_sha "$HEAD_SHA" \
+    --argjson ci_checks "$CI_CHECKS" \
+    --argjson conversation_comments "$CONVERSATION_COMMENTS" '
     {
         pr: ($pr | tonumber),
         repo: $repo,
-        head_timestamp: $head_timestamp,
-        reviews_after_head: [
+        head_sha: $head_sha,
+        reviews: [
             .[] | . as $review | {
                 review_id: .review_id,
                 submitted_at: .submitted_at,
                 state: .state,
                 body: .body,
+                commit_id: .commit_id,
                 user_login: .user_login,
                 user_type: .user_type,
                 comments: [
@@ -170,13 +181,13 @@ OUTPUT="$(echo "$FILTERED_REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFI
                     }
                 ]
             }
-        ]
+        ],
+        ci_checks: $ci_checks,
+        conversation_comments: $conversation_comments
     }
 ')"
 
-rm -f "$COMMENTS_TMPFILE"
-
-TOTAL_COMMENTS="$(echo "$OUTPUT" | jq '[.reviews_after_head[].comments | length] | add // 0')"
+TOTAL_COMMENTS="$(echo "$OUTPUT" | jq '[.reviews[].comments | length] | add // 0')"
 echo "Total comments across reviews: ${TOTAL_COMMENTS}" >&2
 
 echo "$OUTPUT"
