@@ -28,9 +28,13 @@ does this (lines 61-69: `git fetch origin "$DEFAULT_BRANCH"`).
 1. **Add behind-check call to `worktree_enter.sh`** — insert after the
    branch/PWD display (line 291) and before the "Helpful commands" block
    (line 295). For workspace worktrees, run `check_branch_updates.sh`
-   directly. For layer worktrees, find the first non-symlinked project
-   repo directory (same pattern as `wt_layer_branch`) and run
-   `check_branch_updates.sh` from there via a subshell `(cd "$pkg_dir" && ...)`.
+   directly. For layer worktrees, iterate all non-symlinked project git
+   repos under `<layer>_ws/src/*` (reuse the same loops as
+   `wt_layer_is_dirty` and `wt_layer_branch` for repo detection) and run
+   `check_branch_updates.sh` from each repo via a subshell
+   `(cd "$pkg_dir" && ...)`. Guard each with
+   `git -C "$pkg_dir" rev-parse --git-dir` before running, and skip
+   gracefully if no suitable repo is found.
 
 2. **Handle execution from a sourced script** — `worktree_enter.sh` is
    sourced, but `check_branch_updates.sh` must be executed (has a
