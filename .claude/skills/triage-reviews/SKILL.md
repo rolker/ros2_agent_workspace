@@ -1,6 +1,6 @@
 ---
 name: triage-reviews
-description: Evaluate PR review comments (human and bot) against local code, principles, and ADRs. Classifies each as valid or false positive and presents a fix plan.
+description: Evaluate PR review comments (human and bot) against local code, principles, and ADRs. Includes CI check status. Classifies each as valid or false positive and presents a fix plan.
 ---
 
 # Triage Reviews
@@ -45,23 +45,22 @@ git pull --ff-only
 Ensure the local worktree matches the remote HEAD so line numbers in review
 comments align with local files.
 
-### 3. Fetch PR review comments
+### 3. Fetch PR reviews and CI status
 
-Run the helper script to get comments submitted after the most recent commit:
+Run the helper script to get all reviews and CI check status:
 
 ```bash
 .agent/scripts/fetch_pr_reviews.sh --pr <N>
 ```
 
 The script:
-- Gets the HEAD commit's committer date as the cutoff timestamp
-- Fetches all reviews on the PR via `gh api`
-- Filters to reviews submitted after the cutoff (all authors)
+- Fetches all reviews on the PR via `gh api` (no timestamp filter)
+- Includes `commit_id` on each review for timeline reasoning
 - Includes `user_login` and `user_type` for each review and comment
-- Outputs structured JSON with paths, line numbers, and comment bodies
+- Fetches CI check-runs for the PR head SHA
+- Outputs structured JSON with `head_sha`, `reviews`, and `ci_checks`
 
-If the result contains neither inline comments nor non-empty review bodies,
-report "No new review comments since last commit" and stop.
+If the result contains no reviews, report "No reviews on this PR" and stop.
 
 ### 4. Load governance context
 
@@ -80,7 +79,16 @@ For project repo PRs, also check:
 For each comment in the JSON output:
 
 a. **Read the local file** at the referenced path and line using the Read tool
-b. **Identify the source** — check `user_type` and `user_login`:
+b. **Check review freshness** — each review carries a `commit_id` (the commit
+   it was submitted against). Compare it to `head_sha` from the script output:
+   - If `commit_id` matches `head_sha`, the review is against current code.
+   - If `commit_id` differs, the code has changed since the review. Read the
+     file at the referenced path and line. If the concern appears addressed,
+     classify as "Likely addressed — verify." If not, classify as valid.
+   - For force-pushed branches where `commit_id` is unreachable, read current
+     code and note the uncertainty. No shell commands needed — just read and
+     assess.
+c. **Identify the source** — check `user_type` and `user_login`:
    - **Human reviewers** (`user_type: "User"`): these carry highest authority.
      Check whether the current code already addresses the concern raised
      (e.g., the requested change is present or the issue no longer exists
@@ -89,11 +97,11 @@ b. **Identify the source** — check `user_type` and `user_login`:
    - **Copilot / bot reviewers** (`user_type: "Bot"`): evaluate as potential
      issues or false positives. Bots may compare against stale `main` or
      misunderstand intent.
-c. **Assess the comment** against the actual code:
+d. **Assess the comment** against the actual code:
    - Is the concern valid? Does the code actually have the issue flagged?
    - Is it a false positive? (e.g., comparing against stale `main`, or
      misunderstanding the intent)
-d. **Check governance context** — does the comment align with or contradict:
+e. **Check governance context** — does the comment align with or contradict:
    - Workspace principles (`docs/PRINCIPLES.md`)
    - Relevant ADRs (`docs/decisions/`)
    - Project-level governance (`.agents/README.md` in the project repo, if applicable)
@@ -107,8 +115,7 @@ Output a structured report:
 
 **PR**: <url>
 **Head**: `<branch>` at `<short-sha>`
-**Cutoff**: <HEAD committer date>
-**Reviews found**: <count> review(s), <count> comment(s)
+**Reviews**: <total> review(s), <total> inline comment(s)
 
 ### Human Reviewer Comments
 
@@ -133,6 +140,12 @@ Output a structured report:
 - [ ] Fix: <specific action for each valid issue>
 - [ ] Address: <specific action for each unaddressed human comment>
 - [ ] (Optional) Dismiss false positive reviews on the PR
+
+### CI Status
+
+| Check | Result | Link |
+|-------|--------|------|
+| <name> | <conclusion> | [link](<html_url>) |
 
 ### Summary
 
