@@ -1,6 +1,6 @@
 #!/bin/bash
-# Fetch PR Reviews and CI Status
-# Retrieves all reviews and CI check status for a PR.
+# Fetch PR Reviews, Conversation Comments, and CI Status
+# Retrieves all reviews, conversation comments, and CI check status for a PR.
 # Outputs structured JSON to stdout.
 #
 # Usage: fetch_pr_reviews.sh --pr <number>
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 --pr <number>"
             echo ""
-            echo "Fetch all PR reviews and CI check status."
+            echo "Fetch all PR reviews, conversation comments, and CI check status."
             echo "Outputs structured JSON to stdout."
             echo ""
             echo "Options:"
@@ -146,6 +146,7 @@ echo "Found $(echo "$CI_CHECKS" | jq 'length') CI check(s)" >&2
 
 # Use --slurpfile instead of --argjson to avoid "Argument list too long" on large responses
 COMMENTS_TMPFILE="$(mktemp /tmp/pr_review_comments.XXXXXX.json)"
+trap 'rm -f "$COMMENTS_TMPFILE"' EXIT
 # --paginate returns concatenated JSON arrays; merge them before writing
 echo "$ALL_COMMENTS" | jq -s 'add' > "$COMMENTS_TMPFILE"
 
@@ -185,8 +186,6 @@ OUTPUT="$(echo "$REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" \
         conversation_comments: $conversation_comments
     }
 ')"
-
-rm -f "$COMMENTS_TMPFILE"
 
 TOTAL_COMMENTS="$(echo "$OUTPUT" | jq '[.reviews[].comments | length] | add // 0')"
 echo "Total comments across reviews: ${TOTAL_COMMENTS}" >&2

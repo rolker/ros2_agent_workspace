@@ -36,7 +36,8 @@ CURRENT_BRANCH=$(git branch --show-current)
 
 If they don't match:
 
-1. Extract the issue number from the PR branch name (pattern: `feature/issue-<N>`).
+1. Extract the issue number from the PR branch name (patterns:
+   `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`).
 2. Auto-enter the worktree:
    ```bash
    source .agent/scripts/worktree_enter.sh --issue <N>
