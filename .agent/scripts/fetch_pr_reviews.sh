@@ -88,7 +88,8 @@ if ! ALL_REVIEWS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/rev
 fi
 
 # Extract all reviews with commit_id for timeline reasoning
-REVIEWS="$(echo "$ALL_REVIEWS" | jq -c '
+# --paginate returns concatenated JSON arrays; merge them before processing
+REVIEWS="$(echo "$ALL_REVIEWS" | jq -s 'add' | jq -c '
     [.[] | {
         review_id: .id,
         submitted_at: .submitted_at,
@@ -110,9 +111,34 @@ if ! ALL_COMMENTS="$(gh api --paginate "repos/${REPO_SLUG}/pulls/${PR_NUMBER}/co
     exit 1
 fi
 
+# --- Fetch conversation comments (issue-level comments on the PR) ---
+
+if ! ALL_CONVERSATION="$(gh api --paginate "repos/${REPO_SLUG}/issues/${PR_NUMBER}/comments")"; then
+    echo "Warning: Failed to fetch conversation comments for PR #${PR_NUMBER}" >&2
+    ALL_CONVERSATION="[]"
+fi
+
+CONVERSATION_COMMENTS="$(echo "$ALL_CONVERSATION" | jq -s 'add' | jq -c '
+    [.[] | {
+        comment_id: .id,
+        created_at: .created_at,
+        body: .body,
+        user_login: .user.login,
+        user_type: .user.type,
+        html_url: .html_url
+    }]
+')"
+
+echo "Found $(echo "$CONVERSATION_COMMENTS" | jq 'length') conversation comment(s)" >&2
+
 # --- Fetch CI check-runs ---
 
-CI_CHECKS="$(gh api "repos/${REPO_SLUG}/commits/${HEAD_SHA}/check-runs" --jq '.check_runs | [.[] | {name, conclusion, html_url}]' 2>/dev/null || echo '[]')"
+if ! CI_CHECKS_RAW="$(gh api --paginate "repos/${REPO_SLUG}/commits/${HEAD_SHA}/check-runs")"; then
+    echo "Warning: Failed to fetch CI check-runs for PR #${PR_NUMBER}" >&2
+    CI_CHECKS="[]"
+else
+    CI_CHECKS="$(echo "$CI_CHECKS_RAW" | jq -s '[.[].check_runs[] | {name, conclusion, html_url}]')"
+fi
 
 echo "Found $(echo "$CI_CHECKS" | jq 'length') CI check(s)" >&2
 
@@ -120,13 +146,15 @@ echo "Found $(echo "$CI_CHECKS" | jq 'length') CI check(s)" >&2
 
 # Use --slurpfile instead of --argjson to avoid "Argument list too long" on large responses
 COMMENTS_TMPFILE="$(mktemp /tmp/pr_review_comments.XXXXXX.json)"
-echo "$ALL_COMMENTS" > "$COMMENTS_TMPFILE"
+# --paginate returns concatenated JSON arrays; merge them before writing
+echo "$ALL_COMMENTS" | jq -s 'add' > "$COMMENTS_TMPFILE"
 
 OUTPUT="$(echo "$REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" \
     --arg pr "$PR_NUMBER" \
     --arg repo "$REPO_SLUG" \
     --arg head_sha "$HEAD_SHA" \
-    --argjson ci_checks "$CI_CHECKS" '
+    --argjson ci_checks "$CI_CHECKS" \
+    --argjson conversation_comments "$CONVERSATION_COMMENTS" '
     {
         pr: ($pr | tonumber),
         repo: $repo,
@@ -153,7 +181,8 @@ OUTPUT="$(echo "$REVIEWS" | jq -c --slurpfile comments "$COMMENTS_TMPFILE" \
                 ]
             }
         ],
-        ci_checks: $ci_checks
+        ci_checks: $ci_checks,
+        conversation_comments: $conversation_comments
     }
 ')"
 
