@@ -26,6 +26,7 @@ The simplest approach — include `ros_gz_sim`'s launch file and enable its
 built-in shutdown coupling:
 
 ```python
+import os
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -111,7 +112,7 @@ session = LaunchSession(gui_ld)
 
 def on_ready(s):
     # Wait for model spawn, not just Gazebo startup
-    s.wait_for_output('Entity creation successful', timeout=60)
+    s.wait_for_output('Entity creation successful', stream='stdout', timeout=60)
 
     # Monitor pose via gz topic subprocess (more reliable than ROS bridges)
     import subprocess, re
@@ -119,11 +120,15 @@ def on_ready(s):
         ['gz', 'topic', '-e', '-t', '/world/ocean/dynamic_pose/info'],
         stdout=subprocess.PIPE, text=True,
     )
-    for line in proc.stdout:
-        match = re.search(r'position.*?x:\s*([\d.-]+).*?y:\s*([\d.-]+).*?z:\s*([\d.-]+)', line)
-        if match:
-            print(f"pose: x={match.group(1)} y={match.group(2)} z={match.group(3)}")
-    s.shutdown()
+    try:
+        for line in proc.stdout:
+            match = re.search(r'position.*?x:\s*([\d.-]+).*?y:\s*([\d.-]+).*?z:\s*([\d.-]+)', line)
+            if match:
+                print(f"pose: x={match.group(1)} y={match.group(2)} z={match.group(3)}")
+                break  # got a pose sample; add more iterations as needed
+    finally:
+        proc.terminate()
+        s.shutdown()
 
 exit_code = session.run(on_ready=on_ready)
 ```
@@ -187,17 +192,17 @@ ros2 launch my_package my_launch.py
 This prevents topic cross-talk between instances but does not prevent
 resource contention (GPU memory, ports).
 
-**Port awareness**: Gazebo uses UDP multicast for discovery:
-- `GZ_DISCOVERY_MSG_PORT` — default 10317
-- `GZ_DISCOVERY_SRV_PORT` — default 10318
-
-Override these for true multi-instance isolation (each instance needs unique ports).
+**Port awareness**: Gazebo uses UDP multicast for discovery (default ports
+10317/10318). The gz-transport library may support overriding these via
+`GZ_DISCOVERY_MSG_PORT` and `GZ_DISCOVERY_SRV_PORT`, but these env vars are
+**not documented in the public API** — verify against gz-transport source
+before relying on them for multi-instance isolation.
 
 ## Common Pitfalls
 
 | Pitfall | Details | Fix |
 |---------|---------|-----|
-| `on_exit_shutdown` defaults to `false` | Closing Gazebo leaves ROS launch running | Set `on_exit_shutdown: 'true'` explicitly |
+| `on_exit_shutdown` defaults to `false` | Closing Gazebo leaves ROS launch running | Pass `'on_exit_shutdown': 'true'` in the `launch_arguments` dict |
 | SIGTERM not forwarded to gz-sim | `shell=True` in `gz_sim.launch.py` wraps the process in a shell, which intercepts SIGTERM | Fixed in gz-sim 8.8.x+ (backport of [gz-sim#2747](https://github.com/gazebosim/gz-sim/pull/2747)); check your version with `gz sim --version` |
 | `parameter_bridge` double-SIGINT | Bridge sometimes needs two SIGINTs to exit cleanly | Known issue; ensure launch shutdown handler sends SIGINT then waits before escalating |
 | `Pose_V → TFMessage` bridge: empty frame IDs | `Pose_V` messages don't carry frame names that map to TF | Use `gz topic -e` for world-frame pose data instead |
