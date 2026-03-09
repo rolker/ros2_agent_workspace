@@ -256,7 +256,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories |
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
-| `.agent/scripts/fetch_pr_reviews.sh` | Fetch PR review comments after HEAD |
+| `.agent/scripts/fetch_pr_reviews.sh` | Fetch all PR reviews and CI status |
 
 ## Layered Architecture
 
