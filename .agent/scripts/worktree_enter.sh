@@ -291,6 +291,30 @@ echo "   Branch: $CURRENT_BRANCH"
 echo "   PWD:    $(pwd)"
 echo ""
 
+# Check if feature branch is behind the default branch
+_CHECK_SCRIPT="$ROOT_DIR/.agent/scripts/check_branch_updates.sh"
+if [ -x "$_CHECK_SCRIPT" ]; then
+    if [ "$WORKTREE_TYPE" == "layer" ]; then
+        # Layer worktrees: check each non-symlinked project repo
+        for _ws_dir in "$WORKTREE_DIR"/*_ws; do
+            [ -d "$_ws_dir" ] || continue
+            [ -L "$_ws_dir" ] && continue
+            [ -d "$_ws_dir/src" ] || continue
+            for _pkg_dir in "$_ws_dir"/src/*; do
+                [ -d "$_pkg_dir" ] || continue
+                [ -L "$_pkg_dir" ] && continue
+                if git -C "$_pkg_dir" rev-parse --git-dir &>/dev/null; then
+                    (cd "$_pkg_dir" && "$_CHECK_SCRIPT") || true
+                fi
+            done
+        done
+    else
+        # Workspace worktrees: check directly
+        ("$_CHECK_SCRIPT") || true
+    fi
+fi
+unset _CHECK_SCRIPT _ws_dir _pkg_dir
+
 # Show helpful commands
 echo "Helpful commands:"
 echo "  git status                    # Check changes"
