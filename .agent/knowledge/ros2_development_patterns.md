@@ -85,6 +85,8 @@ introducing a mix.
 - **Right**: `simulator_launch.py`, `robot_bringup_launch.py`
 - For programmatic launch management and GUI monitoring, see
   [Launch Tooling for Agents](launch_tooling.md)
+- For Gazebo simulation launch patterns and lifecycle coupling, see
+  [Gazebo + ROS 2 Launch Patterns](gazebo_ros_launch_patterns.md)
 
 ### Licensing
 

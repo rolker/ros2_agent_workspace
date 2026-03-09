@@ -8,6 +8,7 @@ checked out in `layers/`.
 - **[ROS 2 CLI Best Practices](ros2_cli_best_practices.md)**: Using the `ros2` CLI effectively as an automated agent.
 - **[ROS 2 Development Patterns](ros2_development_patterns.md)**: Package structure and build patterns for the layered workspace.
 - **[Launch Tooling](launch_tooling.md)**: Using `ros2launch_session` and `ros2launch_gui` for programmatic launch management and visual monitoring.
+- **[Gazebo + ROS 2 Launch Patterns](gazebo_ros_launch_patterns.md)**: Lifecycle coupling, instance management, and common pitfalls when launching Gazebo with ROS 2.
 
 ## IDE Setup
 - **[VS Code Setup Guide](vscode_setup.md)**: Multi-root workspace configuration, Makefile tasks, C++/Python IntelliSense, and Claude Code extension integration.
