@@ -118,6 +118,12 @@ exit_code = session.run(on_ready=on_ready)
 - **Agent calls `shutdown()`**: The GUI window closes and the launch service
   shuts down gracefully.
 
+## Simulation-Specific Patterns
+
+For Gazebo + ROS 2 launch integration (lifecycle coupling, instance management,
+`on_exit_shutdown`, and `LaunchSession` + Gazebo debugging workflows), see
+[Gazebo + ROS 2 Launch Patterns](gazebo_ros_launch_patterns.md).
+
 ## Availability
 
 Both packages come from the `rolker` GitHub organization:
