@@ -47,7 +47,42 @@ Read relevant files to understand the current state:
 - Documentation that references them
 - Use the consequences map to identify what else may be affected
 
-### 4. Generate the plan
+### 4. Ensure correct worktree
+
+Before writing or committing the plan, verify you are in a worktree for the
+target issue. If the plan is committed from a different worktree, it ends up
+on the wrong branch.
+
+Check `$WORKTREE_ISSUE` (set by `worktree_enter.sh`). If it does not match
+`<N>`, or is unset, create and enter the correct worktree:
+
+**Workspace issues** (changes to `.agent/`, `docs/`, configs, skills):
+
+```bash
+.agent/scripts/worktree_create.sh --issue <N> --type workspace
+source .agent/scripts/worktree_enter.sh --issue <N>
+```
+
+**Project repo issues** (changes to ROS packages in `layers/main/`):
+
+```bash
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <project_repo>
+source .agent/scripts/worktree_enter.sh --issue <N>
+```
+
+To determine the worktree type and parameters:
+
+1. Check which GitHub repo the issue belongs to — use `gh issue view <N>
+   --json url` and compare against the workspace repo URL. If the issue is
+   in a project repo, use `--type layer`.
+2. Infer the layer and package from the issue body, labels, or the repo
+   name. Project repos live under `layers/main/<layer>_ws/src/<project_repo>/`
+   — use `ls` to find the matching layer.
+3. If the layer or package cannot be determined, ask the user.
+
+If a worktree for the issue already exists, just enter it.
+
+### 5. Generate the plan
 
 Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md`:
 
@@ -102,7 +137,7 @@ Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md`:
 <single PR / multiple PRs / needs breakdown>
 ```
 
-### 5. Commit the plan
+### 6. Commit the plan
 
 ```bash
 git add .agent/work-plans/PLAN_ISSUE-<N>.md
@@ -111,7 +146,7 @@ git commit -m "Add work plan for #<N>
 <one-line summary of the approach>"
 ```
 
-### 6. Create a draft PR
+### 7. Create a draft PR
 
 Push the branch and create a draft PR with the plan as the body. This
 allows Copilot and humans to review the plan before implementation.
@@ -125,7 +160,7 @@ ISSUE_TITLE=$(gh issue view <N> --json title --jq '.title')
 gh pr create --draft --title "$ISSUE_TITLE" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
 ```
 
-### 7. Report to user
+### 8. Report to user
 
 Summarize:
 - What the plan proposes
