@@ -288,6 +288,9 @@ else
     echo "✅ Now in worktree for issue #$ISSUE_NUM"
 fi
 echo "   Branch: $CURRENT_BRANCH"
+if [ -n "${WORKTREE_PARENT_ISSUE:-}" ]; then
+    echo "   Parent: #$WORKTREE_PARENT_ISSUE (feature/issue-$WORKTREE_PARENT_ISSUE)"
+fi
 echo "   PWD:    $(pwd)"
 echo ""
 

@@ -250,6 +250,30 @@ git push -u origin HEAD && gh pr create --fill
 **Note**: `--issue` and `--skill` are mutually exclusive. All other worktree rules
 (atomic commits, AI signature, pre-commit hooks, PR review) still apply.
 
+### Sub-issue Worktrees (`--parent-issue <N>`)
+
+When creating a worktree for a sub-task of an existing issue, use `--parent-issue`
+to branch from the parent's feature branch and target the draft PR at it (stacked PR).
+
+**Example workflow**:
+```bash
+# Parent issue #100 already has a worktree on feature/issue-100
+# Create a sub-issue worktree that branches from the parent
+.agent/scripts/worktree_create.sh --issue 101 --type workspace --parent-issue 100
+
+# Enter the sub-issue worktree
+source .agent/scripts/worktree_enter.sh --issue 101
+
+# Work, commit, push — the draft PR targets feature/issue-100
+```
+
+**Environment**: `WORKTREE_PARENT_ISSUE` is set in the generated `setup.bash`,
+making it available to scripts like `gh_create_issue.sh` (which auto-injects
+"Part of #N" into new issues created from within the worktree).
+
+**Fallback**: If the parent branch (`feature/issue-<N>`) doesn't exist locally or
+on the remote, the worktree falls back to branching from HEAD with a warning.
+
 ## Commands Reference
 
 ### Create Worktree
@@ -272,6 +296,7 @@ git push -u origin HEAD && gh pr create --fill
 | `--type <type>` | Yes | `layer` or `workspace` |
 | `--layer <name>` | For layer type | Which layer to work on (core, sensors, etc.) |
 | `--packages <pkg1,pkg2,...>` | For layer type | Comma-separated list of packages to include as worktrees |
+| `--parent-issue <N>` | No | Parent issue number; branches from parent's feature branch and targets PR at it |
 | `--branch <name>` | No | Custom branch name (default: `feature/ISSUE-<N>` or `skill/<id>`) |
 
 ### List Worktrees
@@ -301,6 +326,7 @@ source .agent/scripts/worktree_enter.sh --skill <name>
 Sets these variables:
 - `WORKTREE_ISSUE` - The issue number (issue mode only)
 - `WORKTREE_SKILL` - The skill name (skill mode only)
+- `WORKTREE_PARENT_ISSUE` - Parent issue number (when `--parent-issue` was used)
 - `WORKTREE_TYPE` - "layer" or "workspace"
 - `WORKTREE_ROOT` - Path to worktree directory
 
