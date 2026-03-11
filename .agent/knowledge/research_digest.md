@@ -1,6 +1,6 @@
 # Research Digest: Workspace
 
-<!-- Last updated: 2026-03-04 -->
+<!-- Last updated: 2026-03-11 -->
 <!-- If older than 30 days, consider running /research --refresh; entries older than 90 days should be flagged for review -->
 
 ## Command Runner Alternatives to Make
@@ -216,3 +216,19 @@ Key takeaways:
 - Both support offline runner registration for CI in disconnected environments
 
 **Relevance**: The workspace uses a GitLab instance on the robot network for repo sync. Forgejo/Gitea could replace it at a fraction of the resource cost while adding a built-in issue tracker and web UI. Combined with git-bug for distributed issue sync, this enables a fully local-first development workflow where GitHub becomes a publication channel rather than a dependency. See [#345](https://github.com/rolker/ros2_agent_workspace/issues/345).
+
+---
+
+## Agent Orchestrators for Parallel Coding Agents
+
+**Added**: 2026-03-11 | **Sources**: [ComposioHQ/agent-orchestrator](https://github.com/ComposioHQ/agent-orchestrator), [jayminwest/overstory](https://github.com/jayminwest/overstory), [awesome-agent-orchestrators](https://gist.github.com/sujayjayjay/d0e88d5f53a5198c4ba5bb007a859bdd), [Shipyard blog](https://shipyard.build/blog/claude-code-multi-agent/), [ainativedev parallelizing agents](https://ainativedev.io/news/how-to-parallelize-ai-coding-agents)
+
+Key takeaways:
+- **Agent-orchestrator** (ComposioHQ, 4.1k stars, MIT): spawns parallel coding agents each in its own git worktree/branch/PR; pluggable adapters for runtime (tmux/Docker/K8s), agent (Claude Code/Codex/Aider), workspace (worktree/clone), tracker (GitHub/Linear), and notifier (desktop/Slack)
+- **Reaction system**: configurable auto-responses to CI failures (agent retries fix), review comments (agent addresses feedback), and approved PRs (notify or auto-merge) — the key differentiator over manual multi-agent setups
+- **Overstory**: similar concept with SQLite-backed inter-agent messaging, 4-tier conflict resolution, and a watchdog daemon; pluggable AgentRuntime interface for Claude Code, Pi, Gemini CLI
+- **Convergent patterns across all orchestrators**: (1) git worktree isolation per agent, (2) supervisor/coordinator that decomposes tasks, (3) event-driven reactions to CI/review, (4) dashboard for human oversight, (5) YAML-based configuration
+- **Ecosystem is exploding**: 9+ purpose-built orchestrators emerged in early 2026 (Vibe Kanban, Superset, Symphony, dmux, agtx, Ralph, GoClaw, plus the above) — all converge on worktree isolation as the fundamental primitive
+- The bottleneck has shifted from "can AI write code?" to "how do I run multiple agents in parallel without chaos?" — orchestration is the 2026 scaling lever
+
+**Relevance**: This workspace already has the foundational primitives that all orchestrators build on: worktree isolation scripts, draft-PR visibility, workforce protocol, and multi-framework identity. The gaps relative to agent-orchestrator are: (1) **no reaction system** — CI failures and review comments require manual agent re-engagement; (2) **no dashboard** — `worktree_list.sh` shows status but lacks a unified view of agent progress, CI, and PRs; (3) **no automated task decomposition** — issues are manually assigned to agents; (4) **no inter-agent messaging** — agents can't coordinate or hand off work. Of these, a reaction system for CI failures and review feedback would deliver the most immediate value, since agents already create PRs but can't respond to CI/review events autonomously. See [#375](https://github.com/rolker/ros2_agent_workspace/issues/375).
