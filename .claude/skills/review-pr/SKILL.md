@@ -38,7 +38,7 @@ Identify:
 - What repo the PR targets (workspace or project repo?)
 - What files changed and in which directories
 - The linked issue and its requirements
-- Whether a work plan exists (`.agent/work-plans/PLAN_ISSUE-*.md`)
+- Whether a work plan exists (`.agent/work-plans/PLAN_ISSUE-*.md` — check in the PR's target repo)
 
 ### 2. Load governance context
 

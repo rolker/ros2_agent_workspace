@@ -60,6 +60,20 @@ One plan per issue. Keep plans concise but complete.
 4. **Merged**: Plan merges with code (permanent record)
 5. **Archived**: No cleanup needed - plans serve as documentation
 
+## Project Repos
+
+This directory pattern is not unique to the workspace repo. Project repos
+(under `layers/main/<layer>_ws/src/<project_repo>/`) maintain their own
+`.agent/work-plans/` directories following the same conventions. Plans live
+in whichever repo owns the issue being worked on:
+
+- **Workspace issues** (changes to `.agent/`, `docs/`, configs, skills) →
+  plan goes in the workspace repo's `.agent/work-plans/`
+- **Project repo issues** (changes to ROS packages) → plan goes in that
+  project repo's `.agent/work-plans/`
+
+The workflow is the same — the only difference is which repo you're committing to.
+
 ## Notes
 
 - Plans are **git-tracked** (visible in PRs and commits)
