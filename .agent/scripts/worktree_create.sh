@@ -859,6 +859,24 @@ EOF
         fi
     done
 
+    # If child branch already existed and --parent-issue was given, probe parent
+    # branch existence in target package repos so draft PR can still target it.
+    if [ -n "$PARENT_BRANCH" ] && [ "$PARENT_BRANCH_FOUND" = false ]; then
+        for pkg_dir in "$WORKTREE_DIR"/"${TARGET_LAYER}_ws"/src/*; do
+            [ -L "$pkg_dir" ] && continue
+            [ ! -d "$pkg_dir/.git" ] && continue
+            if git -C "$pkg_dir" show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" || \
+               git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+                PARENT_BRANCH_FOUND=true
+                break
+            elif fetch_remote_branch "$pkg_dir" "$PARENT_BRANCH" && \
+                 git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+                PARENT_BRANCH_FOUND=true
+                break
+            fi
+        done
+    fi
+
     # Generate convenience scripts (setup.bash, build.sh, test.sh, etc.)
     generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR"
 fi
