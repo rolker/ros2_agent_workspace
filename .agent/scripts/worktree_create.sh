@@ -636,6 +636,9 @@ echo ""
 # Create parent directory if needed
 mkdir -p "$(dirname "$WORKTREE_DIR")"
 
+# Track whether parent branch was actually used (guards PR --base later)
+PARENT_BRANCH_FOUND=false
+
 # Create the worktree directory
 if [ "$WORKTREE_TYPE" == "workspace" ]; then
     # Workspace worktrees are full git worktrees of the workspace repo
@@ -650,9 +653,11 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
         if git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH"; then
             echo "Creating new branch '$BRANCH_NAME' from parent branch '$PARENT_BRANCH'..."
             git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR" "$PARENT_BRANCH"
+            PARENT_BRANCH_FOUND=true
         elif fetch_remote_branch "$ROOT_DIR" "$PARENT_BRANCH"; then
             echo "Creating new branch '$BRANCH_NAME' from parent branch 'origin/$PARENT_BRANCH'..."
             git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR" "origin/$PARENT_BRANCH"
+            PARENT_BRANCH_FOUND=true
         else
             echo "⚠️  Parent branch '$PARENT_BRANCH' not found; falling back to HEAD"
             git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
@@ -692,6 +697,11 @@ Files here are gitignored and isolated from other worktrees.
 
 **Working layer**: ${TARGET_LAYER}_ws
 EOF
+    fi
+
+    # Persist parent issue for worktree_enter.sh to pick up
+    if [ -n "$PARENT_ISSUE_NUM" ]; then
+        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.scratchpad/.parent_issue"
     fi
 
     # Create symlinks to main for all layers except target
@@ -775,9 +785,11 @@ EOF
                         elif [ -n "$PARENT_BRANCH" ] && git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" && \
                              git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "$PARENT_BRANCH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from parent $PARENT_BRANCH)"
+                            PARENT_BRANCH_FOUND=true
                         elif [ -n "$PARENT_BRANCH" ] && git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH" && \
                              git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$PARENT_BRANCH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from parent origin/$PARENT_BRANCH)"
+                            PARENT_BRANCH_FOUND=true
                         elif [ -n "$REPOS_BRANCH" ] && \
                              git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$REPOS_BRANCH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from $REPOS_BRANCH)"
@@ -841,6 +853,11 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
 
     # Ensure scratchpad exists
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"
+
+    # Persist parent issue for worktree_enter.sh to pick up
+    if [ -n "$PARENT_ISSUE_NUM" ]; then
+        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.agent/.parent_issue"
+    fi
 fi
 
 echo ""
@@ -1004,11 +1021,17 @@ PREOF
         rm -f "$GH_STDERR" "$BODY_FILE"
     }
 
+    # Only use parent branch as PR base if it was actually found during worktree creation
+    PR_PARENT_BASE=""
+    if [ "$PARENT_BRANCH_FOUND" = true ]; then
+        PR_PARENT_BASE="$PARENT_BRANCH"
+    fi
+
     if [ "$WORKTREE_TYPE" == "workspace" ]; then
         if [ -n "$SKILL_NAME" ]; then
             create_draft_pr "$WORKTREE_DIR" ""
         else
-            create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM" "" "$PARENT_BRANCH"
+            create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM" "" "$PR_PARENT_BASE"
         fi
         cd "$ROOT_DIR"
 
@@ -1038,8 +1061,8 @@ PREOF
             fi
 
             # Resolve the .repos base branch for the PR target
-            # Parent branch takes priority for stacked PRs
-            if [ -n "$PARENT_BRANCH" ]; then
+            # Parent branch takes priority for stacked PRs (only if it was found)
+            if [ "$PARENT_BRANCH_FOUND" = true ]; then
                 PKG_BASE_BRANCH="$PARENT_BRANCH"
             else
                 PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")

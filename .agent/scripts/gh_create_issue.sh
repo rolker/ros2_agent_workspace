@@ -135,8 +135,9 @@ if [ -n "${WORKTREE_ISSUE:-}" ]; then
 Part of ${PARENT_REF}"
             echo "ℹ️  Auto-added parent reference: Part of ${PARENT_REF}"
         elif [ -n "$BODY_FILE_PATH" ] && [ -f "$BODY_FILE_PATH" ]; then
-            # Create temp copy with appended reference
+            # Create temp copy with appended reference; trap ensures cleanup on exit
             PARENT_BODY_FILE=$(mktemp /tmp/gh_body_parent.XXXXXX.md)
+            trap 'rm -f "$PARENT_BODY_FILE"' EXIT
             cp "$BODY_FILE_PATH" "$PARENT_BODY_FILE"
             printf '\n\nPart of %s\n' "$PARENT_REF" >> "$PARENT_BODY_FILE"
             ORIGINAL_ARGS[$BODY_FILE_ARG_INDEX]="$PARENT_BODY_FILE"

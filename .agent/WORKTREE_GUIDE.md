@@ -267,9 +267,10 @@ source .agent/scripts/worktree_enter.sh --issue 101
 # Work, commit, push — the draft PR targets feature/issue-100
 ```
 
-**Environment**: `WORKTREE_PARENT_ISSUE` is set in the generated `setup.bash`,
-making it available to scripts like `gh_create_issue.sh` (which auto-injects
-"Part of #N" into new issues created from within the worktree).
+**Environment**: `WORKTREE_PARENT_ISSUE` is exported by `worktree_enter.sh`
+(read from a metadata file written at creation time). For layer worktrees it is
+also set in the generated `setup.bash`. This makes it available to scripts like
+`gh_create_issue.sh` (which auto-injects "Part of #N" into new issues).
 
 **Fallback**: If the parent branch (`feature/issue-<N>`) doesn't exist locally or
 on the remote, the worktree falls back to branching from HEAD with a warning.
