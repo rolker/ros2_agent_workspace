@@ -1,6 +1,6 @@
 ---
 name: plan-task
-description: Generate a principles-aware work plan for an issue. Saves to `.agent/work-plans/` and commits as the first step on the feature branch.
+description: Generate a principles-aware work plan for an issue. Saves to `.agent/work-plans/` in the repo that owns the issue and commits as the first step on the feature branch.
 ---
 
 # Plan Task
@@ -84,7 +84,8 @@ If a worktree for the issue already exists, just enter it.
 
 ### 5. Generate the plan
 
-Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md`:
+Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md` (relative to the current
+repo — workspace repo for workspace issues, project repo for project issues):
 
 ```markdown
 # Plan: <issue-title>
@@ -138,6 +139,8 @@ Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md`:
 ```
 
 ### 6. Commit the plan
+
+The plan file path is relative to the current repo (workspace or project):
 
 ```bash
 git add .agent/work-plans/PLAN_ISSUE-<N>.md

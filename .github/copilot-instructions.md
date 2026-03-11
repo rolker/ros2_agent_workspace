@@ -6,7 +6,9 @@ That file contains the shared workspace rules for all AI agents.
 ## Code Review Guidelines
 
 This repository uses a plan-first workflow. The first commit on a feature branch
-is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. When reviewing:
+is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. Project repos
+follow the same convention — plans live in whichever repo owns the issue, not
+only in the workspace repo. When reviewing:
 
 - If the PR contains only a plan file, review the plan for clarity, completeness,
   and alignment with the principles in `docs/PRINCIPLES.md`.

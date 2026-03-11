@@ -11,6 +11,10 @@ Files in `.agent/work-plans/` are implementation plans, not code. They follow th
 naming convention `PLAN_ISSUE-<N>.md` and are committed as the first step on a
 feature branch — often in a draft PR before implementation begins.
 
+This pattern applies to both the workspace repo and project repos. Plans live in
+whichever repo owns the issue being worked on — project repos maintain their own
+`.agent/work-plans/` directories following the same conventions.
+
 ## What to Review
 
 - **Scope**: Does the plan address the linked issue? Are there gaps or overreach?
