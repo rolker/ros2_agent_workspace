@@ -74,6 +74,10 @@ source setup.bash                  # set up ROS environment
 # Multiple project repos in one worktree
 .agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <repo1>,<repo2>
 
+# Sub-issue work (branches from parent's feature branch, targets PR at it)
+.agent/scripts/worktree_create.sh --issue <N> --type workspace --parent-issue <parent_N>
+.agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <project_repo> --parent-issue <parent_N>
+
 # List / remove
 .agent/scripts/worktree_list.sh
 .agent/scripts/worktree_remove.sh --issue <N>
@@ -93,6 +97,15 @@ repo, not just the workspace repo.
 
 **Trivial fixes** (typos, minor doc corrections) don't need a dedicated issue — use the
 current task's worktree or create a quick issue for a new one.
+
+**Sub-tasks**: When creating a new issue as a sub-task of existing work, reference
+the parent issue in the issue body (e.g., "Part of #NNN"). Use full
+`owner/repo#NNN` syntax for cross-repo references. The reference must be in the
+issue body — GitHub only auto-links body mentions in the sidebar.
+
+`gh_create_issue.sh` auto-injects this reference when `$WORKTREE_ISSUE` is set.
+When creating a worktree for a sub-issue, use `--parent-issue <N>` so the worktree
+branches from the parent's feature branch and the draft PR targets it (stacked PR).
 
 **Verify before committing**: Before your first commit, confirm the issue matches
 your task: `gh issue view $WORKTREE_ISSUE --json title --jq '.title'`
