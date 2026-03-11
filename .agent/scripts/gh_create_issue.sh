@@ -153,21 +153,21 @@ fi
 # If no labels specified or metadata file doesn't exist, just pass through to gh
 if [ ${#LABELS[@]} -eq 0 ]; then
     echo "ℹ️  No labels specified, passing through to 'gh issue create'"
-    exec gh issue create "${ORIGINAL_ARGS[@]}"
+    gh issue create "${ORIGINAL_ARGS[@]}"; exit $?
 fi
 
 if [ ! -f "$METADATA_FILE" ]; then
     echo "⚠️  Warning: $METADATA_FILE not found"
     echo "   Skipping label validation. Labels will be validated by GitHub."
     echo "   To enable validation, create the metadata file with valid labels."
-    exec gh issue create "${ORIGINAL_ARGS[@]}"
+    gh issue create "${ORIGINAL_ARGS[@]}"; exit $?
 fi
 
 # Load valid labels from metadata
 VALID_LABELS=$(jq -r '.labels[]' "$METADATA_FILE" 2>/dev/null) || {
     echo "⚠️  Warning: Failed to parse $METADATA_FILE"
     echo "   Skipping label validation."
-    exec gh issue create "${ORIGINAL_ARGS[@]}"
+    gh issue create "${ORIGINAL_ARGS[@]}"; exit $?
 }
 
 # Validate each label

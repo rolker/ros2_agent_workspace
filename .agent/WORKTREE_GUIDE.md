@@ -269,8 +269,10 @@ source .agent/scripts/worktree_enter.sh --issue 101
 
 **Environment**: `WORKTREE_PARENT_ISSUE` is exported by `worktree_enter.sh`
 (read from a metadata file written at creation time). For layer worktrees it is
-also set in the generated `setup.bash`. This makes it available to scripts like
-`gh_create_issue.sh` (which auto-injects "Part of #N" into new issues).
+also set in the generated `setup.bash`. Note: `gh_create_issue.sh` auto-injects
+"Part of #N" based on `WORKTREE_ISSUE` (the current issue number), not
+`WORKTREE_PARENT_ISSUE`. The parent issue variable is available for custom
+scripts and workflows that need to know the parent relationship.
 
 **Fallback**: If the parent branch (`feature/issue-<N>`) doesn't exist locally or
 on the remote, the worktree falls back to branching from HEAD with a warning.

@@ -381,6 +381,15 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --parent-issue)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --parent-issue requires an issue number"
+                show_usage
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --parent-issue value must be a number, got '$2'"
+                exit 1
+            fi
             PARENT_ISSUE_NUM="$2"
             shift 2
             ;;
@@ -669,6 +678,18 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
     else
         echo "Creating new branch '$BRANCH_NAME' from current HEAD..."
         git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+    fi
+
+    # If child branch already existed and --parent-issue was given, probe parent
+    # branch existence so draft PR can still target it (stacked PR).
+    if [ -n "$PARENT_BRANCH" ] && [ "$PARENT_BRANCH_FOUND" = false ]; then
+        if git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" || \
+           git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+            PARENT_BRANCH_FOUND=true
+        elif fetch_remote_branch "$ROOT_DIR" "$PARENT_BRANCH" && \
+             git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+            PARENT_BRANCH_FOUND=true
+        fi
     fi
 else
     # Layer worktrees are plain directories containing per-package git worktrees.
