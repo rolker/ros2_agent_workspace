@@ -79,6 +79,74 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# Auto-inject parent issue reference when $WORKTREE_ISSUE is set
+if [ -n "${WORKTREE_ISSUE:-}" ]; then
+    # Determine the correct issue reference format (cross-repo vs same-repo)
+    PARENT_REF="#${WORKTREE_ISSUE}"
+    CURRENT_REPO_SLUG=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || echo "")
+    WORKSPACE_REPO_SLUG=""
+    WORKSPACE_ROOT="${ROS2_WORKSPACE_ROOT:-}"
+    if [ -n "$WORKSPACE_ROOT" ] && git -C "$WORKSPACE_ROOT" remote get-url origin &>/dev/null; then
+        _WS_URL=$(git -C "$WORKSPACE_ROOT" remote get-url origin)
+        WORKSPACE_REPO_SLUG=$(echo "$_WS_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+    fi
+    if [ -n "$CURRENT_REPO_SLUG" ] && [ -n "$WORKSPACE_REPO_SLUG" ] && [ "$CURRENT_REPO_SLUG" != "$WORKSPACE_REPO_SLUG" ]; then
+        PARENT_REF="${WORKSPACE_REPO_SLUG}#${WORKTREE_ISSUE}"
+    fi
+
+    # Check if body already references the parent issue
+    BODY_TEXT=""
+    BODY_FILE_PATH=""
+    BODY_ARG_INDEX=-1
+    BODY_FILE_ARG_INDEX=-1
+    for (( i=0; i<${#ORIGINAL_ARGS[@]}; i++ )); do
+        case "${ORIGINAL_ARGS[$i]}" in
+            --body)
+                if [ -n "${ORIGINAL_ARGS[$((i+1))]:-}" ]; then
+                    BODY_TEXT="${ORIGINAL_ARGS[$((i+1))]}"
+                    BODY_ARG_INDEX=$((i+1))
+                fi
+                ;;
+            --body-file)
+                if [ -n "${ORIGINAL_ARGS[$((i+1))]:-}" ]; then
+                    BODY_FILE_PATH="${ORIGINAL_ARGS[$((i+1))]}"
+                    BODY_FILE_ARG_INDEX=$((i+1))
+                fi
+                ;;
+        esac
+    done
+
+    NEEDS_INJECTION=true
+    if [ -n "$BODY_TEXT" ]; then
+        if echo "$BODY_TEXT" | grep -qF "#${WORKTREE_ISSUE}"; then
+            NEEDS_INJECTION=false
+        fi
+    elif [ -n "$BODY_FILE_PATH" ] && [ -f "$BODY_FILE_PATH" ]; then
+        if grep -qF "#${WORKTREE_ISSUE}" "$BODY_FILE_PATH"; then
+            NEEDS_INJECTION=false
+        fi
+    fi
+
+    if [ "$NEEDS_INJECTION" = true ]; then
+        if [ -n "$BODY_TEXT" ]; then
+            # Append to --body value
+            ORIGINAL_ARGS[$BODY_ARG_INDEX]="${BODY_TEXT}
+
+Part of ${PARENT_REF}"
+            echo "ℹ️  Auto-added parent reference: Part of ${PARENT_REF}"
+        elif [ -n "$BODY_FILE_PATH" ] && [ -f "$BODY_FILE_PATH" ]; then
+            # Create temp copy with appended reference
+            PARENT_BODY_FILE=$(mktemp /tmp/gh_body_parent.XXXXXX.md)
+            cp "$BODY_FILE_PATH" "$PARENT_BODY_FILE"
+            printf '\n\nPart of %s\n' "$PARENT_REF" >> "$PARENT_BODY_FILE"
+            ORIGINAL_ARGS[$BODY_FILE_ARG_INDEX]="$PARENT_BODY_FILE"
+            echo "ℹ️  Auto-added parent reference: Part of ${PARENT_REF}"
+        else
+            echo "⚠️  No --body or --body-file provided; cannot auto-inject parent reference (Part of ${PARENT_REF})"
+        fi
+    fi
+fi
+
 # If no labels specified or metadata file doesn't exist, just pass through to gh
 if [ ${#LABELS[@]} -eq 0 ]; then
     echo "ℹ️  No labels specified, passing through to 'gh issue create'"
