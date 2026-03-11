@@ -56,7 +56,7 @@ made explicit in the docs that currently assume workspace-only.
 | Principle | Consideration |
 |---|---|
 | A change includes its consequences | Review-issue comment identified `review-pr/SKILL.md` as an additional file — included in plan |
-| Workspace improvements cascade to projects | The `.agents/work-plans/` convention in project repos already works; this just documents it |
+| Workspace improvements cascade to projects | The `.agent/work-plans/` convention in project repos already works; this just documents it |
 | Only what's needed | Documentation-only, no code or script changes |
 
 ## ADR Compliance
