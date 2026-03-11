@@ -19,7 +19,7 @@ made explicit in the docs that currently assume workspace-only.
 ## Approach
 
 1. **Update `.agent/work-plans/README.md`** — Add a section explaining that
-   this directory pattern is replicated in project repos (under `.agents/work-plans/`).
+   this directory pattern is replicated in project repos (under `.agent/work-plans/`).
    Note that the workspace copy documents workspace issues; project repos
    document their own issues.
 
@@ -28,13 +28,14 @@ made explicit in the docs that currently assume workspace-only.
    workspace and project repos (plan lives in the repo being changed).
 
 3. **Update `.github/instructions/work-plans.instructions.md`** — Broaden
-   the `applies_to` scope description and add a note that project repos
-   have the same pattern under `.agents/work-plans/`.
+   the scope description and add a note that project repos have the same
+   pattern under `.agent/work-plans/`.
 
-4. **Update `.claude/skills/plan-task/SKILL.md`** — In step 5, clarify that
-   the plan file path is relative to the current repo. For project repo
-   issues, the plan is committed in the project repo's `.agents/work-plans/`,
-   not the workspace's.
+4. **Update `.claude/skills/plan-task/SKILL.md`** — Update all references to
+   work plan paths (frontmatter description, step 5 text, commit command, and
+   `gh pr create --body-file` example) so they clearly state the path is
+   relative to the current repo. For project repo issues, the plan is
+   committed in that repo's `.agent/work-plans/`, not only the workspace's.
 
 5. **Update `.claude/skills/review-pr/SKILL.md`** — Line 41 references
    `.agent/work-plans/PLAN_ISSUE-*.md` without noting it's repo-relative.
