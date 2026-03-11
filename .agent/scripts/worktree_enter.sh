@@ -259,6 +259,21 @@ else
     fi
 fi
 
+# Load parent issue from metadata file (written by worktree_create.sh)
+_PARENT_ISSUE_FILE=""
+if [ "$WORKTREE_TYPE" == "layer" ]; then
+    _PARENT_ISSUE_FILE="$WORKTREE_DIR/.scratchpad/.parent_issue"
+else
+    _PARENT_ISSUE_FILE="$WORKTREE_DIR/.agent/scratchpad/.parent_issue"
+fi
+if [ -f "$_PARENT_ISSUE_FILE" ]; then
+    WORKTREE_PARENT_ISSUE="$(tr -d '[:space:]' < "$_PARENT_ISSUE_FILE")"
+    export WORKTREE_PARENT_ISSUE
+else
+    unset WORKTREE_PARENT_ISSUE
+fi
+unset _PARENT_ISSUE_FILE
+
 # For layer worktrees, also set up scratchpad path
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     export WORKTREE_SCRATCHPAD="$WORKTREE_DIR/.scratchpad"
@@ -288,6 +303,9 @@ else
     echo "✅ Now in worktree for issue #$ISSUE_NUM"
 fi
 echo "   Branch: $CURRENT_BRANCH"
+if [ -n "${WORKTREE_PARENT_ISSUE:-}" ]; then
+    echo "   Parent: #$WORKTREE_PARENT_ISSUE (feature/issue-$WORKTREE_PARENT_ISSUE)"
+fi
 echo "   PWD:    $(pwd)"
 echo ""
 

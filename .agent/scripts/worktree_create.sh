@@ -114,6 +114,9 @@ SETUP_HEADER
     if [ -n "$SKILL_NAME" ]; then
         printf 'export WORKTREE_SKILL=%q\n' "$SKILL_NAME" >> "$wt_dir/setup.bash"
     fi
+    if [ -n "$PARENT_ISSUE_NUM" ]; then
+        printf 'export WORKTREE_PARENT_ISSUE=%q\n' "$PARENT_ISSUE_NUM" >> "$wt_dir/setup.bash"
+    fi
 
     cat >> "$wt_dir/setup.bash" << 'SETUP_VARS2'
 export WORKTREE_TYPE="layer"
@@ -309,6 +312,7 @@ TARGET_LAYER=""
 REPO_SLUG=""
 TARGET_PACKAGES=""  # Comma-separated list of packages to modify
 PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
+PARENT_ISSUE_NUM="" # Parent issue number for sub-issue worktrees
 
 # Skills allowed to create worktrees without a GitHub issue
 ALLOWED_SKILLS=("research")
@@ -329,6 +333,7 @@ show_usage() {
     echo "                        Comma-separated list for multiple packages"
     echo "  --repo-slug <slug>    Repository slug for naming (auto-detected if not provided)"
     echo "  --branch <name>       Custom branch name (default: feature/issue-<N> or skill/<id>)"
+    echo "  --parent-issue <N>    Parent issue number; branches from parent's feature branch and targets PR at it"
     echo "  --plan-file <path>    Path to approved plan file; creates draft PR and posts plan as comment"
     echo ""
     echo "Examples:"
@@ -375,6 +380,19 @@ while [[ $# -gt 0 ]]; do
             TARGET_PACKAGES="$2"
             shift 2
             ;;
+        --parent-issue)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --parent-issue requires an issue number"
+                show_usage
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --parent-issue value must be a number, got '$2'"
+                exit 1
+            fi
+            PARENT_ISSUE_NUM="$2"
+            shift 2
+            ;;
         --plan-file)
             PLAN_FILE="$2"
             shift 2
@@ -400,6 +418,10 @@ fi
 if [ -z "$ISSUE_NUM" ] && [ -z "$SKILL_NAME" ]; then
     echo "Error: either --issue or --skill is required"
     show_usage
+    exit 1
+fi
+if [ -n "$SKILL_NAME" ] && [ -n "$PARENT_ISSUE_NUM" ]; then
+    echo "Error: --parent-issue cannot be used with --skill (skills have no parent issue)"
     exit 1
 fi
 
@@ -574,6 +596,12 @@ if [ -z "$BRANCH_NAME" ]; then
     fi
 fi
 
+# Derive parent branch name from --parent-issue
+PARENT_BRANCH=""
+if [ -n "$PARENT_ISSUE_NUM" ]; then
+    PARENT_BRANCH="feature/issue-${PARENT_ISSUE_NUM}"
+fi
+
 # Determine worktree path based on type and mode (issue vs skill)
 if [ -n "$SKILL_NAME" ]; then
     DIR_PREFIX="skill-${REPO_SLUG}-${SYNTHETIC_ID}"
@@ -614,11 +642,15 @@ echo "  Repository: $REPO_SLUG"
 echo "  Type:       $WORKTREE_TYPE"
 [ -n "$TARGET_LAYER" ] && echo "  Layer:      $TARGET_LAYER"
 echo "  Branch:     $BRANCH_NAME"
+[ -n "$PARENT_BRANCH" ] && echo "  Parent:     #$PARENT_ISSUE_NUM ($PARENT_BRANCH)"
 echo "  Path:       $WORKTREE_DIR"
 echo ""
 
 # Create parent directory if needed
 mkdir -p "$(dirname "$WORKTREE_DIR")"
+
+# Track whether parent branch was actually used (guards PR --base later)
+PARENT_BRANCH_FOUND=false
 
 # Create the worktree directory
 if [ "$WORKTREE_TYPE" == "workspace" ]; then
@@ -629,9 +661,35 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
     elif fetch_remote_branch "$ROOT_DIR" "$BRANCH_NAME"; then
         echo "Tracking remote branch 'origin/$BRANCH_NAME'..."
         git worktree add --track -b "$BRANCH_NAME" "$WORKTREE_DIR" "origin/$BRANCH_NAME"
+    elif [ -n "$PARENT_BRANCH" ]; then
+        # Branch from parent issue's feature branch
+        if git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH"; then
+            echo "Creating new branch '$BRANCH_NAME' from parent branch '$PARENT_BRANCH'..."
+            git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR" "$PARENT_BRANCH"
+            PARENT_BRANCH_FOUND=true
+        elif fetch_remote_branch "$ROOT_DIR" "$PARENT_BRANCH"; then
+            echo "Creating new branch '$BRANCH_NAME' from parent branch 'origin/$PARENT_BRANCH'..."
+            git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR" "origin/$PARENT_BRANCH"
+            PARENT_BRANCH_FOUND=true
+        else
+            echo "⚠️  Parent branch '$PARENT_BRANCH' not found; falling back to HEAD"
+            git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+        fi
     else
         echo "Creating new branch '$BRANCH_NAME' from current HEAD..."
         git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+    fi
+
+    # If child branch already existed and --parent-issue was given, probe parent
+    # branch existence so draft PR can still target it (stacked PR).
+    if [ -n "$PARENT_BRANCH" ] && [ "$PARENT_BRANCH_FOUND" = false ]; then
+        if git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" || \
+           git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+            PARENT_BRANCH_FOUND=true
+        elif fetch_remote_branch "$ROOT_DIR" "$PARENT_BRANCH" && \
+             git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+            PARENT_BRANCH_FOUND=true
+        fi
     fi
 else
     # Layer worktrees are plain directories containing per-package git worktrees.
@@ -664,6 +722,11 @@ Files here are gitignored and isolated from other worktrees.
 
 **Working layer**: ${TARGET_LAYER}_ws
 EOF
+    fi
+
+    # Persist parent issue for worktree_enter.sh to pick up
+    if [ -n "$PARENT_ISSUE_NUM" ]; then
+        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.scratchpad/.parent_issue"
     fi
 
     # Create symlinks to main for all layers except target
@@ -733,12 +796,25 @@ EOF
                             git fetch --quiet origin "$REPOS_BRANCH" 2>/dev/null || true
                         fi
 
-                        # Prefer the issue branch for this package: local first, then remote, then new from .repos branch, then new from HEAD
+                        # Fetch parent branch if specified
+                        if [ -n "$PARENT_BRANCH" ]; then
+                            fetch_remote_branch "$pkg_path" "$PARENT_BRANCH" || true
+                        fi
+
+                        # Prefer the issue branch for this package: local first, then remote, then parent branch, then .repos branch, then HEAD
                         if git worktree add "$WORKTREE_PKG_PATH" "$BRANCH_NAME" 2>/dev/null; then
                             echo "      ✓ Worktree created from existing local branch: $BRANCH_NAME"
                         elif fetch_remote_branch "$pkg_path" "$BRANCH_NAME" && \
                              git worktree add --track -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$BRANCH_NAME" 2>/dev/null; then
                             echo "      ✓ Worktree created tracking remote branch: origin/$BRANCH_NAME"
+                        elif [ -n "$PARENT_BRANCH" ] && git show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" && \
+                             git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "$PARENT_BRANCH" 2>/dev/null; then
+                            echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from parent $PARENT_BRANCH)"
+                            PARENT_BRANCH_FOUND=true
+                        elif [ -n "$PARENT_BRANCH" ] && git show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH" && \
+                             git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$PARENT_BRANCH" 2>/dev/null; then
+                            echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from parent origin/$PARENT_BRANCH)"
+                            PARENT_BRANCH_FOUND=true
                         elif [ -n "$REPOS_BRANCH" ] && \
                              git worktree add -b "$BRANCH_NAME" "$WORKTREE_PKG_PATH" "origin/$REPOS_BRANCH" 2>/dev/null; then
                             echo "      ✓ Worktree created with new branch: $BRANCH_NAME (from $REPOS_BRANCH)"
@@ -783,6 +859,24 @@ EOF
         fi
     done
 
+    # If child branch already existed and --parent-issue was given, probe parent
+    # branch existence in target package repos so draft PR can still target it.
+    if [ -n "$PARENT_BRANCH" ] && [ "$PARENT_BRANCH_FOUND" = false ]; then
+        for pkg_dir in "$WORKTREE_DIR"/"${TARGET_LAYER}_ws"/src/*; do
+            [ -L "$pkg_dir" ] && continue
+            [ ! -d "$pkg_dir/.git" ] && continue
+            if git -C "$pkg_dir" show-ref --verify --quiet "refs/heads/$PARENT_BRANCH" || \
+               git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+                PARENT_BRANCH_FOUND=true
+                break
+            elif fetch_remote_branch "$pkg_dir" "$PARENT_BRANCH" && \
+                 git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH"; then
+                PARENT_BRANCH_FOUND=true
+                break
+            fi
+        done
+    fi
+
     # Generate convenience scripts (setup.bash, build.sh, test.sh, etc.)
     generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR"
 fi
@@ -802,6 +896,12 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
 
     # Ensure scratchpad exists
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"
+
+    # Persist parent issue for worktree_enter.sh to pick up
+    # Use scratchpad (gitignored) to avoid untracked file noise
+    if [ -n "$PARENT_ISSUE_NUM" ]; then
+        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.agent/scratchpad/.parent_issue"
+    fi
 fi
 
 echo ""
@@ -813,6 +913,7 @@ if [ -n "$SKILL_NAME" ]; then
 elif [ -n "$ISSUE_TITLE" ]; then
     echo "  Issue #$ISSUE_NUM: $ISSUE_TITLE"
 fi
+[ -n "$PARENT_BRANCH" ] && echo "  Parent: #$PARENT_ISSUE_NUM ($PARENT_BRANCH)"
 echo ""
 
 # --plan-file: push branch, create draft PR, post plan as comment
@@ -926,6 +1027,19 @@ PREOF
 $ISSUE_TITLE
 
 Closes $issue_ref
+PREOF
+            # Add parent issue reference if creating a sub-issue worktree
+            # Use same cross-repo resolution as issue_ref (owner/repo#N vs #N)
+            if [ -n "$PARENT_ISSUE_NUM" ]; then
+                if [[ "$issue_ref" == */* ]]; then
+                    # Cross-repo: extract owner/repo prefix from issue_ref
+                    _parent_ref="${issue_ref%%#*}#${PARENT_ISSUE_NUM}"
+                else
+                    _parent_ref="#${PARENT_ISSUE_NUM}"
+                fi
+                echo "Part of $_parent_ref" >> "$BODY_FILE"
+            fi
+            cat >> "$BODY_FILE" << PREOF
 
 ---
 **Authored-By**: \`${DRAFT_AGENT_NAME}\`
@@ -958,11 +1072,17 @@ PREOF
         rm -f "$GH_STDERR" "$BODY_FILE"
     }
 
+    # Only use parent branch as PR base if it was actually found during worktree creation
+    PR_PARENT_BASE=""
+    if [ "$PARENT_BRANCH_FOUND" = true ]; then
+        PR_PARENT_BASE="$PARENT_BRANCH"
+    fi
+
     if [ "$WORKTREE_TYPE" == "workspace" ]; then
         if [ -n "$SKILL_NAME" ]; then
             create_draft_pr "$WORKTREE_DIR" ""
         else
-            create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM"
+            create_draft_pr "$WORKTREE_DIR" "#$ISSUE_NUM" "" "$PR_PARENT_BASE"
         fi
         cd "$ROOT_DIR"
 
@@ -992,7 +1112,18 @@ PREOF
             fi
 
             # Resolve the .repos base branch for the PR target
-            PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
+            # Parent branch takes priority, but verify it exists in this package repo
+            PKG_BASE_BRANCH=""
+            if [ "$PARENT_BRANCH_FOUND" = true ]; then
+                fetch_remote_branch "$pkg_dir" "$PARENT_BRANCH" || true
+                if git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH" || \
+                   git -C "$pkg_dir" show-ref --verify --quiet "refs/heads/$PARENT_BRANCH"; then
+                    PKG_BASE_BRANCH="$PARENT_BRANCH"
+                fi
+            fi
+            if [ -z "$PKG_BASE_BRANCH" ]; then
+                PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
+            fi
 
             create_draft_pr "$pkg_dir" "$ISSUE_REF" "$PKG_REPO_SLUG" "$PKG_BASE_BRANCH"
         done
