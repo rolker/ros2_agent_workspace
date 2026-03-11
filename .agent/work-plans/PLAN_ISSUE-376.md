@@ -55,22 +55,27 @@ This makes the documentation rule from sub-issue A mechanically enforced.
 
 ### Sub-issue C: Add `--parent-issue` flag to `worktree_create.sh`
 
-**Branch-base fix.** Add `--parent-issue <N>` to `worktree_create.sh` so sub-issue
-worktrees branch from the parent's feature branch instead of HEAD.
+**Branch-base and PR-target fix.** Add `--parent-issue <N>` to `worktree_create.sh` so
+sub-issue worktrees branch from the parent's feature branch instead of HEAD, and draft
+PRs target the parent's branch (stacked PRs).
 
 Behavior:
 1. Accept `--parent-issue <N>` argument.
 2. Derive the parent's branch name: `feature/issue-<N>` (matching existing convention).
-3. For **workspace worktrees**: `git worktree add -b feature/issue-<CHILD> <path> feature/issue-<PARENT>`
-   (fetch from origin first if needed).
-4. For **layer worktrees**: same logic in the per-package worktree creation — branch from
-   the parent's branch instead of `origin/$REPOS_BRANCH` or HEAD.
+3. **Branch origin** — For **workspace worktrees**:
+   `git worktree add -b feature/issue-<CHILD> <path> feature/issue-<PARENT>`
+   (fetch from origin first if needed). For **layer worktrees**: same logic in
+   per-package worktree creation — branch from the parent's branch instead of
+   `origin/$REPOS_BRANCH` or HEAD.
+4. **PR target** — When `--plan-file` creates a draft PR, set `--base feature/issue-<PARENT>`
+   so the sub-issue PR targets the parent's branch (stacked PR). This keeps the PR diff
+   focused on only the sub-issue's changes and enforces merge ordering (parent merges first).
 5. If the parent branch doesn't exist locally or on origin, warn and fall back to current
    behavior (branch from default).
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/worktree_create.sh` | Add `--parent-issue` flag, modify branching logic |
+| `.agent/scripts/worktree_create.sh` | Add `--parent-issue` flag, modify branching + PR target logic |
 
 ## Principles Self-Check
 
@@ -98,11 +103,7 @@ Behavior:
 
 ## Open Questions
 
-1. **PR target for sub-issue worktrees**: Should the sub-issue PR target the parent's
-   branch (stacked PRs) or the default branch? Stacked PRs are cleaner but GitHub's
-   support is limited. Recommend: target the default branch, and note the parent PR
-   in the sub-issue PR description. The branching is about starting from the right
-   code, not about merge topology.
+None — stacked PRs (sub-issue PR targets parent's branch) confirmed as the approach.
 
 ## Estimated Scope
 
