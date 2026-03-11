@@ -411,6 +411,10 @@ if [ -z "$ISSUE_NUM" ] && [ -z "$SKILL_NAME" ]; then
     show_usage
     exit 1
 fi
+if [ -n "$SKILL_NAME" ] && [ -n "$PARENT_ISSUE_NUM" ]; then
+    echo "Error: --parent-issue cannot be used with --skill (skills have no parent issue)"
+    exit 1
+fi
 
 # Validate skill name against allowlist
 if [ -n "$SKILL_NAME" ]; then
@@ -855,8 +859,9 @@ if [ "$WORKTREE_TYPE" == "workspace" ]; then
     mkdir -p "$WORKTREE_DIR/.agent/scratchpad"
 
     # Persist parent issue for worktree_enter.sh to pick up
+    # Use scratchpad (gitignored) to avoid untracked file noise
     if [ -n "$PARENT_ISSUE_NUM" ]; then
-        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.agent/.parent_issue"
+        echo "$PARENT_ISSUE_NUM" > "$WORKTREE_DIR/.agent/scratchpad/.parent_issue"
     fi
 fi
 
@@ -985,8 +990,15 @@ $ISSUE_TITLE
 Closes $issue_ref
 PREOF
             # Add parent issue reference if creating a sub-issue worktree
+            # Use same cross-repo resolution as issue_ref (owner/repo#N vs #N)
             if [ -n "$PARENT_ISSUE_NUM" ]; then
-                echo "Part of #$PARENT_ISSUE_NUM" >> "$BODY_FILE"
+                if [[ "$issue_ref" == */* ]]; then
+                    # Cross-repo: extract owner/repo prefix from issue_ref
+                    _parent_ref="${issue_ref%%#*}#${PARENT_ISSUE_NUM}"
+                else
+                    _parent_ref="#${PARENT_ISSUE_NUM}"
+                fi
+                echo "Part of $_parent_ref" >> "$BODY_FILE"
             fi
             cat >> "$BODY_FILE" << PREOF
 
@@ -1061,10 +1073,16 @@ PREOF
             fi
 
             # Resolve the .repos base branch for the PR target
-            # Parent branch takes priority for stacked PRs (only if it was found)
+            # Parent branch takes priority, but verify it exists in this package repo
+            PKG_BASE_BRANCH=""
             if [ "$PARENT_BRANCH_FOUND" = true ]; then
-                PKG_BASE_BRANCH="$PARENT_BRANCH"
-            else
+                fetch_remote_branch "$pkg_dir" "$PARENT_BRANCH" || true
+                if git -C "$pkg_dir" show-ref --verify --quiet "refs/remotes/origin/$PARENT_BRANCH" || \
+                   git -C "$pkg_dir" show-ref --verify --quiet "refs/heads/$PARENT_BRANCH"; then
+                    PKG_BASE_BRANCH="$PARENT_BRANCH"
+                fi
+            fi
+            if [ -z "$PKG_BASE_BRANCH" ]; then
                 PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
             fi
 

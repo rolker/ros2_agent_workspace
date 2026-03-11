@@ -264,7 +264,7 @@ _PARENT_ISSUE_FILE=""
 if [ "$WORKTREE_TYPE" == "layer" ]; then
     _PARENT_ISSUE_FILE="$WORKTREE_DIR/.scratchpad/.parent_issue"
 else
-    _PARENT_ISSUE_FILE="$WORKTREE_DIR/.agent/.parent_issue"
+    _PARENT_ISSUE_FILE="$WORKTREE_DIR/.agent/scratchpad/.parent_issue"
 fi
 if [ -f "$_PARENT_ISSUE_FILE" ]; then
     WORKTREE_PARENT_ISSUE="$(tr -d '[:space:]' < "$_PARENT_ISSUE_FILE")"

@@ -117,12 +117,14 @@ if [ -n "${WORKTREE_ISSUE:-}" ]; then
     done
 
     NEEDS_INJECTION=true
+    # Use word-boundary regex to avoid substring false positives (e.g., #12 matching #123)
+    _PARENT_PATTERN="(^|[^0-9])#${WORKTREE_ISSUE}([^0-9]|$)"
     if [ -n "$BODY_TEXT" ]; then
-        if echo "$BODY_TEXT" | grep -qF "#${WORKTREE_ISSUE}"; then
+        if printf '%s\n' "$BODY_TEXT" | grep -Eq "$_PARENT_PATTERN"; then
             NEEDS_INJECTION=false
         fi
     elif [ -n "$BODY_FILE_PATH" ] && [ -f "$BODY_FILE_PATH" ]; then
-        if grep -qF "#${WORKTREE_ISSUE}" "$BODY_FILE_PATH"; then
+        if grep -Eq "$_PARENT_PATTERN" "$BODY_FILE_PATH"; then
             NEEDS_INJECTION=false
         fi
     fi
