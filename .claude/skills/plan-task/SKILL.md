@@ -163,7 +163,7 @@ ISSUE_TITLE=$(gh issue view <N> --json title --jq '.title')
 CURRENT_BRANCH=$(git branch --show-current)
 
 # Check for existing PR on this branch
-EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null || echo "")
 
 if [ -n "$EXISTING_PR" ]; then
     # Update existing PR title and body
