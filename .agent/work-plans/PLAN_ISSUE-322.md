@@ -10,7 +10,7 @@ The `gather-project-knowledge` skill (`.claude/skills/gather-project-knowledge/S
 has a validation step (step 4) that checks package names in profiles against `package.xml`
 `<name>` elements. However, summary statistics in `workspace_overview.md` (repo counts,
 package counts per layer) are not validated, leading to incorrect numbers in the second
-run (see unh_marine_autonomy#96). The root cause is the same as #320: values were copied
+run (see [rolker/unh_marine_autonomy#96](https://github.com/rolker/unh_marine_autonomy/pull/96)). The root cause is the same as #320: values were copied
 from intermediate agent output instead of being derived from the authoritative inventory
 table.
 
