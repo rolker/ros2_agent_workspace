@@ -165,13 +165,19 @@ CURRENT_BRANCH=$(git branch --show-current)
 # Check for existing PR on this branch
 EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null || echo "")
 
+# Build PR body: prepend Closes reference, then plan content
+BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+printf 'Closes #<N>\n\n' > "$BODY_FILE"
+cat .agent/work-plans/PLAN_ISSUE-<N>.md >> "$BODY_FILE"
+
 if [ -n "$EXISTING_PR" ]; then
     # Update existing PR title and body
-    gh pr edit "$EXISTING_PR" --title "[PLAN] $ISSUE_TITLE" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
+    gh pr edit "$EXISTING_PR" --title "[PLAN] $ISSUE_TITLE" --body-file "$BODY_FILE"
 else
     # Create new draft PR
-    gh pr create --draft --title "[PLAN] $ISSUE_TITLE" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
+    gh pr create --draft --title "[PLAN] $ISSUE_TITLE" --body-file "$BODY_FILE"
 fi
+rm -f "$BODY_FILE"
 ```
 
 ### 8. Report to user

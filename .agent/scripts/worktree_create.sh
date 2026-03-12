@@ -562,8 +562,8 @@ fi
 ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
-    # Reject if the number is a pull request, not an issue
     if command -v gh &>/dev/null; then
+        # Reject if the number is a pull request, not an issue
         _PR_CHECK=""
         if [ -n "$GH_REPO_SLUG" ]; then
             _PR_CHECK=$(gh pr view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json number --jq '.number' 2>/dev/null || echo "")
@@ -575,8 +575,6 @@ if [ -n "$ISSUE_NUM" ]; then
             echo "Use the original issue number instead."
             exit 1
         fi
-    fi
-    if command -v gh &>/dev/null; then
         if [ -n "$GH_REPO_SLUG" ]; then
             _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
         else
