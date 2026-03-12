@@ -99,6 +99,14 @@ High-level workspace inventory:
 - Cross-repo relationships (shared dependencies, message types)
 - Repos with governance docs vs repos without
 
+> **Count derivation rule**: All numeric counts in `workspace_overview.md` —
+> repos per layer, packages per layer, and totals — must be derived from the
+> structured inventory table from step 2. Repos per layer = the number of rows
+> for that layer. Packages per layer = the sum of the package-name entries
+> across those rows (not the number of rows, since one repo may contain
+> multiple packages). Never copy counts from intermediate outputs, prior runs,
+> or pre-computed summaries.
+
 ##### `governance_summary.md`
 
 Unified governance view organized by theme, not by repo:
@@ -150,6 +158,22 @@ find . -name package.xml -not -path '*/build/*' -not -path '*/install/*' -print0
 
 Compare the output against what the profile claims. Every name must match
 exactly. Do not proceed to step 5 until all profiles pass validation.
+
+#### Validate summary counts (manifest repo mode only)
+
+If `workspace_overview.md` was generated, verify its Layer Structure table:
+
+1. For each layer row:
+   - **Repo count**: Count the number of rows in the Package Inventory table
+     that belong to that layer.
+   - **Package count**: For those rows, sum the number of package names listed
+     in the Packages column (do not just count rows — multi-package repos
+     contribute one count per package name).
+2. Compare these repo and package counts against the values claimed in the
+   Layer Structure table.
+3. Verify that totals equal the sum of per-layer counts.
+
+If any count mismatches, fix `workspace_overview.md` before proceeding.
 
 ### 5. Add frontmatter to generated files
 
