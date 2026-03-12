@@ -118,6 +118,11 @@ d. **Assess the comment** against the actual code:
    - Is the concern valid? Does the code actually have the issue flagged?
    - Is it a false positive? (e.g., comparing against stale `main`, or
      misunderstanding the intent)
+   - **Plan files** (`PLAN_ISSUE-*.md`): If the comment targets a file in
+     `.agent/work-plans/`, it is a planning artifact. Check whether the
+     concern is addressed in the implementation files changed in the same PR.
+     If so, classify as "Addressed in implementation." Plan wording does not
+     need to be updated to match implementation.
 e. **Evaluate conversation comments** — `conversation_comments` are PR-level
    comments (not attached to specific files or lines). Treat them as general PR
    feedback:
@@ -205,3 +210,13 @@ Output a structured report:
   workspace principles or ADRs.
 - **No comments posted** — this skill is read-only. It does not post review comments,
   dismiss reviews, or modify the PR in any way.
+- **Plan-first workflow PRs** — In the plan-first workflow, a PR starts with a
+  plan commit and later receives implementation commits. When triaging these PRs:
+  - Comments on `.agent/work-plans/PLAN_ISSUE-*.md` files are low priority —
+    the plan is a pre-implementation artifact and the implementation is the
+    source of truth.
+  - Reviews submitted against the plan-only commit (`commit_id` differs from
+    `head_sha`) are likely stale once implementation lands. Evaluate the
+    reviewer's concern against the current implementation code, not the plan text.
+  - Classify plan-file comments as false positives when the implementation
+    already addresses the concern, even if the plan wording doesn't match.
