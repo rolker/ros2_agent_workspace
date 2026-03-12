@@ -563,6 +563,18 @@ ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
     if command -v gh &>/dev/null; then
+        # Reject if the number is a pull request, not an issue
+        _PR_CHECK=""
+        if [ -n "$GH_REPO_SLUG" ]; then
+            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json number --jq '.number' 2>/dev/null || echo "")
+        else
+            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --json number --jq '.number' 2>/dev/null || echo "")
+        fi
+        if [ -n "$_PR_CHECK" ]; then
+            echo "Error: #$ISSUE_NUM is a pull request, not an issue."
+            echo "Use the original issue number instead."
+            exit 1
+        fi
         if [ -n "$GH_REPO_SLUG" ]; then
             _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
         else
@@ -1021,13 +1033,25 @@ Automated update from the \`$SKILL_NAME\` skill.
 **Model**: \`${DRAFT_AGENT_MODEL}\`
 PREOF
         else
-            cat > "$BODY_FILE" << PREOF
+            if [ -n "$PLAN_FILE" ]; then
+                cat > "$BODY_FILE" << PREOF
+## Summary
+
+$ISSUE_TITLE
+
+Plan for $issue_ref
+
+Closes $issue_ref
+PREOF
+            else
+                cat > "$BODY_FILE" << PREOF
 ## Summary
 
 $ISSUE_TITLE
 
 Closes $issue_ref
 PREOF
+            fi
             # Add parent issue reference if creating a sub-issue worktree
             # Use same cross-repo resolution as issue_ref (owner/repo#N vs #N)
             if [ -n "$PARENT_ISSUE_NUM" ]; then
@@ -1047,7 +1071,11 @@ PREOF
 PREOF
         fi
 
-        local gh_args=(pr create --draft --title "$ISSUE_TITLE" --body-file "$BODY_FILE")
+        local pr_title="$ISSUE_TITLE"
+        if [ -n "$PLAN_FILE" ]; then
+            pr_title="[PLAN] $ISSUE_TITLE"
+        fi
+        local gh_args=(pr create --draft --title "$pr_title" --body-file "$BODY_FILE")
         [ -n "$repo_flag" ] && gh_args+=(--repo "$repo_flag")
         [ -n "$base_flag" ] && gh_args+=(--base "$base_flag")
 

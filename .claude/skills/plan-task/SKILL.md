@@ -149,18 +149,35 @@ git commit -m "Add work plan for #<N>
 <one-line summary of the approach>"
 ```
 
-### 7. Create a draft PR
+### 7. Create or update a draft PR
 
-Push the branch and create a draft PR with the plan as the body. This
-allows Copilot and humans to review the plan before implementation.
+Push the branch and create (or update) a draft PR with a `[PLAN]` title
+prefix and the plan as the body. The prefix prevents agents from confusing
+the PR number with the issue number.
 
 ```bash
 # Push current branch (name may vary: feature/issue-<N> or feature/ISSUE-<N>-<desc>)
 git push -u origin HEAD
 
-# Create draft PR (use --body-file for title safety)
 ISSUE_TITLE=$(gh issue view <N> --json title --jq '.title')
-gh pr create --draft --title "$ISSUE_TITLE" --body-file .agent/work-plans/PLAN_ISSUE-<N>.md
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Check for existing PR on this branch
+EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json url --jq '.[0].url // ""' 2>/dev/null || echo "")
+
+# Build PR body: prepend Closes reference, then plan content
+BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+printf 'Closes #<N>\n\n' > "$BODY_FILE"
+cat .agent/work-plans/PLAN_ISSUE-<N>.md >> "$BODY_FILE"
+
+if [ -n "$EXISTING_PR" ]; then
+    # Update existing PR title and body
+    gh pr edit "$EXISTING_PR" --title "[PLAN] $ISSUE_TITLE" --body-file "$BODY_FILE"
+else
+    # Create new draft PR
+    gh pr create --draft --title "[PLAN] $ISSUE_TITLE" --body-file "$BODY_FILE"
+fi
+rm -f "$BODY_FILE"
 ```
 
 ### 8. Report to user
