@@ -566,9 +566,9 @@ if [ -n "$ISSUE_NUM" ]; then
         # Reject if the number is a pull request, not an issue
         _PR_CHECK=""
         if [ -n "$GH_REPO_SLUG" ]; then
-            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json number --jq '.number' 2>/dev/null || echo "")
+            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json state --jq '.state' 2>/dev/null || echo "")
         else
-            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --json number --jq '.number' 2>/dev/null || echo "")
+            _PR_CHECK=$(gh pr view "$ISSUE_NUM" --json state --jq '.state' 2>/dev/null || echo "")
         fi
         if [ -n "$_PR_CHECK" ]; then
             echo "Error: #$ISSUE_NUM is a pull request, not an issue."
