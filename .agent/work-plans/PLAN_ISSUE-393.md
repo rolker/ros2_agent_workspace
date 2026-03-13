@@ -51,6 +51,8 @@ New stamp depending on `bootstrap.done`:
 - Added as a dependency of `setup-all` (not `build` — git-bug is optional
   infrastructure, not a build prerequisite)
 - Add `skip-git-bug` target for environments where git-bug isn't wanted
+- Add `skip-git-bug` to `.PHONY` list and `help` target
+- Run `make generate-skills` if any new targets should be slash commands
 
 ### 5. Add git-bug sync to `sync_repos.py`
 
@@ -64,6 +66,9 @@ Add a `sync_gitbug()` function that:
 
 Before the existing `gh issue view` block (~line 234):
 - Try `git bug show` first for issue title (using workspace root repo)
+- All `git bug` calls must be non-fatal (`cmd 2>/dev/null || echo ""`)
+  since these scripts use `set -e` — an unconfigured bridge or offline
+  state must not abort worktree entry
 - Also trigger a background `git bug pull` to keep data fresh
 - Fall back to `gh` if git-bug is not configured or returns nothing
 - No change to the exported `WORKTREE_ISSUE_TITLE` variable
@@ -72,6 +77,8 @@ Before the existing `gh issue view` block (~line 234):
 
 Before the existing `gh issue view` block (~line 578):
 - Try `git bug show` for issue title and state
+- All `git bug` calls must be non-fatal (`cmd 2>/dev/null || echo ""`)
+  to preserve graceful degradation under `set -e`
 - Normalize state values (git-bug uses lowercase, existing code expects uppercase)
 - Fall back to `gh` for the issue check; PR check stays `gh`-only
 
