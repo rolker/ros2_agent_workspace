@@ -333,6 +333,11 @@ Sets these variables:
 - `WORKTREE_TYPE` - "layer" or "workspace"
 - `WORKTREE_ROOT` - Path to worktree directory
 
+**Issue lookup**: Both `worktree_enter.sh` and `worktree_create.sh` try git-bug
+first for issue title/state (fast, offline-capable), then fall back to `gh` API
+if git-bug is unavailable or returns no data. This is transparent — the same
+environment variables are set regardless of the lookup source.
+
 ### Remove Worktree
 
 ```bash

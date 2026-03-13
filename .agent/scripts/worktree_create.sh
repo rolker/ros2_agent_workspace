@@ -562,8 +562,24 @@ fi
 ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
+    # Try git-bug first for issue title and state (offline-capable)
+    if command -v git-bug &>/dev/null; then
+        _BUG_OUTPUT=$(git -C "$ROOT_DIR" bug select "$ISSUE_NUM" 2>/dev/null \
+            && git -C "$ROOT_DIR" bug show 2>/dev/null || echo "")
+        if [ -n "$_BUG_OUTPUT" ]; then
+            _BUG_TITLE=$(echo "$_BUG_OUTPUT" | head -1 | sed 's/^[^ ]* //')
+            _BUG_STATE=$(echo "$_BUG_OUTPUT" | grep -i '^status:' | awk '{print $2}' || echo "")
+            if [ -n "$_BUG_TITLE" ]; then
+                ISSUE_TITLE="$_BUG_TITLE"
+                [[ "${_BUG_STATE,,}" == "closed" ]] && ISSUE_STATE="CLOSED"
+                [[ "${_BUG_STATE,,}" == "open" ]] && ISSUE_STATE="OPEN"
+            fi
+        fi
+        git -C "$ROOT_DIR" bug deselect 2>/dev/null || true
+    fi
+
     if command -v gh &>/dev/null; then
-        # Reject if the number is a pull request, not an issue
+        # PR check stays gh-only — git-bug doesn't track PRs
         _PR_CHECK=""
         if [ -n "$GH_REPO_SLUG" ]; then
             _PR_CHECK=$(gh pr view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json state --jq '.state' 2>/dev/null || echo "")
@@ -575,14 +591,18 @@ if [ -n "$ISSUE_NUM" ]; then
             echo "Use the original issue number instead."
             exit 1
         fi
-        if [ -n "$GH_REPO_SLUG" ]; then
-            _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
-        else
-            _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
-        fi
-        if [[ "$_ISSUE_INFO" == *"||"* ]]; then
-            ISSUE_TITLE="${_ISSUE_INFO%||*}"
-            ISSUE_STATE="${_ISSUE_INFO##*||}"
+
+        # Fall back to gh for title/state if git-bug didn't provide them
+        if [ -z "$ISSUE_TITLE" ] || [ -z "$ISSUE_STATE" ]; then
+            if [ -n "$GH_REPO_SLUG" ]; then
+                _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+            else
+                _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
+            fi
+            if [[ "$_ISSUE_INFO" == *"||"* ]]; then
+                ISSUE_TITLE="${_ISSUE_INFO%||*}"
+                ISSUE_STATE="${_ISSUE_INFO##*||}"
+            fi
         fi
     fi
     if [ -n "$ISSUE_TITLE" ]; then

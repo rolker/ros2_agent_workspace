@@ -71,6 +71,7 @@ whether it's already done, missing, or partially done.
 | **Branch protection** | GitHub branch ruleset requires PRs on default branch | Configure via `gh api` — requires admin access |
 | **Copilot auto-review** | Copilot is configured to review PRs | Check via `gh api` — requires admin access |
 | **Package labels** | `pkg:` labels exist (multi-package repos only) | Create via `gh label create` for each package |
+| **git-bug bridge** | `git bug bridge list` in repo shows GitHub bridge | Configure bridge with `git bug bridge new` + initial pull |
 | **License headers** | Source files have copyright/license headers matching `package.xml` license | Report per ADR-0008; too invasive for batch fix — always open issue |
 
 ### 3. Present findings interactively
@@ -85,9 +86,10 @@ Present items in this order (quick wins first):
 1. Pre-commit config
 2. CI workflow
 3. Package labels (multi-package repos)
-4. Branch protection / Copilot auto-review
-5. Agent guide (`.agents/README.md`)
-6. License headers (always suggest "open issue" — too invasive for batch fix)
+4. git-bug bridge (if git-bug is installed)
+5. Branch protection / Copilot auto-review
+6. Agent guide (`.agents/README.md`)
+7. License headers (always suggest "open issue" — too invasive for batch fix)
 
 Skip items that are already in place. If everything is already done, report
 that and exit.
@@ -110,6 +112,20 @@ For labels (requires write but not admin):
 ```bash
 gh label create "pkg:<package_name>" --description "<package description>" \
   --color "5319E7" -R <owner>/<repo>
+```
+
+For git-bug bridge (if git-bug is installed):
+```bash
+if command -v git-bug &>/dev/null; then
+    cd "$REPO_DIR" && git bug bridge list 2>/dev/null | grep -q "github" || {
+        GH_TOKEN=$(gh auth token 2>/dev/null)
+        OWNER=$(cd "$REPO_DIR" && gh repo view --json owner --jq '.owner.login' 2>/dev/null)
+        REPO=$(cd "$REPO_DIR" && gh repo view --json name --jq '.name' 2>/dev/null)
+        git bug bridge new --name github --target github \
+            --owner "$OWNER" --project "$REPO" --token "$GH_TOKEN" --non-interactive
+        git bug pull
+    }
+fi
 ```
 
 ### 5. Implement "fix now" items

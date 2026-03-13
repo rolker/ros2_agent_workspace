@@ -145,7 +145,20 @@ if [ "$DRY_RUN" = false ]; then
     rosdep update
 fi
 
-# 5. Codespace Configuration
+# 5. git-bug (local issue tracking)
+GIT_BUG_VERSION="0.10.1"
+GIT_BUG_BIN="/usr/local/bin/git-bug"
+if [ ! -x "$GIT_BUG_BIN" ] || ! "$GIT_BUG_BIN" version 2>/dev/null | grep -q "$GIT_BUG_VERSION"; then
+    ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+    GIT_BUG_URL="https://github.com/git-bug/git-bug/releases/download/v${GIT_BUG_VERSION}/git-bug_linux_${ARCH}"
+    run_or_collect curl -fL -o /tmp/git-bug "$GIT_BUG_URL"
+    run_or_collect chmod +x /tmp/git-bug
+    run_or_collect sudo mv /tmp/git-bug "$GIT_BUG_BIN"
+else
+    [ "$DRY_RUN" = false ] && echo "git-bug v${GIT_BUG_VERSION} already installed."
+fi
+
+# 6. Codespace Configuration
 if [ "${CODESPACES}" = "true" ] && [ "$DRY_RUN" = false ]; then
     echo "Detected GitHub Codespaces environment."
     echo "Converting SSH URLs to HTTPS in .repos files..."

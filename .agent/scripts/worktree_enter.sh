@@ -232,7 +232,19 @@ else
 
     # Fetch and display issue title so agents can verify they're on the right issue
     _ISSUE_TITLE=""
-    if command -v gh &>/dev/null; then
+
+    # Try git-bug first (offline-capable, fast)
+    if command -v git-bug &>/dev/null; then
+        # git bug select + show: extract title from the first line (strip leading ID token)
+        _ISSUE_TITLE=$(git -C "$ROOT_DIR" bug select "$ISSUE_NUM" 2>/dev/null \
+            && git -C "$ROOT_DIR" bug show 2>/dev/null \
+            | head -1 | sed 's/^[^ ]* //' || echo "")
+        # Deselect to avoid side effects
+        git -C "$ROOT_DIR" bug deselect 2>/dev/null || true
+    fi
+
+    # Fall back to gh API if git-bug didn't return a title
+    if [ -z "$_ISSUE_TITLE" ] && command -v gh &>/dev/null; then
         _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
         # Layer worktrees cd into package repos where gh context may differ;
         # retry with the workspace repo if the first attempt fails

@@ -14,6 +14,7 @@ Options:
 """
 
 import sys
+import shutil
 import subprocess
 import argparse
 from pathlib import Path
@@ -63,12 +64,12 @@ def get_current_branch(repo_path, dry_run=False):
 
 
 def sync_repo(repo_path, repo_name, dry_run=False):
-    """Synchronize a single repository."""
+    """Synchronize a single repository. Returns True if sync proceeded."""
     print(f"Checking {repo_name}...")
 
     if not repo_path.exists():
         print(f"  ❌ Path does not exist: {repo_path}")
-        return
+        return False
 
     # 1. Check for local modifications
     if is_dirty(repo_path, dry_run):
@@ -76,12 +77,12 @@ def sync_repo(repo_path, repo_name, dry_run=False):
             print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
             print("  ⚠️  Skipping: Uncommitted changes detected.")
-        return
+        return False
 
     branch = get_current_branch(repo_path, dry_run)
     if not branch:
         print("  ❌ Skipping: Detached HEAD or invalid git state.")
-        return
+        return False
 
     # 2. Sync Logic
     if branch in ["main", "jazzy", "rolling"]:
@@ -118,6 +119,45 @@ def sync_repo(repo_path, repo_name, dry_run=False):
         else:
             print(f"     ❌ Fetch failed: {output}")
 
+    return True
+
+
+def sync_gitbug(repo_path, dry_run=False):
+    """Sync git-bug issues for a repo if git-bug is installed and a bridge is configured."""
+    if not shutil.which("git-bug"):
+        return
+
+    # Check if a bridge is configured in this repo
+    try:
+        result = subprocess.run(
+            ["git", "bug", "bridge", "list"],
+            cwd=str(repo_path),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return
+    except OSError:
+        return
+
+    repo_name = repo_path.name
+    if dry_run:
+        print(f"  [DRY-RUN] {repo_name}: git bug pull")
+        print(f"  [DRY-RUN] {repo_name}: git bug push")
+        return
+
+    print(f"  Syncing git-bug issues for {repo_name}...")
+    for cmd in [["git", "bug", "pull"], ["git", "bug", "push"]]:
+        result = subprocess.run(
+            cmd, cwd=str(repo_path), capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            print(f"     ⚠️  {' '.join(cmd)} failed: {stderr}")
+            return
+    print("     ✅ git-bug synced.")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Safely sync workspace repositories.")
@@ -132,7 +172,8 @@ def main():
     repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
 
     # Also include the root repo itself
-    sync_repo(root_dir, "ros2_agent_workspace", args.dry_run)
+    if sync_repo(root_dir, "ros2_agent_workspace", args.dry_run):
+        sync_gitbug(root_dir, args.dry_run)
 
     for repo in repos:
         # Determine workspace directory from source file (e.g. core.repos -> core_ws)
@@ -163,7 +204,8 @@ def main():
             )
             continue
 
-        sync_repo(repo_path, repo["name"], args.dry_run)
+        if sync_repo(repo_path, repo["name"], args.dry_run):
+            sync_gitbug(repo_path, args.dry_run)
 
     print("\n✅ Sync complete.")
 
