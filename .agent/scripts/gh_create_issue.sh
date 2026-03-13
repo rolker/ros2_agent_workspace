@@ -150,6 +150,45 @@ Part of ${PARENT_REF}"
     fi
 fi
 
+# Optional: create via git-bug + push (offline-capable, opt-in via GITBUG_CREATE=1)
+# Placed before label validation so it's reachable with or without labels.
+if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
+    _TITLE=""
+    _BODY=""
+    _BODY_FILE=""
+    for (( i=0; i<${#ORIGINAL_ARGS[@]}; i++ )); do
+        case "${ORIGINAL_ARGS[$i]}" in
+            --title) _TITLE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+            --body) _BODY="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+            --body-file) _BODY_FILE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+        esac
+    done
+    if [ ${#LABELS[@]} -gt 0 ]; then
+        echo "⚠️  git-bug does not support labels — labels will not be applied."
+        echo "   Add labels manually after sync, or unset GITBUG_CREATE to use gh CLI."
+    fi
+    if [ -n "$_TITLE" ]; then
+        _GB_ARGS=(--title "$_TITLE")
+        if [ -n "$_BODY_FILE" ] && [ -f "$_BODY_FILE" ]; then
+            _BODY=$(cat "$_BODY_FILE")
+        fi
+        if [ -n "$_BODY" ]; then
+            _GB_ARGS+=(--message "$_BODY")
+        fi
+        if git bug new "${_GB_ARGS[@]}" 2>/dev/null; then
+            if git bug push 2>/dev/null; then
+                echo "✅ Issue created via git-bug and synced to GitHub"
+            else
+                echo "✅ Issue created locally via git-bug"
+                echo "⚠️  git bug push failed — sync manually with: git bug push"
+            fi
+            exit 0
+        else
+            echo "⚠️  git-bug create failed — falling through to gh CLI"
+        fi
+    fi
+fi
+
 # If no labels specified or metadata file doesn't exist, just pass through to gh
 if [ ${#LABELS[@]} -eq 0 ]; then
     echo "ℹ️  No labels specified, passing through to 'gh issue create'"
@@ -191,44 +230,6 @@ if [ ${#INVALID_LABELS[@]} -gt 0 ]; then
     echo ""
     echo "Or fetch current labels: gh label list --json name --jq '.[].name' | sort"
     exit 1
-fi
-
-# Optional: create via git-bug + push (offline-capable, opt-in via GITBUG_CREATE=1)
-if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
-    _TITLE=""
-    _BODY=""
-    _BODY_FILE=""
-    for (( i=0; i<${#ORIGINAL_ARGS[@]}; i++ )); do
-        case "${ORIGINAL_ARGS[$i]}" in
-            --title) _TITLE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
-            --body) _BODY="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
-            --body-file) _BODY_FILE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
-        esac
-    done
-    if [ ${#LABELS[@]} -gt 0 ]; then
-        echo "⚠️  git-bug does not support labels — labels will not be applied."
-        echo "   Add labels manually after sync, or unset GITBUG_CREATE to use gh CLI."
-    fi
-    if [ -n "$_TITLE" ]; then
-        _GB_ARGS=(--title "$_TITLE")
-        if [ -n "$_BODY_FILE" ] && [ -f "$_BODY_FILE" ]; then
-            _BODY=$(cat "$_BODY_FILE")
-        fi
-        if [ -n "$_BODY" ]; then
-            _GB_ARGS+=(--message "$_BODY")
-        fi
-        if git bug new "${_GB_ARGS[@]}" 2>/dev/null; then
-            if git bug push 2>/dev/null; then
-                echo "✅ Issue created via git-bug and synced to GitHub"
-            else
-                echo "✅ Issue created locally via git-bug"
-                echo "⚠️  git bug push failed — sync manually with: git bug push"
-            fi
-            exit 0
-        else
-            echo "⚠️  git-bug create failed — falling through to gh CLI"
-        fi
-    fi
 fi
 
 # All labels valid, proceed with gh issue create
