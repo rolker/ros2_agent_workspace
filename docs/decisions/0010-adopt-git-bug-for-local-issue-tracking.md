@@ -58,4 +58,4 @@ Key choices:
 - Additional stamp in the Makefile setup chain
 - Scripts gain a second lookup path (git-bug → gh fallback), increasing
   code complexity slightly
-- Bridge sync adds a few seconds to `make sync` and `worktree_enter.sh`
+- Bridge sync adds a few seconds to `make sync` and `dashboard`

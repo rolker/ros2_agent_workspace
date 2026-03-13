@@ -71,7 +71,7 @@ whether it's already done, missing, or partially done.
 | **Branch protection** | GitHub branch ruleset requires PRs on default branch | Configure via `gh api` — requires admin access |
 | **Copilot auto-review** | Copilot is configured to review PRs | Check via `gh api` — requires admin access |
 | **Package labels** | `pkg:` labels exist (multi-package repos only) | Create via `gh label create` for each package |
-| **git-bug bridge** | `git bug bridge list` in repo shows GitHub bridge | Configure bridge with `git bug bridge configure` + initial pull |
+| **git-bug bridge** | `git bug bridge list` in repo shows GitHub bridge | Configure bridge with `git bug bridge new` + initial pull |
 | **License headers** | Source files have copyright/license headers matching `package.xml` license | Report per ADR-0008; too invasive for batch fix — always open issue |
 
 ### 3. Present findings interactively

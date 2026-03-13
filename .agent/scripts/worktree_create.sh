@@ -593,7 +593,7 @@ if [ -n "$ISSUE_NUM" ]; then
         fi
 
         # Fall back to gh for title/state if git-bug didn't provide them
-        if [ -z "$ISSUE_TITLE" ]; then
+        if [ -z "$ISSUE_TITLE" ] || [ -z "$ISSUE_STATE" ]; then
             if [ -n "$GH_REPO_SLUG" ]; then
                 _ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$GH_REPO_SLUG" --json title,state --jq '.title + "||" + .state' 2>/dev/null || echo "")
             else
