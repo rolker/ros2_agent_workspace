@@ -235,7 +235,7 @@ else
 
     # Try git-bug first (offline-capable, fast)
     if command -v git-bug &>/dev/null; then
-        # git bug select + show: title is the first non-empty line after the ID line
+        # git bug select + show: extract title from the first line (strip leading ID token)
         _ISSUE_TITLE=$(git -C "$ROOT_DIR" bug select "$ISSUE_NUM" 2>/dev/null \
             && git -C "$ROOT_DIR" bug show 2>/dev/null \
             | head -1 | sed 's/^[^ ]* //' || echo "")

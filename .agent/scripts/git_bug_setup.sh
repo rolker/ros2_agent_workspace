@@ -20,7 +20,12 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# 1. Check git-bug is installed
+# 1. Skip in CI or if git-bug is not installed
+if [ -n "${CI:-}" ] || [ -n "${NONINTERACTIVE:-}" ]; then
+    echo "CI/non-interactive environment — skipping git-bug setup."
+    exit 0
+fi
+
 if ! command -v git-bug &>/dev/null; then
     echo "git-bug not installed — skipping setup."
     exit 0
@@ -41,12 +46,8 @@ if ! git bug user ls &>/dev/null 2>&1 || [ -z "$(git bug user ls 2>/dev/null)" ]
     fi
     echo "Creating git-bug identity: $GIT_NAME <$GIT_EMAIL>"
     if ! git bug user new --name "$GIT_NAME" --email "$GIT_EMAIL" --non-interactive 2>/dev/null; then
-        echo "⚠️  Failed to create git-bug identity (may need --non-interactive support)."
-        # Try without --non-interactive for older versions
-        echo "$GIT_NAME" | git bug user new 2>/dev/null || {
-            echo "⚠️  Could not create git-bug identity — skipping."
-            exit 0
-        }
+        echo "⚠️  Could not create git-bug identity — skipping."
+        exit 0
     fi
 else
     echo "git-bug identity already exists."

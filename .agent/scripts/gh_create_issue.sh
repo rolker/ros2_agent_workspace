@@ -205,6 +205,10 @@ if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
             --body-file) _BODY_FILE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
         esac
     done
+    if [ ${#LABELS[@]} -gt 0 ]; then
+        echo "⚠️  git-bug does not support labels — labels will not be applied."
+        echo "   Add labels manually after sync, or unset GITBUG_CREATE to use gh CLI."
+    fi
     if [ -n "$_TITLE" ]; then
         _GB_ARGS=(--title "$_TITLE")
         if [ -n "$_BODY_FILE" ] && [ -f "$_BODY_FILE" ]; then

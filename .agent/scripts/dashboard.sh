@@ -503,7 +503,11 @@ if [ "$SKIP_GITHUB" = false ]; then
             count=""
             if [ "$repo" = "$ROOT_REPO" ] && command -v git-bug &>/dev/null \
                 && git -C "$ROOT_DIR" bug bridge list &>/dev/null 2>&1; then
-                count=$(git -C "$ROOT_DIR" bug ls status:open 2>/dev/null | wc -l)
+                _gb_output=$(git -C "$ROOT_DIR" bug ls status:open 2>/dev/null)
+                _gb_rc=$?
+                if [ $_gb_rc -eq 0 ]; then
+                    count=$(printf '%s\n' "$_gb_output" | grep -c . || echo "0")
+                fi
             fi
             # Fall back to gh API
             if [ -z "$count" ] || ! [[ "$count" =~ ^[0-9]+$ ]]; then
