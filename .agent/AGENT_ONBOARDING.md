@@ -54,7 +54,8 @@ corresponding SKILL.md and follow its steps.
 Available workflow skills: `review-issue`, `plan-task`, `review-pr`,
 `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
-`triage-reviews`.
+`triage-reviews`, `skill-importer`, `document-package`, `issue-triage`,
+`test-engineering`.
 
 ## References
 
