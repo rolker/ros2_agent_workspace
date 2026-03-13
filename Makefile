@@ -40,7 +40,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build test lint clean setup-all dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap agent-build agent-run agent-shell push-gateway
+.PHONY: help build test lint clean setup-all dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -67,6 +67,7 @@ help:
 	@echo "  unlock        - Unlock workspace"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
 	@echo "  skip-bootstrap - Skip bootstrap (system already configured)"
+	@echo "  skip-git-bug  - Skip git-bug setup (optional)"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo "  generate-skills - Regenerate Claude Code /make_* slash commands"
 	@echo ""
@@ -95,7 +96,7 @@ clean:
 	@rm -rf $(STAMP)
 	@echo "Done. Run 'make build' to re-setup and rebuild."
 
-setup-all: $(LAYER_STAMPS)
+setup-all: $(LAYER_STAMPS) $(STAMP)/git-bug.done
 	@echo "Setup complete. All layers are ready."
 
 dashboard:
@@ -165,6 +166,11 @@ $(STAMP)/layer-%.done: $(STAMP)/manifest.done $$(wildcard $(MAIN_ROOT)/configs/m
 	@./.agent/scripts/setup_layers.sh "$*"
 	@touch $@
 
+$(STAMP)/git-bug.done: $(STAMP)/bootstrap.done
+	@mkdir -p $(STAMP)
+	@./.agent/scripts/git_bug_setup.sh
+	@touch $@
+
 # =============================================================================
 # Tier 3 — Maintenance & agent container targets
 # =============================================================================
@@ -173,6 +179,11 @@ skip-bootstrap:
 	@mkdir -p $(STAMP)
 	@touch $(STAMP)/bootstrap.done
 	@echo "Bootstrap marked as done. Run 'make clean' to reset."
+
+skip-git-bug:
+	@mkdir -p $(STAMP)
+	@touch $(STAMP)/git-bug.done
+	@echo "git-bug setup marked as done. Run 'make clean' to reset."
 
 sync:
 	@python3 ./.agent/scripts/sync_repos.py
