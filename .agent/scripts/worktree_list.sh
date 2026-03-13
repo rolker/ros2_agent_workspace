@@ -3,7 +3,7 @@
 # List all git worktrees for this workspace
 #
 # Usage:
-#   ./worktree_list.sh [--verbose]
+#   ./worktree_list.sh [--verbose] [--json]
 #
 # Shows all active worktrees including:
 #   - Issue number
@@ -11,6 +11,9 @@
 #   - Branch name
 #   - Path
 #   - Status (clean/dirty)
+#
+# Options:
+#   --json    Output structured JSON to stdout (diagnostics to stderr)
 
 set -e
 
@@ -20,6 +23,7 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$SCRIPT_DIR/_worktree_helpers.sh"
 
 VERBOSE=false
+JSON_OUTPUT=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -28,11 +32,16 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
         -h|--help)
-            echo "Usage: $0 [--verbose]"
+            echo "Usage: $0 [--verbose] [--json]"
             echo ""
             echo "Options:"
             echo "  -v, --verbose    Show detailed status for each worktree"
+            echo "      --json       Output structured JSON to stdout"
             exit 0
             ;;
         *)
@@ -42,12 +51,54 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# JSON array accumulator
+JSON_ENTRIES=()
+
+# Helper: escape a string for JSON (handles quotes, backslashes, newlines)
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+# Helper: build a JSON object for one worktree
+# Arguments: type issue skill path branch status repo layer files_changed
+build_json_entry() {
+    local type="$1" issue="$2" skill="$3" path="$4" branch="$5"
+    local status="$6" repo="$7" layer="$8" files_changed="$9"
+
+    local issue_val="null"
+    [ -n "$issue" ] && issue_val="$issue"
+
+    local skill_val="null"
+    [ -n "$skill" ] && skill_val="\"$(json_escape "$skill")\""
+
+    local repo_val="null"
+    [ -n "$repo" ] && repo_val="\"$(json_escape "$repo")\""
+
+    local layer_val="null"
+    [ -n "$layer" ] && layer_val="\"$(json_escape "$layer")\""
+
+    local branch_val="null"
+    [ -n "$branch" ] && branch_val="\"$(json_escape "$branch")\""
+
+    printf '{"type":"%s","issue":%s,"skill":%s,"path":"%s","branch":%s,"status":"%s","repo":%s,"layer":%s,"files_changed":%s}' \
+        "$type" "$issue_val" "$skill_val" \
+        "$(json_escape "$path")" "$branch_val" "$status" \
+        "$repo_val" "$layer_val" "${files_changed:-0}"
+}
+
 cd "$ROOT_DIR"
 
-echo "========================================"
-echo "Git Worktrees"
-echo "========================================"
-echo ""
+if [ "$JSON_OUTPUT" = false ]; then
+    echo "========================================"
+    echo "Git Worktrees"
+    echo "========================================"
+    echo ""
+fi
 
 # Get worktree list from git (finds main workspace + workspace worktrees)
 WORKTREES=$(git worktree list --porcelain)
@@ -103,38 +154,51 @@ print_worktree() {
 
     # Check if clean or dirty
     local status="clean"
+    local files_changed=0
     if [ -d "$path" ]; then
-        if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+        local porcelain
+        porcelain="$(git -C "$path" status --porcelain 2>/dev/null || true)"
+        if [ -n "$porcelain" ]; then
             status="dirty"
         fi
-    fi
-
-    # Format output
-    if [ "$type" == "main" ]; then
-        echo "[main] Main Workspace"
-        echo "   Path:   $path"
-        echo "   Branch: ${branch:-detached at $head}"
-        echo "   Status: $status"
-    elif [ -n "$skill" ]; then
-        echo "[workspace] Skill: $skill ($type) - Repository: $repo"
-        echo "   Path:   $path"
-        echo "   Branch: ${branch:-detached at $head}"
-        echo "   Status: $status"
-
-        if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
-            echo "   Files changed: $(git -C "$path" status --porcelain 2>/dev/null | wc -l)"
-        fi
-    else
-        echo "[workspace] Issue #$issue ($type) - Repository: $repo"
-        echo "   Path:   $path"
-        echo "   Branch: ${branch:-detached at $head}"
-        echo "   Status: $status"
-
-        if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
-            echo "   Files changed: $(git -C "$path" status --porcelain 2>/dev/null | wc -l)"
+        if [ -n "$porcelain" ]; then
+            files_changed=$(echo "$porcelain" | wc -l)
+            files_changed=$((files_changed + 0))  # strip whitespace
         fi
     fi
-    echo ""
+
+    # Collect JSON entry (always, for both modes)
+    local display_branch="${branch:-detached at $head}"
+    JSON_ENTRIES+=("$(build_json_entry "$type" "$issue" "$skill" "$path" "$display_branch" "$status" "$repo" "" "$files_changed")")
+
+    # Format text output
+    if [ "$JSON_OUTPUT" = false ]; then
+        if [ "$type" == "main" ]; then
+            echo "[main] Main Workspace"
+            echo "   Path:   $path"
+            echo "   Branch: $display_branch"
+            echo "   Status: $status"
+        elif [ -n "$skill" ]; then
+            echo "[workspace] Skill: $skill ($type) - Repository: $repo"
+            echo "   Path:   $path"
+            echo "   Branch: $display_branch"
+            echo "   Status: $status"
+
+            if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
+                echo "   Files changed: $files_changed"
+            fi
+        else
+            echo "[workspace] Issue #$issue ($type) - Repository: $repo"
+            echo "   Path:   $path"
+            echo "   Branch: $display_branch"
+            echo "   Status: $status"
+
+            if [ "$VERBOSE" = true ] && [ -d "$path" ]; then
+                echo "   Files changed: $files_changed"
+            fi
+        fi
+        echo ""
+    fi
 }
 
 # Parse and display worktrees from git worktree list (main + workspace types)
@@ -184,18 +248,9 @@ if [ -d "$LAYER_WT_DIR" ]; then
             local_status="dirty"
         fi
 
-        if [ -n "$local_skill" ]; then
-            echo "[layer] Skill: $local_skill (layer) - Repository: $local_repo"
-        else
-            echo "[layer] Issue #$local_issue (layer) - Repository: $local_repo"
-        fi
-        echo "   Path:   $layer_wt"
-        echo "   Branch: ${local_branch:-unknown}"
-        echo "   Status: $local_status"
-
-        if [ "$VERBOSE" = true ]; then
-            # Count changed files across all inner package worktrees
-            local_changed=0
+        # Count changed files across all inner package worktrees
+        local_changed=0
+        if [ "$VERBOSE" = true ] || [ "$JSON_OUTPUT" = true ]; then
             for ws_dir in "$layer_wt"/*_ws; do
                 [ -d "$ws_dir" ] || continue
                 [ -L "$ws_dir" ] && continue
@@ -210,13 +265,71 @@ if [ -d "$LAYER_WT_DIR" ]; then
                     fi
                 done
             done
-            echo "   Files changed: $local_changed"
         fi
 
-        echo ""
+        # Determine layer name from the non-symlinked *_ws directory
+        local_layer=""
+        for ws_dir in "$layer_wt"/*_ws; do
+            [ -d "$ws_dir" ] || continue
+            [ -L "$ws_dir" ] && continue
+            local_layer="$(basename "$ws_dir" _ws)"
+            break
+        done
+
+        # Collect JSON entry
+        JSON_ENTRIES+=("$(build_json_entry "layer" "$local_issue" "$local_skill" "$layer_wt" "${local_branch:-}" "$local_status" "$local_repo" "$local_layer" "$local_changed")")
+
+        # Format text output
+        if [ "$JSON_OUTPUT" = false ]; then
+            if [ -n "$local_skill" ]; then
+                echo "[layer] Skill: $local_skill (layer) - Repository: $local_repo"
+            else
+                echo "[layer] Issue #$local_issue (layer) - Repository: $local_repo"
+            fi
+            echo "   Path:   $layer_wt"
+            echo "   Branch: ${local_branch:-unknown}"
+            echo "   Status: $local_status"
+
+            if [ "$VERBOSE" = true ]; then
+                echo "   Files changed: $local_changed"
+            fi
+
+            echo ""
+        fi
         ((LAYER_COUNT++)) || true
     done
 fi
+
+# --- Output ---
+
+if [ "$JSON_OUTPUT" = true ]; then
+    # Count dirty worktrees
+    DIRTY_COUNT=0
+    for entry in "${JSON_ENTRIES[@]}"; do
+        if [[ "$entry" == *'"status":"dirty"'* ]]; then
+            ((DIRTY_COUNT++)) || true
+        fi
+    done
+
+    TOTAL=${#JSON_ENTRIES[@]}
+
+    # Build JSON array
+    printf '{"worktrees":['
+    first=true
+    for entry in "${JSON_ENTRIES[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            printf ','
+        fi
+        printf '%s' "$entry"
+    done
+    printf '],"summary":{"total":%d,"layer":%d,"workspace":%d,"dirty":%d}}\n' \
+        "$TOTAL" "$LAYER_COUNT" "$WORKSPACE_COUNT" "$DIRTY_COUNT"
+    exit 0
+fi
+
+# Text output continues below
 
 # If no worktrees found at all, show help
 if [ -z "$WORKTREES" ] && [ "$LAYER_COUNT" -eq 0 ]; then
