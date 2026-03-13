@@ -81,7 +81,8 @@ git branch --list "feature/issue-<N>" "feature/ISSUE-<N>-*" 2>/dev/null
 Also check if the issue number appears in any open PRs:
 
 ```bash
-gh pr list --repo <workspace-repo> --state open --json title,url --jq '.[] | select(.title | test("\\b<N>\\b"))'
+ISSUE_NUM=<N>
+gh pr list --repo <workspace-repo> --state open --json title,url --jq ".[] | select(.title | test(\"\\b${ISSUE_NUM}\\b\"))"
 ```
 
 ### 6. Generate report
