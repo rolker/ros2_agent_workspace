@@ -1,0 +1,361 @@
+/* Agent Dashboard — minimal dark theme */
+
+:root {
+    --bg: #1a1b26;
+    --bg-panel: #24283b;
+    --bg-tab: #1f2335;
+    --bg-tab-active: #3b4261;
+    --text: #c0caf5;
+    --text-dim: #565f89;
+    --text-bright: #e0e4f5;
+    --border: #3b4261;
+    --green: #9ece6a;
+    --yellow: #e0af68;
+    --red: #f7768e;
+    --blue: #7aa2f7;
+    --gray: #565f89;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* --- Tab Bar --- */
+
+#tab-bar {
+    display: flex;
+    gap: 2px;
+    padding: 4px 8px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+#no-sessions {
+    color: var(--text-dim);
+    padding: 8px;
+    font-style: italic;
+}
+
+.tab {
+    padding: 6px 14px;
+    background: var(--bg-tab);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tab:hover {
+    background: var(--bg-tab-active);
+    color: var(--text);
+}
+
+.tab.active {
+    background: var(--bg-panel);
+    color: var(--text-bright);
+    border-bottom-color: var(--bg-panel);
+}
+
+.tab .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.working { background: var(--green); }
+.status-dot.waiting { background: var(--yellow); }
+.status-dot.idle { background: var(--gray); }
+.status-dot.inactive { background: var(--gray); opacity: 0.4; }
+.status-dot.error { background: var(--red); }
+
+/* --- Dashboard Panels --- */
+
+#dashboard {
+    display: flex;
+    flex: 1;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.panel {
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#terminal-panel {
+    flex: 4;
+}
+
+#plan-panel {
+    flex: 3;
+}
+
+#context-panel {
+    flex: 3;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.panel-header h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+/* --- Terminal --- */
+
+#terminal-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text);
+}
+
+#send-bar {
+    display: flex;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border);
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+#agent-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+#agent-input:focus {
+    border-color: var(--blue);
+}
+
+#send-btn {
+    background: var(--blue);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#send-btn:hover {
+    opacity: 0.9;
+}
+
+/* --- Status Badge --- */
+
+.status-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.status-badge.working { background: var(--green); color: var(--bg); }
+.status-badge.waiting { background: var(--yellow); color: var(--bg); }
+.status-badge.idle { background: var(--gray); color: var(--text); }
+.status-badge.inactive { background: var(--bg); color: var(--text-dim); }
+
+/* --- Plan Panel --- */
+
+#plan-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    line-height: 1.6;
+}
+
+#plan-content em {
+    color: var(--text-dim);
+}
+
+#plan-content h1, #plan-content h2, #plan-content h3 {
+    color: var(--text-bright);
+    margin: 12px 0 6px 0;
+}
+
+#plan-content h1 { font-size: 16px; }
+#plan-content h2 { font-size: 14px; }
+#plan-content h3 { font-size: 13px; }
+
+#plan-content ul, #plan-content ol {
+    padding-left: 20px;
+    margin: 4px 0;
+}
+
+#plan-content code {
+    background: var(--bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+#plan-content pre {
+    background: var(--bg);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+#plan-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+#plan-content th, #plan-content td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    text-align: left;
+}
+
+#plan-content th {
+    background: var(--bg);
+}
+
+/* --- Context Panel --- */
+
+#context-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+#context-content em {
+    color: var(--text-dim);
+}
+
+.ctx-section {
+    margin-bottom: 16px;
+}
+
+.ctx-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.ctx-issue-title {
+    font-size: 14px;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+}
+
+.ctx-label {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin: 2px 2px 2px 0;
+}
+
+.ctx-kv {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 12px;
+}
+
+.ctx-kv .key {
+    color: var(--text-dim);
+}
+
+.ctx-kv .val {
+    color: var(--text);
+}
+
+.ctx-kv .val.pass { color: var(--green); }
+.ctx-kv .val.fail { color: var(--red); }
+
+.ctx-file-list {
+    font-size: 12px;
+    list-style: none;
+    padding: 0;
+}
+
+.ctx-file-list li {
+    padding: 1px 0;
+}
+
+.ctx-file-list .file-status {
+    display: inline-block;
+    width: 16px;
+    font-weight: 600;
+}
+
+.ctx-file-list .file-status.M { color: var(--yellow); }
+.ctx-file-list .file-status.A { color: var(--green); }
+.ctx-file-list .file-status.D { color: var(--red); }
+
+/* --- Scrollbar --- */
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-dim);
+}

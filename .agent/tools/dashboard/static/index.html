@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav id="tab-bar">
+        <span id="no-sessions">No active sessions found. Waiting...</span>
+    </nav>
+
+    <main id="dashboard">
+        <section id="terminal-panel" class="panel">
+            <div class="panel-header">
+                <h3>Terminal</h3>
+                <span id="terminal-status" class="status-badge"></span>
+            </div>
+            <pre id="terminal-output">Select a session tab above.</pre>
+            <div id="send-bar">
+                <input type="text" id="agent-input" placeholder="Send to agent..."
+                       autocomplete="off">
+                <button id="send-btn" onclick="sendToAgent()">Send</button>
+            </div>
+        </section>
+
+        <section id="plan-panel" class="panel">
+            <div class="panel-header">
+                <h3>Plan</h3>
+            </div>
+            <div id="plan-content"><em>Select a session to view its plan.</em></div>
+        </section>
+
+        <section id="context-panel" class="panel">
+            <div class="panel-header">
+                <h3>Context</h3>
+            </div>
+            <div id="context-content"><em>Select a session to view context.</em></div>
+        </section>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>
