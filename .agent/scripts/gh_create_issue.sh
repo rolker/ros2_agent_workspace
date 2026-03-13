@@ -193,6 +193,36 @@ if [ ${#INVALID_LABELS[@]} -gt 0 ]; then
     exit 1
 fi
 
+# Optional: create via git-bug + push (offline-capable, opt-in via GITBUG_CREATE=1)
+if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
+    _TITLE=""
+    _BODY=""
+    _BODY_FILE=""
+    for (( i=0; i<${#ORIGINAL_ARGS[@]}; i++ )); do
+        case "${ORIGINAL_ARGS[$i]}" in
+            --title) _TITLE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+            --body) _BODY="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+            --body-file) _BODY_FILE="${ORIGINAL_ARGS[$((i+1))]:-}" ;;
+        esac
+    done
+    if [ -n "$_TITLE" ]; then
+        _GB_ARGS=(--title "$_TITLE")
+        if [ -n "$_BODY_FILE" ] && [ -f "$_BODY_FILE" ]; then
+            _BODY=$(cat "$_BODY_FILE")
+        fi
+        if [ -n "$_BODY" ]; then
+            _GB_ARGS+=(--message "$_BODY")
+        fi
+        if git bug new "${_GB_ARGS[@]}" 2>/dev/null; then
+            git bug push 2>/dev/null || echo "⚠️  git bug push failed — sync manually"
+            echo "✅ Issue created via git-bug and synced to GitHub"
+            exit 0
+        else
+            echo "⚠️  git-bug create failed — falling through to gh CLI"
+        fi
+    fi
+fi
+
 # All labels valid, proceed with gh issue create
 echo "✅ All labels valid, creating issue..."
 exec gh issue create "${ORIGINAL_ARGS[@]}"
