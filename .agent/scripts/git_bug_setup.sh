@@ -21,8 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # 1. Skip in CI or if git-bug is not installed
-if [ -n "${CI:-}" ] || [ -n "${NONINTERACTIVE:-}" ]; then
-    echo "CI/non-interactive environment — skipping git-bug setup."
+if [ -n "${CI:-}" ]; then
+    echo "CI environment — skipping git-bug setup."
     exit 0
 fi
 
@@ -63,7 +63,7 @@ if ! git bug user adopt &>/dev/null 2>&1; then
 fi
 
 # 3. GitHub bridge setup
-BRIDGE_EXISTS=$(git bug bridge list 2>/dev/null | grep -c "github" || echo "0")
+BRIDGE_EXISTS=$(git bug bridge list 2>/dev/null | grep -c "github" || true)
 if [ "$BRIDGE_EXISTS" -eq 0 ]; then
     # Need gh CLI for auth token
     if ! command -v gh &>/dev/null; then

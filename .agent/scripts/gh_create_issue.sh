@@ -218,8 +218,12 @@ if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
             _GB_ARGS+=(--message "$_BODY")
         fi
         if git bug new "${_GB_ARGS[@]}" 2>/dev/null; then
-            git bug push 2>/dev/null || echo "⚠️  git bug push failed — sync manually"
-            echo "✅ Issue created via git-bug and synced to GitHub"
+            if git bug push 2>/dev/null; then
+                echo "✅ Issue created via git-bug and synced to GitHub"
+            else
+                echo "✅ Issue created locally via git-bug"
+                echo "⚠️  git bug push failed — sync manually with: git bug push"
+            fi
             exit 0
         else
             echo "⚠️  git-bug create failed — falling through to gh CLI"

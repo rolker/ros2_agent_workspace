@@ -506,7 +506,7 @@ if [ "$SKIP_GITHUB" = false ]; then
                 _gb_output=$(git -C "$ROOT_DIR" bug ls status:open 2>/dev/null)
                 _gb_rc=$?
                 if [ $_gb_rc -eq 0 ]; then
-                    count=$(printf '%s\n' "$_gb_output" | grep -c . || echo "0")
+                    count=$(printf '%s\n' "$_gb_output" | grep -c . || true)
                 fi
             fi
             # Fall back to gh API
