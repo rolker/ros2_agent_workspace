@@ -164,7 +164,7 @@ if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
         esac
     done
     if [ ${#LABELS[@]} -gt 0 ]; then
-        echo "⚠️  git-bug does not support labels — labels will not be applied."
+        echo "⚠️  This script's git-bug path does not apply labels — labels will be skipped."
         echo "   Add labels manually after sync, or unset GITBUG_CREATE to use gh CLI."
     fi
     if [ -n "$_TITLE" ]; then

@@ -84,6 +84,11 @@ if [ "$BRIDGE_EXISTS" -eq 0 ]; then
         exit 0
     fi
 
+    if [[ "$REMOTE_URL" != *"github.com"* ]]; then
+        echo "⚠️  Remote is not a GitHub URL — cannot configure GitHub bridge."
+        exit 0
+    fi
+
     REPO_SLUG=$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
     OWNER="${REPO_SLUG%%/*}"
     REPO="${REPO_SLUG##*/}"
