@@ -48,9 +48,6 @@ ros-code-documentation).
    `.agent/instructions/gemini-cli.instructions.md`, and
    `.agent/AGENT_ONBOARDING.md` (per consequences map).
 
-7. **Run `make generate-skills`** — Regenerate slash command wrappers so the
-   new skills are recognized by Claude Code.
-
 ## Files to Change
 
 | File | Change |
