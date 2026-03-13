@@ -48,6 +48,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+# Install git-bug (local-first issue tracking, see ADR-0010)
+ARG GITBUG_VERSION=v0.10.1
+RUN curl -fsSL "https://github.com/MichaelMure/git-bug/releases/download/${GITBUG_VERSION}/git-bug_linux_amd64" \
+        -o /usr/local/bin/git-bug \
+    && chmod 755 /usr/local/bin/git-bug
+
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 

@@ -41,6 +41,7 @@ The image is based on `ros:jazzy-perception` and includes:
 - ROS 2 Jazzy dev tools, rosdep, vcstool
 - Node.js 22.x + Claude Code CLI
 - GitHub CLI (`gh`) for read-only access (see [Read-Only GitHub Access](#read-only-github-access))
+- git-bug for local issue access (reads/comments without network, see ADR-0010)
 - Git (for local commits only — no SSH keys)
 
 The build passes your host UID/GID to match file ownership.
