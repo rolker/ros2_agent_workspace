@@ -32,6 +32,7 @@ humans use it as a checklist.
 | 0007 — Retain Make with Dependency Tracking | Changing the Makefile or proposing a different task runner | Keep Make; use stamp-file dependencies for incremental setup and build |
 | 0008 — Follow ROS 2 Official Conventions | Creating or modifying ROS 2 packages, launch files, `package.xml`, or license headers | Follow ROS 2 conventions (target Rolling); deviations require their own ADR; check `.agent/knowledge/ros2_development_patterns.md` |
 | 0009 — Python package management | Installing Python packages or modifying `.venv` | Use apt/rosdep for build/runtime; .venv for dev tools; never bare pip install |
+| 0010 — git-bug for local issue tracking | Adding or modifying issue lookup scripts, bootstrap, or sync | git-bug is optional; scripts try git-bug first, fall back to `gh`; graceful degradation required |
 
 ## Consequences Map
 
