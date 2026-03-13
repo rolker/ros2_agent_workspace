@@ -1,19 +1,19 @@
 ---
-name: review-pr
+name: review-code
 description: Evaluate a PR against workspace principles and ADRs. For project repos, also evaluates against project-level governance. Produces a structured report.
 ---
 
-# Review PR
+# Review Code
 
 ## Usage
 
 ```
-/review-pr <pr-number-or-url>
+/review-code <pr-number-or-url>
 ```
 
 ## Overview
 
-**Lifecycle position**: review-issue → plan-task → implement → **review-pr**
+**Lifecycle position**: review-issue → plan-task → implement → **review-code**
 
 Evaluate a pull request against workspace principles, ADRs, and (when applicable)
 project-level governance. Produces a structured report in the conversation. Does

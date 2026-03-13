@@ -3,7 +3,7 @@
 # Shows PR pipeline status and provides interactive management
 #
 # NOTE: The --pr-triage flag was removed from status_report.sh (#276).
-# For principles-aware PR review, use the review-pr skill instead.
+# For principles-aware PR review, use the review-code skill instead.
 
 set -euo pipefail
 

@@ -115,7 +115,7 @@ make dashboard QUICK=1  # Equivalent to --quick
 - Required: `vcs`, `git`, `python3`, `jq`
 - Optional: `gh` CLI authenticated (`gh auth login`) — for GitHub PR/issue features
 
-For principles-aware PR review, use the `review-pr` skill instead.
+For principles-aware PR review, use the `review-code` skill instead.
 
 ---
 

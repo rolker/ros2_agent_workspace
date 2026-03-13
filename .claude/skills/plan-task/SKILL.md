@@ -19,7 +19,7 @@ planning system. Use EnterPlanMode for general codebase exploration and
 approach design; use this skill to ensure the plan accounts for workspace
 principles, ADR compliance, and downstream consequences.
 
-**Lifecycle position**: review-issue → **plan-task** → implement → review-pr
+**Lifecycle position**: review-issue → **plan-task** → implement → review-code
 
 ## Steps
 
@@ -191,7 +191,7 @@ Summarize:
 ## Guidelines
 
 - **Generate, don't just evaluate** — this skill produces a plan, not a
-  review of an existing plan. For reviewing plans, use `review-pr` on the
+  review of an existing plan. For reviewing plans, use `review-code` on the
   draft PR.
 - **Concrete, not generic** — "Update tests" is not a plan step. "Add test
   for edge case X in `test_foo.py`" is.
