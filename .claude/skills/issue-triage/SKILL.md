@@ -32,7 +32,7 @@ workspace-level tracking.
 python3 .agent/scripts/list_overlay_repos.py
 ```
 
-This outputs a JSON list of `{name, url, version}` for all overlay repos.
+This outputs a JSON list of `{name, url, version, source_file}` for all overlay repos.
 Parse the `owner/repo` from each URL.
 
 If `--repo` was specified, filter to just that repository.
@@ -65,12 +65,9 @@ Classify each issue by type based on labels and title keywords:
 An issue is stale if:
 - `updatedAt` is more than `<stale-days>` days ago (default: 90)
 - It has no assignee
-- It has no recent comments
 
-```bash
-# Check for recent comments on a potentially stale issue
-gh issue view <N> --repo <owner/repo> --json comments --jq '.comments | length'
-```
+The `updatedAt` field already reflects all activity (comments, label changes,
+assignments), so no separate comment check is needed.
 
 ### 5. Cross-reference with workspace
 

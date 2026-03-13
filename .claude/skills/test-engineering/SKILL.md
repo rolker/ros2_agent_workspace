@@ -128,14 +128,14 @@ For integration tests involving launch files, consider using
 
 #### Reproduce locally
 
-In a layer worktree, use the generated build/test scripts:
+**In a layer worktree** (preferred), use the generated convenience scripts:
 
 ```bash
 ./<layer>_ws/build.sh <package_name>
 ./<layer>_ws/test.sh <package_name>
 ```
 
-Or with verbose output:
+**In the main workspace**, source the environment and use colcon directly:
 
 ```bash
 source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && \
