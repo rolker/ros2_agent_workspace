@@ -1,17 +1,21 @@
 {
   "labels": [
     "bug",
+    "dependencies",
     "documentation",
     "duplicate",
     "enhancement",
+    "github_actions",
     "good first issue",
     "help wanted",
     "invalid",
+    "proposal",
     "question",
+    "rfc",
     "wontfix"
   ],
   "description": "GitHub repository metadata for agent discoverability",
-  "updated": "2026-01-28",
+  "updated": "2026-03-13",
   "notes": [
     "This file contains common GitHub labels to help agents validate label names before creating issues/PRs.",
     "To add a new label: 1) Add it to GitHub via 'gh label create <name> --description <desc> --color <hex>', 2) Update this file",
