@@ -2,10 +2,10 @@
 
 ## Per-Issue Lifecycle
 
-The governance skills follow a sequence from idea exploration through pre-merge PR review:
+The governance skills follow a sequence from idea exploration through pre-merge code review:
 
 ```
-brainstorm → review-issue → plan-task → implement → review-code
+brainstorm → review-issue → plan-task → review-plan → implement → review-code
 ```
 
 Each step is optional — simple issues can skip straight to `plan-task` or implementation.
@@ -19,7 +19,8 @@ Each step is optional — simple issues can skip straight to `plan-task` or impl
 | `brainstorm` | Before review-issue | Explore possibilities using research digests and project knowledge |
 | `review-issue` | Before plan-task | Evaluate issue scope, principle alignment, and ADR applicability |
 | `plan-task` | Before implementation | Generate a principles-aware work plan, commit to branch |
-| `review-code` | After implementation | Evaluate PR against principles, ADRs, and consequences |
+| `review-plan` | After plan-task, before implementation | Independent evaluation of a committed work plan |
+| `review-code` | After implementation | Lead reviewer orchestrating specialist sub-reviews (static analysis, governance, plan drift) |
 
 ### Utility skills (on-demand / periodic)
 

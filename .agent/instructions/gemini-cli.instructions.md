@@ -26,8 +26,8 @@ These are plain markdown — not Claude Code-specific. When asked to review an
 issue, plan a task, review a PR, brainstorm, or run research, read the
 corresponding SKILL.md and follow its steps.
 
-Available workflow skills: `review-issue`, `plan-task`, `review-code`,
-`brainstorm`, `research`, `audit-workspace`, `audit-project`,
+Available workflow skills: `review-issue`, `plan-task`, `review-plan`,
+`review-code`, `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
 `triage-reviews`, `skill-importer`, `document-package`, `issue-triage`,
 `test-engineering`.
