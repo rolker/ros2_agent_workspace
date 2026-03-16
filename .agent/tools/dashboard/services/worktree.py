@@ -160,9 +160,18 @@ def _update_cache(sessions):
 
 
 def _make_session_id(wt):
-    """Generate a stable session ID from worktree data."""
+    """Generate a stable session ID from worktree data.
+
+    Includes type and repo to avoid collisions when multiple worktrees
+    exist for the same issue across repos (e.g., workspace vs layer).
+    """
+    wt_type = wt.get("type", "unknown")
+    repo = wt.get("repo")
+
     if wt.get("issue"):
-        return f"issue-{wt['issue']}"
+        if repo:
+            return f"issue-{wt_type}-{repo}-{wt['issue']}"
+        return f"issue-{wt_type}-{wt['issue']}"
     if wt.get("skill"):
         return f"skill-{wt['skill']}"
     # Fallback: use basename of path

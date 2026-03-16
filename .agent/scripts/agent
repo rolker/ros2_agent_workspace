@@ -257,7 +257,8 @@ launch_agent() {
     if [ -n "$prompt" ] && [ "$no_agent" = false ]; then
         echo "Waiting for claude to initialize..."
         sleep 3
-        tmux send-keys -t "$session_name" "$prompt" Enter
+        tmux send-keys -t "$session_name" -l "$prompt"
+        tmux send-keys -t "$session_name" Enter
     fi
 
     echo ""

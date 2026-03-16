@@ -527,7 +527,9 @@ function inlineFormat(text) {
     // Links — restrict to http/https schemes and add rel for tabnabbing protection
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
         if (/^https?:\/\//i.test(href) || href.startsWith('#') || href.startsWith('/')) {
-            return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">${label}</a>`;
+            // Attribute-escape href to prevent injection via crafted URLs
+            const safeHref = href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+            return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">${label}</a>`;
         }
         return `${label} (${href})`;
     });
