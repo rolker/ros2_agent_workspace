@@ -73,9 +73,10 @@ def start_poller(workspace_root, interval=10):
     from services import worktree
 
     previous_statuses = {}
+    first_poll = True
 
     def poll_loop():
-        nonlocal previous_statuses
+        nonlocal previous_statuses, first_poll
         while True:
             try:
                 sessions = worktree.discover_sessions(workspace_root)
@@ -83,6 +84,11 @@ def start_poller(workspace_root, interval=10):
                 for session in sessions:
                     sid = session["id"]
                     current[sid] = session["agent_status"]
+
+                    if first_poll:
+                        # Suppress session_added events on the initial poll
+                        # to avoid a burst of redundant refreshSessions() calls
+                        continue
 
                     # Detect status changes
                     prev = previous_statuses.get(sid)
@@ -112,6 +118,7 @@ def start_poller(workspace_root, interval=10):
                         push_event("session_removed", {"session": sid})
 
                 previous_statuses = current
+                first_poll = False
             except Exception as exc:
                 print(f"[sse-poller] error: {exc}", file=sys.stderr)
 

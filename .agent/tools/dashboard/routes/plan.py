@@ -5,7 +5,7 @@ def handle_get(server, session_id):
     """Return the work plan markdown for a session."""
     from services import worktree, workspace
 
-    sessions = worktree.discover_sessions(server.workspace_root)
+    sessions = worktree.get_sessions(server.workspace_root)
     session = _find_session(sessions, session_id)
 
     if session is None:
