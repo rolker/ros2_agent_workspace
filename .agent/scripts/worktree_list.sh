@@ -53,6 +53,7 @@ done
 
 # JSON array accumulator
 JSON_ENTRIES=()
+DIRTY_COUNT=0
 
 # Helper: escape a string for JSON (handles quotes, backslashes, newlines)
 json_escape() {
@@ -167,6 +168,11 @@ print_worktree() {
         fi
     fi
 
+    # Track dirty count (exclude main — summary.total excludes main too)
+    if [ "$status" = "dirty" ] && [ "$type" != "main" ]; then
+        ((DIRTY_COUNT++)) || true
+    fi
+
     # Collect JSON entry (always, for both modes)
     local display_branch="${branch:-detached at $head}"
     JSON_ENTRIES+=("$(build_json_entry "$type" "$issue" "$skill" "$path" "$display_branch" "$status" "$repo" "" "$files_changed")")
@@ -246,6 +252,7 @@ if [ -d "$LAYER_WT_DIR" ]; then
         local_status="clean"
         if wt_layer_is_dirty "$layer_wt"; then
             local_status="dirty"
+            ((DIRTY_COUNT++)) || true
         fi
 
         # Count changed files across all inner package worktrees
@@ -303,14 +310,6 @@ fi
 # --- Output ---
 
 if [ "$JSON_OUTPUT" = true ]; then
-    # Count dirty worktrees
-    DIRTY_COUNT=0
-    for entry in "${JSON_ENTRIES[@]}"; do
-        if [[ "$entry" == *'"status":"dirty"'* ]]; then
-            ((DIRTY_COUNT++)) || true
-        fi
-    done
-
     # Exclude main worktree from total so layer + workspace == total
     TOTAL=$(( LAYER_COUNT + WORKSPACE_COUNT ))
 
