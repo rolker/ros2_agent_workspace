@@ -51,6 +51,10 @@ def handle_send(server, session_id):
         server.send_error_json(404, f"Session '{session_id}' not found")
         return
 
+    if session.get("type") == "app":
+        server.send_error_json(400, "Cannot send input to app sessions (read-only)")
+        return
+
     if session["pane_id"] is None:
         server.send_error_json(400, "Session has no active tmux pane")
         return

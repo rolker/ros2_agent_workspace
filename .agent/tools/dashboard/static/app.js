@@ -3,6 +3,8 @@
 let activeTab = null;
 let terminalInterval = null;
 let sessions = [];
+let activeAppTab = null;
+let appTerminalInterval = null;
 
 // --- Initialization ---
 
@@ -19,22 +21,30 @@ async function refreshSessions() {
     try {
         const resp = await fetch('/api/sessions');
         sessions = await resp.json();
+        setConnected(true);
     } catch (e) {
+        setConnected(false);
         sessions = [];
     }
     renderTabs();
 
-    // Auto-select first tab if none active
-    if (activeTab === null && sessions.length > 0) {
-        switchTab(sessions[0].id);
+    // Auto-select first agent tab if none active
+    const agentSessions = sessions.filter(s => s.type !== 'app');
+    if (activeTab === null && agentSessions.length > 0) {
+        switchTab(agentSessions[0].id);
     }
     // If active tab disappeared, select first
-    if (activeTab !== null && !sessions.find(s => s.id === activeTab)) {
-        if (sessions.length > 0) {
-            switchTab(sessions[0].id);
+    if (activeTab !== null && !agentSessions.find(s => s.id === activeTab)) {
+        if (agentSessions.length > 0) {
+            switchTab(agentSessions[0].id);
         } else {
             activeTab = null;
         }
+    }
+
+    // Refresh app sub-tabs if a tab is active
+    if (activeTab !== null) {
+        renderAppTabs();
     }
 }
 
@@ -44,14 +54,17 @@ function renderTabs() {
     const bar = document.getElementById('tab-bar');
     const noSessions = document.getElementById('no-sessions');
 
-    if (sessions.length === 0) {
+    // Only show agent sessions (not app sessions) as top-level tabs
+    const agentSessions = sessions.filter(s => s.type !== 'app');
+
+    if (agentSessions.length === 0) {
         bar.innerHTML = '';
         bar.appendChild(noSessions || createNoSessionsEl());
         return;
     }
 
     bar.innerHTML = '';
-    for (const s of sessions) {
+    for (const s of agentSessions) {
         const tab = document.createElement('div');
         tab.className = 'tab' + (s.id === activeTab ? ' active' : '');
         tab.dataset.session = s.id;
@@ -62,11 +75,25 @@ function renderTabs() {
         tab.appendChild(dot);
 
         const label = document.createElement('span');
-        label.textContent = s.issue ? `#${s.issue}` : (s.skill || s.id);
+        label.textContent = formatTabLabel(s);
         tab.appendChild(label);
 
         bar.appendChild(tab);
     }
+}
+
+function formatTabLabel(session) {
+    let base = session.issue ? `#${session.issue}` : (session.skill || session.id);
+    // Add repo/layer context for layer worktrees
+    if (session.type === 'layer') {
+        const context = session.layer || session.repo;
+        if (context) {
+            base += ` (${context})`;
+        }
+    } else if (session.type === 'workspace') {
+        base += ' (ws)';
+    }
+    return base;
 }
 
 function createNoSessionsEl() {
@@ -94,6 +121,92 @@ function switchTab(sessionId) {
     // Load context and plan
     loadContext(sessionId);
     loadPlan(sessionId);
+
+    // Update app sub-tabs for this session's issue
+    renderAppTabs();
+}
+
+// --- App Output Panel ---
+
+function getAppSessionsForActiveTab() {
+    if (!activeTab) return [];
+    const activeSession = sessions.find(s => s.id === activeTab);
+    if (!activeSession || !activeSession.issue) return [];
+    return sessions.filter(s => s.type === 'app' && s.issue === activeSession.issue);
+}
+
+function renderAppTabs() {
+    const appSessions = getAppSessionsForActiveTab();
+    const panel = document.getElementById('app-panel');
+    const tabsEl = document.getElementById('app-tabs');
+
+    if (appSessions.length === 0) {
+        panel.style.display = 'none';
+        clearInterval(appTerminalInterval);
+        activeAppTab = null;
+        return;
+    }
+
+    panel.style.display = '';
+    tabsEl.innerHTML = '';
+
+    for (const s of appSessions) {
+        const tab = document.createElement('span');
+        tab.className = 'app-tab' + (s.id === activeAppTab ? ' active' : '');
+        tab.dataset.appSession = s.id;
+        tab.onclick = () => switchAppTab(s.id);
+
+        const dot = document.createElement('span');
+        dot.className = 'status-dot ' + s.agent_status;
+        tab.appendChild(dot);
+
+        const label = document.createTextNode(s.label);
+        tab.appendChild(label);
+
+        tabsEl.appendChild(tab);
+    }
+
+    // Auto-select first app tab if none active or current disappeared
+    if (!activeAppTab || !appSessions.find(s => s.id === activeAppTab)) {
+        switchAppTab(appSessions[0].id);
+    }
+}
+
+function switchAppTab(appSessionId) {
+    activeAppTab = appSessionId;
+
+    // Update app tab active state
+    document.querySelectorAll('.app-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.appSession === appSessionId));
+
+    // Update attach command
+    document.getElementById('app-attach-cmd').textContent =
+        `tmux attach -t ${appSessionId}`;
+
+    // Start polling for this app session
+    clearInterval(appTerminalInterval);
+    refreshAppTerminal();
+    appTerminalInterval = setInterval(refreshAppTerminal, 1500);
+}
+
+async function refreshAppTerminal() {
+    if (!activeAppTab) return;
+
+    try {
+        const resp = await fetch(`/api/terminal/${encodeURIComponent(activeAppTab)}`);
+        const data = await resp.json();
+
+        const el = document.getElementById('app-output');
+        const wasScrolledToBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+
+        el.textContent = data.output || '(no output)';
+
+        if (wasScrolledToBottom) {
+            el.scrollTop = el.scrollHeight;
+        }
+    } catch (e) {
+        // Ignore fetch errors
+    }
 }
 
 // --- Terminal Panel ---
@@ -413,10 +526,25 @@ function inlineFormat(text) {
     return text;
 }
 
+// --- Connection Status ---
+
+function setConnected(connected) {
+    const el = document.getElementById('connection-status');
+    if (connected) {
+        el.className = 'connected';
+        el.title = 'Connected to server';
+    } else {
+        el.className = 'disconnected';
+        el.title = 'Server unreachable';
+    }
+}
+
 // --- SSE Connection ---
 
 function connectSSE() {
     const events = new EventSource('/api/events');
+
+    events.onopen = () => setConnected(true);
 
     events.addEventListener('status_change', (e) => {
         const data = JSON.parse(e.data);
@@ -425,6 +553,10 @@ function connectSSE() {
         if (session) {
             session.agent_status = data.status;
             renderTabs();
+            // Re-render app tabs if the status change is for an app session
+            if (session.type === 'app') {
+                renderAppTabs();
+            }
         }
     });
 
@@ -438,7 +570,8 @@ function connectSSE() {
     });
 
     events.onerror = () => {
-        // EventSource auto-reconnects; nothing to do
+        setConnected(false);
+        // EventSource auto-reconnects automatically
     };
 }
 

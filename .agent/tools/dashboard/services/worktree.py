@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -89,8 +90,51 @@ def discover_sessions(workspace_root):
             }
         )
 
+    # Merge in app sessions
+    app_sessions = discover_app_sessions()
+    sessions.extend(app_sessions)
+
     _update_cache(sessions)
     return sessions
+
+
+def discover_app_sessions():
+    """Discover tmux sessions named issue-<N>-<label> (app sessions).
+
+    Returns a list of session dicts with type="app".
+    """
+    _APP_RE = re.compile(r"^issue-(\d+)-(.+)$")
+    session_names = tmux.list_sessions()
+    app_sessions = []
+
+    for name in session_names:
+        match = _APP_RE.match(name)
+        if not match:
+            continue
+
+        issue_num = int(match.group(1))
+        label = match.group(2)
+        alive = tmux.is_session_alive(name)
+
+        app_sessions.append(
+            {
+                "id": name,
+                "issue": issue_num,
+                "label": label,
+                "type": "app",
+                "pane_id": f"{name}:0.0",
+                "agent_status": "running" if alive else "exited",
+                "skill": None,
+                "path": None,
+                "branch": None,
+                "worktree_status": None,
+                "files_changed": 0,
+                "repo": None,
+                "layer": None,
+            }
+        )
+
+    return app_sessions
 
 
 def get_sessions(workspace_root):

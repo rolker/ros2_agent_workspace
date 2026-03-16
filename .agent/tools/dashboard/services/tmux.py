@@ -101,6 +101,56 @@ def detect_status(pane_id):
     return "working"
 
 
+def list_sessions():
+    """List all tmux session names.
+
+    Returns list of session name strings.
+    """
+    try:
+        result = subprocess.run(
+            ["tmux", "list-sessions", "-F", "#{session_name}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return []
+
+    if result.returncode != 0:
+        return []
+
+    return [s for s in result.stdout.strip().split("\n") if s]
+
+
+def is_session_alive(session_name):
+    """Check if a tmux session's pane process is still running.
+
+    Returns True if the process is alive, False if it has exited.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "tmux",
+                "display-message",
+                "-t",
+                f"{session_name}:0.0",
+                "-p",
+                "#{pane_dead}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+    if result.returncode != 0:
+        return False
+
+    # pane_dead is "1" when the process has exited, "0" when alive
+    return result.stdout.strip() != "1"
+
+
 def send_keys(pane_id, text):
     """Send text to a tmux pane followed by Enter."""
     try:

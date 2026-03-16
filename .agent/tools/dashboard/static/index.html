@@ -9,6 +9,7 @@
 <body>
     <nav id="tab-bar">
         <span id="no-sessions">No active sessions found. Waiting...</span>
+        <span id="connection-status" class="connected" title="Connected to server"></span>
     </nav>
 
     <main id="dashboard">
@@ -23,6 +24,15 @@
                        autocomplete="off">
                 <button id="send-btn" onclick="sendToAgent()">Send</button>
             </div>
+        </section>
+
+        <section id="app-panel" class="panel" style="display:none">
+            <div class="panel-header">
+                <h3>App Output</h3>
+                <code id="app-attach-cmd" class="attach-cmd"></code>
+                <div id="app-tabs"></div>
+            </div>
+            <pre id="app-output">(no app sessions)</pre>
         </section>
 
         <section id="plan-panel" class="panel">
