@@ -72,7 +72,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error_json(403, "Forbidden")
             return
 
-        filepath = os.path.join(self.static_dir, safe_path)
+        filepath = os.path.realpath(os.path.join(self.static_dir, safe_path))
+        if not filepath.startswith(
+            os.path.realpath(self.static_dir) + os.sep
+        ) and filepath != os.path.realpath(self.static_dir):
+            self.send_error_json(403, "Forbidden")
+            return
+
         if not os.path.isfile(filepath):
             self.send_error_json(404, f"Not found: {path}")
             return
