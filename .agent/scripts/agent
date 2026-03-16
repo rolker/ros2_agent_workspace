@@ -25,12 +25,15 @@ agent - Enforced Task Isolation for AI Agents
 
 USAGE:
     agent start-task <issue> [options]
+    agent launch <issue> [options]
     agent --help
 
 COMMANDS:
-    start-task <issue>    Start work on an issue in isolated worktree
-                          Automatically creates worktree, enters it, and
-                          sets up the environment
+    start-task <issue>    Create worktree for an issue (no tmux session)
+    launch <issue>        Launch agent in a named tmux session
+                          Creates worktree if needed, then starts a tmux
+                          session named issue-<N> with the environment
+                          set up and claude code running.
 
 OPTIONS:
     --layer <name>        Specify layer for ROS package work
@@ -38,19 +41,25 @@ OPTIONS:
                           Omit for infrastructure/workspace work
     --packages <pkg,...>  Package(s) to modify (required with --layer)
                           Comma-separated list for multiple packages
+    --prompt <text>       Initial prompt to send to claude (launch only)
+    --no-agent            Set up tmux session but don't launch claude (launch only)
     --help, -h            Show this help message
 
 EXAMPLES:
-    # Infrastructure work (scripts, docs, configs)
+    # Launch agent in tmux for infrastructure work
+    agent launch 125
+
+    # Launch agent in tmux for ROS package work
+    agent launch 42 --layer core --packages unh_marine_autonomy
+
+    # Launch with an initial prompt
+    agent launch 125 --prompt "Implement the plan"
+
+    # Just set up the tmux session (no claude)
+    agent launch 125 --no-agent
+
+    # Create worktree only (no tmux)
     agent start-task 125
-
-    # ROS package development
-    agent start-task 42 --layer core --packages unh_marine_autonomy
-
-ENFORCEMENT:
-    This wrapper is the ONLY approved way for agents to start work.
-    Direct git checkout or working in main source tree is prohibited
-    to prevent workspace pollution and enable multi-agent coordination.
 
 SEE ALSO:
     CLAUDE.md                    - Claude Code operational rules
@@ -137,11 +146,138 @@ start_task() {
     echo ""
 }
 
+launch_agent() {
+    local issue_num="$1"
+    shift
+
+    local layer=""
+    local packages=""
+    local prompt=""
+    local no_agent=false
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --layer)
+                layer="$2"
+                shift 2
+                ;;
+            --packages)
+                packages="$2"
+                shift 2
+                ;;
+            --prompt)
+                prompt="$2"
+                shift 2
+                ;;
+            --no-agent)
+                no_agent=true
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                echo "Run 'agent --help' for usage"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Validate issue number
+    if [ -z "$issue_num" ]; then
+        echo "Error: Issue number required"
+        echo "Usage: agent launch <issue> [--layer <name>] [--packages <pkg>] [--prompt <text>] [--no-agent]"
+        exit 1
+    fi
+
+    if ! [[ "$issue_num" =~ ^[0-9]+$ ]]; then
+        echo "Error: Issue number must be numeric, got: $issue_num"
+        exit 1
+    fi
+
+    local session_name="issue-${issue_num}"
+
+    # Check if tmux session already exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "tmux session '$session_name' already exists."
+        echo "  Attach: tmux attach -t $session_name"
+        exit 0
+    fi
+
+    # Check if worktree exists; if not, create it
+    local wt_exists=false
+    if [ -n "$layer" ]; then
+        # Layer worktrees live under layers/worktrees/
+        for dir in "$ROOT_DIR"/layers/worktrees/issue-*-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_exists=true
+                break
+            fi
+        done
+    else
+        # Workspace worktrees
+        for dir in "$ROOT_DIR"/.workspace-worktrees/issue-*-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_exists=true
+                break
+            fi
+        done
+    fi
+
+    if [ "$wt_exists" = false ]; then
+        echo "Creating worktree for issue #${issue_num}..."
+        local create_args=(--issue "$issue_num")
+        if [ -n "$layer" ]; then
+            create_args+=(--type layer --layer "$layer")
+            if [ -n "$packages" ]; then
+                create_args+=(--packages "$packages")
+            fi
+        else
+            create_args+=(--type workspace)
+        fi
+        "$SCRIPT_DIR/worktree_create.sh" "${create_args[@]}"
+    fi
+
+    # Build the shell init commands for the tmux session
+    local init_cmds="source '$SCRIPT_DIR/worktree_enter.sh' --issue $issue_num"
+
+    if [ "$no_agent" = false ]; then
+        init_cmds="$init_cmds && claude"
+    fi
+
+    # Create the tmux session
+    tmux new-session -d -s "$session_name" bash -i
+    # Send the init commands (using send-keys so the shell is interactive)
+    tmux send-keys -t "$session_name" "$init_cmds" Enter
+
+    # If there's a prompt, wait a moment for claude to start, then send it
+    if [ -n "$prompt" ] && [ "$no_agent" = false ]; then
+        echo "Waiting for claude to initialize..."
+        sleep 3
+        tmux send-keys -t "$session_name" "$prompt" Enter
+    fi
+
+    echo ""
+    echo "========================================="
+    echo "Agent session launched"
+    echo "========================================="
+    echo "  Issue:   #$issue_num"
+    echo "  Session: $session_name"
+    echo "  Attach:  tmux attach -t $session_name"
+    echo ""
+    if [ "$no_agent" = false ]; then
+        echo "  Dashboard: make dashboard-ui  (http://localhost:3000)"
+    fi
+}
+
 # Main command routing
 case "${1:-}" in
     start-task)
         shift
         start_task "$@"
+        ;;
+    launch)
+        shift
+        launch_agent "$@"
         ;;
     --help|-h|help)
         show_usage
