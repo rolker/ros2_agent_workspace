@@ -248,14 +248,9 @@ if [ -d "$LAYER_WT_DIR" ]; then
         # Get branch from inner package worktree
         local_branch=$(wt_layer_branch "$layer_wt" 2>/dev/null || echo "")
 
-        # Check dirty status
+        # Check dirty status and count changed files in a single pass
+        # (avoids running git status twice per repo)
         local_status="clean"
-        if wt_layer_is_dirty "$layer_wt"; then
-            local_status="dirty"
-            ((DIRTY_COUNT++)) || true
-        fi
-
-        # Count changed files across all inner package worktrees
         local_changed=0
         if [ "$VERBOSE" = true ] || [ "$JSON_OUTPUT" = true ]; then
             for ws_dir in "$layer_wt"/*_ws; do
@@ -272,6 +267,16 @@ if [ -d "$LAYER_WT_DIR" ]; then
                     fi
                 done
             done
+            if [ "$local_changed" -gt 0 ]; then
+                local_status="dirty"
+                ((DIRTY_COUNT++)) || true
+            fi
+        else
+            # Text mode without --verbose: just check dirty, skip counting
+            if wt_layer_is_dirty "$layer_wt"; then
+                local_status="dirty"
+                ((DIRTY_COUNT++)) || true
+            fi
         fi
 
         # Determine layer name from the non-symlinked *_ws directory
