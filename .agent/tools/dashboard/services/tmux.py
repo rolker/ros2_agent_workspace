@@ -158,12 +158,14 @@ def send_keys(pane_id, text):
     Enter is sent as a separate command since -l suppresses key lookup.
     """
     try:
-        subprocess.run(
+        r1 = subprocess.run(
             ["tmux", "send-keys", "-t", pane_id, "-l", text], capture_output=True, timeout=5
         )
-        subprocess.run(
+        if r1.returncode != 0:
+            return False
+        r2 = subprocess.run(
             ["tmux", "send-keys", "-t", pane_id, "Enter"], capture_output=True, timeout=5
         )
-        return True
+        return r2.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
