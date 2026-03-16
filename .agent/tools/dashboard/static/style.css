@@ -35,14 +35,20 @@ body {
 
 /* --- Tab Bar --- */
 
-#tab-bar {
+#tab-bar-wrapper {
     display: flex;
-    gap: 2px;
+    align-items: center;
     padding: 4px 8px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
-    overflow-x: auto;
     flex-shrink: 0;
+}
+
+#tab-bar {
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    flex: 1;
 }
 
 #no-sessions {
@@ -257,9 +263,8 @@ body {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    margin-left: auto;
+    margin-left: 8px;
     flex-shrink: 0;
-    align-self: center;
     transition: background 0.3s;
 }
 

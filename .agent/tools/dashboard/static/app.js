@@ -325,6 +325,14 @@ function renderContext(ctx) {
         html += '</div>';
     }
 
+    // Build report
+    if (ctx.build_report) {
+        html += '<div class="ctx-section">';
+        html += '<div class="ctx-section-title">Build</div>';
+        html += `<pre style="font-size:11px;white-space:pre-wrap;color:var(--text-dim)">${escapeHtml(ctx.build_report)}</pre>`;
+        html += '</div>';
+    }
+
     // Changed files
     if (ctx.changed_files && ctx.changed_files.length > 0) {
         html += '<div class="ctx-section">';

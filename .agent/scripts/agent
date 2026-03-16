@@ -224,13 +224,17 @@ launch_agent() {
     fi
 
     if [ "$wt_exists" = false ]; then
+        # Validate --packages is provided when --layer is used
+        if [ -n "$layer" ] && [ -z "$packages" ]; then
+            echo "Error: --packages is required with --layer"
+            echo "Usage: agent launch <issue> --layer <name> --packages <pkg,...>"
+            exit 1
+        fi
+
         echo "Creating worktree for issue #${issue_num}..."
         local create_args=(--issue "$issue_num")
         if [ -n "$layer" ]; then
-            create_args+=(--type layer --layer "$layer")
-            if [ -n "$packages" ]; then
-                create_args+=(--packages "$packages")
-            fi
+            create_args+=(--type layer --layer "$layer" --packages "$packages")
         else
             create_args+=(--type workspace)
         fi

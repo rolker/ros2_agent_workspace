@@ -38,14 +38,11 @@ def handle_get(server, session_id):
         issue_cwd = _resolve_issue_repo(session, server.workspace_root)
         ctx["issue"] = issues.get_issue(session["issue"], issue_cwd)
 
-    # Test summary
-    ctx["test_summary"] = workspace.get_test_summary(session["path"])
-
-    # Build report (raw markdown)
-    ctx["build_report"] = workspace.get_build_report(session["path"])
-
-    # Changed files
-    ctx["changed_files"] = workspace.get_changed_files(session["path"])
+    # Workspace data — skip for app sessions (no worktree path)
+    if session["path"] is not None:
+        ctx["test_summary"] = workspace.get_test_summary(session["path"])
+        ctx["build_report"] = workspace.get_build_report(session["path"])
+        ctx["changed_files"] = workspace.get_changed_files(session["path"])
 
     server.send_json(ctx)
 

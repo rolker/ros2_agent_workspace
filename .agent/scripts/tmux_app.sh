@@ -54,6 +54,11 @@ if [[ -z "$ISSUE" ]]; then
     exit 1
 fi
 
+if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --issue must be numeric, got: $ISSUE" >&2
+    exit 1
+fi
+
 # Validate label format (alphanumeric + hyphens only)
 validate_label() {
     if [[ ! "$1" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$ ]]; then

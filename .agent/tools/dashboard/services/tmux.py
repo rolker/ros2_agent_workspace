@@ -152,10 +152,17 @@ def is_session_alive(session_name):
 
 
 def send_keys(pane_id, text):
-    """Send text to a tmux pane followed by Enter."""
+    """Send text to a tmux pane followed by Enter.
+
+    Uses -l (literal) so tmux key names in the text are not interpreted.
+    Enter is sent as a separate command since -l suppresses key lookup.
+    """
     try:
         subprocess.run(
-            ["tmux", "send-keys", "-t", pane_id, text, "Enter"], capture_output=True, timeout=5
+            ["tmux", "send-keys", "-t", pane_id, "-l", text], capture_output=True, timeout=5
+        )
+        subprocess.run(
+            ["tmux", "send-keys", "-t", pane_id, "Enter"], capture_output=True, timeout=5
         )
         return True
     except (subprocess.TimeoutExpired, FileNotFoundError):
