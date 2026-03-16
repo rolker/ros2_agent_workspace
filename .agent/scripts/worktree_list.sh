@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "Error: Unknown option $1"
+            echo "Error: Unknown option $1" >&2
             exit 1
             ;;
     esac
@@ -311,7 +311,8 @@ if [ "$JSON_OUTPUT" = true ]; then
         fi
     done
 
-    TOTAL=${#JSON_ENTRIES[@]}
+    # Exclude main worktree from total so layer + workspace == total
+    TOTAL=$(( LAYER_COUNT + WORKSPACE_COUNT ))
 
     # Build JSON array
     printf '{"worktrees":['
