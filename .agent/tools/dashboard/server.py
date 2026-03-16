@@ -38,11 +38,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self._dispatch("POST")
 
     def do_OPTIONS(self):
-        """Handle CORS preflight."""
+        """Handle preflight (same-origin only, no CORS needed)."""
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
     def _dispatch(self, method):
@@ -99,7 +96,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -109,7 +105,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -157,6 +152,12 @@ def main():
     parser = argparse.ArgumentParser(description="Agent Dashboard Server")
     parser.add_argument("--port", type=int, default=3000, help="Port to listen on (default: 3000)")
     parser.add_argument(
+        "--bind",
+        type=str,
+        default="127.0.0.1",
+        help="Address to bind to (default: 127.0.0.1, use 0.0.0.0 for LAN access)",
+    )
+    parser.add_argument(
         "--workspace",
         type=str,
         default=None,
@@ -193,8 +194,8 @@ def main():
     start_poller(workspace_root)
 
     # Start server
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), DashboardHandler)
-    print(f"Agent Dashboard running at http://localhost:{args.port}")
+    server = ThreadingHTTPServer((args.bind, args.port), DashboardHandler)
+    print(f"Agent Dashboard running at http://{args.bind}:{args.port}")
     print(f"Workspace: {workspace_root}")
     print("Press Ctrl+C to stop.")
 

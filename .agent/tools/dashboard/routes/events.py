@@ -1,6 +1,7 @@
 """GET /api/events — Server-Sent Events stream for real-time updates."""
 
 import json
+import sys
 import threading
 import time
 
@@ -38,7 +39,6 @@ def handle_sse(server):
     server.send_header("Content-Type", "text/event-stream")
     server.send_header("Cache-Control", "no-cache")
     server.send_header("Connection", "keep-alive")
-    server.send_header("Access-Control-Allow-Origin", "*")
     server.end_headers()
 
     # Parse Last-Event-ID from client (for reconnection)
@@ -112,8 +112,8 @@ def start_poller(workspace_root, interval=10):
                         push_event("session_removed", {"session": sid})
 
                 previous_statuses = current
-            except Exception:
-                pass  # Don't crash the poller
+            except Exception as exc:
+                print(f"[sse-poller] error: {exc}", file=sys.stderr)
 
             time.sleep(interval)
 

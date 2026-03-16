@@ -3,8 +3,16 @@
 import json
 import os
 import subprocess
+import threading
+import time
 
 import services.tmux as tmux
+
+# Session cache — populated by the SSE poller, read by terminal/context routes
+_session_cache = []
+_cache_lock = threading.Lock()
+_cache_time = 0
+_CACHE_TTL = 5  # seconds
 
 
 def list_worktrees(workspace_root):
@@ -49,10 +57,13 @@ def discover_sessions(workspace_root):
 
         wt_path = wt.get("path", "")
 
-        # Find a tmux pane whose cwd is inside this worktree
+        # Find a tmux pane whose cwd is inside this worktree.
+        # Use path-boundary check to avoid /issue-12 matching /issue-123.
         matching_pane = None
+        wt_real = os.path.realpath(wt_path)
         for pane in panes:
-            if pane["cwd"].startswith(wt_path):
+            pane_real = os.path.realpath(pane["cwd"])
+            if pane_real == wt_real or pane_real.startswith(wt_real + os.sep):
                 matching_pane = pane
                 break
 
@@ -78,7 +89,30 @@ def discover_sessions(workspace_root):
             }
         )
 
+    _update_cache(sessions)
     return sessions
+
+
+def get_sessions(workspace_root):
+    """Return cached sessions, refreshing if stale.
+
+    Used by terminal/context routes to avoid shelling out on every poll.
+    """
+    global _session_cache, _cache_time
+    with _cache_lock:
+        if time.time() - _cache_time < _CACHE_TTL and _session_cache:
+            return list(_session_cache)
+    # Cache miss — do a fresh discovery
+    sessions = discover_sessions(workspace_root)
+    return sessions
+
+
+def _update_cache(sessions):
+    """Update the session cache (called by discover_sessions)."""
+    global _session_cache, _cache_time
+    with _cache_lock:
+        _session_cache = list(sessions)
+        _cache_time = time.time()
 
 
 def _make_session_id(wt):

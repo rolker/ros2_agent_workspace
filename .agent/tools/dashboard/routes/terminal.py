@@ -8,7 +8,7 @@ def handle_get(server, session_id):
     """Return captured terminal output for a session."""
     from services import worktree, tmux
 
-    sessions = worktree.discover_sessions(server.workspace_root)
+    sessions = worktree.get_sessions(server.workspace_root)
     session = _find_session(sessions, session_id)
 
     if session is None:

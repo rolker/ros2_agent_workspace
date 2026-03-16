@@ -180,7 +180,7 @@ function renderContext(ctx) {
         }
         if (ctx.issue.url) {
             html += `<div style="margin-top:4px"><a href="${escapeHtml(ctx.issue.url)}" `
-                + `target="_blank" style="color:var(--blue);font-size:11px">View on GitHub</a></div>`;
+                + `target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-size:11px">View on GitHub</a></div>`;
         }
         html += '</div>';
     }
@@ -322,6 +322,18 @@ function renderMarkdown(md) {
             continue;
         }
 
+        // Checkbox items (must be checked before unordered list)
+        if (/^\s*[-*]\s+\[[ x]\]/i.test(line)) {
+            while (i < lines.length && /^\s*[-*]\s+\[[ x]\]/i.test(lines[i])) {
+                const checked = /\[x\]/i.test(lines[i]);
+                const content = lines[i].replace(/^\s*[-*]\s+\[[ x]\]\s*/i, '');
+                const icon = checked ? '&#9745;' : '&#9744;';
+                html += `<div>${icon} ${inlineFormat(content)}</div>`;
+                i++;
+            }
+            continue;
+        }
+
         // Unordered list items
         if (/^\s*[-*]\s+/.test(line)) {
             html += '<ul>';
@@ -343,16 +355,6 @@ function renderMarkdown(md) {
                 i++;
             }
             html += '</ol>';
-            continue;
-        }
-
-        // Checkbox items
-        if (/^\s*[-*]\s+\[[ x]\]/.test(line)) {
-            const checked = /\[x\]/i.test(line);
-            const content = line.replace(/^\s*[-*]\s+\[[ x]\]\s*/, '');
-            const icon = checked ? '&#9745;' : '&#9744;';
-            html += `<div>${icon} ${inlineFormat(content)}</div>`;
-            i++;
             continue;
         }
 
@@ -395,13 +397,19 @@ function renderTable(rows) {
 }
 
 function inlineFormat(text) {
+    // Escape HTML first to prevent XSS
+    text = escapeHtml(text);
     // Bold
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     // Inline code
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // Links
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" style="color:var(--blue)">$1</a>');
+    // Links — restrict to http/https schemes and add rel for tabnabbing protection
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+        if (/^https?:\/\//i.test(href) || href.startsWith('#') || href.startsWith('/')) {
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">${label}</a>`;
+        }
+        return `${label} (${href})`;
+    });
     return text;
 }
 

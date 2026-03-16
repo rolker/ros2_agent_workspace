@@ -5,7 +5,8 @@ Local web dashboard for monitoring concurrent agent sessions.
 ## Quick Start
 
 ```bash
-python .agent/tools/dashboard/server.py
+make dashboard-ui
+# or: python .agent/tools/dashboard/server.py [--port 3000] [--bind 127.0.0.1]
 # Open http://localhost:3000
 ```
 
