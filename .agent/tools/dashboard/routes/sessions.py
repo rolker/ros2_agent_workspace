@@ -5,5 +5,5 @@ def handle_get(server):
     """Return all sessions as JSON."""
     from services import worktree
 
-    sessions = worktree.discover_sessions(server.workspace_root)
+    sessions = worktree.get_sessions(server.workspace_root)
     server.send_json(sessions)
