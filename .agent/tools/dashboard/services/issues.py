@@ -44,19 +44,47 @@ def get_issue(issue_number, repo_dir=None):
 
 
 def _try_gitbug(issue_number, repo_dir):
-    """Try to get issue from git-bug."""
+    """Try to get issue from git-bug (local-first, offline-capable).
+
+    Uses git bug select + show + deselect — the correct pattern for looking up
+    a bug by issue number. 'git bug show <N>' is not valid; select sets the
+    current bug context first.
+    """
     try:
-        result = subprocess.run(
-            ["git", "bug", "show", str(issue_number)],
+        # Select the bug by issue number
+        select = subprocess.run(
+            ["git", "bug", "select", str(issue_number)],
             capture_output=True,
             text=True,
             timeout=5,
             cwd=repo_dir,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            # git-bug show outputs plain text; parse title from first line
-            lines = result.stdout.strip().split("\n")
-            title = lines[0] if lines else f"Issue #{issue_number}"
+        if select.returncode != 0:
+            return None
+
+        # Show the selected bug
+        show = subprocess.run(
+            ["git", "bug", "show"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=repo_dir,
+        )
+
+        # Always deselect to avoid leaving side effects
+        subprocess.run(
+            ["git", "bug", "deselect"],
+            capture_output=True,
+            timeout=5,
+            cwd=repo_dir,
+        )
+
+        if show.returncode == 0 and show.stdout.strip():
+            lines = show.stdout.strip().split("\n")
+            # First line format: "<id-prefix> <title>" — strip the leading ID token
+            first_line = lines[0] if lines else ""
+            parts = first_line.split(" ", 1)
+            title = parts[1] if len(parts) > 1 else first_line
             body = "\n".join(lines[1:]) if len(lines) > 1 else ""
             return {
                 "title": title,

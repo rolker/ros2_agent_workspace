@@ -159,6 +159,14 @@ def _update_cache(sessions):
         _cache_time = time.time()
 
 
+def find_session(sessions, session_id):
+    """Return the session with the given ID, or None if not found."""
+    for s in sessions:
+        if s["id"] == session_id:
+            return s
+    return None
+
+
 def _make_session_id(wt):
     """Generate a stable session ID from worktree data.
 
@@ -173,6 +181,9 @@ def _make_session_id(wt):
             return f"issue-{wt_type}-{repo}-{wt['issue']}"
         return f"issue-{wt_type}-{wt['issue']}"
     if wt.get("skill"):
-        return f"skill-{wt['skill']}"
+        # Include the path basename to disambiguate multiple timestamped skill
+        # worktrees with the same skill name (e.g. skill/research-20260301-...)
+        path_tag = os.path.basename(wt.get("path", "")) or wt["skill"]
+        return f"skill-{path_tag}"
     # Fallback: use basename of path
     return os.path.basename(wt.get("path", "unknown"))

@@ -13,6 +13,7 @@ import mimetypes
 import os
 import re
 import sys
+import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 # Ensure the dashboard package directory is on the path
@@ -66,8 +67,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/":
             path = "/index.html"
 
-        # Security: prevent directory traversal
-        safe_path = os.path.normpath(path.lstrip("/"))
+        # Security: decode percent-encoding before normpath so that
+        # /%2e%2e/.. sequences are caught by the startswith("..") check.
+        safe_path = os.path.normpath(urllib.parse.unquote(path).lstrip("/"))
         if safe_path.startswith(".."):
             self.send_error_json(403, "Forbidden")
             return

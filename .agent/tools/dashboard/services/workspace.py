@@ -60,10 +60,15 @@ def get_work_plan(issue_number, worktree_path, workspace_root):
 
 
 def get_changed_files(worktree_path):
-    """Get list of changed files in worktree via git."""
+    """Get list of changed files in worktree via git.
+
+    Uses git status --porcelain to match the files_changed count reported by
+    worktree_list.sh (which also uses git status). This includes untracked files,
+    avoiding a UI discrepancy where the count exceeds the displayed list.
+    """
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-status", "HEAD"],
+            ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
             timeout=5,

@@ -6,7 +6,7 @@ def handle_get(server, session_id):
     from services import worktree, workspace
 
     sessions = worktree.get_sessions(server.workspace_root)
-    session = _find_session(sessions, session_id)
+    session = worktree.find_session(sessions, session_id)
 
     if session is None:
         server.send_error_json(404, f"Session '{session_id}' not found")
@@ -31,10 +31,3 @@ def handle_get(server, session_id):
             }
         }
     )
-
-
-def _find_session(sessions, session_id):
-    for s in sessions:
-        if s["id"] == session_id:
-            return s
-    return None

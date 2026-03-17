@@ -67,15 +67,16 @@ validate_label() {
     fi
 }
 
+if ! command -v tmux &>/dev/null; then
+    echo "ERROR: tmux is required but not found." >&2
+    exit 1
+fi
+
 SESSION_PREFIX="issue-${ISSUE}-"
 
 case "$MODE" in
     list)
         # List all tmux sessions matching the issue prefix
-        if ! command -v tmux &>/dev/null; then
-            echo "tmux not found." >&2
-            exit 1
-        fi
         tmux list-sessions -F "#{session_name}" 2>/dev/null \
             | grep "^${SESSION_PREFIX}" \
             || echo "(no app sessions for issue $ISSUE)"

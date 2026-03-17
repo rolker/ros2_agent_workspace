@@ -40,7 +40,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build test lint clean setup-all dashboard dashboard-ui validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
+.PHONY: help build test lint clean setup-all dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -60,6 +60,7 @@ help:
 	@echo "  dashboard     - Unified workspace status (worktrees, PRs, health)"
 	@echo "  dashboard QUICK=1 - Quick mode (skip sync and GitHub API)"
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
+	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  validate      - Validate workspace config (CI-oriented, pass/fail)"
 	@echo ""
 	@echo "Maintenance:"
@@ -109,6 +110,9 @@ endif
 
 dashboard-ui:
 	@python3 ./.agent/tools/dashboard/server.py
+
+test-dashboard:
+	@python3 -m unittest discover .agent/tools/dashboard/tests -v
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py

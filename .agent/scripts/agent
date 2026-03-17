@@ -194,6 +194,11 @@ launch_agent() {
         exit 1
     fi
 
+    if ! command -v tmux &>/dev/null; then
+        echo "Error: tmux is required for 'agent launch' but was not found."
+        exit 1
+    fi
+
     local session_name="issue-${issue_num}"
 
     # Check if tmux session already exists
@@ -203,27 +208,30 @@ launch_agent() {
         exit 0
     fi
 
-    # Check if worktree exists; if not, create it
-    local wt_exists=false
+    # Check if worktree exists; capture the path to extract the repo slug later.
+    # Match both slug format (issue-<slug>-<N>) and legacy format (issue-<N>).
+    local wt_path=""
     if [ -n "$layer" ]; then
         # Layer worktrees live under layers/worktrees/
-        for dir in "$ROOT_DIR"/layers/worktrees/issue-*-"${issue_num}"; do
+        for dir in "$ROOT_DIR"/layers/worktrees/issue-*-"${issue_num}" \
+                   "$ROOT_DIR"/layers/worktrees/issue-"${issue_num}"; do
             if [ -d "$dir" ]; then
-                wt_exists=true
+                wt_path="$dir"
                 break
             fi
         done
     else
         # Workspace worktrees
-        for dir in "$ROOT_DIR"/.workspace-worktrees/issue-*-"${issue_num}"; do
+        for dir in "$ROOT_DIR"/.workspace-worktrees/issue-*-"${issue_num}" \
+                   "$ROOT_DIR"/.workspace-worktrees/issue-"${issue_num}"; do
             if [ -d "$dir" ]; then
-                wt_exists=true
+                wt_path="$dir"
                 break
             fi
         done
     fi
 
-    if [ "$wt_exists" = false ]; then
+    if [ -z "$wt_path" ]; then
         # Validate --packages is provided when --layer is used
         if [ -n "$layer" ] && [ -z "$packages" ]; then
             echo "Error: --packages is required with --layer"
@@ -239,10 +247,38 @@ launch_agent() {
             create_args+=(--type workspace)
         fi
         "$SCRIPT_DIR/worktree_create.sh" "${create_args[@]}"
+
+        # Re-probe for the newly created path
+        local probe_base
+        if [ -n "$layer" ]; then
+            probe_base="$ROOT_DIR/layers/worktrees"
+        else
+            probe_base="$ROOT_DIR/.workspace-worktrees"
+        fi
+        for dir in "$probe_base"/issue-*-"${issue_num}" "$probe_base"/issue-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_path="$dir"
+                break
+            fi
+        done
+    fi
+
+    # Extract the repo slug from the worktree directory name so worktree_enter.sh
+    # can resolve unambiguously when multiple worktrees share the same issue number.
+    local repo_slug_arg=""
+    if [ -n "$wt_path" ]; then
+        local wt_basename
+        wt_basename=$(basename "$wt_path")
+        # "issue-<slug>-<N>" -> extract slug; "issue-<N>" (legacy) -> no slug
+        if [[ "$wt_basename" != "issue-${issue_num}" ]]; then
+            local stripped="${wt_basename#issue-}"   # strip leading "issue-"
+            local slug="${stripped%-${issue_num}}"   # strip trailing "-<N>"
+            repo_slug_arg="--repo-slug $slug"
+        fi
     fi
 
     # Build the shell init commands for the tmux session
-    local init_cmds="source '$SCRIPT_DIR/worktree_enter.sh' --issue $issue_num"
+    local init_cmds="source '$SCRIPT_DIR/worktree_enter.sh' --issue $issue_num $repo_slug_arg"
 
     if [ "$no_agent" = false ]; then
         init_cmds="$init_cmds && claude"

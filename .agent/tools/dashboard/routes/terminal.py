@@ -9,7 +9,7 @@ def handle_get(server, session_id):
     from services import worktree, tmux
 
     sessions = worktree.get_sessions(server.workspace_root)
-    session = _find_session(sessions, session_id)
+    session = worktree.find_session(sessions, session_id)
 
     if session is None:
         server.send_error_json(404, f"Session '{session_id}' not found")
@@ -44,8 +44,8 @@ def handle_send(server, session_id):
         server.send_error_json(400, "Missing 'text' field")
         return
 
-    sessions = worktree.discover_sessions(server.workspace_root)
-    session = _find_session(sessions, session_id)
+    sessions = worktree.get_sessions(server.workspace_root)
+    session = worktree.find_session(sessions, session_id)
 
     if session is None:
         server.send_error_json(404, f"Session '{session_id}' not found")
@@ -61,10 +61,3 @@ def handle_send(server, session_id):
 
     ok = tmux.send_keys(session["pane_id"], text)
     server.send_json({"ok": ok})
-
-
-def _find_session(sessions, session_id):
-    for s in sessions:
-        if s["id"] == session_id:
-            return s
-    return None
