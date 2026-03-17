@@ -68,6 +68,7 @@ class TestDashboardAPI(unittest.TestCase):
     def tearDownClass(cls):
         if cls.server:
             cls.server.shutdown()
+            cls.server.server_close()
 
     # --- helpers ---
 

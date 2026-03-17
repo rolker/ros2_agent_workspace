@@ -112,7 +112,8 @@ dashboard-ui:
 	@python3 ./.agent/tools/dashboard/server.py
 
 test-dashboard:
-	@python3 -m unittest discover .agent/tools/dashboard/tests -v
+	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \
+	$$PYTHON -m unittest discover .agent/tools/dashboard/tests -v
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py

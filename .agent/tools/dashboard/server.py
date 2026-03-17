@@ -125,6 +125,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """Suppress default access logging (too noisy with polling)."""
         pass
 
+    def handle_error(self, request, client_address):
+        """Suppress BrokenPipeError — common when browser closes connection early."""
+        import traceback
+
+        exc = sys.exc_info()[1]
+        if isinstance(exc, BrokenPipeError):
+            return
+        traceback.print_exc()
+
 
 def _setup_routes():
     """Register API route handlers."""
