@@ -65,6 +65,9 @@ def get_changed_files(worktree_path):
     Uses git status --porcelain to match the files_changed count reported by
     worktree_list.sh (which also uses git status). This includes untracked files,
     avoiding a UI discrepancy where the count exceeds the displayed list.
+
+    Returns a list of {"status": str, "path": str} dicts parsed from porcelain
+    output (format: "XY path" where XY is the 2-char status code).
     """
     try:
         result = subprocess.run(
@@ -75,7 +78,11 @@ def get_changed_files(worktree_path):
             cwd=worktree_path,
         )
         if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip().split("\n")
+            entries = []
+            for line in result.stdout.strip().split("\n"):
+                if len(line) >= 4:  # "XY path" minimum
+                    entries.append({"status": line[:2].strip() or "?", "path": line[3:]})
+            return entries
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     return []

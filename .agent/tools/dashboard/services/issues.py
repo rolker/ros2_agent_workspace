@@ -11,6 +11,10 @@ _cache = {}
 _cache_lock = threading.Lock()
 _CACHE_TTL = 60  # seconds
 
+# Serializes git-bug select/show/deselect to prevent concurrent requests from
+# interleaving subprocess calls and returning wrong issue data.
+_gitbug_lock = threading.Lock()
+
 
 def _cached(key, ttl=_CACHE_TTL):
     """Return cached value if fresh, else None."""
@@ -54,54 +58,55 @@ def _try_gitbug(issue_number, repo_dir):
     a bug by issue number. 'git bug show <N>' is not valid; select sets the
     current bug context first.
     """
-    try:
-        # Select the bug by issue number
-        select = subprocess.run(
-            ["git", "bug", "select", str(issue_number)],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            cwd=repo_dir,
-        )
-        if select.returncode != 0:
-            return None
-
-        show = None
+    with _gitbug_lock:
         try:
-            # Show the selected bug
-            show = subprocess.run(
-                ["git", "bug", "show"],
+            # Select the bug by issue number
+            select = subprocess.run(
+                ["git", "bug", "select", str(issue_number)],
                 capture_output=True,
                 text=True,
                 timeout=5,
                 cwd=repo_dir,
             )
-        finally:
-            # Always deselect to avoid leaving side effects, even on exception
-            subprocess.run(
-                ["git", "bug", "deselect"],
-                capture_output=True,
-                timeout=5,
-                cwd=repo_dir,
-            )
+            if select.returncode != 0:
+                return None
 
-        if show is not None and show.returncode == 0 and show.stdout.strip():
-            lines = show.stdout.strip().split("\n")
-            # First line format: "<id-prefix> <title>" — strip the leading ID token
-            first_line = lines[0] if lines else ""
-            parts = first_line.split(" ", 1)
-            title = parts[1] if len(parts) > 1 else first_line
-            body = "\n".join(lines[1:]) if len(lines) > 1 else ""
-            return {
-                "title": title,
-                "body": body,
-                "labels": [],
-                "state": "open",
-                "url": None,
-                "source": "git-bug",
-            }
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+            show = None
+            try:
+                # Show the selected bug
+                show = subprocess.run(
+                    ["git", "bug", "show"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=repo_dir,
+                )
+            finally:
+                # Always deselect to avoid leaving side effects, even on exception
+                subprocess.run(
+                    ["git", "bug", "deselect"],
+                    capture_output=True,
+                    timeout=5,
+                    cwd=repo_dir,
+                )
+
+            if show is not None and show.returncode == 0 and show.stdout.strip():
+                lines = show.stdout.strip().split("\n")
+                # First line format: "<id-prefix> <title>" — strip the leading ID token
+                first_line = lines[0] if lines else ""
+                parts = first_line.split(" ", 1)
+                title = parts[1] if len(parts) > 1 else first_line
+                body = "\n".join(lines[1:]) if len(lines) > 1 else ""
+                return {
+                    "title": title,
+                    "body": body,
+                    "labels": [],
+                    "state": "open",
+                    "url": None,
+                    "source": "git-bug",
+                }
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
     return None
 
 

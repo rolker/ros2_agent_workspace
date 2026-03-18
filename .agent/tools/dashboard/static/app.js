@@ -342,10 +342,9 @@ function renderContext(ctx) {
         html += '<div class="ctx-section">';
         html += '<div class="ctx-section-title">Changed Files</div>';
         html += '<ul class="ctx-file-list">';
-        for (const line of ctx.changed_files) {
-            const parts = line.split('\t');
-            const status = parts[0] || '?';
-            const file = parts.slice(1).join('\t') || line;
+        for (const entry of ctx.changed_files) {
+            const status = entry.status || '?';
+            const file = entry.path || '';
             html += `<li><span class="file-status ${escapeHtml(status[0])}">${escapeHtml(status[0])}</span> `
                 + `${escapeHtml(file)}</li>`;
         }

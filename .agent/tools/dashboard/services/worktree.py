@@ -13,7 +13,7 @@ import services.tmux as tmux
 _session_cache = []
 _cache_lock = threading.Lock()
 _cache_time = 0
-_CACHE_TTL = 5  # seconds
+_CACHE_TTL = 15  # seconds — must be >= SSE poller interval (10s) to stay warm between ticks
 
 
 def list_worktrees(workspace_root):

@@ -32,9 +32,11 @@ def handle_send(server, session_id):
     """Send text to the agent's tmux pane."""
     from services import worktree, tmux
 
-    # CSRF guard: reject cross-origin POST requests.
+    # CSRF guard: reject cross-origin POST requests from browsers.
     # Non-simple requests (application/json) are already blocked by CORS preflight,
     # but a simple-request form POST (enctype=text/plain) can still reach this endpoint.
+    # Note: non-browser clients (curl, scripts) do not send Origin and are not blocked
+    # here; when bound to 127.0.0.1 (the default) they are assumed to be the local user.
     origin = server.headers.get("Origin", "")
     if origin and not (
         origin.startswith("http://127.0.0.1") or origin.startswith("http://localhost")
