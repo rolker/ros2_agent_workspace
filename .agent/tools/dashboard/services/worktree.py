@@ -144,7 +144,7 @@ def get_sessions(workspace_root):
     """
     global _session_cache, _cache_time
     with _cache_lock:
-        if time.time() - _cache_time < _CACHE_TTL and _session_cache:
+        if time.time() - _cache_time < _CACHE_TTL:
             return list(_session_cache)
     # Cache miss — do a fresh discovery
     sessions = discover_sessions(workspace_root)

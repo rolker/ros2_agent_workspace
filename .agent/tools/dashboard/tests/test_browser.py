@@ -35,6 +35,25 @@ if _dashboard_dir not in sys.path:
 
 from server import DashboardHandler, _setup_routes  # noqa: E402
 
+# Synthetic session returned by the patched get_sessions() so tab tests
+# are independent of the host environment (no live worktrees or tmux needed).
+_FAKE_SESSIONS = [
+    {
+        "id": "issue-workspace-999",
+        "issue": 999,
+        "skill": None,
+        "type": "workspace",
+        "path": None,
+        "branch": "feature/issue-999",
+        "worktree_status": "clean",
+        "files_changed": 0,
+        "repo": None,
+        "layer": None,
+        "pane_id": None,
+        "agent_status": "inactive",
+    }
+]
+
 
 def _find_workspace_root():
     candidate = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +92,13 @@ class TestDashboardBrowser(unittest.TestCase):
         _TestHandler.static_dir = static_dir
         _TestHandler._routes = _setup_routes()
 
+        # Patch worktree discovery so tab tests work on any machine without
+        # requiring live worktrees or tmux (CI-safe).
+        import services.worktree as _wt
+
+        cls._orig_get_sessions = _wt.get_sessions
+        _wt.get_sessions = lambda root: list(_FAKE_SESSIONS)
+
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), _TestHandler)
         cls.port = cls.server.server_address[1]
         cls._thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -90,6 +116,12 @@ class TestDashboardBrowser(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # Restore the real get_sessions
+        if hasattr(cls, "_orig_get_sessions"):
+            import services.worktree as _wt
+
+            _wt.get_sessions = cls._orig_get_sessions
+
         if cls.browser:
             cls.browser.close()
         if cls._pw:

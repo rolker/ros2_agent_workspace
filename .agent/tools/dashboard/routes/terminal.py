@@ -60,4 +60,7 @@ def handle_send(server, session_id):
         return
 
     ok = tmux.send_keys(session["pane_id"], text)
-    server.send_json({"ok": ok})
+    if not ok:
+        server.send_error_json(500, "Failed to send keys to tmux pane")
+        return
+    server.send_json({"ok": True})

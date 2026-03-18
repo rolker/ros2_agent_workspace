@@ -109,7 +109,8 @@ else
 endif
 
 dashboard-ui:
-	@python3 ./.agent/tools/dashboard/server.py
+	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \
+	$$PYTHON ./.agent/tools/dashboard/server.py
 
 test-dashboard:
 	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \

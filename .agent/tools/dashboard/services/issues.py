@@ -2,25 +2,29 @@
 
 import json
 import subprocess
+import threading
 import time
 
 
 # Simple TTL cache: {key: (timestamp, value)}
 _cache = {}
+_cache_lock = threading.Lock()
 _CACHE_TTL = 60  # seconds
 
 
 def _cached(key, ttl=_CACHE_TTL):
     """Return cached value if fresh, else None."""
-    if key in _cache:
-        ts, val = _cache[key]
-        if time.time() - ts < ttl:
-            return val
+    with _cache_lock:
+        if key in _cache:
+            ts, val = _cache[key]
+            if time.time() - ts < ttl:
+                return val
     return None
 
 
 def _set_cache(key, value):
-    _cache[key] = (time.time(), value)
+    with _cache_lock:
+        _cache[key] = (time.time(), value)
 
 
 def get_issue(issue_number, repo_dir=None):
