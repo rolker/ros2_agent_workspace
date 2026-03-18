@@ -62,24 +62,26 @@ def _try_gitbug(issue_number, repo_dir):
         if select.returncode != 0:
             return None
 
-        # Show the selected bug
-        show = subprocess.run(
-            ["git", "bug", "show"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            cwd=repo_dir,
-        )
+        show = None
+        try:
+            # Show the selected bug
+            show = subprocess.run(
+                ["git", "bug", "show"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=repo_dir,
+            )
+        finally:
+            # Always deselect to avoid leaving side effects, even on exception
+            subprocess.run(
+                ["git", "bug", "deselect"],
+                capture_output=True,
+                timeout=5,
+                cwd=repo_dir,
+            )
 
-        # Always deselect to avoid leaving side effects
-        subprocess.run(
-            ["git", "bug", "deselect"],
-            capture_output=True,
-            timeout=5,
-            cwd=repo_dir,
-        )
-
-        if show.returncode == 0 and show.stdout.strip():
+        if show is not None and show.returncode == 0 and show.stdout.strip():
             lines = show.stdout.strip().split("\n")
             # First line format: "<id-prefix> <title>" — strip the leading ID token
             first_line = lines[0] if lines else ""

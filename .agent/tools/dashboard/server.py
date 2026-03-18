@@ -125,13 +125,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """Suppress default access logging (too noisy with polling)."""
         pass
 
+
+class DashboardServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer with BrokenPipeError suppression."""
+
     def handle_error(self, request, client_address):
         """Suppress BrokenPipeError — common when browser closes connection early."""
-        import traceback
-
         exc = sys.exc_info()[1]
         if isinstance(exc, BrokenPipeError):
             return
+        import traceback
+
         traceback.print_exc()
 
 
@@ -211,8 +215,13 @@ def main():
     start_poller(workspace_root)
 
     # Start server
-    server = ThreadingHTTPServer((args.bind, args.port), DashboardHandler)
+    server = DashboardServer((args.bind, args.port), DashboardHandler)
     print(f"Agent Dashboard running at http://{args.bind}:{args.port}")
+    if args.bind == "0.0.0.0":
+        print(
+            "WARNING: Dashboard bound to 0.0.0.0 — the terminal write API is reachable "
+            "from the LAN with no authentication."
+        )
     print(f"Workspace: {workspace_root}")
     print("Press Ctrl+C to stop.")
 

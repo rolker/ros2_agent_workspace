@@ -79,7 +79,14 @@ class TestDashboardBrowser(unittest.TestCase):
         cls._thread.start()
 
         cls._pw = sync_playwright().start()
-        cls.browser = cls._pw.chromium.launch(headless=True)
+        try:
+            cls.browser = cls._pw.chromium.launch(headless=True)
+        except Exception as exc:
+            cls._pw.stop()
+            cls._pw = None
+            raise unittest.SkipTest(
+                f"Chromium binaries not available — run: playwright install chromium ({exc})"
+            )
 
     @classmethod
     def tearDownClass(cls):
