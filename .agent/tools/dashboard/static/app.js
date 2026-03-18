@@ -69,7 +69,12 @@ function renderTabs() {
         const tab = document.createElement('div');
         tab.className = 'tab' + (s.id === activeTab ? ' active' : '');
         tab.dataset.session = s.id;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('tabindex', '0');
         tab.onclick = () => switchTab(s.id);
+        tab.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(s.id); }
+        });
 
         const dot = document.createElement('span');
         dot.className = 'status-dot ' + s.agent_status;

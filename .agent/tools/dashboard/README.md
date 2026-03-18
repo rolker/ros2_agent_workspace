@@ -26,5 +26,14 @@ The dashboard is a zero-dependency Python stdlib web server that:
 2. Serves a three-panel UI: terminal, plan, and context
 3. Pushes real-time status updates via Server-Sent Events (SSE)
 
+There are two independent polling mechanisms:
+
+- **Session poller** (backend, 10s interval): SSE endpoint runs `discover_sessions()`
+  every 10 seconds to detect added/removed/status-changed sessions. Intentionally
+  conservative — session changes are infrequent and `worktree_list.sh` is expensive.
+- **Terminal poller** (frontend, 1.5s interval): After opening a terminal panel the
+  browser polls `GET /api/terminal/:id` every 1.5 seconds to refresh the captured
+  tmux output. This is independent of the SSE session poller.
+
 See [#398](https://github.com/rolker/ros2_agent_workspace/issues/398) for the
 full design document.

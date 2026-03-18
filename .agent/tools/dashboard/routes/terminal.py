@@ -20,12 +20,10 @@ def handle_get(server, session_id):
         return
 
     output = tmux.capture_pane(session["pane_id"])
-    server.send_json(
-        {
-            "output": output,
-            "status": session["agent_status"],
-        }
-    )
+    # Re-detect status live so the badge matches the captured output rather
+    # than the potentially 15s-stale cached value.
+    status = tmux.detect_status(session["pane_id"])
+    server.send_json({"output": output, "status": status})
 
 
 def handle_send(server, session_id):
