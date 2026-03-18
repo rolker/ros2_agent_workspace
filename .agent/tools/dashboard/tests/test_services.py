@@ -6,7 +6,6 @@ calls, or network access. Fast and safe to run in any environment.
 
 Run with:
     python -m unittest discover .agent/tools/dashboard/tests
-    python -m pytest .agent/tools/dashboard/tests/
 """
 import os
 import re

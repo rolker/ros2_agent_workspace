@@ -7,7 +7,6 @@ started once per test class and shut down in tearDownClass.
 
 Run with:
     python -m unittest discover .agent/tools/dashboard/tests
-    python -m pytest .agent/tools/dashboard/tests/
 """
 import json
 import os

@@ -35,12 +35,19 @@ def handle_send(server, session_id):
     # but a simple-request form POST (enctype=text/plain) can still reach this endpoint.
     # Note: non-browser clients (curl, scripts) do not send Origin and are not blocked
     # here; when bound to 127.0.0.1 (the default) they are assumed to be the local user.
+    # When bound to 0.0.0.0, the UI may be accessed via a LAN IP; same-origin requests
+    # carry Origin: http://<lan-ip>:<port> which we allow by matching against Host.
     origin = server.headers.get("Origin", "")
-    if origin and not (
-        origin.startswith("http://127.0.0.1") or origin.startswith("http://localhost")
-    ):
-        server.send_error_json(403, "Forbidden: cross-origin requests not allowed")
-        return
+    if origin:
+        host = server.headers.get("Host", "")
+        allowed = (
+            origin.startswith("http://127.0.0.1")
+            or origin.startswith("http://localhost")
+            or (host and origin == f"http://{host}")
+        )
+        if not allowed:
+            server.send_error_json(403, "Forbidden: cross-origin requests not allowed")
+            return
 
     body = server.read_body()
     try:
