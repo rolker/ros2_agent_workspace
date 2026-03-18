@@ -32,6 +32,16 @@ def handle_send(server, session_id):
     """Send text to the agent's tmux pane."""
     from services import worktree, tmux
 
+    # CSRF guard: reject cross-origin POST requests.
+    # Non-simple requests (application/json) are already blocked by CORS preflight,
+    # but a simple-request form POST (enctype=text/plain) can still reach this endpoint.
+    origin = server.headers.get("Origin", "")
+    if origin and not (
+        origin.startswith("http://127.0.0.1") or origin.startswith("http://localhost")
+    ):
+        server.send_error_json(403, "Forbidden: cross-origin requests not allowed")
+        return
+
     body = server.read_body()
     try:
         data = json.loads(body)

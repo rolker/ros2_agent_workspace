@@ -293,7 +293,10 @@ function renderContext(ctx) {
             ).join('');
         }
         if (ctx.issue.url) {
-            html += `<div style="margin-top:4px"><a href="${escapeHtml(ctx.issue.url)}" `
+            // escapeHtml() does not escape " — replace additionally to prevent
+            // attribute breakout (same pattern as inlineFormat()).
+            const safeUrl = escapeHtml(ctx.issue.url).replace(/"/g, '&quot;');
+            html += `<div style="margin-top:4px"><a href="${safeUrl}" `
                 + `target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-size:11px">View on GitHub</a></div>`;
         }
         html += '</div>';
