@@ -20,6 +20,7 @@ async function init() {
 async function refreshSessions() {
     try {
         const resp = await fetch('/api/sessions');
+        if (!resp.ok) throw new Error(resp.status);
         sessions = await resp.json();
         setConnected(true);
     } catch (e) {

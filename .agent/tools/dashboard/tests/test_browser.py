@@ -94,9 +94,12 @@ class TestDashboardBrowser(unittest.TestCase):
 
         # Patch worktree discovery so tab tests work on any machine without
         # requiring live worktrees or tmux (CI-safe).
+        # addClassCleanup runs even when setUpClass raises (e.g. SkipTest from
+        # missing Chromium), guaranteeing the patch is always reverted.
         import services.worktree as _wt
 
-        cls._orig_get_sessions = _wt.get_sessions
+        orig = _wt.get_sessions
+        cls.addClassCleanup(setattr, _wt, "get_sessions", orig)
         _wt.get_sessions = lambda root: list(_FAKE_SESSIONS)
 
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), _TestHandler)
@@ -116,12 +119,6 @@ class TestDashboardBrowser(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Restore the real get_sessions
-        if hasattr(cls, "_orig_get_sessions"):
-            import services.worktree as _wt
-
-            _wt.get_sessions = cls._orig_get_sessions
-
         if cls.browser:
             cls.browser.close()
         if cls._pw:

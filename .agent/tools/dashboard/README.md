@@ -12,7 +12,7 @@ make dashboard-ui
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+
 - tmux (for terminal capture)
 - `worktree_list.sh --json` (#399)
 - `gh` CLI (optional, for issue data)
