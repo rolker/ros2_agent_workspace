@@ -38,8 +38,8 @@ def handle_send(server, session_id):
     # When bound to 0.0.0.0, the UI may be accessed via a LAN IP; same-origin requests
     # carry Origin: http://<lan-ip>:<port> which we allow by matching against Host.
     origin = server.headers.get("Origin", "")
+    host = server.headers.get("Host", "")
     if origin:
-        host = server.headers.get("Host", "")
         allowed = (
             origin.startswith("http://127.0.0.1")
             or origin.startswith("http://localhost")
@@ -47,6 +47,12 @@ def handle_send(server, session_id):
         )
         if not allowed:
             server.send_error_json(403, "Forbidden: cross-origin requests not allowed")
+            return
+    else:
+        # No Origin header — non-browser clients (curl, scripts) or crafted requests.
+        # Allow when bound to loopback; reject when Host indicates a LAN interface.
+        if host and not host.startswith("127.0.0.1") and not host.startswith("localhost"):
+            server.send_error_json(403, "Forbidden: missing Origin on non-loopback interface")
             return
 
     body = server.read_body()

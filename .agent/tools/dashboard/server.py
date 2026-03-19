@@ -52,7 +52,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 continue
             match = pattern.match(path)
             if match:
-                handler(self, **match.groupdict())
+                # URL-decode captured groups so percent-encoded session IDs
+                # round-trip correctly from the frontend's encodeURIComponent().
+                kwargs = {k: urllib.parse.unquote(v) for k, v in match.groupdict().items()}
+                handler(self, **kwargs)
                 return
 
         # Static files

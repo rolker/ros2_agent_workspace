@@ -30,7 +30,7 @@ def list_worktrees(workspace_root):
             timeout=30,
             cwd=workspace_root,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
         return {"worktrees": [], "summary": {"total": 0, "layer": 0, "workspace": 0, "dirty": 0}}
 
     if result.returncode != 0:
