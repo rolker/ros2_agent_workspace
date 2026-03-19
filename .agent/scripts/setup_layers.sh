@@ -37,6 +37,13 @@ LAYER_NAME=$1
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
 MANIFEST_SYMLINK="configs/manifest"
 
+# Check if a layer is optional (allowed to fail during setup)
+is_optional_layer() {
+    local layer="$1"
+    local optional_file="$MANIFEST_SYMLINK/optional_layers.txt"
+    [ -f "$optional_file" ] && grep -qx "$layer" "$optional_file"
+}
+
 # Function to bootstrap the manifest repository if needed
 bootstrap_manifest_repo() {
     # If the manifest symlink already exists and resolves, we're bootstrapped
@@ -185,6 +192,11 @@ if [ -z "$LAYER_NAME" ]; then
             echo "Setting up layer: $layer"
             echo "========================================="
             if ! "$0" "$layer"; then
+                if is_optional_layer "$layer"; then
+                    echo ""
+                    echo "Skipping optional layer: $layer (clone failed — private repo?)"
+                    continue
+                fi
                 echo ""
                 echo "Error: Failed to set up layer: $layer"
                 echo "Aborting auto-setup."
@@ -245,7 +257,15 @@ mkdir -p "$LAYER_DIR/src"
 
 if command -v vcs &> /dev/null; then
     echo "Importing repositories into $LAYER_DIR/src..."
-    vcs import --skip-existing "$LAYER_DIR/src" < "$CONFIG_FILE"
+    if ! vcs import --skip-existing "$LAYER_DIR/src" < "$CONFIG_FILE"; then
+        if is_optional_layer "$LAYER_NAME"; then
+            echo ""
+            echo "Warning: Failed to import some repos for optional layer: $LAYER_NAME"
+            echo "This is expected if you don't have access to a private repository."
+            exit 0
+        fi
+        exit 1
+    fi
 else
     echo "Warning: 'vcs' command not found. Skipping repository import."
     echo "To install all necessary dependencies, run:"

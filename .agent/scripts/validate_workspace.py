@@ -19,6 +19,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
+import yaml
+
 # Add lib directory to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
@@ -141,6 +143,38 @@ def get_git_branch(repo_path):
         return None
 
 
+def get_optional_layers(workspace_root):
+    """Read optional layer names from optional_layers.txt."""
+    optional_file = Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"
+    if not optional_file.exists():
+        return set()
+    layers = set()
+    for line in optional_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            layers.add(line)
+    return layers
+
+
+def get_optional_repo_names(workspace_root):
+    """Get repo names that belong to optional layers."""
+    optional_layers = get_optional_layers(workspace_root)
+    if not optional_layers:
+        return set()
+    optional_repos = set()
+    repos_dir = Path(workspace_root) / "configs" / "manifest" / "repos"
+    for layer in optional_layers:
+        repos_file = repos_dir / f"{layer}.repos"
+        if repos_file.exists():
+            try:
+                data = yaml.safe_load(repos_file.read_text())
+                if data and "repositories" in data:
+                    optional_repos.update(data["repositories"].keys())
+            except Exception:
+                pass
+    return optional_repos
+
+
 def validate_workspace(verbose=False):
     """Validate workspace matches configuration."""
     print("Validating workspace against .repos configuration...")
@@ -153,6 +187,9 @@ def validate_workspace(verbose=False):
     # Convert list to dict for easy lookup
     config_repos = {item["name"]: item for item in configured_list}
 
+    # Identify repos from optional layers (allowed to be missing)
+    optional_repos = get_optional_repo_names(root)
+
     # Get actual repos
     actual_repos = get_actual_repos(root)
 
@@ -161,11 +198,15 @@ def validate_workspace(verbose=False):
         print(f"Found {len(actual_repos)} actual repositories in workspace")
         print()
 
-    # Find missing repos
+    # Find missing repos (exclude optional layer repos)
     missing_repos = []
+    missing_optional = []
     for name, config in config_repos.items():
         if name not in actual_repos:
-            missing_repos.append({"name": name, "config": config})
+            if name in optional_repos:
+                missing_optional.append({"name": name, "config": config})
+            else:
+                missing_repos.append({"name": name, "config": config})
 
     # Find extra repos (orphans)
     extra_repos = []
@@ -253,6 +294,12 @@ def validate_workspace(verbose=False):
     if missing_repos:
         print(f"❌ Missing repos ({len(missing_repos)}):")
         for item in sorted(missing_repos, key=lambda x: x["name"]):
+            print(f"   - {item['name']} (from {item['config'].get('source_file')})")
+        print()
+
+    if missing_optional:
+        print(f"ℹ️  Optional repos not present ({len(missing_optional)}):")
+        for item in sorted(missing_optional, key=lambda x: x["name"]):
             print(f"   - {item['name']} (from {item['config'].get('source_file')})")
         print()
 
