@@ -41,7 +41,7 @@ MANIFEST_SYMLINK="configs/manifest"
 is_optional_layer() {
     local layer="$1"
     local optional_file="$MANIFEST_SYMLINK/optional_layers.txt"
-    [ -f "$optional_file" ] && grep -qx "$layer" "$optional_file"
+    [ -f "$optional_file" ] && grep -Fxq -- "$layer" "$optional_file"
 }
 
 # Function to bootstrap the manifest repository if needed

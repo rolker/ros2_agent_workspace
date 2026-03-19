@@ -170,8 +170,11 @@ def get_optional_repo_names(workspace_root):
                 data = yaml.safe_load(repos_file.read_text())
                 if data and "repositories" in data:
                     optional_repos.update(data["repositories"].keys())
-            except Exception:
-                pass
+            except yaml.YAMLError as e:
+                print(
+                    f"Warning: Failed to parse {repos_file}: {e}",
+                    file=sys.stderr,
+                )
     return optional_repos
 
 
