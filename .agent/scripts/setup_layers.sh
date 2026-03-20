@@ -38,7 +38,7 @@ BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
 MANIFEST_SYMLINK="configs/manifest"
 
 # Check if a layer is optional (allowed to fail during setup)
-# Parsing matches validate_workspace.py: strip whitespace, ignore # comments
+# Parsing: strip inline '#' comments, trim whitespace, ignore empty lines
 is_optional_layer() {
     local layer="$1"
     local optional_file="$MANIFEST_SYMLINK/optional_layers.txt"
@@ -271,8 +271,9 @@ if command -v vcs &> /dev/null; then
             echo ""
             echo "Warning: Failed to import some repos for optional layer: $LAYER_NAME"
             echo "This is expected if you don't have access to a private repository."
-            # Clean up empty/partial layer directory so build.sh skips it
-            rmdir "$LAYER_DIR/src" "$LAYER_DIR" 2>/dev/null || true
+            # Clean up partial layer directory so build.sh skips it
+            rm -rf "$LAYER_DIR/src" 2>/dev/null || true
+            rmdir "$LAYER_DIR" 2>/dev/null || true
             exit 0
         fi
         exit 1

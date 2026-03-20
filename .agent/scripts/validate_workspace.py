@@ -149,8 +149,8 @@ def get_optional_layers(workspace_root):
         return set()
     layers = set()
     for line in optional_file.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
+        line = line.split("#", 1)[0].strip()
+        if line:
             layers.add(line)
     return layers
 
