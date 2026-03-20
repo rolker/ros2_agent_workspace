@@ -19,7 +19,6 @@ import argparse
 import subprocess
 from pathlib import Path
 
-import yaml
 
 # Add lib directory to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -156,26 +155,17 @@ def get_optional_layers(workspace_root):
     return layers
 
 
-def get_optional_repo_names(workspace_root):
-    """Get repo names that belong to optional layers."""
-    optional_layers = get_optional_layers(workspace_root)
+def get_optional_repo_names(configured_list, optional_layers):
+    """Get repo names that belong to optional layers.
+
+    Derives optional repos from the already-parsed configured_list by matching
+    each item's source_file against optional layer names, avoiding re-reading
+    .repos files independently of get_overlay_repos().
+    """
     if not optional_layers:
         return set()
-    optional_repos = set()
-    repos_dir = Path(workspace_root) / "configs" / "manifest" / "repos"
-    for layer in optional_layers:
-        repos_file = repos_dir / f"{layer}.repos"
-        if repos_file.exists():
-            try:
-                data = yaml.safe_load(repos_file.read_text())
-                if data and "repositories" in data:
-                    optional_repos.update(data["repositories"].keys())
-            except yaml.YAMLError as e:
-                print(
-                    f"Warning: Failed to parse {repos_file}: {e}",
-                    file=sys.stderr,
-                )
-    return optional_repos
+    optional_files = {f"{layer}.repos" for layer in optional_layers}
+    return {item["name"] for item in configured_list if item.get("source_file") in optional_files}
 
 
 def validate_workspace(verbose=False):
@@ -191,7 +181,8 @@ def validate_workspace(verbose=False):
     config_repos = {item["name"]: item for item in configured_list}
 
     # Identify repos from optional layers (allowed to be missing)
-    optional_repos = get_optional_repo_names(root)
+    optional_layers = get_optional_layers(root)
+    optional_repos = get_optional_repo_names(configured_list, optional_layers)
 
     # Get actual repos
     actual_repos = get_actual_repos(root)
