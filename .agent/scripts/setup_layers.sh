@@ -262,6 +262,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 echo "Setting up layer: $LAYER_NAME"
+LAYER_DIR_EXISTED=false
+[ -d "$LAYER_DIR/src" ] && LAYER_DIR_EXISTED=true
 mkdir -p "$LAYER_DIR/src"
 
 if command -v vcs &> /dev/null; then
@@ -271,9 +273,12 @@ if command -v vcs &> /dev/null; then
             echo ""
             echo "Warning: Failed to import some repos for optional layer: $LAYER_NAME"
             echo "This is expected if you don't have access to a private repository."
-            # Clean up partial layer directory so build.sh skips it
-            rm -rf "$LAYER_DIR/src" 2>/dev/null || true
-            rmdir "$LAYER_DIR" 2>/dev/null || true
+            # Only clean up if we created the directory this run — preserve
+            # a previously-cloned layer that a developer may already be using.
+            if [ "$LAYER_DIR_EXISTED" = false ]; then
+                rm -rf "$LAYER_DIR/src" 2>/dev/null || true
+                rmdir "$LAYER_DIR" 2>/dev/null || true
+            fi
             exit 0
         fi
         exit 1
