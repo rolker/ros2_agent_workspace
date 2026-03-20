@@ -37,6 +37,22 @@ LAYER_NAME=$1
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
 MANIFEST_SYMLINK="configs/manifest"
 
+# Check if a layer is optional (allowed to fail during setup)
+# Parsing: strip inline '#' comments, trim whitespace, ignore empty lines
+is_optional_layer() {
+    local layer="$1"
+    local optional_file="$MANIFEST_SYMLINK/optional_layers.txt"
+    [ -f "$optional_file" ] || return 1
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [ -n "$line" ] || continue
+        [ "$line" = "$layer" ] && return 0
+    done < "$optional_file"
+    return 1
+}
+
 # Function to bootstrap the manifest repository if needed
 bootstrap_manifest_repo() {
     # If the manifest symlink already exists and resolves, we're bootstrapped
@@ -185,6 +201,11 @@ if [ -z "$LAYER_NAME" ]; then
             echo "Setting up layer: $layer"
             echo "========================================="
             if ! "$0" "$layer"; then
+                if is_optional_layer "$layer"; then
+                    echo ""
+                    echo "Skipping optional layer: $layer (setup failed — private repo?)"
+                    continue
+                fi
                 echo ""
                 echo "Error: Failed to set up layer: $layer"
                 echo "Aborting auto-setup."
@@ -241,11 +262,27 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 echo "Setting up layer: $LAYER_NAME"
+LAYER_DIR_EXISTED=false
+[ -d "$LAYER_DIR/src" ] && LAYER_DIR_EXISTED=true
 mkdir -p "$LAYER_DIR/src"
 
 if command -v vcs &> /dev/null; then
     echo "Importing repositories into $LAYER_DIR/src..."
-    vcs import --skip-existing "$LAYER_DIR/src" < "$CONFIG_FILE"
+    if ! vcs import --skip-existing "$LAYER_DIR/src" < "$CONFIG_FILE"; then
+        if is_optional_layer "$LAYER_NAME"; then
+            echo ""
+            echo "Warning: Failed to import some repos for optional layer: $LAYER_NAME"
+            echo "This is expected if you don't have access to a private repository."
+            # Only clean up if we created the directory this run — preserve
+            # a previously-cloned layer that a developer may already be using.
+            if [ "$LAYER_DIR_EXISTED" = false ]; then
+                rm -rf "$LAYER_DIR/src" 2>/dev/null || true
+                rmdir "$LAYER_DIR" 2>/dev/null || true
+            fi
+            exit 0
+        fi
+        exit 1
+    fi
 else
     echo "Warning: 'vcs' command not found. Skipping repository import."
     echo "To install all necessary dependencies, run:"
