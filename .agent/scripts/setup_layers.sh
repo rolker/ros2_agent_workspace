@@ -194,7 +194,7 @@ if [ -z "$LAYER_NAME" ]; then
             if ! "$0" "$layer"; then
                 if is_optional_layer "$layer"; then
                     echo ""
-                    echo "Skipping optional layer: $layer (clone failed — private repo?)"
+                    echo "Skipping optional layer: $layer (setup failed — private repo?)"
                     continue
                 fi
                 echo ""
