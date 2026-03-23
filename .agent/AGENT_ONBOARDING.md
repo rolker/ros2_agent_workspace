@@ -55,7 +55,7 @@ Available workflow skills: `review-issue`, `plan-task`, `review-plan`,
 `review-code`, `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
 `triage-reviews`, `skill-importer`, `document-package`, `issue-triage`,
-`test-engineering`.
+`test-engineering`, `inspiration-tracker`.
 
 ## References
 

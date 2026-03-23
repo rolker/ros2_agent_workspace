@@ -32,6 +32,7 @@ Each step is optional — simple issues can skip straight to `plan-task` or impl
 | `audit-project` | Before or after repo work | Check a project repo against workspace and project conventions |
 | `onboard-project` | When onboarding a repo | Interactive audit + fix: add CI, pre-commit, agent guide, GitHub settings |
 | `skill-importer` | When importing external skills | Evaluate, adapt, and import skills from external sources |
+| `inspiration-tracker` | Periodically | Track external projects for portable enhancements and interesting patterns |
 | `document-package` | After audit-project flags doc gaps | Generate or update ROS 2 package README and API docs from source |
 | `issue-triage` | Periodically | Cross-repo issue scanning, categorization, and stale issue detection |
 | `test-engineering` | After audit-project flags test gaps | Test scaffolding, debugging, and coverage analysis for ROS 2 packages |
