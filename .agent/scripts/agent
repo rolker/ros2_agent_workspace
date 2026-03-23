@@ -25,12 +25,15 @@ agent - Enforced Task Isolation for AI Agents
 
 USAGE:
     agent start-task <issue> [options]
+    agent launch <issue> [options]
     agent --help
 
 COMMANDS:
-    start-task <issue>    Start work on an issue in isolated worktree
-                          Automatically creates worktree, enters it, and
-                          sets up the environment
+    start-task <issue>    Create worktree for an issue (no tmux session)
+    launch <issue>        Launch agent in a named tmux session
+                          Creates worktree if needed, then starts a tmux
+                          session named issue-<N> with the environment
+                          set up and claude code running.
 
 OPTIONS:
     --layer <name>        Specify layer for ROS package work
@@ -38,19 +41,25 @@ OPTIONS:
                           Omit for infrastructure/workspace work
     --packages <pkg,...>  Package(s) to modify (required with --layer)
                           Comma-separated list for multiple packages
+    --prompt <text>       Initial prompt to send to claude (launch only)
+    --no-agent            Set up tmux session but don't launch claude (launch only)
     --help, -h            Show this help message
 
 EXAMPLES:
-    # Infrastructure work (scripts, docs, configs)
+    # Launch agent in tmux for infrastructure work
+    agent launch 125
+
+    # Launch agent in tmux for ROS package work
+    agent launch 42 --layer core --packages unh_marine_autonomy
+
+    # Launch with an initial prompt
+    agent launch 125 --prompt "Implement the plan"
+
+    # Just set up the tmux session (no claude)
+    agent launch 125 --no-agent
+
+    # Create worktree only (no tmux)
     agent start-task 125
-
-    # ROS package development
-    agent start-task 42 --layer core --packages unh_marine_autonomy
-
-ENFORCEMENT:
-    This wrapper is the ONLY approved way for agents to start work.
-    Direct git checkout or working in main source tree is prohibited
-    to prevent workspace pollution and enable multi-agent coordination.
 
 SEE ALSO:
     CLAUDE.md                    - Claude Code operational rules
@@ -137,11 +146,179 @@ start_task() {
     echo ""
 }
 
+launch_agent() {
+    local issue_num="$1"
+    shift
+
+    local layer=""
+    local packages=""
+    local prompt=""
+    local no_agent=false
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --layer)
+                layer="$2"
+                shift 2
+                ;;
+            --packages)
+                packages="$2"
+                shift 2
+                ;;
+            --prompt)
+                prompt="$2"
+                shift 2
+                ;;
+            --no-agent)
+                no_agent=true
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                echo "Run 'agent --help' for usage"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Validate issue number
+    if [ -z "$issue_num" ]; then
+        echo "Error: Issue number required"
+        echo "Usage: agent launch <issue> [--layer <name>] [--packages <pkg>] [--prompt <text>] [--no-agent]"
+        exit 1
+    fi
+
+    if ! [[ "$issue_num" =~ ^[0-9]+$ ]]; then
+        echo "Error: Issue number must be numeric, got: $issue_num"
+        exit 1
+    fi
+
+    if ! command -v tmux &>/dev/null; then
+        echo "Error: tmux is required for 'agent launch' but was not found."
+        exit 1
+    fi
+
+    local session_name="issue-${issue_num}"
+
+    # Check if tmux session already exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "tmux session '$session_name' already exists."
+        echo "  Attach: tmux attach -t $session_name"
+        exit 0
+    fi
+
+    # Check if worktree exists; capture the path to extract the repo slug later.
+    # Match both slug format (issue-<slug>-<N>) and legacy format (issue-<N>).
+    local wt_path=""
+    if [ -n "$layer" ]; then
+        # Layer worktrees live under layers/worktrees/
+        for dir in "$ROOT_DIR"/layers/worktrees/issue-*-"${issue_num}" \
+                   "$ROOT_DIR"/layers/worktrees/issue-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_path="$dir"
+                break
+            fi
+        done
+    else
+        # Workspace worktrees
+        for dir in "$ROOT_DIR"/.workspace-worktrees/issue-*-"${issue_num}" \
+                   "$ROOT_DIR"/.workspace-worktrees/issue-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_path="$dir"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "$wt_path" ]; then
+        # Validate --packages is provided when --layer is used
+        if [ -n "$layer" ] && [ -z "$packages" ]; then
+            echo "Error: --packages is required with --layer"
+            echo "Usage: agent launch <issue> --layer <name> --packages <pkg,...>"
+            exit 1
+        fi
+
+        echo "Creating worktree for issue #${issue_num}..."
+        local create_args=(--issue "$issue_num")
+        if [ -n "$layer" ]; then
+            create_args+=(--type layer --layer "$layer" --packages "$packages")
+        else
+            create_args+=(--type workspace)
+        fi
+        "$SCRIPT_DIR/worktree_create.sh" "${create_args[@]}"
+
+        # Re-probe for the newly created path
+        local probe_base
+        if [ -n "$layer" ]; then
+            probe_base="$ROOT_DIR/layers/worktrees"
+        else
+            probe_base="$ROOT_DIR/.workspace-worktrees"
+        fi
+        for dir in "$probe_base"/issue-*-"${issue_num}" "$probe_base"/issue-"${issue_num}"; do
+            if [ -d "$dir" ]; then
+                wt_path="$dir"
+                break
+            fi
+        done
+    fi
+
+    # Extract the repo slug from the worktree directory name so worktree_enter.sh
+    # can resolve unambiguously when multiple worktrees share the same issue number.
+    local repo_slug_arg=""
+    if [ -n "$wt_path" ]; then
+        local wt_basename
+        wt_basename=$(basename "$wt_path")
+        # "issue-<slug>-<N>" -> extract slug; "issue-<N>" (legacy) -> no slug
+        if [[ "$wt_basename" != "issue-${issue_num}" ]]; then
+            local stripped="${wt_basename#issue-}"   # strip leading "issue-"
+            local slug="${stripped%-${issue_num}}"   # strip trailing "-<N>"
+            repo_slug_arg="--repo-slug $slug"
+        fi
+    fi
+
+    # Build the shell init commands for the tmux session
+    local init_cmds="source '$SCRIPT_DIR/worktree_enter.sh' --issue $issue_num $repo_slug_arg"
+
+    if [ "$no_agent" = false ]; then
+        init_cmds="$init_cmds && claude"
+    fi
+
+    # Create the tmux session
+    tmux new-session -d -s "$session_name" bash -i
+    # Send the init commands (using send-keys so the shell is interactive)
+    tmux send-keys -t "$session_name" "$init_cmds" Enter
+
+    # If there's a prompt, wait a moment for claude to start, then send it
+    if [ -n "$prompt" ] && [ "$no_agent" = false ]; then
+        echo "Waiting for claude to initialize..."
+        sleep 3
+        tmux send-keys -t "$session_name" -l "$prompt"
+        tmux send-keys -t "$session_name" Enter
+    fi
+
+    echo ""
+    echo "========================================="
+    echo "Agent session launched"
+    echo "========================================="
+    echo "  Issue:   #$issue_num"
+    echo "  Session: $session_name"
+    echo "  Attach:  tmux attach -t $session_name"
+    echo ""
+    if [ "$no_agent" = false ]; then
+        echo "  Dashboard: make dashboard-ui  (http://localhost:3000)"
+    fi
+}
+
 # Main command routing
 case "${1:-}" in
     start-task)
         shift
         start_task "$@"
+        ;;
+    launch)
+        shift
+        launch_agent "$@"
         ;;
     --help|-h|help)
         show_usage

@@ -94,15 +94,24 @@ build_json_entry() {
 
 cd "$ROOT_DIR"
 
+# Get worktree list from git (finds main workspace + workspace worktrees)
+WORKTREES=$(git worktree list --porcelain)
+
+# Resolve the main workspace root from the first git worktree entry.
+# This is needed because layer worktrees live under the main tree's
+# layers/worktrees/, not under workspace worktrees.
+MAIN_ROOT="$ROOT_DIR"
+_first_wt_line="${WORKTREES%%$'\n'*}"
+if [[ "$_first_wt_line" =~ ^worktree\ (.+) ]]; then
+    MAIN_ROOT="${BASH_REMATCH[1]}"
+fi
+
 if [ "$JSON_OUTPUT" = false ]; then
     echo "========================================"
     echo "Git Worktrees"
     echo "========================================"
     echo ""
 fi
-
-# Get worktree list from git (finds main workspace + workspace worktrees)
-WORKTREES=$(git worktree list --porcelain)
 
 # Count worktrees (excluding main)
 LAYER_COUNT=0
@@ -235,7 +244,7 @@ fi
 
 # Discover layer worktrees by scanning the directory
 # Layer worktrees are plain directories (not git worktrees) after the fix for #193
-LAYER_WT_DIR="$ROOT_DIR/layers/worktrees"
+LAYER_WT_DIR="$MAIN_ROOT/layers/worktrees"
 if [ -d "$LAYER_WT_DIR" ]; then
     for layer_wt in "$LAYER_WT_DIR"/issue-* "$LAYER_WT_DIR"/skill-*; do
         [ -d "$layer_wt" ] || continue
