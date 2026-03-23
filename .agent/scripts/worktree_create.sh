@@ -315,7 +315,7 @@ PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 PARENT_ISSUE_NUM="" # Parent issue number for sub-issue worktrees
 
 # Skills allowed to create worktrees without a GitHub issue
-ALLOWED_SKILLS=("research")
+ALLOWED_SKILLS=("research" "inspiration-tracker")
 
 # Available layers (same order as setup.bash)
 AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
