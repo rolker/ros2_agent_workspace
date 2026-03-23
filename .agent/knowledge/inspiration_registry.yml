@@ -1,0 +1,7 @@
+projects:
+  agent_workspace:
+    type: fork
+    repo: rolker/agent_workspace
+    description: Fork of this workspace with independent evolution
+    domain_patterns: [ros2, colcon, layer, overlay, gazebo, launch]
+    categories: [scripts, skills, adrs, templates, knowledge, makefile, config]
