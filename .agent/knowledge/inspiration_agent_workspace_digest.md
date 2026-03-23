@@ -13,6 +13,12 @@ Repo: rolker/agent_workspace @ cebd918bacf69e1651e028c7b4182472e33ba4e1
 
 ## Pending Review
 
+## Roadmapped
+
+## Skipped
+
+## Deferred
+
 - `setup_project.sh` — generic project bootstrapping script, upstream-only (2026-03-23)
 - `document-project` skill — generic documentation skill (upstream equivalent of document-package) (2026-03-23)
 - 5 upstream inspiration digests — cross-pollination research from gstack, superpowers, microsoft-skills, gastown, ros2_agent_workspace (2026-03-23)
@@ -22,9 +28,3 @@ Repo: rolker/agent_workspace @ cebd918bacf69e1651e028c7b4182472e33ba4e1
 - `configure_git_identity.sh` 30-line diff — minor divergence (2026-03-23)
 - `skill_workflows.md` diff — may have structural improvements (2026-03-23)
 - ADR-0010 title divergence — different wording for git-bug ADR (2026-03-23)
-
-## Roadmapped
-
-## Skipped
-
-## Deferred
