@@ -31,6 +31,8 @@ Supports two project types with different comparison strategies:
 ## Registry
 
 The project registry lives at `.agent/knowledge/inspiration_registry.yml` (git-tracked).
+If the file does not exist yet, treat it as an empty registry — it will be created
+on the first `add` run via the skill worktree flow (step 11).
 
 ```yaml
 projects:
