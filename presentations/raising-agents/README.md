@@ -1,6 +1,6 @@
-# AI in Our Work — Presentation
+# Raising Agents — Presentation
 
-A discussion-format presentation for the CCOM/JHC working group on using AI tools in technical workflows.
+"Raising Agents" is a discussion-format presentation for the CCOM/JHC AI Working Group on using AI tools in technical workflows.
 
 ## Prerequisites
 
@@ -13,6 +13,12 @@ npm install -g @marp-team/marp-cli
 Or use the [Marp for VS Code](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode) extension.
 
 ## Usage
+
+All commands below assume you are in the presentation directory:
+
+```bash
+cd presentations/raising-agents
+```
 
 ### Present in browser (with live reload)
 
@@ -39,7 +45,7 @@ If using the Marp VS Code extension, add to `.vscode/settings.json`:
 ```json
 {
   "markdown.marp.themes": [
-    "./presentations/ai-in-our-work/theme-ccom.css"
+    "./presentations/raising-agents/theme-ccom.css"
   ]
 }
 ```
@@ -50,4 +56,3 @@ If using the Marp VS Code extension, add to `.vscode/settings.json`:
 |------|---------|
 | `slides.md` | Presentation content (Marp markdown) |
 | `theme-ccom.css` | Custom theme with UNH CCOM/JHC brand colors |
-| `images/` | Screenshots, diagrams, and visual assets |
