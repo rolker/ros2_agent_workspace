@@ -3,14 +3,14 @@ marp: true
 theme: ccom
 paginate: true
 header: ''
-footer: 'CCOM/JHC -- AI in Our Work'
+footer: 'CCOM/JHC -- Raising Agents'
 ---
 
 <!-- _class: title -->
 <!-- _paginate: false -->
 <!-- _footer: '' -->
 
-# AI in Our Work
+# Raising Agents
 
 ## From Autocomplete to Autonomous Agents
 
@@ -19,13 +19,21 @@ March 2026
 
 ---
 
-# Before Agents
+# Two Aha Moments
 
-- About a year of **GitHub Copilot** in VS Code -- AI-enhanced autocomplete
-- Free Gemini Pro subscription came with my phone -- tried **vibe coding** a web-based mission planner
+**Aha #1: AI Autocomplete** -- GitHub Copilot in VS Code for about a year
+
+- A genuine productivity boost -- predicts what you're about to type
+- Small step in retrospect, but it changed how coding *felt*
+
+**Aha #2: Vibe Coding** -- free Gemini Pro subscription came with my phone
+
+- Built a web-based mission planner through conversation alone
+- Got to **90% effortlessly** -- a genuine wow moment
+- But the last 10% was a wall: poor architectural choices, hard to improve
 - The agent had no idea what direction I wanted to take it
-- Made poor architectural choices that were hard to improve
-- Quick to start, but a dead end
+
+Both moments made me think: *what if I go further?*
 
 ---
 
@@ -38,33 +46,83 @@ March 2026
 
 Everything that follows is about *how* to craft that context.
 
+*(This is a genuine quote, not AI-generated!)*
+
 ---
 
 # Building the Context
 
-**January 9, 2026** -- created `ros_agent_workspace`
+**January 9, 2026** -- created `ros2_agent_workspace` ([github.com/rolker/ros2_agent_workspace](https://github.com/rolker/ros2_agent_workspace))
 
 - Wanted to test agents on **real code**, not throwaway projects
-- Started with Gemini CLI and Copilot CLI -- asked an agent how to support multiple frameworks, and it helped set up the workspace
-- Also tried Google Antigravity during those early days
+- Started with Gemini CLI, Copilot CLI, and Google Antigravity
+- Asked an agent how to support multiple frameworks -- it helped set up the workspace
 
 **First real test**: renaming project11 to unh_marine_autonomy, consolidating repos
 
 - Tedious work, not hard thinking -- agents did it in minutes
-- But the simulator didn't work afterward
-- Led to building up tests: unit, then integration, then UI for agent-testable stack
-- **Took longer than doing it manually** -- but got test coverage and documentation that wouldn't have existed otherwise
+- Simulator broke -- expected, it would have broken if I did it manually too
+- But **I test by looking at the UI** and quickly know something's not right. Agents can't see the simulator, can't tell if things "look right"
+- Real cost: **building tools that give agents the eyes I already have**
+- Slowed this task down, but makes every future task faster
+
+---
+
+# How the Workspace Works
+
+A **workspace repo** wraps multiple **project repos** with agent infrastructure:
+
+- **Rules and guardrails** -- instruction files tell agents what to do and what not to do
+- **Scripts** -- worktree management, status reports, issue creation, identity tracking
+- **Skills** -- reusable prompts for common workflows (research, code review, testing)
+- **Governance** -- ADRs and guiding principles that persist lessons learned
+
+The project itself is layered: workspace contains **layers**, layers contain **repos**, repos contain **ROS 2 packages**. This makes things like worktree isolation harder than a single-repo project, but it reflects the real complexity of the system.
+
+---
+
+# Workspace Structure
+
+```
+ros2_agent_workspace/
+├── AGENTS.md, CLAUDE.md          # Agent instruction files
+├── Makefile                       # Build, test, lint, dashboard
+├── .agent/
+│   ├── scripts/                   # Worktree, identity, build, status
+│   ├── knowledge/                 # ROS 2 patterns, review guides
+│   ├── templates/                 # Issue, test, documentation templates
+│   └── work-plans/                # Saved plans for active tasks
+├── docs/decisions/                # Architecture Decision Records
+├── configs/                       # Workspace manifest and layer config
+└── layers/main/
+    ├── underlay_ws/src/           # Dependencies (vrx, geographic_info, ...)
+    ├── core_ws/src/               # Core repos (unh_marine_autonomy, ...)
+    ├── simulation_ws/src/         # Simulation (unh_marine_simulation, ...)
+    ├── sensors_ws/src/            # Sensors (cube_bathymetry, ...)
+    ├── platforms_ws/src/          # Platforms (ben_description, ...)
+    └── ui_ws/src/                 # UI (camp, rviz plugins, ...)
+```
 
 ---
 
 # Scaling Up
 
-- **Claude Code** became framework of choice for its coding ability
-- Goal from the start: **multiple agents working simultaneously**
-- Asked an agent how to avoid conflicts -- learned about **git worktrees**
-- Problems would get solved, then creep back -- **governance** emerged (ADRs, guiding principles)
+- A few weeks in, tried **Claude Code** -- better results, more comfortable running multiple agents in parallel
+- Asked an agent how to avoid conflicts -- learned about **git worktrees** (isolated copies of the repo so agents don't step on each other's work on the main branch)
+- Agents teach me too -- they know obscure command options I'd never look up
 
-**The Great Simplification**: agents generated so much structure (workflows, rules, skills) that the workspace became bloated -- had to delete **51 files** in one pruning session
+---
+
+# The Great Simplification
+
+**The problem**: each friction point got its own issue, each fix was isolated -- and fixes would break other fixes because nothing connected them
+
+**The result**: a bloated, messy, disorganized workspace -- **51 files** of overlapping scripts, rules, and workflows
+
+**The solution**:
+- Agents scanned all scripts, extracted intents, consolidated into fewer scripts
+- Established **ADRs and guiding principles** as the source of truth
+- A **review process** that checks adherence prevents it from happening again
 
 Power tools produce sawdust too.
 
@@ -76,40 +134,50 @@ Power tools produce sawdust too.
 
 **Toddler moments** -- doing something unexpected because you didn't say not to, but any reasonable adult would know better
 
-*Had to programmatically block `git checkout` because agents kept bypassing worktrees*
+*Added a guardrail that blocks `git checkout` -- not to prevent it outright, but to nudge agents to re-read the rules and use a worktree instead. Google Antigravity didn't even try to branch -- it just edited files directly on main, then thought it was being clever when it hit the guardrail.*
 
 **Intern moments** -- passable code with flaws that experience would have caught
 
-*Security vulnerabilities (XSS, path traversal, injection) that needed multiple rounds of review*
+*Hard-coding my machine's absolute path instead of using a relative one. Lacking the big-picture awareness that comes from years of working with the codebase.*
 
 You parent the toddler behavior with guardrails.
 You mentor the intern behavior with code review.
 
 ---
 
-# 2025: Writing Code by Hand
+<!-- _class: divider -->
 
-- ~**39,000** lines of code across project repos
-- ~3,200 lines per month
-- Just me, writing code
+# So, Did It Work?
 
----
-
-# 2026: Zero Lines of Code
-
-- Lines of code written by me: **0**
-- I have not written a single line of code this year
+Measuring the impact.
 
 ---
 
-# 2026: What the Agents Wrote
+# Measuring Productivity
 
-- **~148,000 lines** in 11 weeks
-- ~**4x** the annual output -- in under 3 months
-- ~20 commits/month in 2025 --> ~354 commits/month in 2026 = **17x**
+In 2025, I wrote ~**39,000** lines of code.
+
+---
+
+# Measuring Productivity
+
+In 2025, I wrote ~**39,000** lines of code.
+
+In 2026, I wrote ~**0** lines of code.
+
+---
+
+# Measuring Productivity
+
+In 2025, I wrote ~**39,000** lines of code.
+
+In 2026, I wrote ~**0** lines of code.
+
+In 2026, agents wrote ~**148,000** lines of code in 11 weeks.
+
+- ~**4x** the annual output in under 3 months
+- ~20 commits/month (2025) --> ~354 commits/month (2026) = **17x**
 - **206** issues, **206** pull requests
-
-<!-- The wood carver picked up power tools. -->
 
 ---
 
@@ -125,16 +193,21 @@ It still takes someone who **understands wood** to get the most out of power too
 
 ---
 
-# What Agents Enabled
+# Growing Bandwidth
 
-Things that **wouldn't have happened** without agent help:
+Early on: **one agent** working on the project, watching closely, maybe a second fixing a workspace bug
 
-- **ENC to Gazebo world builder** -- converts nautical charts to simulation worlds with terrain, piers, trees, waves. Too time-consuming to tackle alone. *(demo later)*
+As the workspace improved, guardrails handled more of the supervision:
+
+- One or two agents on **project work**
+- One or two agents on **workspace improvements**
+- Enough bandwidth left over for a **sidequest**
+
+Things that **wouldn't have happened** without this bandwidth:
+
+- **ENC to Gazebo world builder** -- converts nautical charts to simulation worlds with terrain, piers, trees, waves. Too time-consuming to tackle alone *(demo later)*
 - **GeoZui4D revival** -- resurrecting a legacy geospatial tool to extract missing functionality
 - **Test coverage and documentation** that always got skipped as a solo developer
-- **Research and inspiration tracker** -- agents survey the rapidly evolving landscape so I can keep up
-
-Infrastructure vs. project work: ~63% / 37% -- but the infrastructure *is* the multiplier.
 
 ---
 
@@ -147,33 +220,57 @@ The biggest workflow change: **I don't have to hold everything in my head**
 - I can oversee **multiple threads** because the state is externalized in issues and PRs
 - From **coder** to **manager**: I don't miss writing code -- it's the results that excite me, not the typing
 
-The downside: GitHub-centered workflow adds latency. Evolving toward local-first with git-bug and local reviews.
+The organization is still evolving -- dogfooding *(testing your own tools on yourself)* the brainstorm and research skills generated dozens of issues that needed their own triage. Now shifting toward roadmap documents that gather findings before opening targeted issues.
+
+The workspace is a work in progress.
 
 ---
 
-# Beyond Code -- BizzyBoat
+# Beyond Code -- BizzyBoat (The Problem)
 
 **This week**: pivoted from coding to setting up a new EchoBoat
 
-- IzzyBoat's network had grown organically -- docs incomplete or outdated
-- **Claude Code + tmux** used to:
-  - Document IzzyBoat's current network state
-  - Plan and implement BizzyBoat's network
-  - Update firmware on both boats
-  - Simplify VPN, test simultaneous operation and inter-robot communication
+The network is not a simple wifi link:
+- **Shore side**: operator laptop --> Teltonika router --> internet + wifi bridge
+- **Boat side**: Teltonika router --> Starlink + cell modem backup + wifi bridge
+- **Cloud**: VPN server for beyond-range connectivity
+- **Five devices**, all configured via SSH command line
 
-**~2 weeks of work done in 2 days**
-
-Agents aren't just for writing code.
+IzzyBoat's network had grown organically -- documentation was incomplete or outdated. Setting up BizzyBoat to match meant first figuring out what IzzyBoat actually looked like.
 
 ---
 
-# What's Next
+# Beyond Code -- BizzyBoat (The Solution)
 
-- **Containerized agents** -- letting them run more freely once I'm satisfied I can verify their output
-- **Reducing permission prompts** -- the friction is real, but I'm not ready to let agents loose
-- **Local-first workflow** -- git-bug for offline issues, better local reviews to cut GitHub latency
-- **Research + inspiration tracker** -- the space is evolving so fast that keeping up is itself a task for agents
+**Claude Code + tmux** -- the agent surveyed all devices via CLI, parsed the output into organized reference docs
+
+For setup, I did most steps manually in the web GUIs -- I was comfortable with that. The agent's role shifted to:
+- **Reminding me** of values like IP addresses and config details
+- **Checking my work** after each step via CLI commands
+- **Helping me navigate** unfamiliar UIs more quickly
+- **Documenting everything** as we went
+
+**~2 weeks of work done in 2 days.** Agents aren't just for writing code.
+
+Friction: every new agent session needed re-explanation of the rules. *(Live demo: let's open an issue about that...)*
+
+---
+
+# With That Extra Bandwidth...
+
+A few more irons in the fire:
+
+- **More autonomous agents** -- containerized, fewer permission prompts
+- **Tighter loop** -- local-first workflow (git-bug, local reviews) to speed up review --> fix --> merge
+
+---
+
+# Keeping Up With a Fast-Moving Space
+
+- **Research skill**: survey what's out there -- can it replace what we built, or can we borrow good ideas?
+- **Inspiration tracker**: born from creating `agent_workspace` ([github.com/rolker/agent_workspace](https://github.com/rolker/agent_workspace)) -- a non-ROS derivative for simpler projects (including a video game for my daughter). Needed a way to track changes in repos we've borrowed from, complementing research which finds *new* sources
+
+We improve by solving our own problems *and* keeping an eye on what others are doing.
 
 ---
 
@@ -186,6 +283,10 @@ I sometimes struggle with communicating effectively.
 Having an agent help me refine how I get my thoughts across has been genuinely useful -- not just for code, but for writing, planning, and yes, presentations.
 
 I'll let you guess who helped me put this one together.
+
+<br><br>
+
+*Authored-By: Claude Code Agent | Model: Claude Opus 4.6*
 
 ---
 
