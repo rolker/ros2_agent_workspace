@@ -317,8 +317,28 @@ PARENT_ISSUE_NUM="" # Parent issue number for sub-issue worktrees
 # Skills allowed to create worktrees without a GitHub issue
 ALLOWED_SKILLS=("research" "inspiration-tracker")
 
-# Available layers (same order as setup.bash)
-AVAILABLE_LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+# Available layers — read from manifest, fallback to hardcoded defaults.
+# ROOT_DIR may point into a worktree where configs/ doesn't exist;
+# derive the main workspace root the same way setup.bash does.
+_LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
+if [ ! -f "$_LAYERS_CONFIG" ]; then
+    # Try main workspace root (worktree is under .workspace-worktrees/ or layers/worktrees/)
+    for _depth in 2 3; do
+        _main_root="$ROOT_DIR"
+        for (( _i=0; _i<_depth; _i++ )); do _main_root="$(dirname "$_main_root")"; done
+        if [ -f "$_main_root/configs/manifest/layers.txt" ]; then
+            _LAYERS_CONFIG="$_main_root/configs/manifest/layers.txt"
+            break
+        fi
+    done
+fi
+if [ -f "$_LAYERS_CONFIG" ]; then
+    mapfile -t AVAILABLE_LAYERS < <(grep -v '^[[:space:]]*$' "$_LAYERS_CONFIG" | grep -v '^#')
+else
+    echo "Error: Layer config not found at configs/manifest/layers.txt"
+    echo "Run 'make build' to set up the workspace first."
+    exit 1
+fi
 
 show_usage() {
     echo "Usage: $0 (--issue <number> | --skill <name>) --type <layer|workspace> [options]"
