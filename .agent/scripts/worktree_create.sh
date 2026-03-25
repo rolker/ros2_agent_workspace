@@ -317,12 +317,15 @@ PARENT_ISSUE_NUM="" # Parent issue number for sub-issue worktrees
 # Skills allowed to create worktrees without a GitHub issue
 ALLOWED_SKILLS=("research" "inspiration-tracker")
 
-# Available layers — read from manifest, fallback to hardcoded defaults.
-# ROOT_DIR may point into a worktree where configs/ doesn't exist;
-# derive the main workspace root the same way setup.bash does.
+# Available layers — read from manifest; exit if not found.
+# ROOT_DIR is derived from BASH_SOURCE and may resolve into a worktree
+# (e.g., when invoked via a symlink from .workspace-worktrees/ or
+# layers/worktrees/) where configs/ doesn't exist. Search parent
+# directories to find the main workspace root:
+#   depth 2: .workspace-worktrees/issue-workspace-N -> main root
+#   depth 3: layers/worktrees/issue-repo-N -> main root
 _LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
 if [ ! -f "$_LAYERS_CONFIG" ]; then
-    # Try main workspace root (worktree is under .workspace-worktrees/ or layers/worktrees/)
     for _depth in 2 3; do
         _main_root="$ROOT_DIR"
         for (( _i=0; _i<_depth; _i++ )); do _main_root="$(dirname "$_main_root")"; done
@@ -333,10 +336,16 @@ if [ ! -f "$_LAYERS_CONFIG" ]; then
     done
 fi
 if [ -f "$_LAYERS_CONFIG" ]; then
-    mapfile -t AVAILABLE_LAYERS < <(grep -v '^[[:space:]]*$' "$_LAYERS_CONFIG" | grep -v '^#')
+    mapfile -t AVAILABLE_LAYERS < <(grep -v '^[[:space:]]*$' "$_LAYERS_CONFIG" | grep -v '^#' | sed 's/[[:space:]]*$//')
 else
-    echo "Error: Layer config not found at configs/manifest/layers.txt"
+    echo "Error: Layer config not found."
+    echo "Expected layer manifest at: $_LAYERS_CONFIG"
+    echo "ROOT_DIR was: $ROOT_DIR"
     echo "Run 'make build' to set up the workspace first."
+    exit 1
+fi
+if [ ${#AVAILABLE_LAYERS[@]} -eq 0 ]; then
+    echo "Error: No layers found in $_LAYERS_CONFIG"
     exit 1
 fi
 
