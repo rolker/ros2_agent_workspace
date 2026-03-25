@@ -47,5 +47,9 @@ __pycache__/
 *$py.class
 *.so
 
+# Presentation build outputs
+presentations/*/slides.html
+presentations/*/slides.pdf
+
 # CodeQL generated files
 _codeql_detected_source_root
