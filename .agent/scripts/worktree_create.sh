@@ -592,19 +592,16 @@ ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
     # Try git-bug first for issue title and state (offline-capable)
-    if command -v git-bug &>/dev/null; then
-        _BUG_OUTPUT=$(git -C "$ROOT_DIR" bug select "$ISSUE_NUM" 2>/dev/null \
-            && git -C "$ROOT_DIR" bug show 2>/dev/null || echo "")
-        if [ -n "$_BUG_OUTPUT" ]; then
-            _BUG_TITLE=$(echo "$_BUG_OUTPUT" | head -1 | sed 's/^[^ ]* //')
-            _BUG_STATE=$(echo "$_BUG_OUTPUT" | grep -i '^status:' | awk '{print $2}' || echo "")
-            if [ -n "$_BUG_TITLE" ]; then
-                ISSUE_TITLE="$_BUG_TITLE"
-                [[ "${_BUG_STATE,,}" == "closed" ]] && ISSUE_STATE="CLOSED"
-                [[ "${_BUG_STATE,,}" == "open" ]] && ISSUE_STATE="OPEN"
-            fi
-        fi
-        git -C "$ROOT_DIR" bug deselect 2>/dev/null || true
+    # shellcheck source=gitbug_helpers.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+    _BUG_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    if [ -n "$_BUG_TITLE" ]; then
+        ISSUE_TITLE="$_BUG_TITLE"
+        _BUG_STATE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" status 2>/dev/null || echo "")
+        [[ "${_BUG_STATE,,}" == "closed" ]] && ISSUE_STATE="CLOSED"
+        [[ "${_BUG_STATE,,}" == "open" ]] && ISSUE_STATE="OPEN"
+    elif command -v git-bug &>/dev/null; then
+        echo "⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
     fi
 
     if command -v gh &>/dev/null; then

@@ -266,6 +266,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |
 | `.agent/scripts/gh_create_issue.sh` | Create issue with label validation (`GITBUG_CREATE=1` for offline) |
 | `.agent/scripts/git_bug_setup.sh` | Configure git-bug identity + GitHub bridge |
+| `.agent/scripts/gitbug_helpers.sh` | Shared git-bug lookup helpers **(source)** |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |

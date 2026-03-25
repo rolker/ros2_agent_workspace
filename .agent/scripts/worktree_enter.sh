@@ -234,16 +234,16 @@ else
     _ISSUE_TITLE=""
 
     # Try git-bug first (offline-capable, fast)
-    if command -v git-bug &>/dev/null; then
-        # git bug select + show: extract title from the first line (strip leading ID token)
-        _ISSUE_TITLE=$(git -C "$ROOT_DIR" bug select "$ISSUE_NUM" 2>/dev/null \
-            && git -C "$ROOT_DIR" bug show 2>/dev/null \
-            | head -1 | sed 's/^[^ ]* //' || echo "")
-        # Deselect to avoid side effects
-        git -C "$ROOT_DIR" bug deselect 2>/dev/null || true
-    fi
+    # shellcheck source=gitbug_helpers.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+    _ISSUE_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
 
     # Fall back to gh API if git-bug didn't return a title
+    if [ -z "$_ISSUE_TITLE" ]; then
+        if command -v git-bug &>/dev/null; then
+            echo "  ⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
+        fi
+    fi
     if [ -z "$_ISSUE_TITLE" ] && command -v gh &>/dev/null; then
         _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
         # Layer worktrees cd into package repos where gh context may differ;
