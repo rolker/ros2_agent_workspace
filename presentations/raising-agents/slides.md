@@ -1,5 +1,6 @@
 ---
 marp: true
+html: true
 theme: ccom
 paginate: true
 header: ''
@@ -26,12 +27,12 @@ March 2026
 - A genuine productivity boost -- predicts what you're about to type
 - Small step in retrospect, but it changed how coding *felt*
 
-**Aha #2: Vibe Coding** -- free Gemini Pro subscription came with my phone
+**Aha #2: Vibe Coding** -- a free Gemini Pro subscription
 
 - Built a web-based mission planner through conversation alone
 - Got to **90% effortlessly** -- a genuine wow moment
 - But the last 10% was a wall: poor architectural choices, hard to improve
-- The agent had no idea what direction I wanted to take it
+- The agent had no idea what direction I wanted to take it — and I had no way to tell it
 
 Both moments made me think: *what if I go further?*
 
@@ -46,7 +47,7 @@ Both moments made me think: *what if I go further?*
 
 Everything that follows is about *how* to craft that context.
 
-*(This is a genuine quote, not AI-generated!)*
+*(I came up with this myself — the fact that I have to clarify says something about where we are.)*
 
 ---
 
@@ -55,16 +56,22 @@ Everything that follows is about *how* to craft that context.
 **January 9, 2026** -- created `ros2_agent_workspace` ([github.com/rolker/ros2_agent_workspace](https://github.com/rolker/ros2_agent_workspace))
 
 - Wanted to test agents on **real code**, not throwaway projects
-- Started with Gemini CLI, Copilot CLI, and Google Antigravity
+- Started with Gemini CLI, Copilot CLI, and Google Antigravity (a GUI-based multi-agent orchestrator)
 - Asked an agent how to support multiple frameworks -- it helped set up the workspace
 
-**First real test**: renaming project11 to unh_marine_autonomy, consolidating repos
+---
+
+# First Real Test
+
+Renaming project11 to unh_marine_autonomy, consolidating repos
 
 - Tedious work, not hard thinking -- agents did it in minutes
 - Simulator broke -- expected, it would have broken if I did it manually too
 - But **I test by looking at the UI** and quickly know something's not right. Agents can't see the simulator, can't tell if things "look right"
-- Real cost: **building tools that give agents the eyes I already have**
-- Slowed this task down, but makes every future task faster
+
+Real cost: **building tools that give agents the eyes I already have**
+
+Slowed this task down, but makes every future task faster.
 
 ---
 
@@ -113,6 +120,23 @@ ros2_agent_workspace/
 
 ---
 
+# The Workspace as Orchestrator
+
+Early inspiration: the **Conductor** plugin for Gemini CLI -- structured planning, phase checkpoints, feature revert
+
+Problem: it only worked with one framework. Solution: adopt the *patterns*, not the tool.
+
+What the workspace orchestrates today:
+
+- **Issue → plan → review → implement → review → merge** lifecycle
+- **Worktree isolation** -- multiple agents, no conflicts
+- **Guardrails and governance** -- ADRs, principles, pre-commit hooks
+- **Skills** -- reusable workflows any framework can invoke
+
+The orchestrator today is **me** -- agents don't coordinate with each other yet. The goal is to get there, one guardrail at a time.
+
+---
+
 # The Great Simplification
 
 **The problem**: each friction point got its own issue, each fix was isolated -- and fixes would break other fixes because nothing connected them
@@ -124,7 +148,7 @@ ros2_agent_workspace/
 - Established **ADRs and guiding principles** as the source of truth
 - A **review process** that checks adherence prevents it from happening again
 
-Power tools produce sawdust too.
+**Agents are not a magic bullet!**
 
 ---
 
@@ -134,7 +158,7 @@ Power tools produce sawdust too.
 
 **Toddler moments** -- doing something unexpected because you didn't say not to, but any reasonable adult would know better
 
-*Added a guardrail that blocks `git checkout` -- not to prevent it outright, but to nudge agents to re-read the rules and use a worktree instead. Google Antigravity didn't even try to branch -- it just edited files directly on main, then thought it was being clever when it hit the guardrail.*
+*Added a guardrail that blocks `git checkout` -- not to prevent it outright, but to nudge agents to re-read the rules and use a worktree instead. Google Antigravity didn't even try to branch -- it just edited files directly on main.*
 
 **Intern moments** -- passable code with flaws that experience would have caught
 
@@ -195,9 +219,7 @@ It still takes someone who **understands wood** to get the most out of power too
 
 # Growing Bandwidth
 
-Early on: **one agent** working on the project, watching closely, maybe a second fixing a workspace bug
-
-As the workspace improved, guardrails handled more of the supervision:
+Early on: **one agent**, close supervision. As the orchestration improved:
 
 - One or two agents on **project work**
 - One or two agents on **workspace improvements**
@@ -220,7 +242,7 @@ The biggest workflow change: **I don't have to hold everything in my head**
 - I can oversee **multiple threads** because the state is externalized in issues and PRs
 - From **coder** to **manager**: I don't miss writing code -- it's the results that excite me, not the typing
 
-The organization is still evolving -- dogfooding *(testing your own tools on yourself)* the brainstorm and research skills generated dozens of issues that needed their own triage. Now shifting toward roadmap documents that gather findings before opening targeted issues.
+The organization is still evolving -- dogfooding the brainstorm and research skills generated dozens of issues that needed their own triage. Now shifting toward roadmap documents that gather findings before opening targeted issues.
 
 The workspace is a work in progress.
 
@@ -228,7 +250,7 @@ The workspace is a work in progress.
 
 # Beyond Code -- BizzyBoat (The Problem)
 
-**This week**: pivoted from coding to setting up a new EchoBoat
+**This week**: pivoted from coding to setting up a new-to-us EchoBoat donated by Seafloor Systems
 
 The network is not a simple wifi link:
 - **Shore side**: operator laptop --> Teltonika router --> internet + wifi bridge
@@ -256,6 +278,29 @@ Friction: every new agent session needed re-explanation of the rules. *(Live dem
 
 ---
 
+# Reinventing the Wheel (On Purpose)
+
+"Don't reinvent the wheel" -- but sometimes reinventing a crude wheel teaches you what you need to know to select the best one.
+
+That selection hasn't happened yet for this workspace:
+- My needs span **ROS 2, multi-repo layering, and multi-framework agents** -- no off-the-shelf tool covers all of that
+- Building it myself taught me *what matters* -- now I know what to look for
+
+---
+
+# Keeping Up With a Fast-Moving Space
+
+- **Research skill**: survey what's out there -- can it replace what we built, or can we borrow good ideas?
+- **Inspiration tracker**:
+  - Needed a non-ROS version of the workspace for simpler projects -- I'll admit, the motivation was helping write a video game for my daughter one weekend
+  - Created [`agent_workspace`](https://github.com/rolker/agent_workspace) -- probably more relevant for this group
+  - Built a cross-repo cherry-picker to migrate features between the two
+  - Grew into an inspiration tracker once it could also follow repos with similar ideas but different structure
+
+We improve by solving our own problems *and* keeping an eye on what others are doing.
+
+---
+
 # With That Extra Bandwidth...
 
 A few more irons in the fire:
@@ -265,12 +310,11 @@ A few more irons in the fire:
 
 ---
 
-# Keeping Up With a Fast-Moving Space
+<!-- _class: callout -->
 
-- **Research skill**: survey what's out there -- can it replace what we built, or can we borrow good ideas?
-- **Inspiration tracker**: born from creating `agent_workspace` ([github.com/rolker/agent_workspace](https://github.com/rolker/agent_workspace)) -- a non-ROS derivative for simpler projects (including a video game for my daughter). Needed a way to track changes in repos we've borrowed from, complementing research which finds *new* sources
+## The Future of Software Development?
 
-We improve by solving our own problems *and* keeping an eye on what others are doing.
+Instead of configuring an existing product, adding plugins, writing adapters -- just **have agents build exactly what you need**.
 
 ---
 
@@ -286,18 +330,20 @@ I'll let you guess who helped me put this one together.
 
 <br><br>
 
+<div class="signature">
+
 *Authored-By: Claude Code Agent | Model: Claude Opus 4.6*
+
+</div>
 
 ---
 
-<!-- _class: title -->
-<!-- _paginate: false -->
-<!-- _footer: '' -->
-
 # Discussion and Demos
 
-Gazebo worlds generated from nautical charts
+This morning, I noticed the orchestration theme in the announcements, so I pulled up Claude to help me weave it into these slides.
 
-Live Claude Code *(if time permits)*
+While Claude was busy with that, I opened another terminal to check that the Gazebo world demo still worked. It didn't.
 
-Your questions, ideas, and concerns
+So I launched a second Claude to troubleshoot. It found the issue, gave me a quick workaround, and opened [a GitHub issue](https://github.com/rolker/ros2_agent_workspace/issues/414) for a proper fix.
+
+Let's look at that issue with Claude and see if we can fix it live. Oh, and maybe we should also look at that other issue we just opened...
