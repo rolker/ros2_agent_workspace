@@ -161,7 +161,7 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 		echo "Manifest symlink missing — re-running setup..."; \
 		rm -f "$(STAMP)/manifest.done"; \
 	fi
-	@./.agent/scripts/setup_layers.sh --manifest-only
+	@./.agent/scripts/setup_layers.sh $(if $(BOOTSTRAP_URL),--bootstrap-url "$(BOOTSTRAP_URL)") --manifest-only
 	@touch $@
 
 # Enable secondary expansion for the layer stamp rule below.
@@ -173,7 +173,7 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # but once present, changes to the file will re-trigger setup.
 $(STAMP)/layer-%.done: $(STAMP)/manifest.done $$(wildcard $(MAIN_ROOT)/configs/manifest/repos/$$*.repos)
 	@mkdir -p $(STAMP)
-	@./.agent/scripts/setup_layers.sh "$*"
+	@./.agent/scripts/setup_layers.sh $(if $(BOOTSTRAP_URL),--bootstrap-url "$(BOOTSTRAP_URL)") "$*"
 	@touch $@
 
 $(STAMP)/git-bug.done: $(STAMP)/bootstrap.done
