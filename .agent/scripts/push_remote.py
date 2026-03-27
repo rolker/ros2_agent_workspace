@@ -105,6 +105,8 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
             timeout=15,
         )
         return f"default branch set to '{branch}'"
+    except FileNotFoundError:
+        return "curl not found — install curl for Forgejo API support"
     except subprocess.CalledProcessError:
         return f"API call failed (is {host} a Forgejo/Gitea server?)"
     except subprocess.TimeoutExpired:

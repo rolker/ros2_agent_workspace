@@ -102,21 +102,21 @@ def _fetch_and_report(repo_path, remote_name, version, dry_run):
     return _compare_branches(repo_path, branch, remote_ref)
 
 
-def _check_pull_preconditions(repo_path, version, dry_run):
+def _check_pull_preconditions(repo_path, version):
     """Check if repo is ready for a merge. Returns (branch, skip_reason)."""
-    if not dry_run and is_dirty(repo_path):
+    if is_dirty(repo_path):
         return None, "uncommitted changes — skipping merge"
 
     branch = get_default_branch(repo_path, version)
     current = get_current_branch(repo_path)
-    if not dry_run and current != branch:
+    if current != branch:
         return None, f"not on default branch (on '{current}', expected '{branch}')"
     return branch, None
 
 
 def _fetch_and_pull(repo_path, remote_name, version, dry_run):
     """Fetch and merge from remote. Returns (status, message)."""
-    branch, skip_reason = _check_pull_preconditions(repo_path, version, dry_run)
+    branch, skip_reason = _check_pull_preconditions(repo_path, version)
     if skip_reason:
         return "skip", skip_reason
 
@@ -141,7 +141,7 @@ def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
     """Fetch and update a local branch from the remote. Returns (status, message)."""
     # git branch -f fails if the target branch is currently checked out
     current = get_current_branch(repo_path)
-    if not dry_run and current == target_branch:
+    if current == target_branch:
         return "skip", (
             f"branch '{target_branch}' is currently checked out — "
             "cannot force-update; use --pull instead"

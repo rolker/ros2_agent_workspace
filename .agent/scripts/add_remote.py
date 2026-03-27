@@ -77,9 +77,13 @@ def main():
         required=True,
         help="URL prefix (e.g., git@gitcloud:field/)",
     )
+    args = parser.parse_args()
+    if not args.url_prefix.endswith(("/", ":")):
+        parser.error("--url-prefix must end with '/' or ':' (e.g., git@host:org/)")
+
     run_script(
         SCRIPT_DIR,
-        parser.parse_args(),
+        args,
         process_repo,
         {"added": 0, "skip": 0, "error": 0, "missing": 0},
         [
