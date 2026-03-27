@@ -30,17 +30,20 @@ VENV_DIR := $(MAIN_ROOT)/.venv
 VENV_BIN := $(VENV_DIR)/bin
 PRE_COMMIT := $(VENV_BIN)/pre-commit
 
-# --- Layer list (read from manifest config if available) ---
+# --- Layer list (read from manifest config after bootstrap) ---
+# On a fresh clone, layers.txt doesn't exist yet (created by manifest bootstrap).
+# Targets that need LAYER_STAMPS use recursive make after manifest.done so that
+# LAYERS is re-evaluated with the real layers.txt. See: build, setup-all.
 LAYERS_FILE := $(MAIN_ROOT)/configs/manifest/layers.txt
 ifneq ($(wildcard $(LAYERS_FILE)),)
   LAYERS := $(shell awk '!/^[[:space:]]*($$|#)/ {$$1=$$1; print}' $(LAYERS_FILE) | tr '\n' ' ')
 else
-  LAYERS := underlay core platforms sensors simulation ui
+  LAYERS :=
 endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build test lint clean setup-all dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
+.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -80,7 +83,12 @@ help:
 	@echo "  push-gateway  - Process pending push requests from containers"
 	@echo ""
 
-build: $(LAYER_STAMPS)
+# Ensure manifest is bootstrapped first, then re-invoke make so LAYERS is
+# read from the now-existing layers.txt (see layer list comment above).
+build: $(STAMP)/manifest.done
+	@$(MAKE) --no-print-directory _build-layers
+
+_build-layers: $(LAYER_STAMPS)
 	@./.agent/scripts/build.sh
 
 test: build
@@ -98,7 +106,10 @@ clean:
 	@rm -rf $(STAMP)
 	@echo "Done. Run 'make build' to re-setup and rebuild."
 
-setup-all: $(LAYER_STAMPS) $(STAMP)/git-bug.done
+setup-all: $(STAMP)/manifest.done
+	@$(MAKE) --no-print-directory _setup-all-layers
+
+_setup-all-layers: $(LAYER_STAMPS) $(STAMP)/git-bug.done
 	@echo "Setup complete. All layers are ready."
 
 dashboard:
