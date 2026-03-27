@@ -592,9 +592,15 @@ ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
     # Try git-bug first for issue title and state (offline-capable)
-    # shellcheck source=gitbug_helpers.sh
-    source "$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
-    _BUG_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+    if [ -f "$_GITBUG_HELPERS" ]; then
+        # shellcheck source=gitbug_helpers.sh
+        source "$_GITBUG_HELPERS"
+    fi
+    _BUG_TITLE=""
+    if declare -F gitbug_lookup &>/dev/null; then
+        _BUG_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    fi
     if [ -n "$_BUG_TITLE" ]; then
         ISSUE_TITLE="$_BUG_TITLE"
         _BUG_STATE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" status 2>/dev/null || echo "")

@@ -54,8 +54,9 @@ else
 fi
 
 # Adopt identity if not already adopted
-if ! git bug user adopt &>/dev/null 2>&1; then
-    # List identities and adopt the first one
+ADOPTED_ID=$(git config git-bug.identity 2>/dev/null || echo "")
+if [ -z "$ADOPTED_ID" ]; then
+    # No identity adopted yet — adopt the first one
     FIRST_ID=$(git bug user 2>/dev/null | head -1 | awk '{print $1}')
     if [ -n "$FIRST_ID" ]; then
         git bug user adopt "$FIRST_ID" 2>/dev/null || true

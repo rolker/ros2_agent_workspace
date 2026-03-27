@@ -234,9 +234,14 @@ else
     _ISSUE_TITLE=""
 
     # Try git-bug first (offline-capable, fast)
-    # shellcheck source=gitbug_helpers.sh
-    source "$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
-    _ISSUE_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+    if [ -f "$_GITBUG_HELPERS" ]; then
+        # shellcheck source=gitbug_helpers.sh
+        source "$_GITBUG_HELPERS"
+    fi
+    if declare -F gitbug_lookup &>/dev/null; then
+        _ISSUE_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    fi
 
     # Fall back to gh API if git-bug didn't return a title
     if [ -z "$_ISSUE_TITLE" ]; then
