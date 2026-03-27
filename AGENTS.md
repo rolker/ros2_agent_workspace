@@ -268,6 +268,9 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/git_bug_setup.sh` | Configure git-bug identity + GitHub bridge |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
+| `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
+| `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
+| `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos |
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
 | `.agent/scripts/fetch_pr_reviews.sh` | Fetch all PR reviews and CI status |
