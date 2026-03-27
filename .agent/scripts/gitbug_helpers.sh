@@ -28,6 +28,17 @@ gitbug_lookup() {
         return 1
     fi
 
+    # Validate issue_num is numeric to prevent injection
+    if ! [[ "$issue_num" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+
+    # Validate field is one of the allowed values
+    case "$field" in
+        title|status|human_id) ;;
+        *) return 1 ;;
+    esac
+
     local json_output
     json_output=$(git -C "$repo_dir" bug bug --format json 2>/dev/null) || return 1
 
@@ -37,8 +48,8 @@ try:
     data = json.loads(sys.stdin.read())
 except (json.JSONDecodeError, ValueError):
     sys.exit(1)
-field = '$field'
-num = '$issue_num'
+num = sys.argv[1]
+field = sys.argv[2]
 for bug in data:
     url = bug.get('metadata', {}).get('github-url', '')
     if url.endswith('/issues/' + num):
@@ -50,7 +61,7 @@ for bug in data:
             print(bug.get('human_id', ''))
         sys.exit(0)
 sys.exit(1)
-" <<< "$json_output" 2>/dev/null
+" "$issue_num" "$field" <<< "$json_output" 2>/dev/null
 }
 
 # gitbug_has_bridge <repo_dir>

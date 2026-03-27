@@ -601,7 +601,11 @@ if [ -n "$ISSUE_NUM" ]; then
         [[ "${_BUG_STATE,,}" == "closed" ]] && ISSUE_STATE="CLOSED"
         [[ "${_BUG_STATE,,}" == "open" ]] && ISSUE_STATE="OPEN"
     elif command -v git-bug &>/dev/null; then
-        echo "⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
+        if command -v gh &>/dev/null; then
+            echo "⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
+        else
+            echo "⚠️  git-bug lookup failed for #$ISSUE_NUM; gh CLI not available" >&2
+        fi
     fi
 
     if command -v gh &>/dev/null; then

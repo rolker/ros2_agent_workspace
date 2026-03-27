@@ -241,7 +241,11 @@ else
     # Fall back to gh API if git-bug didn't return a title
     if [ -z "$_ISSUE_TITLE" ]; then
         if command -v git-bug &>/dev/null; then
-            echo "  ⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
+            if command -v gh &>/dev/null; then
+                echo "  ⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
+            else
+                echo "  ⚠️  git-bug lookup failed for #$ISSUE_NUM; gh CLI not available" >&2
+            fi
         fi
     fi
     if [ -z "$_ISSUE_TITLE" ] && command -v gh &>/dev/null; then
