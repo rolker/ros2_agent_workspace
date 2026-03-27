@@ -139,6 +139,14 @@ def _fetch_and_pull(repo_path, remote_name, version, dry_run):
 
 def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
     """Fetch and update a local branch from the remote. Returns (status, message)."""
+    # git branch -f fails if the target branch is currently checked out
+    current = get_current_branch(repo_path)
+    if not dry_run and current == target_branch:
+        return "skip", (
+            f"branch '{target_branch}' is currently checked out — "
+            "cannot force-update; use --pull instead"
+        )
+
     branch = get_default_branch(repo_path, version)
 
     # Fetch

@@ -65,7 +65,7 @@ help:
 	@echo ""
 	@echo "Remote sync:"
 	@echo "  add-remote REMOTE=<name> URL_PREFIX=<prefix> - Add remote to all repos"
-	@echo "  push-remote REMOTE=<name> [ALL=1]            - Push to named remote"
+	@echo "  push-remote REMOTE=<name> [ALL=1] [SET_DEFAULT=1] - Push to named remote"
 	@echo "  pull-remote REMOTE=<name> [PULL=1|BRANCH=<b>] - Fetch/pull from remote"
 	@echo ""
 	@echo "Maintenance:"
@@ -214,10 +214,10 @@ add-remote:
 push-remote:
 	@if [ -z "$(REMOTE)" ]; then \
 		echo "Error: REMOTE parameter required"; \
-		echo "Usage: make push-remote REMOTE=gitcloud [ALL=1]"; \
+		echo "Usage: make push-remote REMOTE=gitcloud [ALL=1] [SET_DEFAULT=1]"; \
 		exit 1; \
 	fi
-	@python3 ./.agent/scripts/push_remote.py --remote $(REMOTE) $(if $(ALL),--all-branches,)
+	@python3 ./.agent/scripts/push_remote.py --remote $(REMOTE) $(if $(ALL),--all-branches,) $(if $(SET_DEFAULT),--set-default-branch,)
 
 pull-remote:
 	@if [ -z "$(REMOTE)" ]; then \

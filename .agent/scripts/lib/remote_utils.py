@@ -32,7 +32,11 @@ def remote_exists(repo_path, remote_name):
 
 
 def resolve_repo_path(root_dir, repo):
-    """Resolve the local path for a repo entry. Returns Path or None."""
+    """Resolve the local path for a repo entry. Returns Path or None.
+
+    Only checks the main layer tree (layers/main/). These scripts operate
+    on the primary workspace checkout, not worktrees.
+    """
     ws_name = repo["source_file"].replace(".repos", "_ws")
     candidate = root_dir / "layers" / "main" / ws_name / "src" / repo["name"]
     if candidate.exists():
@@ -92,9 +96,10 @@ def iter_repos(script_dir, args, process_fn, initial_results):
     repos = get_repos(args)
     results = dict(initial_results)
 
-    # Workspace repo itself
+    # Workspace repo itself — detect its default branch rather than hard-coding
+    ws_version = get_default_branch(root_dir, None)
     print("ros2_agent_workspace (workspace root)")
-    status, msg = process_fn(root_dir, "ros2_agent_workspace", "main", args)
+    status, msg = process_fn(root_dir, "ros2_agent_workspace", ws_version, args)
     print(f"  {status}: {msg}")
     results[status] = results.get(status, 0) + 1
 
