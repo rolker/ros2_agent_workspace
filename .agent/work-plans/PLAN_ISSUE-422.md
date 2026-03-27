@@ -75,3 +75,98 @@ should reuse `workspace.py` for repo enumeration and follow the same patterns.
 ## Estimated Scope
 
 Single PR.
+
+---
+
+## Revised Approach (2026-03-27)
+
+After discussion, the design has changed significantly from the original approach above.
+
+### Key Design Decisions
+
+1. **No config file, no URL prefix argument for routine use.** Remotes are assumed
+   to already exist in each repo (added once manually or via a one-time helper).
+   The scripts just take `--remote <name>` and operate on repos where that remote
+   exists, skipping others with a warning.
+
+2. **Two separate scripts** (leave `sync_repos.py` unchanged):
+   - **`push_remote.py --remote <name>`** — Push to a named remote
+   - **`pull_remote.py --remote <name>`** — Pull/fetch from a named remote
+
+3. **Push default branch + tags by default.** The manifest-declared branch
+   (e.g., `jazzy`) is pushed, plus all tags. `--all-branches` opt-in for full mirror.
+
+4. **Pull = fetch + report.** Fetch from the named remote and report which repos
+   have new commits. Don't merge or create branches automatically — some repos
+   require PRs on GitHub, so the user decides how to integrate changes. Branch
+   creation or PR automation can be added later once patterns are clear.
+
+### Revised Script Designs
+
+#### `push_remote.py`
+
+```
+push_remote.py --remote <name> [--all-branches] [--manifest <name,...>]
+                               [--include-underlay] [--dry-run]
+```
+
+- Iterates all workspace repos (via `list_overlay_repos` + workspace root)
+- For each repo: if the named remote exists, push the manifest-declared branch + tags
+- If `--all-branches`: push all branches instead of just the default
+- Skip repos where the remote doesn't exist (warn)
+- Report per-repo success/failure with summary
+
+#### `pull_remote.py`
+
+```
+pull_remote.py --remote <name> [--manifest <name,...>]
+                               [--include-underlay] [--dry-run]
+```
+
+- Iterates all workspace repos
+- For each repo: if the named remote exists, `git fetch <remote>`
+- Compare the remote's default branch against the local default branch
+- Report repos with new commits (ahead/behind counts)
+- No automatic merge — user decides how to integrate (manual merge, PR, etc.)
+
+### Remote Setup (One-Time)
+
+Remotes are added manually or via a future `add_remote.py` helper:
+
+```bash
+# Manual (per repo)
+cd layers/main/core_ws/src/some_repo
+git remote add gitcloud git@gitcloud:field/some_repo.git
+
+# Future helper (all repos at once — not in this PR)
+# add_remote.py --remote gitcloud --url-prefix git@gitcloud:field/
+```
+
+The URL prefix helper could be a follow-up PR if the manual approach proves too
+tedious for 37 repos. It would derive the repo name from the origin URL
+(via `extract_github_owner_repo`) rather than the directory name.
+
+### Makefile Targets
+
+```makefile
+make push-remote REMOTE=gitcloud              # push default branches + tags
+make push-remote REMOTE=gitcloud ALL=1        # push all branches + tags
+make pull-remote REMOTE=gitcloud              # fetch + report
+```
+
+### Files to Change (Revised)
+
+| File | Change |
+|------|--------|
+| `.agent/scripts/push_remote.py` | New — push to named remote |
+| `.agent/scripts/pull_remote.py` | New — fetch from named remote + report |
+| `Makefile` | Add `push-remote` and `pull-remote` targets |
+| `AGENTS.md` | Add scripts to reference table |
+
+### Open Questions (Revised)
+
+- Should the one-time `add_remote.py` helper be included in this PR or deferred?
+  For 37 repos, manual setup is tedious. But keeping this PR focused on push/pull
+  is cleaner.
+- For `pull_remote.py`, should it suggest the next step per repo (e.g., "run
+  `git merge gitcloud/jazzy`" or "create a PR")? Or keep output minimal?
