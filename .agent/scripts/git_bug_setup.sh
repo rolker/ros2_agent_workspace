@@ -37,7 +37,7 @@ echo "Configuring git-bug..."
 cd "$ROOT_DIR" || exit 0
 
 # Check if any identity exists
-if ! git bug user ls &>/dev/null 2>&1 || [ -z "$(git bug user ls 2>/dev/null)" ]; then
+if ! git bug user &>/dev/null 2>&1 || [ -z "$(git bug user 2>/dev/null)" ]; then
     GIT_NAME=$(git config user.name 2>/dev/null || echo "")
     GIT_EMAIL=$(git config user.email 2>/dev/null || echo "")
     if [ -z "$GIT_NAME" ] || [ -z "$GIT_EMAIL" ]; then
@@ -54,16 +54,17 @@ else
 fi
 
 # Adopt identity if not already adopted
-if ! git bug user adopt &>/dev/null 2>&1; then
-    # List identities and adopt the first one
-    FIRST_ID=$(git bug user ls 2>/dev/null | head -1 | awk '{print $1}')
+ADOPTED_ID=$(git config git-bug.identity 2>/dev/null || echo "")
+if [ -z "$ADOPTED_ID" ]; then
+    # No identity adopted yet — adopt the first one
+    FIRST_ID=$(git bug user 2>/dev/null | head -1 | awk '{print $1}')
     if [ -n "$FIRST_ID" ]; then
         git bug user adopt "$FIRST_ID" 2>/dev/null || true
     fi
 fi
 
 # 3. GitHub bridge setup
-BRIDGE_EXISTS=$(git bug bridge list 2>/dev/null | grep -c "github" || true)
+BRIDGE_EXISTS=$(git bug bridge 2>/dev/null | grep -c "github" || true)
 if [ "$BRIDGE_EXISTS" -eq 0 ]; then
     # Need gh CLI for auth token
     if ! command -v gh &>/dev/null; then
@@ -121,4 +122,13 @@ if git bug pull 2>/dev/null; then
     echo "✅ git-bug sync complete."
 else
     echo "⚠️  git bug pull failed — issues may not be up to date."
+fi
+
+# 5. Smoke test — verify commands actually work
+if git bug bug --format json 2>/dev/null | head -c 1 | grep -q '\['; then
+    _COUNT=$(git bug bug "status:open" 2>/dev/null | grep -c . || echo "0")
+    echo "✅ git-bug smoke test passed ($_COUNT open issues cached)"
+else
+    echo "⚠️  git-bug smoke test failed — 'git bug bug --format json' returned unexpected output"
+    echo "   Commands may use wrong syntax for this git-bug version ($(git-bug version 2>/dev/null | head -1))"
 fi

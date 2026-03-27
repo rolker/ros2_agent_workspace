@@ -501,12 +501,17 @@ if [ "$SKIP_GITHUB" = false ]; then
             [ -z "$repo" ] && continue
             # Try git-bug for the workspace repo (where a bridge is configured)
             count=""
-            if [ "$repo" = "$ROOT_REPO" ] && command -v git-bug &>/dev/null \
-                && git -C "$ROOT_DIR" bug bridge list &>/dev/null 2>&1; then
-                _gb_output=$(git -C "$ROOT_DIR" bug ls status:open 2>/dev/null)
-                _gb_rc=$?
-                if [ $_gb_rc -eq 0 ]; then
-                    count=$(printf '%s\n' "$_gb_output" | grep -c . || true)
+            if [ "$repo" = "$ROOT_REPO" ] && command -v git-bug &>/dev/null; then
+                _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+                if [ -f "$_GITBUG_HELPERS" ]; then
+                    # shellcheck source=gitbug_helpers.sh
+                    source "$_GITBUG_HELPERS"
+                fi
+                if declare -F gitbug_has_bridge &>/dev/null && gitbug_has_bridge "$ROOT_DIR"; then
+                    count=$(gitbug_count_open "$ROOT_DIR" 2>/dev/null || echo "")
+                fi
+                if [ -z "$count" ] || ! [[ "$count" =~ ^[0-9]+$ ]]; then
+                    echo "  ⚠️  git-bug count failed for $repo, falling back to gh API" >&2
                 fi
             fi
             # Fall back to gh API
