@@ -13,10 +13,14 @@ Usage:
 
 Prerequisites:
     Remotes must already exist in each repo. Use add_remote.py for one-time setup.
+
+Environment variables:
+    FORGEJO_TOKEN   API token for Forgejo/Gitea (required for --set-default-branch).
 """
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -69,22 +73,34 @@ def parse_remote_url(repo_path, remote_name):
     return None, None, None, None
 
 
+def _build_forgejo_api_url(repo_path, remote_name):
+    """Build the Forgejo API URL for a repo. Returns (url, error_msg)."""
+    scheme, host, owner, repo_name = parse_remote_url(repo_path, remote_name)
+    if not host:
+        return None, "could not parse remote URL for API call"
+    api_scheme = "https" if scheme == "ssh" else scheme
+    return f"{api_scheme}://{host}/api/v1/repos/{owner}/{repo_name}", None
+
+
 def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
     """Set the default branch on a Forgejo/Gitea server via API.
 
-    Returns a message string describing the result.
+    Uses the FORGEJO_TOKEN environment variable for authentication.
+    Returns (success: bool, message: str).
     """
-    scheme, host, owner, repo_name = parse_remote_url(repo_path, remote_name)
-    if not host:
-        return "could not parse remote URL for API call"
+    api_url, err = _build_forgejo_api_url(repo_path, remote_name)
+    if err:
+        return False, err
 
-    api_scheme = "https" if scheme == "ssh" else scheme
-    api_url = f"{api_scheme}://{host}/api/v1/repos/{owner}/{repo_name}"
+    token = os.environ.get("FORGEJO_TOKEN", "")
+    if not token:
+        return False, "FORGEJO_TOKEN not set — required for API calls"
+
     payload = json.dumps({"default_branch": branch})
 
     if dry_run:
         print(f"  [DRY-RUN] PATCH {api_url} {payload}")
-        return "default branch set (dry run)"
+        return True, "default branch set (dry run)"
 
     try:
         subprocess.run(
@@ -96,6 +112,8 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
                 api_url,
                 "-H",
                 "Content-Type: application/json",
+                "-H",
+                f"Authorization: token {token}",
                 "-d",
                 payload,
             ],
@@ -104,13 +122,9 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
             check=True,
             timeout=15,
         )
-        return f"default branch set to '{branch}'"
-    except FileNotFoundError:
-        return "curl not found — install curl for Forgejo API support"
-    except subprocess.CalledProcessError:
-        return f"API call failed (is {host} a Forgejo/Gitea server?)"
-    except subprocess.TimeoutExpired:
-        return f"API call timed out ({host})"
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        return False, f"API call failed: {exc}"
+    return True, f"default branch set to '{branch}'"
 
 
 def process_repo(repo_path, repo_name, version, args):
@@ -137,8 +151,10 @@ def process_repo(repo_path, repo_name, version, args):
 
     # Optionally set the default branch on the remote server
     if args.set_default_branch:
-        msg = set_forgejo_default_branch(repo_path, args.remote, branch, args.dry_run)
+        ok, msg = set_forgejo_default_branch(repo_path, args.remote, branch, args.dry_run)
         print(f"  {msg}")
+        if not ok:
+            errors.append(f"set-default-branch failed: {msg}")
 
     if errors:
         return "error", "; ".join(errors)
@@ -156,7 +172,8 @@ def main():
     parser.add_argument(
         "--set-default-branch",
         action="store_true",
-        help="Set default branch on Forgejo/Gitea to match manifest version",
+        help="Set default branch on Forgejo/Gitea to match manifest "
+        "version (requires FORGEJO_TOKEN)",
     )
     run_script(
         SCRIPT_DIR,

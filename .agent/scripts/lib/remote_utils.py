@@ -47,13 +47,28 @@ def resolve_repo_path(root_dir, repo):
 def get_default_branch(repo_path, version):
     """Get the default branch for a repo.
 
-    Uses the manifest-declared version if available, otherwise detects
-    from origin/HEAD, falling back to 'main'.
+    Uses the manifest-declared version if it resolves to a branch,
+    otherwise detects from origin/HEAD, falling back to 'main'.
+    Tags and commit SHAs are not usable as branch targets for push/pull.
     """
     if version and version != "unknown":
-        return version
+        # Only use the manifest version if it's actually a branch ref
+        for ref in [f"refs/heads/{version}", f"refs/remotes/origin/{version}"]:
+            success, _, _ = run_git(repo_path, ["rev-parse", "--verify", ref])
+            if success:
+                return version
+
+    # Detect from origin/HEAD
     success, out, _ = run_git(repo_path, ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"])
-    return out.replace("origin/", "") if success and out else "main"
+    if success and out:
+        return out.replace("origin/", "")
+
+    # Fall back to current branch
+    success, out, _ = run_git(repo_path, ["symbolic-ref", "HEAD", "--short"])
+    if success and out:
+        return out
+
+    return "main"
 
 
 def add_common_args(parser):
