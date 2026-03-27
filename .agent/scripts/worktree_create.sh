@@ -187,9 +187,12 @@ SETUP_PRECOMMIT
 for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
     [ -d "\$_wt_pkg_build" ] || continue
     _wt_pkg=\$(basename "\$_wt_pkg_build")
-    _wt_sp="\$WORKTREE_DIR/${target_layer}_ws/install/\$_wt_pkg/lib/python3.12/site-packages"
-    [ -d "\$_wt_sp" ] && export PYTHONPATH="\$_wt_sp:\$PYTHONPATH"
-    export PYTHONPATH="\${_wt_pkg_build%/}:\$PYTHONPATH"
+    for _wt_sp in "\$WORKTREE_DIR/${target_layer}_ws/install/\$_wt_pkg"/lib/python3.*/site-packages; do
+        [ -d "\$_wt_sp" ] || continue
+        export PYTHONPATH="\$_wt_sp:\$PYTHONPATH"
+        export PYTHONPATH="\${_wt_pkg_build%/}:\$PYTHONPATH"
+        break
+    done
 done
 unset _wt_pkg_build _wt_pkg _wt_sp
 SETUP_PYTHONPATH_FIX
