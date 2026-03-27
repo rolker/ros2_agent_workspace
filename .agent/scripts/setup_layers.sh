@@ -6,8 +6,16 @@
 #   ./.agent/scripts/setup_layers.sh              # Auto-setup all layers from manifest repo
 #   ./.agent/scripts/setup_layers.sh <layer_name> # Setup a specific layer
 #   ./.agent/scripts/setup_layers.sh --manifest-only  # Bootstrap manifest repo only (no layers)
+#   ./.agent/scripts/setup_layers.sh --bootstrap-url <url> [<layer_name>|--manifest-only]
+#
+# The bootstrap URL (pointing to a remote bootstrap.yaml) can be specified via:
+#   1. BOOTSTRAP_URL environment variable (highest priority)
+#   2. --bootstrap-url <url> CLI flag
+#   3. Interactive prompt (when running with a TTY, not in CI/NONINTERACTIVE mode)
+#   4. configs/project_bootstrap.url file contents (default)
 #
 # Example: ./.agent/scripts/setup_layers.sh core
+# Example: BOOTSTRAP_URL=https://gitcloud/repo/raw/branch/jazzy/config/bootstrap.yaml make build
 #
 # This script will:
 # 1. Bootstrap the manifest repository (if needed)
@@ -31,7 +39,25 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
 fi
 set -e
 
-LAYER_NAME=$1
+# --- Argument parsing ---
+BOOTSTRAP_URL_FLAG=""
+LAYER_NAME=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bootstrap-url)
+            if [[ -z "${2:-}" || "$2" == --* ]]; then
+                echo "Error: --bootstrap-url requires a URL argument." >&2
+                exit 1
+            fi
+            BOOTSTRAP_URL_FLAG="$2"
+            shift 2
+            ;;
+        *)
+            LAYER_NAME="$1"
+            shift
+            ;;
+    esac
+done
 
 # Bootstrapping Configuration
 BOOTSTRAP_URL_FILE="configs/project_bootstrap.url"
@@ -53,6 +79,63 @@ is_optional_layer() {
     return 1
 }
 
+# Resolve the bootstrap URL from the available sources (priority order):
+#   1. BOOTSTRAP_URL env var
+#   2. --bootstrap-url CLI flag
+#   3. Interactive prompt (TTY + not CI/NONINTERACTIVE)
+#   4. configs/project_bootstrap.url file
+resolve_bootstrap_url() {
+    # 1. Environment variable (highest priority)
+    if [ -n "${BOOTSTRAP_URL:-}" ]; then
+        local trimmed
+        trimmed=$(echo "${BOOTSTRAP_URL}" | tr -d '[:space:]')
+        [ -n "$trimmed" ] && echo "$trimmed" && return 0
+    fi
+
+    # 2. CLI flag
+    if [ -n "$BOOTSTRAP_URL_FLAG" ]; then
+        local trimmed
+        trimmed=$(echo "${BOOTSTRAP_URL_FLAG}" | tr -d '[:space:]')
+        [ -n "$trimmed" ] && echo "$trimmed" && return 0
+    fi
+
+    # Read default from file (if it exists)
+    local default_url=""
+    if [ -f "$BOOTSTRAP_URL_FILE" ]; then
+        default_url=$(tr -d '[:space:]' < "$BOOTSTRAP_URL_FILE")
+    fi
+
+    # 3. Interactive prompt (TTY + not CI/NONINTERACTIVE)
+    if [ -z "${CI:-}" ] && [ -z "${NONINTERACTIVE:-}" ] && [ -t 0 ]; then
+        local prompt_url=""
+        if [ -n "$default_url" ]; then
+            echo "Bootstrap URL [${default_url}]:" >&2
+            read -r prompt_url || true
+            # Empty input = accept default
+            if [ -z "$prompt_url" ]; then
+                prompt_url="$default_url"
+            fi
+        else
+            echo "No bootstrap URL configured." >&2
+            echo "Enter the URL to your project's bootstrap.yaml:" >&2
+            read -r prompt_url || true
+        fi
+        if [ -n "$prompt_url" ]; then
+            echo "$prompt_url"
+            return 0
+        fi
+    fi
+
+    # 4. Fall back to file contents
+    if [ -n "$default_url" ]; then
+        echo "$default_url"
+        return 0
+    fi
+
+    # Nothing available
+    return 1
+}
+
 # Function to bootstrap the manifest repository if needed
 bootstrap_manifest_repo() {
     # If the manifest symlink already exists and resolves, we're bootstrapped
@@ -67,22 +150,16 @@ bootstrap_manifest_repo() {
         exit 1
     fi
 
-    if [ ! -f "$BOOTSTRAP_URL_FILE" ]; then
-        echo "Error: Bootstrap configuration not found: $BOOTSTRAP_URL_FILE"
-        echo "This file should contain a URL to the project's bootstrap.yaml"
+    REMOTE_CONFIG_URL=$(resolve_bootstrap_url) || {
+        echo "Error: No bootstrap URL available."
+        echo ""
+        echo "Provide one via:"
+        echo "  BOOTSTRAP_URL=<url> make build"
+        echo "  ./.agent/scripts/setup_layers.sh --bootstrap-url <url>"
+        echo "  Create configs/project_bootstrap.url with the URL"
         exit 1
-    fi
+    }
 
-    echo "Bootstrapping: Reading configuration from $BOOTSTRAP_URL_FILE..."
-    REMOTE_CONFIG_URL=$(cat "$BOOTSTRAP_URL_FILE" | tr -d '[:space:]')
-
-    # Note: The bootstrap config URL is controlled by this project's own
-    # configs/project_bootstrap.url file. The downloaded YAML provides
-    # git_url, branch, layer, and config_path values used to clone and
-    # configure the manifest repo. This is trusted because the URL file is
-    # committed to this repository and points to a known project-controlled
-    # location. If stronger integrity guarantees are needed in the future,
-    # consider pinning to a specific commit hash.
     echo "Fetching bootstrap config from $REMOTE_CONFIG_URL..."
     TEMP_CONFIG=$(mktemp)
     trap 'rm -f "$TEMP_CONFIG"' EXIT
