@@ -87,14 +87,16 @@ is_optional_layer() {
 resolve_bootstrap_url() {
     # 1. Environment variable (highest priority)
     if [ -n "${BOOTSTRAP_URL:-}" ]; then
-        echo "${BOOTSTRAP_URL}" | tr -d '[:space:]'
-        return 0
+        local trimmed
+        trimmed=$(echo "${BOOTSTRAP_URL}" | tr -d '[:space:]')
+        [ -n "$trimmed" ] && echo "$trimmed" && return 0
     fi
 
     # 2. CLI flag
     if [ -n "$BOOTSTRAP_URL_FLAG" ]; then
-        echo "${BOOTSTRAP_URL_FLAG}" | tr -d '[:space:]'
-        return 0
+        local trimmed
+        trimmed=$(echo "${BOOTSTRAP_URL_FLAG}" | tr -d '[:space:]')
+        [ -n "$trimmed" ] && echo "$trimmed" && return 0
     fi
 
     # Read default from file (if it exists)
