@@ -45,6 +45,10 @@ LAYER_NAME=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --bootstrap-url)
+            if [[ -z "${2:-}" || "$2" == --* ]]; then
+                echo "Error: --bootstrap-url requires a URL argument." >&2
+                exit 1
+            fi
             BOOTSTRAP_URL_FLAG="$2"
             shift 2
             ;;
@@ -83,13 +87,13 @@ is_optional_layer() {
 resolve_bootstrap_url() {
     # 1. Environment variable (highest priority)
     if [ -n "${BOOTSTRAP_URL:-}" ]; then
-        echo "$BOOTSTRAP_URL"
+        echo "${BOOTSTRAP_URL}" | tr -d '[:space:]'
         return 0
     fi
 
     # 2. CLI flag
     if [ -n "$BOOTSTRAP_URL_FLAG" ]; then
-        echo "$BOOTSTRAP_URL_FLAG"
+        echo "${BOOTSTRAP_URL_FLAG}" | tr -d '[:space:]'
         return 0
     fi
 
@@ -104,7 +108,7 @@ resolve_bootstrap_url() {
         local prompt_url=""
         if [ -n "$default_url" ]; then
             echo "Bootstrap URL [${default_url}]:" >&2
-            read -r prompt_url
+            read -r prompt_url || true
             # Empty input = accept default
             if [ -z "$prompt_url" ]; then
                 prompt_url="$default_url"
@@ -112,7 +116,7 @@ resolve_bootstrap_url() {
         else
             echo "No bootstrap URL configured." >&2
             echo "Enter the URL to your project's bootstrap.yaml:" >&2
-            read -r prompt_url
+            read -r prompt_url || true
         fi
         if [ -n "$prompt_url" ]; then
             echo "$prompt_url"
