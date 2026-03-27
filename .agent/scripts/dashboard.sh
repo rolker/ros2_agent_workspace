@@ -502,9 +502,12 @@ if [ "$SKIP_GITHUB" = false ]; then
             # Try git-bug for the workspace repo (where a bridge is configured)
             count=""
             if [ "$repo" = "$ROOT_REPO" ] && command -v git-bug &>/dev/null; then
-                # shellcheck source=gitbug_helpers.sh
-                source "$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
-                if gitbug_has_bridge "$ROOT_DIR"; then
+                _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
+                if [ -f "$_GITBUG_HELPERS" ]; then
+                    # shellcheck source=gitbug_helpers.sh
+                    source "$_GITBUG_HELPERS"
+                fi
+                if declare -F gitbug_has_bridge &>/dev/null && gitbug_has_bridge "$ROOT_DIR"; then
                     count=$(gitbug_count_open "$ROOT_DIR" 2>/dev/null || echo "")
                 fi
                 if [ -z "$count" ] || ! [[ "$count" =~ ^[0-9]+$ ]]; then
