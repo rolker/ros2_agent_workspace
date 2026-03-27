@@ -163,10 +163,60 @@ make pull-remote REMOTE=gitcloud              # fetch + report
 | `Makefile` | Add `push-remote` and `pull-remote` targets |
 | `AGENTS.md` | Add scripts to reference table |
 
-### Open Questions (Revised)
+### Resolved Questions
 
-- Should the one-time `add_remote.py` helper be included in this PR or deferred?
-  For 37 repos, manual setup is tedious. But keeping this PR focused on push/pull
-  is cleaner.
-- For `pull_remote.py`, should it suggest the next step per repo (e.g., "run
-  `git merge gitcloud/jazzy`" or "create a PR")? Or keep output minimal?
+- **`add_remote.py` helper**: Include in this PR. Manual setup for 37 repos is
+  too tedious. Derives target repo name from origin URL via `extract_github_owner_repo`.
+- **`pull_remote.py` output and actions**: Default mode fetches and reports, listing
+  individual commits when the remote has new ones. Two action modes available:
+  - `--pull`: merge remote changes directly into the current branch
+  - `--branch <name>`: pull remote changes into a named branch (for PR workflows)
+
+### Additional Script: `add_remote.py`
+
+```
+add_remote.py --remote <name> --url-prefix <prefix>
+              [--manifest <name,...>] [--include-underlay] [--dry-run]
+```
+
+- Iterates all workspace repos (via `list_overlay_repos` + workspace root)
+- Derives repo name from origin URL (e.g., `https://github.com/rolker/foo.git` → `foo`)
+- Adds remote `<name>` pointing to `<prefix><repo_name>.git`
+- Skips repos where the remote already exists
+- One-time setup; subsequent push/pull just use `--remote <name>`
+
+### Revised `pull_remote.py`
+
+```
+pull_remote.py --remote <name> [--pull] [--branch <name>]
+               [--manifest <name,...>] [--include-underlay] [--dry-run]
+```
+
+- **Default (no flags)**: fetch + report. For repos with new remote commits,
+  list them (short hash + subject line).
+- **`--pull`**: fetch, then merge the remote's branch into the current local branch.
+  Skip repos with dirty working directories.
+- **`--branch <name>`**: fetch, then create/update a local branch with the remote's
+  changes. Useful for repos that require PRs — push the branch and open a PR.
+- `--pull` and `--branch` are mutually exclusive.
+
+### Revised Makefile Targets
+
+```makefile
+make add-remote REMOTE=gitcloud URL_PREFIX=git@gitcloud:field/   # one-time setup
+make push-remote REMOTE=gitcloud              # push default branches + tags
+make push-remote REMOTE=gitcloud ALL=1        # push all branches + tags
+make pull-remote REMOTE=gitcloud              # fetch + report with commit listing
+make pull-remote REMOTE=gitcloud PULL=1       # fetch + merge
+make pull-remote REMOTE=gitcloud BRANCH=sync/gitcloud  # fetch into branch
+```
+
+### Revised Files to Change
+
+| File | Change |
+|------|--------|
+| `.agent/scripts/add_remote.py` | New — one-time remote setup for all repos |
+| `.agent/scripts/push_remote.py` | New — push to named remote |
+| `.agent/scripts/pull_remote.py` | New — fetch/report/pull from named remote |
+| `Makefile` | Add `add-remote`, `push-remote`, and `pull-remote` targets |
+| `AGENTS.md` | Add scripts to reference table |
