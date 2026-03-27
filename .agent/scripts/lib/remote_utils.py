@@ -59,12 +59,14 @@ def get_default_branch(repo_path, version):
                 return version
 
     # Detect from origin/HEAD
-    success, out, _ = run_git(repo_path, ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"])
+    success, out, _ = run_git(
+        repo_path, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"]
+    )
     if success and out:
         return out.replace("origin/", "")
 
     # Fall back to current branch
-    success, out, _ = run_git(repo_path, ["symbolic-ref", "HEAD", "--short"])
+    success, out, _ = run_git(repo_path, ["symbolic-ref", "-q", "--short", "HEAD"])
     if success and out:
         return out
 

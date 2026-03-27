@@ -21,8 +21,9 @@ Environment variables:
 import argparse
 import json
 import os
-import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -102,28 +103,20 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
         print(f"  [DRY-RUN] PATCH {api_url} {payload}")
         return True, "default branch set (dry run)"
 
+    req = urllib.request.Request(
+        api_url,
+        data=payload.encode(),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"token {token}",
+        },
+        method="PATCH",
+    )
     try:
-        subprocess.run(
-            [
-                "curl",
-                "-sf",
-                "-X",
-                "PATCH",
-                api_url,
-                "-H",
-                "Content-Type: application/json",
-                "-H",
-                f"Authorization: token {token}",
-                "-d",
-                payload,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=15,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        return False, f"API call failed: {exc}"
+        with urllib.request.urlopen(req, timeout=15):
+            pass
+    except urllib.error.URLError as exc:
+        return False, f"API call failed: {exc.reason}"
     return True, f"default branch set to '{branch}'"
 
 
