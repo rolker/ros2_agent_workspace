@@ -49,7 +49,7 @@ def _compare_branches(repo_path, branch, remote_ref):
     for ref, label in [(remote_ref, "remote"), (branch, "local branch")]:
         success, _, _ = run_git(repo_path, ["rev-parse", "--verify", ref])
         if not success:
-            return "ok", f"fetched (no {ref} on {label})"
+            return "skip", f"fetched (no {ref} on {label})"
 
     # Count commits ahead/behind
     success, output, _ = run_git(

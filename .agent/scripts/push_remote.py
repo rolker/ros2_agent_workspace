@@ -133,7 +133,14 @@ def process_repo(repo_path, repo_name, version, args):
         if not success:
             errors.append(f"push --all failed: {err}")
     else:
-        success, _, err = run_git(repo_path, ["push", args.remote, branch], args.dry_run)
+        # Use explicit refspec — the branch may only exist as a remote tracking
+        # ref (refs/remotes/origin/<branch>) with no local branch.
+        local_exists, _, _ = run_git(repo_path, ["rev-parse", "--verify", f"refs/heads/{branch}"])
+        if local_exists:
+            refspec = branch
+        else:
+            refspec = f"origin/{branch}:{branch}"
+        success, _, err = run_git(repo_path, ["push", args.remote, refspec], args.dry_run)
         if not success:
             errors.append(f"push {branch} failed: {err}")
 
@@ -168,9 +175,13 @@ def main():
         help="Set default branch on Forgejo/Gitea to match manifest "
         "version (requires FORGEJO_TOKEN)",
     )
+    args = parser.parse_args()
+    if args.set_default_branch and not os.environ.get("FORGEJO_TOKEN"):
+        parser.error("--set-default-branch requires FORGEJO_TOKEN environment variable")
+
     run_script(
         SCRIPT_DIR,
-        parser.parse_args(),
+        args,
         process_repo,
         {"ok": 0, "skip": 0, "error": 0, "missing": 0},
         [("ok", "pushed"), ("skip", "skipped"), ("error", "errors"), ("missing", "missing")],

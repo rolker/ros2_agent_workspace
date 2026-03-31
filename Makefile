@@ -217,7 +217,7 @@ push-remote:
 		echo "Usage: make push-remote REMOTE=gitcloud [ALL=1] [SET_DEFAULT=1]"; \
 		exit 1; \
 	fi
-	@python3 ./.agent/scripts/push_remote.py --remote $(REMOTE) $(if $(ALL),--all-branches,) $(if $(SET_DEFAULT),--set-default-branch,)
+	@python3 ./.agent/scripts/push_remote.py --remote $(REMOTE) $(if $(filter 1,$(ALL)),--all-branches,) $(if $(filter 1,$(SET_DEFAULT)),--set-default-branch,)
 
 pull-remote:
 	@if [ -z "$(REMOTE)" ]; then \
@@ -225,7 +225,7 @@ pull-remote:
 		echo "Usage: make pull-remote REMOTE=gitcloud [PULL=1] [BRANCH=<name>]"; \
 		exit 1; \
 	fi
-	@python3 ./.agent/scripts/pull_remote.py --remote $(REMOTE) $(if $(PULL),--pull,) $(if $(BRANCH),--branch $(BRANCH),)
+	@python3 ./.agent/scripts/pull_remote.py --remote $(REMOTE) $(if $(filter 1,$(PULL)),--pull,) $(if $(BRANCH),--branch $(BRANCH),)
 
 lock:
 	@./.agent/scripts/lock.sh "Manual lock via Makefile"
