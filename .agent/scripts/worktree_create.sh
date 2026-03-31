@@ -74,6 +74,7 @@ if v and v != 'unknown': print(v)
 generate_worktree_scripts() {
     local wt_dir="$1"
     local main_root="$2"
+    local target_layer="${3:-}"
 
     echo ""
     echo "Generating convenience scripts..."
@@ -172,9 +173,34 @@ if [ -x ${_escaped_main_root}/.venv/bin/pre-commit ]; then
 fi
 SETUP_PRECOMMIT
 
+    # Worktree PYTHONPATH override: force-prepend target layer's build and install
+    # paths so they take priority over the main tree's symlink-install develop hooks.
+    # Without this, colcon's baked-in absolute paths cause the main tree's stale
+    # egg-info to shadow the worktree's new/modified entry points. See #427.
+    if [ -n "$target_layer" ]; then
+        cat >> "$wt_dir/setup.bash" << SETUP_PYTHONPATH_FIX
+
+# 5. Prioritize worktree target layer over main tree symlink-install paths (#427)
+# Colcon's setup.bash bakes absolute paths to layers/main/ at build time. Symlinked
+# higher layers re-source the main tree's install, bringing in stale develop hooks.
+# Force-prepend the worktree's target layer paths so they win.
+for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
+    [ -d "\$_wt_pkg_build" ] || continue
+    _wt_pkg=\$(basename "\$_wt_pkg_build")
+    for _wt_sp in "\$WORKTREE_DIR/${target_layer}_ws/install/\$_wt_pkg"/lib/python3.*/site-packages; do
+        [ -d "\$_wt_sp" ] || continue
+        export PYTHONPATH="\$_wt_sp:\$PYTHONPATH"
+        export PYTHONPATH="\${_wt_pkg_build%/}:\$PYTHONPATH"
+        break
+    done
+done
+unset _wt_pkg_build _wt_pkg _wt_sp
+SETUP_PYTHONPATH_FIX
+    fi
+
     cat >> "$wt_dir/setup.bash" << 'SETUP_FOOTER2'
 
-# 5. Prevent interactive editor hangs
+# 6. Prevent interactive editor hangs
 export GIT_EDITOR=true
 
 echo "Environment ready."
@@ -946,7 +972,7 @@ EOF
     fi
 
     # Generate convenience scripts (setup.bash, build.sh, test.sh, etc.)
-    generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR"
+    generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR" "$TARGET_LAYER"
 fi
 
 # For workspace worktrees, symlink the layers directory
