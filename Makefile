@@ -43,7 +43,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway
+.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -65,6 +65,11 @@ help:
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  validate      - Validate workspace config (CI-oriented, pass/fail)"
+	@echo ""
+	@echo "Remote sync:"
+	@echo "  add-remote REMOTE=<name> URL_PREFIX=<prefix> - Add remote to all repos"
+	@echo "  push-remote REMOTE=<name> [ALL=1] [SET_DEFAULT=1] - Push to named remote"
+	@echo "  pull-remote REMOTE=<name> [PULL=1|BRANCH=<b>] - Fetch/pull from remote"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  sync          - Safely sync all workspace repositories"
@@ -208,6 +213,30 @@ skip-git-bug:
 
 sync:
 	@python3 ./.agent/scripts/sync_repos.py
+
+add-remote:
+	@if [ -z "$(REMOTE)" ] || [ -z "$(URL_PREFIX)" ]; then \
+		echo "Error: REMOTE and URL_PREFIX required"; \
+		echo "Usage: make add-remote REMOTE=gitcloud URL_PREFIX=git@gitcloud:field/"; \
+		exit 1; \
+	fi
+	@python3 ./.agent/scripts/add_remote.py --remote $(REMOTE) --url-prefix "$(URL_PREFIX)"
+
+push-remote:
+	@if [ -z "$(REMOTE)" ]; then \
+		echo "Error: REMOTE parameter required"; \
+		echo "Usage: make push-remote REMOTE=gitcloud [ALL=1] [SET_DEFAULT=1]"; \
+		exit 1; \
+	fi
+	@python3 ./.agent/scripts/push_remote.py --remote $(REMOTE) $(if $(filter 1,$(ALL)),--all-branches,) $(if $(filter 1,$(SET_DEFAULT)),--set-default-branch,)
+
+pull-remote:
+	@if [ -z "$(REMOTE)" ]; then \
+		echo "Error: REMOTE parameter required"; \
+		echo "Usage: make pull-remote REMOTE=gitcloud [PULL=1] [BRANCH=<name>]"; \
+		exit 1; \
+	fi
+	@python3 ./.agent/scripts/pull_remote.py --remote $(REMOTE) $(if $(filter 1,$(PULL)),--pull,) $(if $(BRANCH),--branch $(BRANCH),)
 
 lock:
 	@./.agent/scripts/lock.sh "Manual lock via Makefile"
