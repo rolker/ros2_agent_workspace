@@ -44,7 +44,7 @@ def get_current_branch(repo_path):
 
 
 def _compare_branches(repo_path, branch, remote_ref):
-    """Compare local and remote branches. Returns (status, message) or None if not comparable."""
+    """Compare local and remote branches. Returns (status, message)."""
     # Verify both refs exist
     for ref, label in [(remote_ref, "remote"), (branch, "local branch")]:
         success, _, _ = run_git(repo_path, ["rev-parse", "--verify", ref])
@@ -109,6 +109,8 @@ def _check_pull_preconditions(repo_path, version):
 
     branch = get_default_branch(repo_path, version)
     current = get_current_branch(repo_path)
+    if current is None:
+        return None, "detached HEAD — skipping merge"
     if current != branch:
         return None, f"not on default branch (on '{current}', expected '{branch}')"
     return branch, None
