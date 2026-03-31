@@ -175,7 +175,7 @@ if [ "${GITBUG_CREATE:-}" = "1" ] && command -v git-bug &>/dev/null; then
         if [ -n "$_BODY" ]; then
             _GB_ARGS+=(--message "$_BODY")
         fi
-        if git bug new "${_GB_ARGS[@]}" 2>/dev/null; then
+        if git bug bug new "${_GB_ARGS[@]}" 2>/dev/null; then
             if git bug push 2>/dev/null; then
                 echo "✅ Issue created via git-bug and synced to GitHub"
             else
