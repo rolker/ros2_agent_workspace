@@ -43,6 +43,8 @@ Phase 1 only (happy path). Phases 2-3 deferred to follow-up issues.
 | File | Change |
 |------|--------|
 | `.agent/scripts/pull_remote.py` | Add `--fetch-only` with JSON output mode |
+| `.agent/project_config.yaml` | New gitignored config file (document in setup) |
+| `.gitignore` | Add `.agent/project_config.yaml` |
 | `.claude/skills/import-field-changes/` | New skill directory |
 | `.claude/skills/import-field-changes/content.md` | Skill definition |
 | `AGENTS.md` | Add skill to reference if needed |
@@ -73,14 +75,24 @@ Phase 1 only (happy path). Phases 2-3 deferred to follow-up issues.
 | `pull_remote.py` flags | Script reference table in AGENTS.md | Yes |
 | Add new skill | Framework adapter skill lists | Yes |
 
+## Decisions
+
+- **Remote name**: read from `.agent/project_config.yaml` (gitignored, project-specific).
+  No hardcoded default. Error with helpful message if file missing or key absent.
+  ```yaml
+  # .agent/project_config.yaml
+  field_remote: gitcloud
+  ```
+- **Issue title convention**: `Field import: <repo> (YYYY-MM-DD)` — one issue per
+  repo, predictable and searchable.
+- **Resync**: deferred to Phase 2. After PRs merge, normal `push_remote.py` handles
+  non-diverged repos. Force-push resync is a separate concern.
+
 ## Open Questions
 
-- Should the skill default to `gitcloud` remote or require explicit `--remote`?
-- Should the issue title follow a convention (e.g., "Import field changes: <repo> <date>")?
-- Should Phase 1 include the resync step (force-push origin→gitcloud after merge)?
-  Previous comments suggest this is needed but adds risk.
+None — all design questions resolved.
 
 ## Estimated Scope
 
-Single PR for Phase 1. Follow-up issues for: Phase 2 (auto-fix in worktree),
-Phase 3 (resync), ADR for field branch conventions.
+Single PR for Phase 1. Follow-up issues for: Phase 2 (auto-fix in worktree +
+resync), ADR for field branch conventions.
