@@ -45,6 +45,24 @@ setup (environment, identity, features), see your framework's adapter file:
 - Construct GitHub URLs from directory names — use `gh` CLI to look them up
 - Run bare `pip install` or use `--break-system-packages` — use `.venv` for dev tools (see ADR-0009)
 
+## Quality Standard
+
+This is software for autonomous robot boats operating on open water. Robustness
+is not optional. The marginal cost of completeness is near zero with AI — do the
+whole thing, do it right, do it with tests.
+
+- When fixing a bug, fix it completely: add the test, handle the edge case, check
+  the lifecycle transition. Never leave a "good enough" fix when the proper one is
+  within reach.
+- When triaging reviews, do not dismiss concerns about error handling, silent
+  failures, stale data, or missing validation as "nits" unless the failure mode
+  genuinely cannot occur. "Config is under our control" and "pathological input"
+  are not blanket dismissals — field configs change under pressure.
+- When importing field fixes, treat them as drafts: add tests, verify topic names,
+  check for idempotency. The PR is the quality gate.
+- Never offer to "table this for later" when the permanent solve is five minutes
+  away. Never present a workaround when the real fix exists.
+
 ## Worktree Workflow
 
 Every task must use an isolated worktree.
