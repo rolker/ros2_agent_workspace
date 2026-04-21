@@ -11,6 +11,9 @@ configs/manifest_repo/
 configs/manifest
 .agent/project_knowledge
 
+# Project-specific config (field remote name, etc. — not shared)
+.agent/project_config.yaml
+
 # Ignore colcon/ROS artifacts in root if any
 build/
 install/

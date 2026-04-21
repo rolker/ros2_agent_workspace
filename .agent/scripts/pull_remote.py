@@ -16,16 +16,19 @@ Prerequisites:
 """
 
 import argparse
+import json as json_mod
 import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
-from remote_utils import (
+from remote_utils import (  # noqa: E402
     add_common_args,
     get_default_branch,
+    get_repos,
     remote_exists,
+    resolve_repo_path,
     run_git,
     run_script,
 )
@@ -184,6 +187,56 @@ def process_repo(repo_path, repo_name, version, args):
     return _fetch_and_report(repo_path, args.remote, version, args.dry_run)
 
 
+def _get_ahead_commits(repo_path, branch, remote_ref):
+    """Get list of commits on remote not on local. Returns list of dicts."""
+    success, output, _ = run_git(repo_path, ["log", "--oneline", f"{branch}..{remote_ref}"])
+    if not success or not output:
+        return []
+    commits = []
+    for line in output.splitlines():
+        parts = line.split(" ", 1)
+        commits.append({"sha": parts[0], "subject": parts[1] if len(parts) > 1 else ""})
+    return commits
+
+
+def _json_report(repo_path, repo_name, version, remote_name):
+    """Generate JSON-friendly report for a single repo."""
+    branch = get_default_branch(repo_path, version)
+    remote_ref = f"{remote_name}/{branch}"
+
+    # Check remote ref exists
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", remote_ref])
+    if not success:
+        return None  # no remote branch
+
+    # Count ahead/behind
+    success, output, _ = run_git(
+        repo_path, ["rev-list", "--left-right", "--count", f"{branch}...{remote_ref}"]
+    )
+    if not success or not output:
+        return None
+
+    parts = output.split()
+    if len(parts) != 2:
+        return None
+
+    ahead, behind = int(parts[0]), int(parts[1])
+    if behind == 0:
+        return None  # nothing new on remote
+
+    commits = _get_ahead_commits(repo_path, branch, remote_ref)
+    return {
+        "repo": repo_name,
+        "path": str(repo_path),
+        "default_branch": branch,
+        "remote_ref": remote_ref,
+        "ahead": ahead,
+        "behind": behind,
+        "diverged": ahead > 0 and behind > 0,
+        "commits": commits,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Fetch/pull from a named remote for all workspace repositories."
@@ -199,7 +252,42 @@ def main():
         "--branch",
         help="Create/update a local branch with remote changes (e.g., sync/gitcloud)",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output JSON report of repos with remote-ahead commits (fetch-only mode)",
+    )
     args = parser.parse_args()
+
+    if args.json:
+        # JSON mode: fetch all, report repos with changes as structured data
+        if args.pull or args.branch:
+            parser.error("--json cannot be combined with --pull or --branch")
+
+        root_dir = SCRIPT_DIR.parent.parent
+        repos = get_repos(args)
+        results = []
+
+        # Workspace repo
+        run_git(root_dir, ["fetch", args.remote], args.dry_run)
+        ws_version = get_default_branch(root_dir, None)
+        entry = _json_report(root_dir, "ros2_agent_workspace", ws_version, args.remote)
+        if entry:
+            results.append(entry)
+
+        for repo in repos:
+            repo_path = resolve_repo_path(root_dir, repo)
+            if repo_path is None:
+                continue
+            if not remote_exists(repo_path, args.remote):
+                continue
+            run_git(repo_path, ["fetch", args.remote], args.dry_run)
+            entry = _json_report(repo_path, repo["name"], repo["version"], args.remote)
+            if entry:
+                results.append(entry)
+
+        print(json_mod.dumps(results, indent=2))
+        sys.exit(0)
 
     if args.pull or args.branch:
         labels = [
