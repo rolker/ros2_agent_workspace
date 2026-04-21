@@ -168,9 +168,9 @@ Output a structured report:
 
 ### False Positives (Bot)
 
-| # | Source | File | Line | Comment | Reasoning |
-|---|--------|------|------|---------|-----------|
-| 1 | Copilot | `path/to/file` | 10 | What the bot said | Why it's not applicable |
+| # | Source | File | Line | Comment | Justification |
+|---|--------|------|------|---------|---------------|
+| 1 | Copilot | `path/to/file` | 10 | What the bot said | Specific reason the failure mode cannot occur |
 
 ### Recommended Actions
 
@@ -209,6 +209,15 @@ Output a structured report:
   issue, group them in the valid issues table.
 - **Governance alignment** — note when a comment aligns with or contradicts
   workspace principles or ADRs.
+- **Justify every false positive** — every "false positive" classification must
+  include a specific reason the failure mode cannot occur in this system. Blanket
+  dismissals are not sufficient:
+  - "Config is under our control" — explain what prevents misconfiguration in the field
+  - "Pathological input" — explain why that input genuinely cannot reach this code path
+  - "Nice-to-have" / "low priority" — not valid justifications; if the concern is
+    about error handling, stale data, or silent failures, classify as Valid unless
+    you can prove the failure mode is impossible
+  - If you cannot articulate why it's safe, classify as Valid and suggest the fix
 - **No comments posted** — this skill is read-only. It does not post review comments,
   dismiss reviews, or modify the PR in any way.
 - **Plan-first workflow PRs** — In the plan-first workflow, a PR starts with a
