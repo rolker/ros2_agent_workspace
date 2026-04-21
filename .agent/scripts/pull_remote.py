@@ -187,9 +187,11 @@ def process_repo(repo_path, repo_name, version, args):
     return _fetch_and_report(repo_path, args.remote, version, args.dry_run)
 
 
-def _get_ahead_commits(repo_path, branch, remote_ref):
+def _get_ahead_commits(repo_path, branch, remote_ref, max_count=50):
     """Get list of commits on remote not on local. Returns list of dicts."""
-    success, output, _ = run_git(repo_path, ["log", "--oneline", f"{branch}..{remote_ref}"])
+    success, output, _ = run_git(
+        repo_path, ["log", "--oneline", f"--max-count={max_count}", f"{branch}..{remote_ref}"]
+    )
     if not success or not output:
         return []
     commits = []
@@ -252,7 +254,7 @@ def main():
         "--branch",
         help="Create/update a local branch with remote changes (e.g., sync/gitcloud)",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--json",
         action="store_true",
         help="Output JSON report of repos with remote-ahead commits (fetch-only mode)",
@@ -260,20 +262,20 @@ def main():
     args = parser.parse_args()
 
     if args.json:
-        # JSON mode: fetch all, report repos with changes as structured data
-        if args.pull or args.branch:
-            parser.error("--json cannot be combined with --pull or --branch")
-
         root_dir = SCRIPT_DIR.parent.parent
         repos = get_repos(args)
         results = []
+        errors = []
 
         # Workspace repo
-        run_git(root_dir, ["fetch", args.remote], args.dry_run)
-        ws_version = get_default_branch(root_dir, None)
-        entry = _json_report(root_dir, "ros2_agent_workspace", ws_version, args.remote)
-        if entry:
-            results.append(entry)
+        success, _, err = run_git(root_dir, ["fetch", args.remote], args.dry_run)
+        if not success:
+            errors.append(f"ros2_agent_workspace: fetch failed: {err}")
+        else:
+            ws_version = get_default_branch(root_dir, None)
+            entry = _json_report(root_dir, "ros2_agent_workspace", ws_version, args.remote)
+            if entry:
+                results.append(entry)
 
         for repo in repos:
             repo_path = resolve_repo_path(root_dir, repo)
@@ -281,13 +283,20 @@ def main():
                 continue
             if not remote_exists(repo_path, args.remote):
                 continue
-            run_git(repo_path, ["fetch", args.remote], args.dry_run)
+            success, _, err = run_git(repo_path, ["fetch", args.remote], args.dry_run)
+            if not success:
+                errors.append(f"{repo['name']}: fetch failed: {err}")
+                continue
             entry = _json_report(repo_path, repo["name"], repo["version"], args.remote)
             if entry:
                 results.append(entry)
 
+        if errors:
+            for e in errors:
+                print(f"ERROR: {e}", file=sys.stderr)
+
         print(json_mod.dumps(results, indent=2))
-        sys.exit(0)
+        sys.exit(1 if errors else 0)
 
     if args.pull or args.branch:
         labels = [

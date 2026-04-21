@@ -57,19 +57,6 @@ git -C <path> diff <default_branch>..<remote>/<default_branch> --stat
 git -C <path> log --oneline <default_branch>..<remote>/<default_branch>
 ```
 
-### 3. For each repo with changes
-
-Process repos sequentially:
-
-#### 3a. Summarize the diff
-
-Read the diff between local default branch and remote:
-
-```bash
-git -C <path> diff <default_branch>..<remote>/<default_branch> --stat
-git -C <path> log --oneline <default_branch>..<remote>/<default_branch>
-```
-
 #### 3b. Pre-review against Quality Standard
 
 Examine the diff for Quality Standard concerns:
@@ -90,20 +77,22 @@ Body should include:
 - Pre-review findings (if any)
 - Whether the repo is diverged (merge needed)
 
-Use `gh issue create` in the project repo directory.
+Use `.agent/scripts/gh_create_issue.sh` from the project repo directory.
 
 #### 3d. Create branch and PR
 
+Create the branch without checking it out (avoids changing main tree HEAD):
+
 **Non-diverged case** (remote ahead, local not ahead):
 ```bash
-git -C <path> checkout -b feature/issue-<N> <remote>/<default_branch>
+git -C <path> branch feature/issue-<N> <remote>/<default_branch>
 git -C <path> push -u origin feature/issue-<N>
 ```
 
 **Diverged case** (both sides have commits):
 ```bash
 # Branch from remote HEAD — merge will happen in worktree
-git -C <path> checkout -b feature/issue-<N> <remote>/<default_branch>
+git -C <path> branch feature/issue-<N> <remote>/<default_branch>
 git -C <path> push -u origin feature/issue-<N>
 ```
 
