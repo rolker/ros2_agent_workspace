@@ -10,6 +10,7 @@ Usage:
     python3 pull_remote.py --remote gitcloud                    # fetch + report
     python3 pull_remote.py --remote gitcloud --pull             # fetch + merge
     python3 pull_remote.py --remote gitcloud --branch sync/gc   # fetch into branch
+    python3 pull_remote.py --remote gitcloud --json             # fetch + JSON output
 
 Prerequisites:
     Remotes must already exist in each repo. Use add_remote.py for one-time setup.

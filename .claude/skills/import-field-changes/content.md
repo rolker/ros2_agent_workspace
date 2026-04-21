@@ -96,8 +96,9 @@ git -C <path> branch feature/issue-<N> <remote>/<default_branch>
 git -C <path> push -u origin feature/issue-<N>
 ```
 
-Create draft PR:
+Create draft PR (run from within the project repo directory):
 ```bash
+cd <path>
 gh pr create --draft --title "Field import: <repo_name> (<date>)" \
   --body-file <body> --base <default_branch>
 ```
