@@ -57,6 +57,19 @@ git -C <path> diff <default_branch>..<remote>/<default_branch> --stat
 git -C <path> log --oneline <default_branch>..<remote>/<default_branch>
 ```
 
+### 3. For each repo with changes
+
+Process repos sequentially:
+
+#### 3a. Summarize the diff
+
+Read the diff between local default branch and remote:
+
+```bash
+git -C <path> diff <default_branch>..<remote>/<default_branch> --stat
+git -C <path> log --oneline <default_branch>..<remote>/<default_branch>
+```
+
 #### 3b. Pre-review against Quality Standard
 
 Examine the diff for Quality Standard concerns:

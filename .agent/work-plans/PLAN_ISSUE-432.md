@@ -16,13 +16,12 @@ worktree creation was heavy enough to tempt shortcuts.
 
 Phase 1 only (happy path). Phases 2-3 deferred to follow-up issues.
 
-1. **Add `--fetch-only` flag to `pull_remote.py`** — currently default mode
-   fetches and reports. Formalize this as an explicit flag that returns
-   structured output (JSON) listing repos with ahead commits, commit count,
-   and whether diverged.
+1. **Add `--json` flag to `pull_remote.py`** — structured output mode that
+   returns JSON listing repos with ahead commits, commit count, and whether
+   diverged. Used by the skill for machine-readable detection.
 
 2. **Create `import-field-changes` skill** — batch skill that:
-   a. Calls `pull_remote.py --fetch-only --remote <name>` (default: gitcloud)
+   a. Calls `pull_remote.py --remote <name> --json`
    b. For each repo with changes: examines diff, generates issue body with
       commit summary and pre-review findings
    c. Creates issue in the project repo via `gh_create_issue.sh`
@@ -42,7 +41,7 @@ Phase 1 only (happy path). Phases 2-3 deferred to follow-up issues.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/pull_remote.py` | Add `--fetch-only` with JSON output mode |
+| `.agent/scripts/pull_remote.py` | Add `--json` structured output mode |
 | `.agent/project_config.yaml` | New gitignored config file (document in setup) |
 | `.gitignore` | Add `.agent/project_config.yaml` |
 | `.claude/skills/import-field-changes/` | New skill directory |
