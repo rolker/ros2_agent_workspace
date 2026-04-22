@@ -14,8 +14,9 @@ For agents without a framework-specific instruction file.
 source .agent/scripts/setup.bash
 
 # 2. Configure git identity
-# Host-based (shared workspace):
-source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
+# Host-based (shared workspace): pass your actual model as the 3rd argument
+# (from your system prompt — do NOT rely on framework_config.sh defaults).
+source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>" "<your model>"
 # Container/isolated:
 .agent/scripts/configure_git_identity.sh "<Agent Name>" "<email>"
 

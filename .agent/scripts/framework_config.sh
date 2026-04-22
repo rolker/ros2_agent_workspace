@@ -26,9 +26,19 @@ declare -A FRAMEWORK_EMAILS=(
 )
 
 # Framework default model lookup table
-# Maps framework key to typical/default model name
-# NOTE: These are defaults - actual runtime model may differ
-# Agents should detect their actual model when possible
+# Maps framework key to fallback model name.
+#
+# IMPORTANT: These are FALLBACKS ONLY — consulted whenever a caller does not
+# supply the model explicitly: `--agent <fw>`, `--detect`, and the 2-arg form
+# all read from this table. Only the 3-arg self-report form bypasses it.
+# Agents MUST pass their actual runtime model as the 3rd argument to
+# `set_git_identity_env.sh` (from their system prompt).
+#
+# DO NOT bump these values for every new model release. Doing so re-creates
+# the staleness treadmill that issue #407 eliminated. If an agent intended to
+# self-report its runtime model and its AI signature shows one of these values,
+# it forgot to pass the 3rd arg — fix the caller, not this file. (Callers using
+# --agent or --detect intentionally read from this table by design.)
 declare -A FRAMEWORK_MODELS=(
     ["copilot"]="GPT-4o"
     ["gemini"]="Gemini 2.0 Flash"

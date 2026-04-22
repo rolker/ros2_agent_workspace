@@ -109,37 +109,79 @@ fi
 echo ""
 
 # Test 5c: Manual 2-parameter usage (backward compatibility)
+#
+# The 2-arg path in set_git_identity_env.sh runs framework detection and looks
+# up the matching fallback model from framework_config.sh. The contract is:
+#   - detection miss → (AGENT_FRAMEWORK=custom,            AGENT_MODEL="Unknown Model")
+#   - detection hit  → (AGENT_FRAMEWORK=<detected>,        AGENT_MODEL=FRAMEWORK_MODELS[normalized key])
+# Framework normalization mirrors set_git_identity_env.sh: strip trailing -cli,
+# lowercase. AGENT_FRAMEWORK must never be the raw sentinel "unknown".
 echo "Test 5c: Manual 2-parameter usage (backward compatibility)..."
 # Clear any existing variables
 unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
 # Source with 2 parameters
 source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" > /dev/null 2>&1
-if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Unknown Model" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
-    echo "✅ 2-parameter usage works correctly (model = 'Unknown Model')"
+
+test_5c_ok=true
+test_5c_reason=""
+if [ "$AGENT_NAME" != "Test Agent" ] || [ "$AGENT_EMAIL" != "test@example.com" ]; then
+    test_5c_ok=false
+    test_5c_reason="name/email mismatch"
+elif [ "$AGENT_FRAMEWORK" = "unknown" ] || [ -z "$AGENT_FRAMEWORK" ]; then
+    test_5c_ok=false
+    test_5c_reason="AGENT_FRAMEWORK must not be empty or 'unknown' (should map to 'custom' on detection miss)"
+elif [ "$AGENT_FRAMEWORK" = "custom" ]; then
+    if [ "$AGENT_MODEL" != "Unknown Model" ]; then
+        test_5c_ok=false
+        test_5c_reason="framework=custom implies model='Unknown Model', got '$AGENT_MODEL'"
+    fi
 else
-    echo "❌ 2-parameter usage failed"
+    # Detected framework: model must match FRAMEWORK_MODELS[normalized key]
+    fwkey="${AGENT_FRAMEWORK%-cli}"
+    fwkey="${fwkey,,}"
+    expected_model="${FRAMEWORK_MODELS[$fwkey]:-Unknown Model}"
+    if [ "$AGENT_MODEL" != "$expected_model" ]; then
+        test_5c_ok=false
+        test_5c_reason="framework='$AGENT_FRAMEWORK' (key='$fwkey') implies model='$expected_model', got '$AGENT_MODEL'"
+    fi
+fi
+
+if [ "$test_5c_ok" = "true" ]; then
+    echo "✅ 2-parameter usage works correctly (framework=$AGENT_FRAMEWORK, model=$AGENT_MODEL)"
+else
+    echo "❌ 2-parameter usage failed: $test_5c_reason"
     echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
     echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
-    echo "   AGENT_MODEL=$AGENT_MODEL (expected: Unknown Model)"
-    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    echo "   AGENT_MODEL=$AGENT_MODEL"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK"
     exit 1
 fi
 echo ""
 
-# Test 5d: Manual 3-parameter usage (new feature)
+# Test 5d: Manual 3-parameter usage (self-report form)
+#
+# The 3-arg form preserves the caller-supplied model verbatim; AGENT_FRAMEWORK
+# comes from framework detection with the raw sentinel "unknown" collapsed to
+# "custom" (see set_git_identity_env.sh:154-164). Contract:
+#   - model matches the 3rd arg exactly (self-report)
+#   - framework is non-empty AND is never the raw sentinel "unknown"
 echo "Test 5d: Manual 3-parameter usage with model (new feature)..."
 # Clear any existing variables
 unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
 # Source with 3 parameters
 source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" "Test Model 1.0" > /dev/null 2>&1
-if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Test Model 1.0" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
-    echo "✅ 3-parameter usage works correctly (model specified)"
+if [ "$AGENT_NAME" = "Test Agent" ] \
+   && [ "$AGENT_EMAIL" = "test@example.com" ] \
+   && [ "$AGENT_MODEL" = "Test Model 1.0" ] \
+   && [ -n "$AGENT_FRAMEWORK" ] \
+   && [ "$AGENT_FRAMEWORK" != "unknown" ]; then
+    echo "✅ 3-parameter usage works correctly (model=$AGENT_MODEL, framework=$AGENT_FRAMEWORK)"
 else
     echo "❌ 3-parameter usage failed"
     echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
     echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
     echo "   AGENT_MODEL=$AGENT_MODEL (expected: Test Model 1.0)"
-    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: non-empty and not 'unknown')"
     exit 1
 fi
 echo ""
