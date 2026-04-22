@@ -36,7 +36,7 @@ Agent identity is determined from these sources (in order of preference):
    - Template is at `.agent/.identity.template`
 
 **How to determine your identity:**
-1. **Use environment variables** (recommended) - Set by `set_git_identity_env.sh --detect`
+1. **Use environment variables** (recommended) - Set by sourcing `set_git_identity_env.sh` with your agent name, email, and runtime model as the 3rd argument (self-report form). `--detect` is a fallback for agents that cannot introspect their own model.
 2. **Read from** `.agent/.identity` file if it exists (check with `[ -f .agent/.identity ]`)
 3. **Ask the user** if auto-detection fails
 4. **Use fallback** values if necessary: "AI Agent" / "Unknown Model"
@@ -208,16 +208,18 @@ We distinguish the **content** author from the **setup** author.
 1.  **Determine your complete identity** when first starting work in this workspace:
     - **Framework name**: e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent"
     - **Email format**: `roland+<platform>@ccom.unh.edu`
-    - **Model name**: Your actual runtime model (e.g., "GPT-4o", "Gemini 2.5 Pro")
-    - **Auto-detect** using: `source .agent/scripts/set_git_identity_env.sh --detect`
+    - **Model name**: Your actual runtime model (e.g., "GPT-4o", "Gemini 2.5 Pro") — read it from your system prompt
+    - **Self-report (preferred)**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>" "<your model>"`
+    - **Fallback**: `source .agent/scripts/set_git_identity_env.sh --detect` if you cannot introspect your model
     - **Or read from**: `.agent/.identity` file
-    - **Ask the user** if auto-detection fails
+    - **Ask the user** if self-reporting and auto-detection both fail
 2.  **Choose the appropriate configuration method**:
     - **Host-based agents (Copilot CLI, Gemini CLI)**: Use ephemeral identity (environment variables)
     - **Containerized agents (Antigravity)**: Use persistent identity (.git/config)
     - See "Configuration Methods: Ephemeral vs. Persistent" section above for details
 3.  **Configure git identity** before making any commits:
-    - **Ephemeral**: `source .agent/scripts/set_git_identity_env.sh --detect` (or `--agent <framework>`)
+    - **Ephemeral (preferred)**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>" "<your model>"` (self-report)
+    - **Ephemeral (fallback)**: `source .agent/scripts/set_git_identity_env.sh --detect` or `--agent <framework>` — uses the `framework_config.sh` fallback model, which may be stale
     - **Persistent**: `./.agent/scripts/configure_git_identity.sh "<Name>" "<Email>"`
 4.  **Use correct model name in signatures**:
     - After configuration, `$AGENT_MODEL` environment variable will be set

@@ -152,11 +152,16 @@ elif [ $# -eq 2 ]; then
         AGENT_FRAMEWORK="custom"
     fi
 elif [ $# -eq 3 ]; then
-    # Manual name, email, and model
+    # Manual name, email, and self-reported model — detect framework so identity stays complete
     AGENT_NAME="$1"
     AGENT_EMAIL="$2"
     AGENT_MODEL="$3"
-    AGENT_FRAMEWORK="custom"
+    DETECTED=$(detect_framework)
+    if [ "$DETECTED" != "unknown" ]; then
+        AGENT_FRAMEWORK="$DETECTED"
+    else
+        AGENT_FRAMEWORK="custom"
+    fi
 else
     echo "Error: Invalid arguments"
     show_usage

@@ -34,9 +34,10 @@ declare -A FRAMEWORK_EMAILS=(
 # `set_git_identity_env.sh` (from their system prompt).
 #
 # DO NOT bump these values for every new model release. Doing so re-creates
-# the staleness treadmill that issue #407 eliminated. If your AI signature
-# shows one of these values, you forgot to pass the 3rd arg — fix the caller,
-# not this file.
+# the staleness treadmill that issue #407 eliminated. If an agent intended to
+# self-report its runtime model and its AI signature shows one of these values,
+# it forgot to pass the 3rd arg — fix the caller, not this file. (Callers using
+# --agent or --detect intentionally read from this table by design.)
 declare -A FRAMEWORK_MODELS=(
     ["copilot"]="GPT-4o"
     ["gemini"]="Gemini 2.0 Flash"
