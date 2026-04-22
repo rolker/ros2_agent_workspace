@@ -54,15 +54,19 @@ Agent identity is determined from these sources (in order of preference):
 
 **Use for**: Copilot CLI, Gemini CLI, or any agent running directly on the host that shares the working copy with the human user.
 
-**Method**: Source the environment variable script:
+**Method**: Source the environment variable script. Prefer the 3-arg form so the agent
+self-reports its runtime model (`framework_config.sh` entries are stale-prone fallbacks):
 ```bash
-# Auto-detect (recommended)
+# Recommended — agent self-reports its model from its system prompt
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "<your model>"
+
+# Auto-detect framework + look up model from framework_config.sh (model may be stale)
 source .agent/scripts/set_git_identity_env.sh --detect
 
-# Or specify framework
+# Or specify framework explicitly (also uses framework_config.sh for model)
 source .agent/scripts/set_git_identity_env.sh --agent copilot
 
-# Or manual (not recommended)
+# 2-arg form falls back to framework_config.sh for the model — avoid for signatures
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 

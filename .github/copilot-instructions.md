@@ -22,11 +22,13 @@ only in the workspace repo. When reviewing:
 
 ```bash
 source .agent/scripts/setup.bash                    # ROS 2 + checkout guardrail
-source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
+# Pass your actual model as the 3rd argument (from your system prompt — do NOT rely on the fallback).
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "<your model>"
 ```
 
-After sourcing, verify `$AGENT_MODEL` matches your actual model (from your system prompt).
-If stale, update the default in `.agent/scripts/framework_config.sh` and commit the one-line fix.
+Replace `<your model>` with your actual runtime model (e.g. `Claude Sonnet 4.5`, `GPT-5`).
+Verify with `echo "$AGENT_MODEL"` — it should echo exactly what you passed. Do not edit
+`framework_config.sh` to match your model; the entries there are fallback-only.
 
 ## Copilot-Specific Notes
 
