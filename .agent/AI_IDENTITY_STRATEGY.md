@@ -38,7 +38,7 @@ Agent identity is determined from these sources (in order of preference):
 **How to determine your identity:**
 1. **Use environment variables** (recommended) - Set by sourcing `set_git_identity_env.sh` with your agent name, email, and runtime model as the 3rd argument (self-report form). `--detect` is a fallback for agents that cannot introspect their own model.
 2. **Read from** `.agent/.identity` file if it exists (check with `[ -f .agent/.identity ]`)
-3. **Ask the user** if auto-detection fails
+3. **Ask the user** if you cannot self-report and auto-detection fails
 4. **Use fallback** values if necessary: "AI Agent" / "Unknown Model"
 5. **Configure git** with your identity before making any commits
 

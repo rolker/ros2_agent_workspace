@@ -109,37 +109,49 @@ fi
 echo ""
 
 # Test 5c: Manual 2-parameter usage (backward compatibility)
+#
+# AGENT_FRAMEWORK and AGENT_MODEL are environment-dependent: the 2-arg path runs
+# framework detection and looks up the matching fallback model from
+# framework_config.sh. In a scrubbed env, detection returns "unknown" →
+# AGENT_FRAMEWORK=custom, AGENT_MODEL="Unknown Model". In a real agent session
+# (e.g. CLAUDECODE=1) detection succeeds and both values reflect the framework.
+# Accept either outcome so the test is deterministic across environments.
 echo "Test 5c: Manual 2-parameter usage (backward compatibility)..."
 # Clear any existing variables
 unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
 # Source with 2 parameters
 source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" > /dev/null 2>&1
-if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Unknown Model" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
-    echo "✅ 2-parameter usage works correctly (model = 'Unknown Model')"
+if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ -n "$AGENT_MODEL" ] && [ -n "$AGENT_FRAMEWORK" ]; then
+    echo "✅ 2-parameter usage works correctly (framework=$AGENT_FRAMEWORK, model=$AGENT_MODEL)"
 else
     echo "❌ 2-parameter usage failed"
     echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
     echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
-    echo "   AGENT_MODEL=$AGENT_MODEL (expected: Unknown Model)"
-    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    echo "   AGENT_MODEL=$AGENT_MODEL (expected: non-empty)"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: non-empty)"
     exit 1
 fi
 echo ""
 
-# Test 5d: Manual 3-parameter usage (new feature)
+# Test 5d: Manual 3-parameter usage (self-report form)
+#
+# The 3-arg form preserves the caller-supplied model verbatim; AGENT_FRAMEWORK
+# is whatever detection returns (or "custom" on miss). Assertions:
+#   - model matches the 3rd arg exactly (self-report contract)
+#   - framework is set (non-empty) — completes the four-component identity
 echo "Test 5d: Manual 3-parameter usage with model (new feature)..."
 # Clear any existing variables
 unset AGENT_NAME AGENT_EMAIL AGENT_MODEL AGENT_FRAMEWORK
 # Source with 3 parameters
 source "$SCRIPT_DIR/set_git_identity_env.sh" "Test Agent" "test@example.com" "Test Model 1.0" > /dev/null 2>&1
-if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Test Model 1.0" ] && [ "$AGENT_FRAMEWORK" = "custom" ]; then
-    echo "✅ 3-parameter usage works correctly (model specified)"
+if [ "$AGENT_NAME" = "Test Agent" ] && [ "$AGENT_EMAIL" = "test@example.com" ] && [ "$AGENT_MODEL" = "Test Model 1.0" ] && [ -n "$AGENT_FRAMEWORK" ]; then
+    echo "✅ 3-parameter usage works correctly (model=$AGENT_MODEL, framework=$AGENT_FRAMEWORK)"
 else
     echo "❌ 3-parameter usage failed"
     echo "   AGENT_NAME=$AGENT_NAME (expected: Test Agent)"
     echo "   AGENT_EMAIL=$AGENT_EMAIL (expected: test@example.com)"
     echo "   AGENT_MODEL=$AGENT_MODEL (expected: Test Model 1.0)"
-    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: custom)"
+    echo "   AGENT_FRAMEWORK=$AGENT_FRAMEWORK (expected: non-empty)"
     exit 1
 fi
 echo ""

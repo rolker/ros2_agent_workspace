@@ -28,9 +28,10 @@ declare -A FRAMEWORK_EMAILS=(
 # Framework default model lookup table
 # Maps framework key to fallback model name.
 #
-# IMPORTANT: These are FALLBACKS ONLY — used when an agent sources this script
-# with only 2 args (name, email) and framework auto-detection can't determine
-# a model. Agents MUST pass their actual runtime model as the 3rd argument to
+# IMPORTANT: These are FALLBACKS ONLY — consulted whenever a caller does not
+# supply the model explicitly: `--agent <fw>`, `--detect`, and the 2-arg form
+# all read from this table. Only the 3-arg self-report form bypasses it.
+# Agents MUST pass their actual runtime model as the 3rd argument to
 # `set_git_identity_env.sh` (from their system prompt).
 #
 # DO NOT bump these values for every new model release. Doing so re-creates
