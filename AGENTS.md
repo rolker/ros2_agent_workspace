@@ -28,7 +28,8 @@ setup (environment, identity, features), see your framework's adapter file:
 - Verify documentation claims against source code
 - Atomic commits: one logical change per commit
 - Branch naming: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`
-- All changes via Pull Requests
+- All changes via Pull Requests on GitHub-origin repos (field-mode repos
+  push to the field remote without PRs — see Worktree Workflow)
 
 ### Ask First (get human approval)
 
@@ -38,8 +39,10 @@ setup (environment, identity, features), see your framework's adapter file:
 
 ### Never (hard stops)
 
-- Commit to `main` on a github-origin repo — branch is protected; direct pushes
-  are rejected. Field-origin repos have their own workflow (see Worktree Workflow).
+- Commit directly to the default branch (e.g. `main`, `jazzy`) on a
+  GitHub-origin repo — branch protection rejects direct pushes; open a PR
+  from a worktree. Field-origin repos have their own workflow (see
+  Worktree Workflow).
 - `git checkout <branch>` — `setup.bash` blocks it; use worktrees
 - Skip hooks with `--no-verify`
 - Commit secrets or credentials
@@ -321,7 +324,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) **(source)** |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
-| `.agent/scripts/field_mode.sh` | Detect field mode (non-github origin) vs. dev mode **(source or exec)** |
+| `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |

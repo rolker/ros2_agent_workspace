@@ -7,15 +7,15 @@ Mode`](../../AGENTS.md#field-mode-origin-not-githubcom).
 
 ## When This Applies
 
-Use this flow when the repo you're editing has a non-github origin
+Use this flow when the repo you're editing has a non-GitHub origin
 (`.agent/scripts/field_mode.sh --describe` prints `field mode`). This is
 how field machines deploy hotfixes that have to land before the next run.
 
-**Github-origin repos** always use the worktree + PR workflow, regardless
+**GitHub-origin repos** always use the worktree + PR workflow, regardless
 of where the machine physically sits.
 
 **Workspace repo on a field machine**: `is_field_mode()` will return true
-if the workspace was cloned from a non-github mirror — the rule is purely
+if the workspace was cloned from a non-GitHub mirror — the rule is purely
 origin-based by design (see Decision 2 on #445). But hotfixing workspace
 infrastructure (agent rules, scripts, docs) from the field is strongly
 discouraged: those changes don't make the boat go, and they bypass the
@@ -34,13 +34,16 @@ hour.
 
 ### 1. Confirm field mode
 
+The detection script lives at the workspace root — pass the project repo
+as an argument so the relative path doesn't shift when you `cd` later:
+
 ```bash
-cd layers/main/platforms_ws/src/unh_echoboats_project11
-.agent/scripts/field_mode.sh --describe
+# From the workspace root
+.agent/scripts/field_mode.sh --describe layers/main/platforms_ws/src/unh_echoboats_project11
 # → field mode  (origin: git@gitcloud:field/unh_echoboats_project11.git)
 ```
 
-If the output says `dev mode`, stop — you're on a github-origin repo and
+If the output says `dev mode`, stop — you're on a GitHub-origin repo and
 this flow does not apply. Use a worktree + PR.
 
 ### 2. Check the default branch
@@ -48,6 +51,7 @@ this flow does not apply. Use a worktree + PR.
 Project repos may use `jazzy` or another branch, not `main`:
 
 ```bash
+cd layers/main/platforms_ws/src/unh_echoboats_project11
 git branch --show-current
 # → jazzy
 ```

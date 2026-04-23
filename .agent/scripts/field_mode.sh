@@ -23,11 +23,16 @@
 
 # is_field_mode [repo_dir]
 # Exit 0 if the given repo (default: $PWD) is in field mode, else 1.
+#
+# A repo is in dev mode iff its origin host is exactly github.com.
+# The host is matched only when preceded by start-of-string, '/', or '@'
+# AND followed by ':' or '/', so hostnames like 'mygithub.com' or
+# 'github.company.internal' are NOT misclassified as dev mode.
 is_field_mode() {
     local repo_dir="${1:-$PWD}"
     local origin_url
     origin_url=$(git -C "$repo_dir" remote get-url origin 2>/dev/null) || return 1
-    [[ "$origin_url" != *github.com* ]]
+    [[ ! "$origin_url" =~ (^|/|@)github\.com[:/] ]]
 }
 
 # describe_mode [repo_dir]
