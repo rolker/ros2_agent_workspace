@@ -31,7 +31,9 @@ See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity d
 See [`AGENTS.md`](../AGENTS.md) for the shared workspace rules all agents must follow.
 
 Key points:
-- Never commit to `main` — use worktrees for isolation
+- Never commit to `main` on a github-origin repo — use worktrees for isolation.
+  Repos with non-github origin (field mode) have their own workflow; see
+  [`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-githubcom).
 - Never `git checkout <branch>` — `setup.bash` blocks it
 - AI signature required on all GitHub Issues/PRs/Comments
 - Use `--body-file` for `gh` CLI, not inline `--body`

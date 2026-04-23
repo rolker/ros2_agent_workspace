@@ -2,6 +2,12 @@
 
 > One-line description from README or `package.xml`.
 
+## Workflow
+
+Workflow rules (worktree vs. field mode, AI signature, branch naming) are
+defined in the workspace `AGENTS.md`. Run `field_mode.sh --describe` in this
+repo to determine the active mode before editing.
+
 ## Package Inventory
 
 | Package | Language | Description |
