@@ -262,6 +262,13 @@ Before marking a task complete or opening a PR:
 3. Check consequences: do tests, docs, or dependent references need updating?
 4. List any gaps; complete them or explain in PR description
 
+**Plan-first workflow**: if the PR opened with a work plan (`.agent/work-plans/PLAN_ISSUE-<N>.md`),
+the plan is expected to stay in sync with the landed code as implementation
+proceeds. Inline edits are the default; see the "During implementation"
+section of `.claude/skills/plan-task/SKILL.md` for the full rules. Keeps
+the plan useful as reference material for review and future agents, and
+avoids recurring plan-drift flags from Copilot.
+
 ## Script Reference
 
 `scripts/` at the repo root is a symlink to `.agent/scripts/` for convenience.
