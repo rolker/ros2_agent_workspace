@@ -5,8 +5,10 @@
 ## Workflow
 
 Workflow rules (worktree vs. field mode, AI signature, branch naming) are
-defined in the workspace `AGENTS.md`. Run `field_mode.sh --describe` in this
-repo to determine the active mode before editing.
+defined in the workspace `AGENTS.md`. Use the workspace's
+`.agent/scripts/field_mode.sh --describe` to determine the active mode
+before editing — the script isn't on PATH; invoke it from the workspace
+root.
 
 ## Package Inventory
 

@@ -7,17 +7,20 @@ Mode`](../../AGENTS.md#field-mode-origin-not-githubcom).
 
 ## When This Applies
 
-Use this flow only when **both** of these are true:
+Use this flow when the repo you're editing has a non-github origin
+(`.agent/scripts/field_mode.sh --describe` prints `field mode`). This is
+how field machines deploy hotfixes that have to land before the next run.
 
-1. The repo you're editing has a non-github origin (`field_mode.sh --describe`
-   prints `field mode`).
-2. You are on a field machine — the boat, an operator station, or another
-   environment where the field remote (gitcloud, Forgejo, etc.) is the
-   authoritative copy.
+**Github-origin repos** always use the worktree + PR workflow, regardless
+of where the machine physically sits.
 
-Neither the workspace repo nor github-origin project repos use this flow; they
-stay on the worktree + PR workflow regardless of where the machine physically
-sits.
+**Workspace repo on a field machine**: `is_field_mode()` will return true
+if the workspace was cloned from a non-github mirror — the rule is purely
+origin-based by design (see Decision 2 on #445). But hotfixing workspace
+infrastructure (agent rules, scripts, docs) from the field is strongly
+discouraged: those changes don't make the boat go, and they bypass the
+review the workspace usually gets. File a git-bug bug report instead
+(see the gotcha at the bottom).
 
 ## Scenario
 
@@ -63,7 +66,10 @@ $EDITOR config/operator_tmux.yaml
 
 Field mode relaxes the worktree/PR requirement. It does **not** relax any
 other quality gate. Pre-commit hooks still run, the AI signature is still
-required, commits stay atomic:
+required, commits stay atomic. The `Co-Authored-By` trailer follows the
+[AGENTS.md AI Signature](../../AGENTS.md#ai-signature-required-on-all-github-issuesprscomments)
+pattern — substitute your framework's actual name, model, and noreply
+email:
 
 ```bash
 git add config/operator_tmux.yaml
@@ -76,7 +82,7 @@ session's layout.
 
 Field hotfix — landing direct on jazzy per AGENTS.md Field Mode.
 
-Co-Authored-By: <your model> <noreply@anthropic.com>
+Co-Authored-By: <agent name and model> <agent-noreply-email>
 EOF
 )"
 ```
@@ -140,11 +146,13 @@ dedicated worktree. Don't force-push either direction.
 commit make later review painful. If the boat needs five things fixed, that's
 five commits.
 
-**Field mode does NOT apply in the workspace repo.** Even if you clone the
-workspace from gitcloud on a field machine, workspace infrastructure is
-never hotfixed in the field. File a git-bug bug report instead
-(`gh_create_issue.sh` with `GITBUG_CREATE=1`) — it will sync back to GitHub
-via the git-bug bridge when the machine reconnects.
+**Don't hotfix workspace infra from the field.** `is_field_mode()` will
+return true on a field-cloned workspace repo (the rule is purely
+origin-based — there is no hard-coded carve-out, see Decision 2 on #445),
+but workspace infrastructure changes don't make the boat go and shouldn't
+be committed in haste. File a git-bug bug report instead — `gh_create_issue.sh`
+with `GITBUG_CREATE=1` creates a bug locally that syncs to GitHub via the
+git-bug bridge when the machine reconnects.
 
 ## Related
 

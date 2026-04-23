@@ -142,10 +142,10 @@ fi
 ```
 
 **Reconciliation**: field commits come back to GitHub via the
-`/import-field-changes` skill on a connected dev machine. The skill fetches
-from the field remote, creates issues + draft PRs for each ahead-of-origin
-repo, and pre-reviews diffs against the Quality Standard. Agents don't run
-field-to-github imports manually.
+`/import-field-changes` skill on a connected dev machine. Use that skill
+rather than hand-rolling cherry-picks — it creates branches without
+perturbing the main tree HEAD, opens draft PRs with pre-review against
+the Quality Standard, and flags diverged repos for human merge.
 
 ## Issue-First Policy
 
