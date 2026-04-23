@@ -50,8 +50,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 # Install git-bug (local-first issue tracking, see ADR-0010)
 # Pinned SHA256 per arch detects tampering or asset substitution.
-# Upstream v0.10.1 publishes linux binaries for amd64, 386, and arm (32-bit) only;
-# arm64 (Apple Silicon) is not available upstream and fails explicitly below.
+# Supports linux amd64 and armhf only; arm64 (Apple Silicon) and other arches
+# are not available upstream for v0.10.1 and fail explicitly below.
 ARG GITBUG_VERSION=v0.10.1
 ARG GITBUG_SHA256_AMD64=3ba2f8b41e526fef1b6e825d5030823be65bb6521a287b1139bd609fed0d54a1
 ARG GITBUG_SHA256_ARM=308b1d17bc4d12685a95c2908baf2b14b77e81737f34b3bd82a8baf10850fd87
