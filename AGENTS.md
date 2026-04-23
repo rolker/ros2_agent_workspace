@@ -14,7 +14,8 @@ setup (environment, identity, features), see your framework's adapter file:
 
 ### Always (proceed autonomously)
 
-- Use worktrees for all feature work — never edit files in the main tree
+- Use worktrees for all feature work — never edit files in the main tree.
+  Exception: **field mode** (origin not github.com) — see Worktree Workflow.
 - Run pre-commit hooks before committing
 - Include AI signature on all GitHub Issues/PRs/Comments (`$AGENT_NAME` / `$AGENT_MODEL`)
 - Reference issue numbers in branches and PRs (`Closes #<N>`)
@@ -37,7 +38,8 @@ setup (environment, identity, features), see your framework's adapter file:
 
 ### Never (hard stops)
 
-- Commit to `main` — branch is protected; direct pushes are rejected
+- Commit to `main` on a github-origin repo — branch is protected; direct pushes
+  are rejected. Field-origin repos have their own workflow (see Worktree Workflow).
 - `git checkout <branch>` — `setup.bash` blocks it; use worktrees
 - Skip hooks with `--no-verify`
 - Commit secrets or credentials
@@ -103,6 +105,47 @@ source setup.bash                  # set up ROS environment
 
 See [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) for hybrid structure details,
 `--repo-slug` disambiguation, and troubleshooting.
+
+### Field Mode (origin not github.com)
+
+When a repo's `origin` is **not** github.com (e.g., gitcloud, private Forgejo),
+the worktree/PR ceremony is relaxed. Agents on a field machine may:
+
+- Edit tracked files directly in the main/default tree
+- Commit to the default branch (`main`, `jazzy`, etc.)
+- Push to `origin` without opening a PR
+
+This is the only way field hotfixes can land before the next run — there's no
+GitHub, no PR review, no CI on the field remote.
+
+**What field mode does NOT change** (all still required):
+
+- Pre-commit hooks run — never `--no-verify`
+- AI signature on commits
+- Atomic commits (one logical change per commit)
+- No committing secrets
+- No force-push, no destructive ops without explicit user approval
+
+**Detection**: the mode is inferred from the repo's origin URL. Use
+[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh):
+
+```bash
+# CLI check
+.agent/scripts/field_mode.sh --describe
+# → "field mode  (origin: git@gitcloud:field/unh_echoboats_project11)"
+
+# Sourced in a script
+source .agent/scripts/field_mode.sh
+if is_field_mode; then
+    # field mode behavior
+fi
+```
+
+**Reconciliation**: field commits come back to GitHub via the
+`/import-field-changes` skill on a connected dev machine. The skill fetches
+from the field remote, creates issues + draft PRs for each ahead-of-origin
+repo, and pre-reviews diffs against the Quality Standard. Agents don't run
+field-to-github imports manually.
 
 ## Issue-First Policy
 
@@ -278,6 +321,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) **(source)** |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
+| `.agent/scripts/field_mode.sh` | Detect field mode (non-github origin) vs. dev mode **(source or exec)** |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
