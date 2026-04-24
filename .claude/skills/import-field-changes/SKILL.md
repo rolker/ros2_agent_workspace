@@ -1,3 +1,8 @@
+---
+name: import-field-changes
+description: Batch-import field changes from a secondary remote (e.g., gitcloud) back to GitHub for review. For each repo with remote-ahead commits, creates an issue, opens a draft PR, and pre-reviews the diff against the Quality Standard.
+---
+
 # Import Field Changes
 
 ## Usage
