@@ -82,11 +82,16 @@ Both items below were resolved during implementation; annotations reflect
 the decisions that landed.
 
 - **Name of the new section inside `.claude/skills/plan-task/SKILL.md`** —
-  Resolved: unnumbered `### During implementation` subsection placed
-  between step 7 and step 8, nested under `## Steps`. Keeps the existing
-  numbered steps untouched while the new guidance is visible in the flow.
-  (Initially landed as a `##` heading, demoted to `###` in a follow-up
-  round so it stays structurally inside `## Steps`.)
+  Resolved: `## During implementation` top-level section placed after
+  `## Steps` (i.e. after step 8), peer to `## Guidelines`, with
+  `### Worked example` as a subsection. Keeps the 8 numbered steps
+  under `## Steps` internally consistent (no mixed numbered/unnumbered
+  peers) and reads honestly as guidance for the post-skill
+  implementation phase. (Landed through several iterations: first
+  `##` inserted between steps which broke nesting; then `###`
+  unnumbered inside Steps which Copilot flagged as inconsistent with
+  the numbered peers; finally moved to its current after-Steps
+  location.)
 - **Depth of the worked example** — Resolved: short before/after excerpt
   pasted inline, plus a SHA reference to `rolker/rqt_operator_tools@9680d3e`.
   Readers see the pattern without clicking through; the SHA anchors the

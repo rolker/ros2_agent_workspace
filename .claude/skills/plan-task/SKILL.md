@@ -180,9 +180,20 @@ fi
 rm -f "$BODY_FILE"
 ```
 
-### During implementation
+### 8. Report to user
 
-The `plan-task` skill produces its artifact at step 7 (the draft PR).
+Summarize:
+- What the plan proposes
+- Which principles and ADRs were considered
+- Any open questions that need input
+- Link to the draft PR
+- Pointer to the "During implementation" section below, so the
+  implementer knows to keep the plan in sync with landed code
+
+## During implementation
+
+The `plan-task` skill's primary artifact is the committed plan file
+created in steps 5–6; step 7 publishes that plan into a draft PR.
 Implementation then proceeds on the same branch — and typically deviates
 from the plan: types get refined, functions change signatures, a "pure
 logic" module picks up a dependency. Keep the plan in sync as this
@@ -222,7 +233,7 @@ misalignment between the plan and the PR. If drift becomes a recurring
 finding across multiple PRs, that's a signal the rule needs more teeth,
 not that the rule is wrong.
 
-#### Worked example
+### Worked example
 
 From `rolker/rqt_operator_tools@9680d3e` (PR #22 round-8 fix pass —
 the code change and its plan edit landed in the same commit):
@@ -247,16 +258,6 @@ motivated it (rule 4). No `Implementation Notes` entry is needed — the
 `Implementation Notes` entry would have been warranted for a case like
 the `QGridLayout` swap cited above, where the rationale doesn't fit in a
 one-line plan edit.
-
-### 8. Report to user
-
-Summarize:
-- What the plan proposes
-- Which principles and ADRs were considered
-- Any open questions that need input
-- Link to the draft PR
-- Pointer to the "During implementation" subsection above, so the
-  implementer knows to keep the plan in sync with landed code
 
 ## Guidelines
 
