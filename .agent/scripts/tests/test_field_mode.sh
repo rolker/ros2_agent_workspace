@@ -14,6 +14,14 @@ SCRIPT="$SCRIPT_DIR/../field_mode.sh"
 TEST_PASS=0
 TEST_FAIL=0
 
+# Shared temp root — trap ensures cleanup even on unexpected failure under
+# set -e. All per-test repos are created as subdirs so they get swept too.
+TMPDIR_ROOT=$(mktemp -d /tmp/test_field_mode.XXXXXX)
+cleanup() {
+    rm -rf "$TMPDIR_ROOT"
+}
+trap cleanup EXIT
+
 # Source the script under test
 # shellcheck source=../field_mode.sh
 source "$SCRIPT"
@@ -21,7 +29,7 @@ source "$SCRIPT"
 make_test_repo() {
     local origin="$1"
     local repo
-    repo=$(mktemp -d /tmp/field_mode_test.XXXXXX)
+    repo=$(mktemp -d "$TMPDIR_ROOT/repo.XXXXXX")
     git -C "$repo" init -q
     if [ -n "$origin" ]; then
         git -C "$repo" remote add origin "$origin"
@@ -40,7 +48,6 @@ assert_field_mode() {
         echo "❌ FAIL: '$origin' → expected field mode, got dev mode"
         TEST_FAIL=$((TEST_FAIL + 1))
     fi
-    rm -rf "$repo"
 }
 
 assert_dev_mode() {
@@ -54,7 +61,6 @@ assert_dev_mode() {
         echo "✅ PASS: '$origin' → dev mode"
         TEST_PASS=$((TEST_PASS + 1))
     fi
-    rm -rf "$repo"
 }
 
 echo "=== is_field_mode: github.com origins (dev mode) ==="
@@ -88,7 +94,7 @@ echo ""
 
 echo "=== is_field_mode: edge cases ==="
 # No origin remote at all → dev mode (returns 1, the safer default)
-NO_ORIGIN_REPO=$(mktemp -d /tmp/no_origin.XXXXXX)
+NO_ORIGIN_REPO=$(mktemp -d "$TMPDIR_ROOT/no_origin.XXXXXX")
 git -C "$NO_ORIGIN_REPO" init -q
 if is_field_mode "$NO_ORIGIN_REPO"; then
     echo "❌ FAIL: no origin → expected dev mode (return 1)"
@@ -97,7 +103,6 @@ else
     echo "✅ PASS: no origin → dev mode (return 1, safer default)"
     TEST_PASS=$((TEST_PASS + 1))
 fi
-rm -rf "$NO_ORIGIN_REPO"
 
 # Non-existent path → dev mode (return 1)
 if is_field_mode "/nonexistent/path/$$"; then
@@ -119,7 +124,6 @@ else
     echo "❌ FAIL: describe_mode dev → '$DESC'"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
-rm -rf "$DEV_REPO"
 
 FIELD_REPO=$(make_test_repo "git@gitcloud:field/test.git")
 DESC=$(describe_mode "$FIELD_REPO")
@@ -130,7 +134,6 @@ else
     echo "❌ FAIL: describe_mode field → '$DESC'"
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
-rm -rf "$FIELD_REPO"
 echo ""
 
 echo "=== Results ==="
