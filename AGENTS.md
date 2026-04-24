@@ -111,36 +111,44 @@ See [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) for hybrid structure 
 
 ### Field Mode (origin not github.com)
 
-When a repo's `origin` is **not** github.com (e.g., gitcloud, private Forgejo),
-the worktree/PR ceremony is relaxed. Agents on a field machine may:
+When a repo's `origin` host is **not** `github.com` (e.g., gitcloud, private
+Forgejo), the worktree/PR ceremony is relaxed. **Field-mode repos may**:
 
 - Edit tracked files directly in the main/default tree
 - Commit to the default branch (`main`, `jazzy`, etc.)
 - Push to `origin` without opening a PR
 
 This is the only way field hotfixes can land before the next run — there's no
-GitHub, no PR review, no CI on the field remote.
+GitHub, no PR review, no CI on the field remote. Mode is determined per repo
+by origin URL, not by the physical machine: a dev workstation working in a
+gitcloud-origin clone is in field mode for that repo.
 
 **What field mode does NOT change** (all still required):
 
 - Pre-commit hooks run — never `--no-verify`
-- AI signature on commits
+- Commits use the configured agent git identity (set via
+  `set_git_identity_env.sh`)
 - Atomic commits (one logical change per commit)
 - No committing secrets
 - No force-push, no destructive ops without explicit user approval
 
 **Detection**: the mode is inferred from the repo's origin URL. Use
-[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh):
+[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) — it isn't
+on PATH, so invoke from the workspace root:
 
 ```bash
-# CLI check
-.agent/scripts/field_mode.sh --describe
+# Form A: from workspace root, pass the target repo path
+.agent/scripts/field_mode.sh --describe layers/main/platforms_ws/src/unh_echoboats_project11
 # → "field mode  (origin: git@gitcloud:field/unh_echoboats_project11)"
 
-# Sourced in a script
+# Form B: cd into the target repo first, reference the script via the workspace root
+cd layers/main/platforms_ws/src/unh_echoboats_project11
+../../../../.agent/scripts/field_mode.sh --describe
+
+# Sourced in a script (any path — uses $PWD by default)
 source .agent/scripts/field_mode.sh
 if is_field_mode; then
-    # field mode behavior
+    # field-mode behavior
 fi
 ```
 

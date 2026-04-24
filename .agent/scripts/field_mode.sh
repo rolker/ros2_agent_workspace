@@ -37,10 +37,14 @@ is_field_mode() {
 
 # describe_mode [repo_dir]
 # Print a human-readable mode summary to stdout.
+#
+# Uses `|| true` on the git call so that callers running with `set -e`
+# don't exit before the empty-string check; we want to print a message
+# and return 1 in that case, not silently abort the parent shell.
 describe_mode() {
     local repo_dir="${1:-$PWD}"
     local origin_url
-    origin_url=$(git -C "$repo_dir" remote get-url origin 2>/dev/null)
+    origin_url=$(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)
     if [ -z "$origin_url" ]; then
         echo "not a git repo or no 'origin' remote: $repo_dir"
         return 1

@@ -66,14 +66,14 @@ Edit the tracked file in place. No worktree needed:
 $EDITOR config/operator_tmux.yaml
 ```
 
-### 4. Commit — hooks and AI signature still required
+### 4. Commit — hooks and identity still required
 
 Field mode relaxes the worktree/PR requirement. It does **not** relax any
-other quality gate. Pre-commit hooks still run, the AI signature is still
-required, commits stay atomic. The `Co-Authored-By` trailer follows the
-[AGENTS.md AI Signature](../../AGENTS.md#ai-signature-required-on-all-github-issuesprscomments)
-pattern — substitute your framework's actual name, model, and noreply
-email:
+other quality gate: pre-commit hooks still run, commits stay atomic, and
+the commit author is your configured agent identity (set by
+`set_git_identity_env.sh`). Adding a `Co-Authored-By` trailer for your
+agent model is conventional — substitute your framework's actual name,
+model, and noreply email:
 
 ```bash
 git add config/operator_tmux.yaml

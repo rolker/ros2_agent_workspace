@@ -4,11 +4,16 @@
 
 ## Workflow
 
-Workflow rules (worktree vs. field mode, AI signature, branch naming) are
-defined in the workspace `AGENTS.md`. Use the workspace's
-`.agent/scripts/field_mode.sh --describe` to determine the active mode
-before editing — the script isn't on PATH; invoke it from the workspace
-root.
+**When this repo is checked out as part of a [ROS 2 Agent
+Workspace](https://github.com/rolker/ros2_agent_workspace)**, workflow
+rules (worktree vs. field mode, branch naming, etc.) are defined in the
+workspace `AGENTS.md`. Run the workspace's
+`.agent/scripts/field_mode.sh --describe <path-to-this-repo>` to
+determine the active mode before editing.
+
+**Standalone use** (this repo cloned alone, outside the workspace): only
+this repo's own conventions apply — the workspace-level workflow rules
+don't bind here.
 
 ## Package Inventory
 
