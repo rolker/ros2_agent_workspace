@@ -14,93 +14,126 @@ existing specialist reviewers causes them to carry forward assumptions from
 previous rounds — they don't re-read the whole diff cold.
 
 The fork `rolker/agent_workspace` has evolved four pieces that directly
-address this: a fresh-context **Adversarial Specialist**, **depth tiers**
-that auto-route to deeper review on risky diffs, **`progress.md`
-persistence** across sessions, and **flexible `review-plan` inputs**
-(file/issue, not only PR number). The `inspiration_agent_workspace_digest.md`
-was last refreshed 2026-03-23 (a month stale); the plan includes a
-refresh step before copying so we track what actually exists in the fork
-today, not a month-old snapshot.
+address this: a fresh-context **Adversarial Specialist** (Claude-only —
+relies on subagent dispatch), **depth tiers** that auto-route to deeper
+review on risky diffs, **`progress.md` persistence** across sessions, and
+**flexible `review-plan` inputs** (file/issue, not only PR number). The
+`inspiration_agent_workspace_digest.md` was last refreshed 2026-03-23 (a
+month stale) and the fork landed these recently — the plan includes a
+refresh step before copying, and treats the design as experimental.
 
-The scope also includes light-touch governance changes to make agents
-actually **run** `/review-code` before pushing — docs-only enforcement
-for now, composite `/ship` skill deferred to a follow-up issue per the
-review-issue findings.
+The scope also includes light-touch governance changes (docs-only
+enforcement) to make agents actually **run** `/review-code` before
+pushing. Composite `/ship` skill deferred to a follow-up issue per the
+review-issue findings. **This is explicitly a soft nudge against the
+"Enforcement over documentation" principle; the PR body will flag it
+as a known deferral.**
+
+A per-issue directory convention (`.agent/work-plans/issue-<N>/`) is
+introduced for new artifacts — plan, progress, review output,
+adversarial findings — without disturbing the 43 legacy flat plans.
+Symlinks bridge legacy plans into the new layout so consumer skills
+only look at one path.
 
 ## Approach
 
-One PR, three logical commit groups. Review-issue recommended this staging
-and warned scope is borderline — if group 1 alone runs long, we split.
+One PR, three logical commit groups. Scope is borderline — if group A
+alone approaches review-fatigue size, split B+C off as a follow-up.
 
-**Commit group A — review-code depth dispatch + Adversarial Specialist + persistence**
+**Commit group A — directory convention, depth dispatch, Adversarial Specialist, persistence**
 
-1. **Refresh the inspiration digest** — re-check the fork at current HEAD
-   and update `inspiration_agent_workspace_digest.md` before copying, so we
-   port what exists today rather than a 2026-03-23 snapshot.
-2. **Add `.agent/knowledge/review_depth_classification.md`** — in
-   ADR-style (Context / Decision / Consequences), documenting the signal
-   table (lines changed, file count, governance-touching paths like
-   `AGENTS.md` / `docs/decisions/` / `.claude/skills/`) and the thresholds
-   that trigger Light / Standard / Deep. Capture the *why* for the
-   thresholds, not just the *what* (per review-issue recommendation 3 and
-   the "Capture decisions" principle).
-3. **Update `review-code/SKILL.md`** to: (a) accept a depth argument
-   `--depth=light|standard|deep` and a pre-push mode selector, (b)
-   dispatch specialists by tier, (c) add the **Adversarial Specialist**
-   sub-section — a fresh-context subagent launched only at Deep tier with
-   no context from other specialists (via `Agent` with a dedicated
-   prompt), and (d) add the `progress.md` append step.
-4. **Dual-mode detection in `review-code`**: argument pattern determines
-   mode — `<number>` or URL → post-PR mode (diff against the PR base);
-   no arg or a branch name → pre-push mode (diff against
-   `origin/<base-branch>`). Document both modes and the detection logic
-   in the SKILL.
+1. **Refresh the inspiration digest** — re-check the fork at current
+   HEAD and update `inspiration_agent_workspace_digest.md` so we port
+   what exists today, not a 2026-03-23 snapshot.
+2. **Introduce per-issue directory convention.**
+   - New plans write to `.agent/work-plans/issue-<N>/plan.md`.
+   - Legacy flat plans (`PLAN_ISSUE-<N>.md`) stay where they are.
+   - Eager migration: create `.agent/work-plans/issue-<N>/plan.md` as
+     a symlink to `../PLAN_ISSUE-<N>.md` for every existing flat plan
+     (~43 files). Single mechanical commit.
+   - After this lands, every issue's plan is reachable at
+     `issue-<N>/plan.md` — skills never branch on legacy vs. new.
+   - Update `plan-task/SKILL.md` to write new plans nested.
+3. **Add `.agent/knowledge/review_depth_classification.md`** — structured
+   as Context / Current thinking / Consequences, leading with
+   **Status: experimental**. Names what we don't yet know (whether
+   thresholds produce the right tier on real PRs). Captures the signal
+   table in two columns: workspace-repo triggers (`AGENTS.md`,
+   `docs/decisions/`, `.claude/skills/`, `.repos`, `setup_layers.sh`,
+   `Makefile`, `framework_config.sh`) and project-repo triggers
+   (`.agents/README.md`, project `PRINCIPLES.md`, project `docs/decisions/`).
+   No ADR — fork landed this recently; we lack experience to commit to
+   ADR-level permanence.
+4. **Update `review-code/SKILL.md`:**
+   - Accept `--depth=light|standard|deep` override; auto-classify when
+     omitted using the signal table from step 3.
+   - Accept pre-push mode: `review-code` (no arg) diffs against the
+     current repo's default branch (`gh repo view --json defaultBranchRef`,
+     fall back to `main`); `--base <branch>` overrides. `review-code <N>`
+     or `<url>` is post-PR mode.
+   - Dispatch specialists by tier; **Adversarial Specialist** at Deep
+     only, launched via `Agent` as a fresh-context subagent with no
+     context from other specialists. Document that Adversarial is
+     **Claude-only** — structural limitation; other frameworks still
+     get depth dispatch + persistence.
+   - Document Adversarial's cross-repo limitation: fresh-context reviewer
+     reads only the diff, so it cannot catch cross-repo consequences in
+     the layered workspace. The Governance Specialist carries that load
+     via the consequences map.
+   - Append findings to `.agent/work-plans/issue-<N>/progress.md` in
+     the owning repo.
+5. **Repo-awareness pass.** The fork is single-repo; its skill text and
+   examples assume one `.agent/work-plans/`, one governance layer. Pass
+   over the ported text (review-code, triage-reviews, review-plan) and
+   generalize: "in the owning repo," repo-aware lookups, per-repo
+   governance paths.
 
 **Commit group B — triage-reviews persistence + review-plan input flex**
 
-5. **Update `triage-reviews/SKILL.md`** to append classification results
-   to the same per-issue `progress.md` (step placement: after step 6 /
-   "Classify and present plan"). Preserve the existing "Justify every
-   false positive" guidance — do not regress it.
-6. **Update `review-plan/SKILL.md`** to accept three input forms: PR
-   number (current), `--issue <N>` (find plan at
-   `.agent/work-plans/PLAN_ISSUE-<N>.md` in the current repo), or a file
-   path. Keep the PR-number path as the default.
+6. **Update `triage-reviews/SKILL.md`** to append classification results
+   to `.agent/work-plans/issue-<N>/progress.md` in the owning repo.
+   **Preserve "Justify every false positive"** — do not regress it when
+   reconciling with the fork's version.
+7. **Update `review-plan/SKILL.md`** to accept three input forms:
+   PR number (current), `--issue <N>` (find plan at the nested path in
+   the current repo; require `--repo <owner/repo>` for cross-repo),
+   or a file path. PR-number path stays default.
 
 **Commit group C — governance and adapter propagation**
 
-7. **Update `AGENTS.md`** Post-Task Verification section to add a "Before
-   opening a PR" bullet: *run `/review-code` against your diff; address
-   findings before pushing*.
-8. **Update `skill_workflows.md`** — insert `review-code` between
-   *implement* and *push/open-PR* in the per-issue lifecycle (today it's
-   positioned "After implementation" which conflates self-review with
-   post-PR review; the new framing supports both modes from step 4).
-9. **Update `plan-task/SKILL.md`** closing "Report to user" to mention
-   `/review-code` as the next step after implementation.
-10. **Propagate to framework adapters** (ADR-0006 + consequences map):
-    mirror the "run `/review-code` before pushing" expectation in
-    `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`,
-    and `.agent/AGENT_ONBOARDING.md`. If any adapter can't invoke the
-    skill the same way (e.g., Copilot review mode), document the
-    deliberate omission instead of silently skipping.
-11. **Mark ported pieces in `inspiration_agent_workspace_digest.md`** —
-    move the four pieces from tracked/pending into a "Ported" section
-    with the PR link, so `inspiration-tracker` doesn't re-flag them.
+8. **Update `AGENTS.md`** Post-Task Verification: add "Before opening a
+   PR" bullet — *run `/review-code` against your diff; address findings
+   before pushing*.
+9. **Update `skill_workflows.md`** — insert `review-code` between
+   *implement* and *push/open-PR* in the per-issue lifecycle.
+10. **Update `plan-task/SKILL.md`** closing "Report to user" to mention
+    `/review-code` as the next step after implementation.
+11. **Propagate to framework adapters** per ADR-0006 — one-line mirror +
+    cross-link to AGENTS.md in `.github/copilot-instructions.md`,
+    `.agent/instructions/gemini-cli.instructions.md`, and
+    `.agent/AGENT_ONBOARDING.md`. Note Adversarial is Claude-only.
+12. **Mark ported pieces in `inspiration_agent_workspace_digest.md`** —
+    move the four pieces into a "Ported" section with PR link.
+
+**Validation (smoke test, not CI):** run `/review-code 448 --depth=deep`
+and confirm (a) Adversarial fires, (b) progress.md is written at
+`.agent/work-plans/issue-448/progress.md`, (c) depth auto-classification
+on a medium PR lands on Standard.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.agent/knowledge/inspiration_agent_workspace_digest.md` | Refresh to current fork HEAD (step 1); add Ported section (step 11) |
-| `.agent/knowledge/review_depth_classification.md` | **New** — ADR-style depth-tier design + signal table |
-| `.claude/skills/review-code/SKILL.md` | Depth arg, dual-mode detection, Adversarial Specialist, progress persistence |
-| `.claude/skills/triage-reviews/SKILL.md` | Progress persistence step; keep "Justify every false positive" |
+| `.agent/knowledge/inspiration_agent_workspace_digest.md` | Refresh at start (step 1); mark ported (step 12) |
+| `.agent/work-plans/issue-<N>/plan.md` × ~43 | **New** symlinks to legacy flat plans (step 2) |
+| `.agent/knowledge/review_depth_classification.md` | **New** — experimental, repo-aware signal table |
+| `.claude/skills/review-code/SKILL.md` | Depth arg, dual-mode detection, Adversarial (Claude-only), progress persistence |
+| `.claude/skills/triage-reviews/SKILL.md` | Progress persistence; preserve "Justify every false positive" |
 | `.claude/skills/review-plan/SKILL.md` | Accept PR number / `--issue <N>` / file path |
-| `.claude/skills/plan-task/SKILL.md` | Closing hint to run `/review-code` before push |
+| `.claude/skills/plan-task/SKILL.md` | Write nested; closing hint to run `/review-code` |
 | `AGENTS.md` | Post-Task Verification: "Before opening a PR" bullet |
 | `.agent/knowledge/skill_workflows.md` | Lifecycle: review-code between implement and push |
-| `.github/copilot-instructions.md` | Mirror AGENTS.md pre-push expectation (or documented omission) |
+| `.github/copilot-instructions.md` | Mirror AGENTS.md pre-push expectation + Adversarial-Claude-only note |
 | `.agent/instructions/gemini-cli.instructions.md` | Same |
 | `.agent/AGENT_ONBOARDING.md` | Same |
 
@@ -108,68 +141,58 @@ and warned scope is borderline — if group 1 alone runs long, we split.
 
 | Principle | Consideration |
 |---|---|
-| Only what's needed | Scope is explicit about what NOT to port (cross-model adversarial, git-bug fallback, plan-path migration, de-ROS config). Adversarial = highest-leverage subset. |
-| A change includes its consequences | Framework adapter propagation (ADR-0006) is in-scope (step 10). Inspiration digest update (step 11) prevents re-flagging. `skill_workflows.md` + `plan-task` closing hint propagate the lifecycle change. |
-| Enforcement over documentation | **Soft nudge only** — docs-only enforcement for the pre-push expectation. Acceptable incremental step; composite `/ship` skill is explicitly deferred to a follow-up issue. Flag in PR body as known deferral. |
-| Capture decisions, not just implementations | `review_depth_classification.md` structured as Context/Decision/Consequences so the *why* behind thresholds survives (review-issue rec 3). Full ADR-0010-style record deferred unless user prefers. |
-| Improve incrementally | Single scoped slice of the fork's review tooling, not the whole thing. |
-| Primary framework first | Adversarial Specialist uses Claude Code subagent dispatch. Adapters (Copilot/Gemini) get the lifecycle expectation, not the subagent mechanics. |
-| Test what breaks | Prose-heavy Markdown skills have no unit-testable surface. Validation is a smoke test: run `/review-code --depth=deep` on a recent PR and confirm Adversarial fires and `progress.md` is written. Not CI. |
+| Only what's needed | Explicit defer list respected (cross-model adversarial, git-bug fallback, de-ROS config). Adversarial = highest-leverage subset. |
+| A change includes its consequences | Adapter propagation (ADR-0006) in-scope (step 11). Digest refresh (step 1) and mark-ported (step 12) keep inspiration-tracker from re-flagging. Lifecycle update propagated through `skill_workflows.md` and `plan-task` closing hint. Symlink migration keeps legacy paths functional (no broken references). |
+| Enforcement over documentation | **Soft nudge only — flagged as known deferral.** Docs-only enforcement of pre-push `/review-code`. Composite `/ship` is the planned next enforcement layer; PR body calls this out explicitly so the deferral is visible, not silent. |
+| Capture decisions, not just implementations | `review_depth_classification.md` documents the *why* for thresholds. Framed experimental — thresholds expected to churn until we have data. Promotion to ADR reserved for when the structure stabilizes. |
+| Improve incrementally | Single scoped slice of the fork's review tooling. Directory convention introduced without disturbing legacy plans. |
+| Primary framework first | Adversarial Specialist uses Claude Code subagent dispatch — full primary-framework capability. Adapters document the limitation rather than hobble the primary tool. |
+| Test what breaks | Prose skills; validation is smoke-test on PR #448 (the motivating case). No CI surface. |
 
 ## ADR Compliance
 
 | ADR | Triggered | How addressed |
 |---|---|---|
-| 0001 Adopt ADRs | Yes | `review_depth_classification.md` uses Context/Decision/Consequences structure. A separate short ADR is an alternative — see Open Questions. |
-| 0002 Worktree isolation | Yes | Plan is being committed from `.workspace-worktrees/issue-workspace-452`. |
-| 0003 Project-agnostic | Yes | Adversarial Specialist prompt stays generic — no references to specific layers, packages, or domain concepts. |
-| 0004/0005 Enforcement hierarchy | Watch | Docs-only enforcement is the explicit Phase-1 choice. PR body flags this as a deferral; `/ship` composite is the planned next layer. |
-| 0006 Shared AGENTS.md | Yes | Step 10 propagates the AGENTS.md change to Copilot, Gemini, and AGENT_ONBOARDING adapters. |
+| 0001 Adopt ADRs | No | Depth-tier design intentionally not promoted to ADR while experimental. Revisit after real PR data. |
+| 0002 Worktree isolation | Yes | Plan committed from `.workspace-worktrees/issue-workspace-452`. |
+| 0003 Project-agnostic | Yes | Adversarial prompt stays generic; no layer-specific or package-specific references. Repo-awareness pass (step 5) ensures skill text generalizes. |
+| 0004/0005 Enforcement hierarchy | Watch | Docs-only enforcement for pre-push expectation — explicit Phase-1 deferral, flagged in PR body. |
+| 0006 Shared AGENTS.md | Yes | Step 11 propagates to adapters. |
+| 0007 Retain Make | No | No Makefile changes. |
 | 0008 ROS 2 conventions | N/A | No ROS package code touched. |
 
 ## Consequences
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
-| `AGENTS.md` | Framework adapters (copilot, gemini-cli, AGENT_ONBOARDING) | **Yes** — step 10 |
-| A framework skill (`.claude/skills/`) | That framework's adapter file | **Yes** — adapters list review-code/triage-reviews/review-plan already; no name changes so no skill-list edit needed, but verify during step 10 |
-| `plan-task` / `review-code` / `triage-reviews` / `review-plan` | `skill_workflows.md` if lifecycle position changes | **Yes** — step 8 |
-| `.agent/knowledge/inspiration_agent_workspace_digest.md` | None — the digest is tracked only by inspiration-tracker skill runs | **Yes** — steps 1 and 11 |
+| `AGENTS.md` | Framework adapters (copilot, gemini-cli, AGENT_ONBOARDING) | **Yes** — step 11 |
+| `plan-task` / `review-code` / `triage-reviews` / `review-plan` | `skill_workflows.md` if lifecycle position changes | **Yes** — step 9 |
+| Plan file layout | Consumer skills that look up plans | **Yes** — symlink migration (step 2) keeps all plans reachable at one path; skills updated in steps 4, 6, 7 |
+| `.agent/knowledge/inspiration_agent_workspace_digest.md` | — (digest is tracked only by inspiration-tracker) | **Yes** — steps 1 and 12 |
 
 ## Open Questions
 
-1. **`progress.md` placement — flat or nested?** Review-issue recommended
-   flat (`.agent/work-plans/PROGRESS_ISSUE-<N>.md`) to stay consistent
-   with the deferred plan-path migration (`PLAN_ISSUE-<N>.md` → nested
-   is tracked separately and out of scope). Plan defaults to flat unless
-   user prefers nested. **Recommend: flat.**
-2. **Depth-tier override keyword syntax.** Options:
-   (a) `/review-code <N> --depth=deep` — extends existing
-   `<pr-number-or-url>` signature cleanly; `--depth=light|standard|deep`.
-   (b) inline magic keyword. **Recommend: (a)** for discoverability.
-3. **Is depth-tier design significant enough for its own ADR?**
-   Review-issue flagged this as a real decision. Alternatives: (i)
-   Context/Decision/Consequences inline in
-   `review_depth_classification.md` (lighter, plan default); (ii) new
-   ADR-0011 that references the knowledge doc for the signal table. If
-   you want ADR-level permanence, we add (ii). **Recommend: (i)** —
-   keep the knowledge doc as the decision record; promote to ADR only
-   if thresholds become contentious.
-4. **Pre-push mode diff base detection.** In post-PR mode the base is
-   the PR base branch. In pre-push mode, we infer base from:
-   `gh repo view --json defaultBranchRef` → fall back to `main`. Is
-   this acceptable, or should pre-push mode require an explicit
-   `--base <branch>` argument? **Recommend: inferred with override
-   flag available.**
-5. **AGENT_ONBOARDING / Copilot propagation depth.** Should the adapter
-   files each get the full pre-push expectation, or a cross-link to
-   AGENTS.md? ADR-0006 says adapters are thin wrappers — leaning
-   toward a brief one-line mention + cross-link rather than full
-   duplication. **Recommend: one-line + cross-link.**
+All resolved during discussion:
+
+1. **Directory convention** → legacy flat plans stay as-is; all new
+   artifacts nest under `.agent/work-plans/issue-<N>/`; eager symlink
+   migration bridges legacy plans so skills only check one path.
+2. **Depth override syntax** → `/review-code <N> --depth=light|standard|deep`.
+3. **ADR vs knowledge doc** → knowledge doc, experimental framing. No
+   ADR until thresholds stabilize with real-PR data.
+4. **Pre-push mode base detection** → inferred from default branch
+   with `--base <branch>` override.
+5. **Adapter propagation depth** → one-line mirror + cross-link to
+   AGENTS.md; adapters note Adversarial is Claude-only.
 
 ## Estimated Scope
 
-**Single PR, staged commits** (A / B / C groups above). Borderline per
-review-issue — if commit group A alone approaches review-fatigue size,
-split B + C off as a follow-up PR against a base branch that includes
-A. No project-repo code touched. Entirely workspace-level.
+**Single PR, staged commits** (A / B / C). Borderline per review-issue.
+If commit group A alone runs long, split B+C off as a follow-up PR
+against a base branch that includes A. No project-repo code touched.
+Entirely workspace-level.
+
+## Implementation Notes
+
+_Rationale for design pivots that aren't obvious from the diffs alone;
+add one-liners here as implementation proceeds. Empty at plan time._
