@@ -209,12 +209,22 @@ make dashboard                                   # Unified workspace status
 make dashboard QUICK=1                           # Quick mode (skip sync + GitHub)
 
 # Single package
-cd layers/main/<layer>_ws && colcon build --packages-select <package>
+cd layers/main/<layer>_ws && colcon build --symlink-install --packages-select <package>
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 
 make lint                                        # Lint + hooks (auto-installs pre-commit)
 ```
+
+**Always use `--symlink-install`** for development builds — it symlinks Python
+files and package markers so edits take effect without a rebuild. `make build`,
+the workspace build scripts (`.agent/scripts/build.sh`), and the single-package
+example above pass this flag explicitly. Worktree-generated `<layer>_ws/build.sh`
+enables symlink installs by default via a generated `colcon/defaults.yaml`
+(`symlink-install: true`) rather than via the CLI flag, so raw `colcon build`
+from the layer workspace picks it up automatically. (Note: ament_cmake
+`install(DIRECTORY ...)` directives still copy their contents, so data-file
+edits still need a rebuild.)
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
 
