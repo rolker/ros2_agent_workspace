@@ -68,13 +68,14 @@ source setup.bash                  # Set up ROS environment
 
 ## Field Mode
 
-Repos whose `origin` is not github.com (field machines pulling from gitcloud,
-private Forgejo, etc.) don't require worktrees for hotfixes. Agents may edit
-the main tree directly and commit to the default branch. See
-[`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-githubcom) for the
-full rule and detection via `.agent/scripts/field_mode.sh`. Field commits are
-imported back to GitHub via the `/import-field-changes` skill on a connected
-dev machine.
+Repos whose `origin` host is not on the GitHub allowlist (currently
+`github.com` and `ssh.github.com` — see
+[`.agent/scripts/field_mode.sh`](../.agent/scripts/field_mode.sh)) don't
+require worktrees for hotfixes. Agents may edit the main tree directly
+and commit to the default branch. See
+[`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-on-a-github-host)
+for the full rule. Field commits are imported back to GitHub via the
+`/import-field-changes` skill on a connected dev machine.
 
 ## Why Worktrees?
 

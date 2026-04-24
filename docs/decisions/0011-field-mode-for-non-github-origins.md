@@ -33,8 +33,12 @@ this ADR now records.
 
 ## Decision
 
-**A repo is in "field mode" when its `origin` host is not `github.com`.**
-Field-mode repos may:
+**A repo is in "field mode" when its `origin` host is not on the
+GitHub allowlist.** The allowlist lives in
+[`.agent/scripts/field_mode.sh`](../../.agent/scripts/field_mode.sh)
+and currently contains `github.com` and `ssh.github.com` (GitHub's
+SSH-over-443 fallback). Hosts are added to the allowlist only when
+GitHub itself documents them for git clone. Field-mode repos may:
 
 - Edit tracked files directly in the main/default tree
 - Commit directly to the default branch (e.g. `main`, `jazzy`)

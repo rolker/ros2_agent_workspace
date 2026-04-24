@@ -3,8 +3,9 @@
 ## Status
 
 Accepted. Scoped exception in [ADR-0011](0011-field-mode-for-non-github-origins.md)
-permits direct default-branch edits in repos whose origin is not `github.com`
-(field-mode repos pulling from gitcloud, private Forgejo, etc.).
+permits direct default-branch edits in repos whose origin host is not on
+the GitHub allowlist (field-mode repos pulling from gitcloud, private
+Forgejo, etc.).
 
 ## Context
 

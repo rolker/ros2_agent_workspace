@@ -15,7 +15,8 @@ setup (environment, identity, features), see your framework's adapter file:
 ### Always (proceed autonomously)
 
 - Use worktrees for all feature work — never edit files in the main tree.
-  Exception: **field mode** (origin not github.com) — see Worktree Workflow.
+  Exception: **field mode** (origin not on a GitHub host) — see Worktree
+  Workflow.
 - Run pre-commit hooks before committing
 - Include AI signature on all GitHub Issues/PRs/Comments (`$AGENT_NAME` / `$AGENT_MODEL`)
 - Reference issue numbers in branches and PRs (`Closes #<N>`)
@@ -111,10 +112,14 @@ source setup.bash                  # set up ROS environment
 See [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) for hybrid structure details,
 `--repo-slug` disambiguation, and troubleshooting.
 
-### Field Mode (origin not github.com)
+### Field Mode (origin not on a GitHub host)
 
-When a repo's `origin` host is **not** `github.com` (e.g., gitcloud, private
-Forgejo), the worktree/PR ceremony is relaxed. **Field-mode repos may**:
+When a repo's `origin` host is **not** on the GitHub allowlist (currently
+`github.com` and `ssh.github.com` — the SSH-over-443 fallback; see
+[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) for the
+authoritative list), the worktree/PR ceremony is relaxed. Examples of
+field-mode origins: gitcloud, private Forgejo, other non-GitHub remotes.
+**Field-mode repos may**:
 
 - Edit tracked files directly in the main/default tree
 - Commit to the default branch (`main`, `jazzy`, etc.)
@@ -145,7 +150,7 @@ on PATH, so invoke from the workspace root:
 
 # Form B: cd into the target repo first, reference the script via the workspace root
 cd layers/main/platforms_ws/src/unh_echoboats_project11
-../../../../.agent/scripts/field_mode.sh --describe
+../../../../../.agent/scripts/field_mode.sh --describe
 
 # Sourced in a script — source by explicit path (the script is not on PATH).
 # is_field_mode takes an optional repo_dir arg, defaulting to $PWD.

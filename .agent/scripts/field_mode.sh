@@ -2,13 +2,15 @@
 # .agent/scripts/field_mode.sh
 # Detect whether the current repo is in "field mode" vs. "dev mode".
 #
-# Field mode = the repo's origin host is NOT github.com (e.g., gitcloud,
-# a private Forgejo, or another non-GitHub remote). In field mode, agents
-# may edit tracked files in the main tree and commit directly to the
-# default branch without opening a PR. See issue #445 for rationale.
+# Field mode = the repo's origin host is NOT on the GitHub allowlist
+# (currently `github.com` and `ssh.github.com` — see is_field_mode
+# below). Examples: gitcloud, a private Forgejo, another non-GitHub
+# remote. In field mode, agents may edit tracked files in the main
+# tree and commit directly to the default branch without opening a
+# PR. See issue #445 for rationale.
 #
-# Dev mode = the repo's origin host is github.com. Dev mode enforces the
-# worktree + PR workflow.
+# Dev mode = the repo's origin host is on the GitHub allowlist. Dev
+# mode enforces the worktree + PR workflow.
 #
 # Usage:
 #   # CLI with no args — exit status mirrors is_field_mode:
@@ -33,14 +35,11 @@
 #
 # Host is extracted from the origin URL by stripping the scheme
 # (`*://`), then any user prefix (`*@`), then anything from the first
-# `:` or `/` onwards. The remaining string is compared exactly to
-# `github.com`. This correctly handles:
-#   - SSH form     git@github.com:user/repo        → host=github.com
-#   - HTTPS form   https://github.com/user/repo    → host=github.com
-#   - ssh://       ssh://git@github.com/user/repo  → host=github.com
-# and rejects:
-#   - Substring traps: git@mygithub.com:..., git@github.company.internal:...
-#   - Path leaks:      https://example.com/github.com/foo.git
+# `:` or `/` onwards. The remaining host is lowercased and compared
+# against the GitHub allowlist (`github.com`, `ssh.github.com`). Any
+# host not in the allowlist — including `mygithub.com`, subdomains
+# like `github.company.internal`, and paths like
+# `https://example.com/github.com/foo` — is field mode.
 is_field_mode() {
     local repo_dir="${1:-$PWD}"
     local origin_url host
