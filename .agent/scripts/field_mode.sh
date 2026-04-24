@@ -51,7 +51,14 @@ is_field_mode() {
     host="${host%%[:/]*}"       # take up to first : or /
     host="${host,,}"            # lowercase (DNS is case-insensitive)
 
-    [[ -n "$host" ]] && [[ "$host" != "github.com" ]]
+    # Dev-mode allowlist: GitHub's canonical git hosts. `ssh.github.com` is
+    # GitHub's SSH-over-443 fallback for users behind firewalls. Extend this
+    # list only for hosts GitHub itself documents for git clone.
+    case "$host" in
+        github.com|ssh.github.com) return 1 ;;  # dev mode
+    esac
+
+    [[ -n "$host" ]]            # field mode iff we extracted a host
 }
 
 # describe_mode [repo_dir]

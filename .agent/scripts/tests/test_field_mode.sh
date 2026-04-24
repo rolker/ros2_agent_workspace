@@ -73,6 +73,11 @@ assert_dev_mode "git@github.com:rolker/repo"  # no .git suffix
 # a GitHub-origin repo to field mode and permit main-tree edits.
 assert_dev_mode "git@GITHUB.COM:rolker/repo.git"
 assert_dev_mode "https://GitHub.com/rolker/repo.git"
+# ssh.github.com is GitHub's SSH-over-443 fallback for users behind firewalls.
+# Both the scheme-less SSH form and the explicit ssh://...:443 form must
+# resolve to dev mode.
+assert_dev_mode "git@ssh.github.com:rolker/repo.git"
+assert_dev_mode "ssh://git@ssh.github.com:443/rolker/repo.git"
 echo ""
 
 echo "=== is_field_mode: non-github origins (field mode) ==="
