@@ -141,7 +141,7 @@ on PATH, so invoke from the workspace root:
 ```bash
 # Form A: from workspace root, pass the target repo path
 .agent/scripts/field_mode.sh --describe layers/main/platforms_ws/src/unh_echoboats_project11
-# → "field mode  (origin: git@gitcloud:field/unh_echoboats_project11)"
+# → field mode  (origin: git@gitcloud:field/unh_echoboats_project11.git)
 
 # Form B: cd into the target repo first, reference the script via the workspace root
 cd layers/main/platforms_ws/src/unh_echoboats_project11
