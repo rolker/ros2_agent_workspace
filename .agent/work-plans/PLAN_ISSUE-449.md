@@ -78,8 +78,19 @@ Three small, tightly related doc edits. Single PR.
 
 ## Open Questions
 
-- **Name of the new section inside `.claude/skills/plan-task/SKILL.md`** — "During implementation" (matches the verbal discussion) or "Step 8: Update the plan as implementation evolves" (matches the skill's existing numbered-step structure)? Recommendation: renumber existing step 8 ("Report to user") to step 9 and make the new content step 8, so the flow reads issue → plan → draft PR → implement-and-update-plan → report.
-- **Depth of the worked example** — reference `rolker/rqt_operator_tools@9680d3e` by commit SHA + a one-line snippet, or paste the full before/after? Recommendation: reference + one-line snippet. Full diff rots if either side edits the file later.
+Both items below were resolved during implementation; annotations reflect
+the decisions that landed.
+
+- **Name of the new section inside `.claude/skills/plan-task/SKILL.md`** —
+  Resolved: unnumbered `### During implementation` subsection placed
+  between step 7 and step 8, nested under `## Steps`. Keeps the existing
+  numbered steps untouched while the new guidance is visible in the flow.
+  (Initially landed as a `##` heading, demoted to `###` in a follow-up
+  round so it stays structurally inside `## Steps`.)
+- **Depth of the worked example** — Resolved: short before/after excerpt
+  pasted inline, plus a SHA reference to `rolker/rqt_operator_tools@9680d3e`.
+  Readers see the pattern without clicking through; the SHA anchors the
+  example to a real commit for anyone who wants full context.
 
 ## Estimated Scope
 
