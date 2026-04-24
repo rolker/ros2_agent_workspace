@@ -218,10 +218,13 @@ make lint                                        # Lint + hooks (auto-installs p
 
 **Always use `--symlink-install`** for development builds — it symlinks Python
 files and package markers so edits take effect without a rebuild. `make build`,
-the workspace build scripts, and worktree-generated `<layer>_ws/build.sh` all
-include this flag by default; the single-package example above does too. (Note:
-ament_cmake `install(DIRECTORY ...)` directives still copy their contents, so
-data-file edits still need a rebuild.)
+the workspace build scripts (`.agent/scripts/build.sh`), and the single-package
+example above pass this flag explicitly. Worktree-generated `<layer>_ws/build.sh`
+enables symlink installs by default via a generated `colcon/defaults.yaml`
+(`symlink-install: true`) rather than via the CLI flag, so raw `colcon build`
+from the layer workspace picks it up automatically. (Note: ament_cmake
+`install(DIRECTORY ...)` directives still copy their contents, so data-file
+edits still need a rebuild.)
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
 
