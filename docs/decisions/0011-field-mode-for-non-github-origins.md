@@ -56,8 +56,9 @@ the existing `/import-field-changes` skill on a connected dev machine.
 
 This is a scoped exception to ADR-0002. Worktree isolation remains the
 default for GitHub-origin repos. The exception applies only when the
-origin URL tells us a PR workflow is impossible (no GitHub on the other
-side).
+origin URL tells us the workspace's GitHub-based PR workflow isn't
+available — other forges (Forgejo, GitLab) may have their own PR/CI
+mechanisms, but those don't plug into this workspace's review pipeline.
 
 ### Decisions Recorded on Issue #445
 

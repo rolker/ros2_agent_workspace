@@ -125,10 +125,13 @@ field-mode origins: gitcloud, private Forgejo, other non-GitHub remotes.
 - Commit to the default branch (`main`, `jazzy`, etc.)
 - Push to `origin` without opening a PR
 
-This is the only way field hotfixes can land before the next run — there's no
-GitHub, no PR review, no CI on the field remote. Mode is determined per repo
-by origin URL, not by the physical machine: a dev workstation working in a
-gitcloud-origin clone is in field mode for that repo.
+This is the only way field hotfixes can land before the next run — the
+workspace's PR-and-review workflow is GitHub-based, and a field remote
+isn't on GitHub. Other forges (Forgejo, GitLab) may support their own
+PR/CI mechanisms, but those don't plug into this workspace's review
+pipeline, so we treat them as field mode too. Mode is determined per
+repo by origin URL, not by the physical machine: a dev workstation
+working in a gitcloud-origin clone is in field mode for that repo.
 
 **What field mode does NOT change** (all still required):
 
