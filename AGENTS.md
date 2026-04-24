@@ -143,13 +143,17 @@ working in a gitcloud-origin clone is in field mode for that repo.
 - No committing secrets
 - No force-push, no destructive ops without explicit user approval
 
-**Hook caveat**: if a field-mode project repo uses `no-commit-to-branch`
-in its `.pre-commit-config.yaml` (the workspace template configures this
-for `main`, `jazzy`, `rolling`), direct commits to the default branch
-will be blocked even though field mode otherwise permits them. Field-mode
-project repos need to exclude their default branch from that hook's
-branch list, or drop the hook. This is a project-repo config concern,
-not a field-mode flag.
+**Hook caveat**: `no-commit-to-branch` is a common pre-commit hook that
+blocks direct commits to listed branches. If a field-mode project repo
+has its default branch in that list, commits will fail at pre-commit —
+even though field mode otherwise permits them. Two templates in this
+workspace configure the hook: the project-repo template
+(`.agent/templates/pre-commit-config.yaml`, where the project substitutes
+`PLACEHOLDER_DEFAULT_BRANCH`), and the workspace's own
+`.pre-commit-config.yaml` (which lists `main`, `jazzy`, `rolling`).
+Field-mode project repos need to remove their default branch from the
+hook's list, or drop the hook. This is a project-repo config concern,
+not a field-mode flag. Never bypass with `--no-verify`.
 
 **Detection**: the mode is inferred from the repo's origin URL. Use
 [`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) — it isn't

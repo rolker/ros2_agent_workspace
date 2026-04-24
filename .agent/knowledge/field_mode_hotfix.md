@@ -2,8 +2,8 @@
 
 Concrete walkthrough for making a hotfix on a field machine and getting the
 change back to GitHub via the import skill. Reference implementation of the
-field-mode carve-out documented in [`AGENTS.md § Field
-Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host).
+field-mode carve-out documented in
+[`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host).
 
 ## When This Applies
 
@@ -157,11 +157,15 @@ be committed in haste. File a git-bug bug report instead — `gh_create_issue.sh
 with `GITBUG_CREATE=1` creates a bug locally that syncs to GitHub via the
 git-bug bridge when the machine reconnects.
 
-**`no-commit-to-branch` hook can block your commit.** The workspace
-pre-commit template configures `no-commit-to-branch` for `main`, `jazzy`,
-`rolling`. If a field-mode project repo inherits that hook, committing
-directly to its default branch will fail at the pre-commit step even
-though field mode otherwise permits it. Check the repo's
+**`no-commit-to-branch` hook can block your commit.** This common
+pre-commit hook blocks direct commits to listed branches. Two templates
+in this workspace configure it: the project-repo template at
+`.agent/templates/pre-commit-config.yaml` (using
+`PLACEHOLDER_DEFAULT_BRANCH` that each project fills in), and the
+workspace's own `.pre-commit-config.yaml` (which lists `main`, `jazzy`,
+`rolling`). If a field-mode project repo has its default branch in the
+hook's list, committing directly will fail at pre-commit even though
+field mode otherwise permits it. Check the repo's
 `.pre-commit-config.yaml`; if `no-commit-to-branch` lists the default
 branch, remove that entry or drop the hook entirely for field-mode
 repos. Don't bypass with `--no-verify` — fix the config.

@@ -4,10 +4,11 @@
 
 ## Workflow
 
-**When this repo is checked out as part of a [ROS 2 Agent
-Workspace](https://github.com/rolker/ros2_agent_workspace)**, workflow
-rules (worktree vs. field mode, branch naming, etc.) are defined in the
-workspace `AGENTS.md`. To determine the active mode before editing, run
+**When this repo is checked out as part of a
+[ROS 2 Agent Workspace](https://github.com/rolker/ros2_agent_workspace)**,
+workflow rules (worktree vs. field mode, branch naming, etc.) are
+defined in the workspace `AGENTS.md`. To determine the active mode
+before editing, run
 the detection script **from the workspace root** (the script is not on
 PATH, and `.agent/` lives at the workspace root, not inside this repo):
 
