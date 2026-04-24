@@ -15,8 +15,9 @@ setup (environment, identity, features), see your framework's adapter file:
 ### Always (proceed autonomously)
 
 - Use worktrees for all feature work — never edit files in the main tree.
-  Exception: **field mode** (origin not on a GitHub host) — see Worktree
-  Workflow.
+  Exception: **field mode** (origin not on the GitHub allowlist — see
+  [`field_mode.sh`](.agent/scripts/field_mode.sh); GitHub Enterprise is
+  field mode by design). See Worktree Workflow.
 - Run pre-commit hooks before committing
 - Include AI signature on all GitHub Issues/PRs/Comments (`$AGENT_NAME` / `$AGENT_MODEL`)
 - Reference issue numbers in branches and PRs (`Closes #<N>`)
@@ -141,6 +142,14 @@ working in a gitcloud-origin clone is in field mode for that repo.
 - Atomic commits (one logical change per commit)
 - No committing secrets
 - No force-push, no destructive ops without explicit user approval
+
+**Hook caveat**: if a field-mode project repo uses `no-commit-to-branch`
+in its `.pre-commit-config.yaml` (the workspace template configures this
+for `main`, `jazzy`, `rolling`), direct commits to the default branch
+will be blocked even though field mode otherwise permits them. Field-mode
+project repos need to exclude their default branch from that hook's
+branch list, or drop the hook. This is a project-repo config concern,
+not a field-mode flag.
 
 **Detection**: the mode is inferred from the repo's origin URL. Use
 [`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) — it isn't

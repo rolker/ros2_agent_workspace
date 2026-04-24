@@ -157,6 +157,15 @@ be committed in haste. File a git-bug bug report instead — `gh_create_issue.sh
 with `GITBUG_CREATE=1` creates a bug locally that syncs to GitHub via the
 git-bug bridge when the machine reconnects.
 
+**`no-commit-to-branch` hook can block your commit.** The workspace
+pre-commit template configures `no-commit-to-branch` for `main`, `jazzy`,
+`rolling`. If a field-mode project repo inherits that hook, committing
+directly to its default branch will fail at the pre-commit step even
+though field mode otherwise permits it. Check the repo's
+`.pre-commit-config.yaml`; if `no-commit-to-branch` lists the default
+branch, remove that entry or drop the hook entirely for field-mode
+repos. Don't bypass with `--no-verify` — fix the config.
+
 ## Related
 
 - [`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host) — canonical rule
