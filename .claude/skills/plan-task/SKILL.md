@@ -180,7 +180,7 @@ fi
 rm -f "$BODY_FILE"
 ```
 
-## During implementation
+### During implementation
 
 The `plan-task` skill produces its artifact at step 7 (the draft PR).
 Implementation then proceeds on the same branch — and typically deviates
@@ -222,7 +222,7 @@ misalignment between the plan and the PR. If drift becomes a recurring
 finding across multiple PRs, that's a signal the rule needs more teeth,
 not that the rule is wrong.
 
-### Worked example
+#### Worked example
 
 From `rolker/rqt_operator_tools@9680d3e` (PR #22 round-8 fix pass —
 the code change and its plan edit landed in the same commit):

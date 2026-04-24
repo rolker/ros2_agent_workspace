@@ -32,10 +32,11 @@ Three small, tightly related doc edits. Single PR.
    rationale-bearing deviations, never append-only, commit discipline), one
    short worked example pair.
 
-2. **Add a one-line reference in `AGENTS.md` § Worktree Workflow**, near the
-   `PLAN_ISSUE-<N>.md` mention, pointing at the new skill subsection so
-   non-Claude agents who adopt plan-first later discover the rule. This
-   prevents the cascade barrier flagged in the review-issue comment.
+2. **Add a one-line reference in `AGENTS.md` § Post-Task Verification**,
+   alongside the existing work-plan bullet in that section, pointing at
+   the new skill subsection so non-Claude agents who adopt plan-first
+   later discover the rule. This prevents the cascade barrier flagged in
+   the review-issue comment.
 
 3. **Acknowledge the enforcement-layer choice in the skill prose** — one
    sentence stating plan freshness is enforced by review feedback
@@ -47,7 +48,7 @@ Three small, tightly related doc edits. Single PR.
 | File | Change |
 |------|--------|
 | `.claude/skills/plan-task/SKILL.md` | Insert new "During implementation" subsection with four rules + worked example pair + enforcement-layer note |
-| `AGENTS.md` | One-line reference to the new subsection near the existing plan-first mention (cited via grep on `PLAN_ISSUE`) |
+| `AGENTS.md` | One-line reference to the new subsection, added under `## Post-Task Verification` alongside the existing work-plan bullet |
 
 ## Principles Self-Check
 
