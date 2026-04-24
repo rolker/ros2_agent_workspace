@@ -78,6 +78,14 @@ assert_field_mode "https://notgithub.com/foo/bar.git"
 assert_field_mode "git@github.company.internal:org/repo.git"
 echo ""
 
+echo "=== is_field_mode: path-position leaks (must be field mode) ==="
+# The host is example.com / gitcloud / etc. — 'github.com' only appears in
+# the URL path. A naive regex against the full URL would misclassify these.
+assert_field_mode "https://example.com/github.com/foo.git"
+assert_field_mode "https://example.com/mirrors/github.com/foo"
+assert_field_mode "git@gitcloud:team/github.com-mirror.git"
+echo ""
+
 echo "=== is_field_mode: edge cases ==="
 # No origin remote at all → dev mode (returns 1, the safer default)
 NO_ORIGIN_REPO=$(mktemp -d /tmp/no_origin.XXXXXX)

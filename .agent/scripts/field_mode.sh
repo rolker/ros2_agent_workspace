@@ -2,37 +2,55 @@
 # .agent/scripts/field_mode.sh
 # Detect whether the current repo is in "field mode" vs. "dev mode".
 #
-# Field mode = the repo's origin is NOT github.com (e.g., gitcloud, a private
-# Forgejo, or another non-github remote). In field mode, agents may edit
-# tracked files in the main tree and commit directly to the default branch
-# without opening a PR. See issue #445 for rationale.
+# Field mode = the repo's origin host is NOT github.com (e.g., gitcloud,
+# a private Forgejo, or another non-GitHub remote). In field mode, agents
+# may edit tracked files in the main tree and commit directly to the
+# default branch without opening a PR. See issue #445 for rationale.
 #
-# Dev mode = the repo's origin is github.com. Dev mode enforces the worktree
-# + PR workflow.
+# Dev mode = the repo's origin host is github.com. Dev mode enforces the
+# worktree + PR workflow.
 #
 # Usage:
-#   # As CLI (exits 0 for field mode, 1 for dev mode):
-#   .agent/scripts/field_mode.sh
-#   .agent/scripts/field_mode.sh --describe   # human-readable summary
+#   # CLI with no args — exit status mirrors is_field_mode:
+#   #   0 = field mode, 1 = dev mode or error (no git repo / no origin)
+#   .agent/scripts/field_mode.sh [<repo_dir>]
 #
-#   # Sourced:
-#   source .agent/scripts/field_mode.sh
-#   if is_field_mode; then
+#   # CLI with --describe — prints a human-readable summary.
+#   # Exit 0 unless origin is missing (then exit 1).
+#   .agent/scripts/field_mode.sh --describe [<repo_dir>]
+#
+#   # Sourced (script must be reachable by path — not on PATH by default):
+#   source /path/to/.agent/scripts/field_mode.sh
+#   if is_field_mode; then                 # checks $PWD
 #     echo "field mode — direct main-tree edits permitted"
+#   fi
+#   if is_field_mode "/path/to/some/repo"; then  # check a specific repo
+#     ...
 #   fi
 
 # is_field_mode [repo_dir]
 # Exit 0 if the given repo (default: $PWD) is in field mode, else 1.
 #
-# A repo is in dev mode iff its origin host is exactly github.com.
-# The host is matched only when preceded by start-of-string, '/', or '@'
-# AND followed by ':' or '/', so hostnames like 'mygithub.com' or
-# 'github.company.internal' are NOT misclassified as dev mode.
+# Host is extracted from the origin URL by stripping the scheme
+# (`*://`), then any user prefix (`*@`), then anything from the first
+# `:` or `/` onwards. The remaining string is compared exactly to
+# `github.com`. This correctly handles:
+#   - SSH form     git@github.com:user/repo        → host=github.com
+#   - HTTPS form   https://github.com/user/repo    → host=github.com
+#   - ssh://       ssh://git@github.com/user/repo  → host=github.com
+# and rejects:
+#   - Substring traps: git@mygithub.com:..., git@github.company.internal:...
+#   - Path leaks:      https://example.com/github.com/foo.git
 is_field_mode() {
     local repo_dir="${1:-$PWD}"
-    local origin_url
+    local origin_url host
     origin_url=$(git -C "$repo_dir" remote get-url origin 2>/dev/null) || return 1
-    [[ ! "$origin_url" =~ (^|/|@)github\.com[:/] ]]
+
+    host="${origin_url#*://}"   # strip scheme (if any)
+    host="${host#*@}"           # strip user@ (if any)
+    host="${host%%[:/]*}"       # take up to first : or /
+
+    [[ -n "$host" ]] && [[ "$host" != "github.com" ]]
 }
 
 # describe_mode [repo_dir]

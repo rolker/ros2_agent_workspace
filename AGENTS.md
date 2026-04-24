@@ -145,10 +145,14 @@ on PATH, so invoke from the workspace root:
 cd layers/main/platforms_ws/src/unh_echoboats_project11
 ../../../../.agent/scripts/field_mode.sh --describe
 
-# Sourced in a script (any path — uses $PWD by default)
-source .agent/scripts/field_mode.sh
-if is_field_mode; then
+# Sourced in a script — source by explicit path (the script is not on PATH).
+# is_field_mode takes an optional repo_dir arg, defaulting to $PWD.
+source /path/to/workspace/.agent/scripts/field_mode.sh
+if is_field_mode; then                  # checks current $PWD
     # field-mode behavior
+fi
+if is_field_mode "/path/to/repo"; then  # check a specific repo
+    # ...
 fi
 ```
 

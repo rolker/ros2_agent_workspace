@@ -71,9 +71,10 @@ $EDITOR config/operator_tmux.yaml
 Field mode relaxes the worktree/PR requirement. It does **not** relax any
 other quality gate: pre-commit hooks still run, commits stay atomic, and
 the commit author is your configured agent identity (set by
-`set_git_identity_env.sh`). Adding a `Co-Authored-By` trailer for your
-agent model is conventional — substitute your framework's actual name,
-model, and noreply email:
+`set_git_identity_env.sh`). The workspace does not currently mandate a
+specific commit-trailer format; if your agent framework has a convention
+for attributing the model in commit messages (e.g. a `Co-Authored-By`
+trailer), apply it as you would on any other commit.
 
 ```bash
 git add config/operator_tmux.yaml
@@ -85,8 +86,6 @@ pane_order list. Added a default ordering matching the previous
 session's layout.
 
 Field hotfix — landing direct on jazzy per AGENTS.md Field Mode.
-
-Co-Authored-By: <agent name and model> <agent-noreply-email>
 EOF
 )"
 ```
