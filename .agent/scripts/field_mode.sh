@@ -49,6 +49,7 @@ is_field_mode() {
     host="${origin_url#*://}"   # strip scheme (if any)
     host="${host#*@}"           # strip user@ (if any)
     host="${host%%[:/]*}"       # take up to first : or /
+    host="${host,,}"            # lowercase (DNS is case-insensitive)
 
     [[ -n "$host" ]] && [[ "$host" != "github.com" ]]
 }

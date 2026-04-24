@@ -68,6 +68,11 @@ assert_dev_mode "git@github.com:rolker/ros2_agent_workspace.git"
 assert_dev_mode "https://github.com/rolker/ros2_agent_workspace.git"
 assert_dev_mode "ssh://git@github.com/rolker/ros2_agent_workspace.git"
 assert_dev_mode "git@github.com:rolker/repo"  # no .git suffix
+# Case normalization: DNS is case-insensitive, so mixed-case hosts must still
+# resolve to dev mode for github.com — otherwise a careless clone could flip
+# a GitHub-origin repo to field mode and permit main-tree edits.
+assert_dev_mode "git@GITHUB.COM:rolker/repo.git"
+assert_dev_mode "https://GitHub.com/rolker/repo.git"
 echo ""
 
 echo "=== is_field_mode: non-github origins (field mode) ==="
