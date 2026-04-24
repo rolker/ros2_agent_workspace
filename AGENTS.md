@@ -73,7 +73,7 @@ whole thing, do it right, do it with tests.
 
 Every task on a GitHub-origin repo must use an isolated worktree. For
 non-GitHub-origin repos (field mode), the worktree/PR ceremony is
-relaxed — see [Field Mode](#field-mode-origin-not-githubcom) below.
+relaxed — see [Field Mode](#field-mode-origin-not-on-a-github-host) below.
 
 **Project repos**: Directories under `layers/main/*_ws/src/` are typically independent
 git repos, each containing one or more ROS 2 packages. Layer worktrees create git

@@ -34,7 +34,7 @@ Key points:
 - Never commit directly to the default branch (e.g. `main`, `jazzy`) on a
   GitHub-origin repo — use worktrees for isolation. Repos with non-GitHub
   origin (field mode) have their own workflow; see
-  [`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-githubcom).
+  [`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-on-a-github-host).
 - Never `git checkout <branch>` — `setup.bash` blocks it
 - AI signature required on all GitHub Issues/PRs/Comments
 - Use `--body-file` for `gh` CLI, not inline `--body`

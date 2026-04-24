@@ -3,7 +3,7 @@
 Concrete walkthrough for making a hotfix on a field machine and getting the
 change back to GitHub via the import skill. Reference implementation of the
 field-mode carve-out documented in [`AGENTS.md § Field
-Mode`](../../AGENTS.md#field-mode-origin-not-githubcom).
+Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host).
 
 ## When This Applies
 
@@ -159,7 +159,7 @@ git-bug bridge when the machine reconnects.
 
 ## Related
 
-- [`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-githubcom) — canonical rule
+- [`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host) — canonical rule
 - [`.agent/scripts/field_mode.sh`](../scripts/field_mode.sh) — mode detection helper
 - [`.claude/skills/import-field-changes/content.md`](../../.claude/skills/import-field-changes/content.md) — the import skill
 - Issue [#445](https://github.com/rolker/ros2_agent_workspace/issues/445) — field-mode design and decisions
