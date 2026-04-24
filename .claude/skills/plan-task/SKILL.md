@@ -180,22 +180,15 @@ fi
 rm -f "$BODY_FILE"
 ```
 
-### 8. Report to user
-
-Summarize:
-- What the plan proposes
-- Which principles and ADRs were considered
-- Any open questions that need input
-- Link to the draft PR
-
 ## During implementation
 
-The `plan-task` skill finishes when the draft PR is up. Implementation then
-proceeds on the same branch — and typically deviates from the plan: types
-get refined, functions change signatures, a "pure logic" module picks up
-a dependency. Keep the plan in sync as this happens so the file stays
-usable reference material — for Copilot's plan-file review, for
-`review-code`, and for the next agent who picks up the package.
+The `plan-task` skill produces its artifact at step 7 (the draft PR).
+Implementation then proceeds on the same branch — and typically deviates
+from the plan: types get refined, functions change signatures, a "pure
+logic" module picks up a dependency. Keep the plan in sync as this
+happens so the file stays usable reference material — for Copilot's
+plan-file review, for `review-code`, and for the next agent who picks
+up the package.
 
 1. **Inline edits are the default.** When implementation diverges from the
    plan in any way — wording, method names, file paths, dependency
@@ -254,6 +247,16 @@ motivated it (rule 4). No `Implementation Notes` entry is needed — the
 `Implementation Notes` entry would have been warranted for a case like
 the `QGridLayout` swap cited above, where the rationale doesn't fit in a
 one-line plan edit.
+
+### 8. Report to user
+
+Summarize:
+- What the plan proposes
+- Which principles and ADRs were considered
+- Any open questions that need input
+- Link to the draft PR
+- Pointer to the "During implementation" subsection above, so the
+  implementer knows to keep the plan in sync with landed code
 
 ## Guidelines
 

@@ -47,7 +47,7 @@ Three small, tightly related doc edits. Single PR.
 | File | Change |
 |------|--------|
 | `.claude/skills/plan-task/SKILL.md` | Insert new "During implementation" subsection with four rules + worked example pair + enforcement-layer note |
-| `AGENTS.md` | One-line reference to the new subsection near the existing plan-first mention (sited via grep on `PLAN_ISSUE`) |
+| `AGENTS.md` | One-line reference to the new subsection near the existing plan-first mention (cited via grep on `PLAN_ISSUE`) |
 
 ## Principles Self-Check
 
