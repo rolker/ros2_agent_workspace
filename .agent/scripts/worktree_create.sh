@@ -74,6 +74,7 @@ if v and v != 'unknown': print(v)
 generate_worktree_scripts() {
     local wt_dir="$1"
     local main_root="$2"
+    local target_layer="${3:-}"
 
     echo ""
     echo "Generating convenience scripts..."
@@ -172,9 +173,43 @@ if [ -x ${_escaped_main_root}/.venv/bin/pre-commit ]; then
 fi
 SETUP_PRECOMMIT
 
+    # Worktree path override: force-prepend target layer's build, install, and
+    # prefix paths so they take priority over the main tree's symlink-install
+    # develop hooks. Without this, colcon's baked-in absolute paths cause the
+    # main tree's stale egg-info and AMENT_PREFIX_PATH to shadow the worktree's
+    # new/modified packages. See #427.
+    if [ -n "$target_layer" ]; then
+        cat >> "$wt_dir/setup.bash" << SETUP_PATH_FIX
+
+# 5. Prioritize worktree target layer over main tree symlink-install paths (#427)
+# Colcon's setup.bash bakes absolute paths to layers/main/ at build time. Symlinked
+# higher layers re-source the main tree's install, bringing in stale develop hooks
+# and AMENT_PREFIX_PATH entries. Force-prepend the worktree's target layer paths
+# so they win.
+_wt_target_install="\$WORKTREE_DIR/${target_layer}_ws/install"
+for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
+    [ -d "\$_wt_pkg_build" ] || continue
+    _wt_pkg=\$(basename "\$_wt_pkg_build")
+    _wt_pkg_prefix="\$_wt_target_install/\$_wt_pkg"
+    # AMENT_PREFIX_PATH: ensure worktree install prefix is found before main tree
+    if [ -d "\$_wt_pkg_prefix" ]; then
+        export AMENT_PREFIX_PATH="\$_wt_pkg_prefix\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}"
+    fi
+    # PYTHONPATH: prepend site-packages and build dir for Python packages
+    for _wt_sp in "\$_wt_pkg_prefix"/lib/python3.*/site-packages; do
+        [ -d "\$_wt_sp" ] || continue
+        export PYTHONPATH="\$_wt_sp\${PYTHONPATH:+:\$PYTHONPATH}"
+        export PYTHONPATH="\${_wt_pkg_build%/}\${PYTHONPATH:+:\$PYTHONPATH}"
+        break
+    done
+done
+unset _wt_target_install _wt_pkg_build _wt_pkg _wt_pkg_prefix _wt_sp
+SETUP_PATH_FIX
+    fi
+
     cat >> "$wt_dir/setup.bash" << 'SETUP_FOOTER2'
 
-# 5. Prevent interactive editor hangs
+# 6. Prevent interactive editor hangs
 export GIT_EDITOR=true
 
 echo "Environment ready."
@@ -946,7 +981,7 @@ EOF
     fi
 
     # Generate convenience scripts (setup.bash, build.sh, test.sh, etc.)
-    generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR"
+    generate_worktree_scripts "$WORKTREE_DIR" "$ROOT_DIR" "$TARGET_LAYER"
 fi
 
 # For workspace worktrees, symlink the layers directory
