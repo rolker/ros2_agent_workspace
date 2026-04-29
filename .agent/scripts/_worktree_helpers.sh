@@ -114,12 +114,16 @@ extract_gh_slug() {
     local url="$1"
     # Strip a single trailing .git so the regex doesn't have to.
     local cleaned="${url%.git}"
-    # Boundary: ^, @, or / before host
+    # Boundary: must be at URL host position — start-of-string, an '@'
+    # (auth section), or a '://' (protocol delimiter). A bare '/' is
+    # not a valid boundary; otherwise URLs like
+    # https://example.com/github.com/owner/repo would falsely match
+    # github.com inside the path.
     # Host:     optional ssh. prefix, then literal github.com
     # Port:     optional :NNN
     # Sep:      / (URL form) or : (SCP form)
     # Path:     OWNER / REPO  (no slashes or whitespace inside either)
-    local re='(^|[@/])(ssh\.)?github\.com(:[0-9]+)?[/:]([^/[:space:]]+)/([^/[:space:]]+)$'
+    local re='(^|@|://)(ssh\.)?github\.com(:[0-9]+)?[/:]([^/[:space:]]+)/([^/[:space:]]+)$'
     if [[ "$cleaned" =~ $re ]]; then
         echo "${BASH_REMATCH[4]}/${BASH_REMATCH[5]}"
     fi

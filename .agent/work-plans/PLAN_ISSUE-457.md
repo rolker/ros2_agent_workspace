@@ -177,6 +177,15 @@ and one test file. No ADR touches, no doc updates.
   the `wt_layer_pkg_dir` helper to `_worktree_helpers.sh` so
   `worktree_enter.sh` can find the package's repo dir from the
   worktree at enter-time (where `--packages` is no longer in scope).
+- **`extract_gh_slug` boundary tightened after round-4 review**:
+  Round-4 Copilot review caught that the initial hardening's boundary
+  class `(^|[@/])` still allowed `github.com` to appear inside a URL
+  path (e.g. `https://example.com/github.com/owner/repo.git` would
+  match the `/` before `github.com` and produce a false-positive
+  slug). Tightened the boundary to `(^|@|://)` so the host must be at
+  a true URL host position (start, after `@` auth section, or after
+  `://` protocol delimiter). Added regression cases for the
+  path-component scenarios.
 - **`extract_gh_slug` hardening brought into scope after round-3
   review**: Copilot pointed out two latent bugs in the existing
   `extract_gh_slug` (defined in `worktree_create.sh`): (1) substring

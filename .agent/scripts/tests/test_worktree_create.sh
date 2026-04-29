@@ -973,6 +973,12 @@ test_extract_gh_slug_rejects_lookalikes() {
     # Subdomains of github.com other than 'ssh.' (notably gist.) must not match.
     _assert_slug "https://gist.github.com/owner/file.git" "" "gist.github.com" || return 1
     _assert_slug "https://api.github.com/repos/owner/repo" "" "api.github.com" || return 1
+    # github.com appearing inside a URL path (not at host position) must
+    # not match — the boundary class would otherwise pick up the leading
+    # '/' before 'github.com' and accept a non-GitHub remote.
+    _assert_slug "https://example.com/github.com/owner/repo.git" "" "github.com in path"        || return 1
+    _assert_slug "https://gitlab.com/foo/github.com/owner/repo"  "" "github.com deep in path"   || return 1
+    _assert_slug "git@example.com/github.com/owner/repo.git"     "" "github.com in scp-ish path" || return 1
     return 0
 }
 run_test "extract_gh_slug rejects lookalike hosts" test_extract_gh_slug_rejects_lookalikes
