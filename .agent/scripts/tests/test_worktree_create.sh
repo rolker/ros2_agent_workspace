@@ -34,6 +34,9 @@ setup_mock_workspace() {
     # Create required directory structure
     mkdir -p .workspace-worktrees
     mkdir -p .agent/scripts
+    # Layer manifest is required by the script's available-layers check
+    mkdir -p configs/manifest
+    echo "core" > configs/manifest/layers.txt
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
@@ -174,6 +177,9 @@ setup_mock_layer_workspace() {
     # Create required directories
     mkdir -p layers/worktrees
     mkdir -p .agent/scripts
+    # Layer manifest is required by the script's available-layers check
+    mkdir -p configs/manifest
+    echo "core" > configs/manifest/layers.txt
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
@@ -445,6 +451,128 @@ test_offline_fallback_message() {
     return 0
 }
 run_test "Offline fallback message when gh fails" test_offline_fallback_message
+
+# ===== git-bug bridge-gating tests (regression for #457) =====
+
+# Install a fake gitbug_helpers.sh next to the copied worktree_create.sh.
+# Behaviour is controlled by env vars:
+#   FAKE_BRIDGE_MODE   = none|workspace_only|project_only|both
+#   FAKE_BUG_WORKSPACE_TITLE / FAKE_BUG_PROJECT_TITLE
+#   FAKE_BUG_WORKSPACE_STATUS / FAKE_BUG_PROJECT_STATUS  (default: open)
+# Workspace vs project repo is distinguished by path: project repos live
+# under .../layers/main/<layer>_ws/src/<pkg>, workspace does not.
+install_fake_gitbug_helpers() {
+    cat > .agent/scripts/gitbug_helpers.sh << 'HELPERS_EOF'
+gitbug_has_bridge() {
+    local repo_dir="$1"
+    case "${FAKE_BRIDGE_MODE:-none}" in
+        workspace_only) [[ "$repo_dir" != *"/layers/main/"*"/src/"* ]] ;;
+        project_only)   [[ "$repo_dir" == *"/layers/main/"*"/src/"* ]] ;;
+        both)           return 0 ;;
+        none|*)         return 1 ;;
+    esac
+}
+gitbug_lookup() {
+    local repo_dir="$1"
+    local field="$3"
+    [ "$field" = "title" ] || [ "$field" = "status" ] || return 1
+    local prefix="WORKSPACE"
+    [[ "$repo_dir" == *"/layers/main/"*"/src/"* ]] && prefix="PROJECT"
+    local field_upper="TITLE"
+    [ "$field" = "status" ] && field_upper="STATUS"
+    local var="FAKE_BUG_${prefix}_${field_upper}"
+    local val="${!var:-}"
+    if [ "$field" = "status" ] && [ -z "$val" ]; then val="open"; fi
+    [ -n "$val" ] && { echo "$val"; return 0; } || return 1
+}
+HELPERS_EOF
+}
+
+# Test: Layer worktree must not show workspace's wrong title when project
+# repo isn't git-bug-bridged (the original #457 collision scenario).
+test_layer_skips_unbridged_project_gitbug() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=workspace_only \
+             FAKE_BUG_WORKSPACE_TITLE="WRONG_TITLE_FROM_WORKSPACE" \
+             FAKE_GH_MODE=open \
+             PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 999 --type layer --layer core --packages test_pkg 2>&1) || true
+
+    cleanup_mock_layer_workspace
+
+    if [[ "$output" == *"WRONG_TITLE_FROM_WORKSPACE"* ]]; then
+        echo "    Workspace git-bug title leaked into layer worktree banner"
+        echo "    Output: $output"
+        return 1
+    fi
+    if [[ "$output" != *"Fix the widget"* ]]; then
+        echo "    Expected gh-fallback title 'Fix the widget' in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Layer worktree skips git-bug when project repo unbridged (#457)" test_layer_skips_unbridged_project_gitbug
+
+# Test: Layer worktree must use project repo's git-bug data when it IS
+# bridged, even if the workspace also has data for the same issue number
+# (forward-compat: project repos will eventually get bridges).
+test_layer_uses_project_gitbug_when_bridged() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=both \
+             FAKE_BUG_PROJECT_TITLE="RIGHT_TITLE_FROM_PROJECT" \
+             FAKE_BUG_WORKSPACE_TITLE="WRONG_TITLE_FROM_WORKSPACE" \
+        .agent/scripts/worktree_create.sh --issue 888 --type layer --layer core --packages test_pkg 2>&1) || true
+
+    cleanup_mock_layer_workspace
+
+    if [[ "$output" == *"WRONG_TITLE_FROM_WORKSPACE"* ]]; then
+        echo "    Workspace title leaked despite project repo being bridged"
+        echo "    Output: $output"
+        return 1
+    fi
+    if [[ "$output" != *"RIGHT_TITLE_FROM_PROJECT"* ]]; then
+        echo "    Expected project-repo title 'RIGHT_TITLE_FROM_PROJECT' in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Layer worktree uses project repo's git-bug when bridged (#457 forward-compat)" test_layer_uses_project_gitbug_when_bridged
+
+# Test: Workspace worktree continues to use workspace git-bug when bridged
+# (sanity check that the bridge gate doesn't break the original happy path).
+test_workspace_uses_workspace_gitbug_when_bridged() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=workspace_only \
+             FAKE_BUG_WORKSPACE_TITLE="HAPPY_PATH_TITLE" \
+        .agent/scripts/worktree_create.sh --issue 777 --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"HAPPY_PATH_TITLE"* ]]; then
+        echo "    Expected workspace git-bug title in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Workspace worktree uses workspace git-bug when bridged" test_workspace_uses_workspace_gitbug_when_bridged
 
 # ===== Skill worktree tests =====
 

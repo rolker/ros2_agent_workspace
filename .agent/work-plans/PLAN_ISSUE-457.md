@@ -58,21 +58,23 @@ whether it happens to be the workspace.
    the constraint isn't being recorded in an ADR — the script comment +
    regression test + PR description carry the breadcrumb.
 
-5. **Regression test.** Add a focused test to
+5. **Regression tests.** Add focused tests to
    `.agent/scripts/tests/test_worktree_create.sh` covering:
    - Collision scenario: layer-type worktree, project repo unbridged,
-     stub `gitbug_lookup` to return a wrong-repo title — assert the gh
+     fake `gitbug_lookup` returns a wrong-repo title — assert the gh
      fallback path runs and the right title is reported.
    - Forward-compat scenario: layer-type worktree, project repo *is*
-     bridged (mocked) — assert `gitbug_lookup` is called against the
+     bridged (mocked) — assert `gitbug_lookup` is queried against the
      project repo's dir, not the workspace.
+   - Sanity scenario: workspace-type worktree, workspace bridged —
+     assert the original happy path still uses workspace git-bug data.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
 | `.agent/scripts/worktree_create.sh` | Add `BUG_QUERY_DIR` resolution; gate `gitbug_lookup` on `gitbug_has_bridge`; pass `BUG_QUERY_DIR` to `gitbug_lookup` for both title and status; add short explanatory comment. |
-| `.agent/scripts/tests/test_worktree_create.sh` | Add collision-scenario regression test and forward-compat (bridged-project-repo) test. |
+| `.agent/scripts/tests/test_worktree_create.sh` | Add three regression tests (collision, forward-compat, workspace sanity) plus a fake-helpers installer; also fix the pre-existing missing-manifest gap in `setup_mock_workspace` / `setup_mock_layer_workspace` (without it, no script-invoking test could run — see Implementation Notes). |
 
 ## Principles Self-Check
 
@@ -122,3 +124,22 @@ Single PR. Changes are localized to one script and one test file. No
 ADR touches, no doc updates. Estimate: ~30 lines of script change
 (`BUG_QUERY_DIR` resolution + gating + helper call updates), ~50–60
 lines of test (two scenarios with mocking).
+
+## Implementation Notes
+
+- **Test infrastructure fix**: `setup_mock_workspace` and
+  `setup_mock_layer_workspace` did not create
+  `configs/manifest/layers.txt`, which the script now requires (early
+  fatal exit). Every script-invoking test in the file (16/20) was
+  silently failing on `main`. Fixed by adding two lines to each setup
+  function. Without this, the new #457 regression tests could not run.
+  This is in scope under the Quality Standard's "fix it completely"
+  guidance — the pre-existing test gap actively blocks the new tests
+  this PR adds, and the fix is a one-line-per-function change.
+- **Third regression test added**: a workspace-type sanity test was
+  added beyond the two listed in the approach. Without it, the
+  bridge-gating change had no positive assertion that the workspace
+  happy path (the original ADR-0010 contract) still works — only
+  negative assertions that wrong data doesn't leak. The added test
+  costs ~15 lines and protects against silently disabling git-bug for
+  the workspace.

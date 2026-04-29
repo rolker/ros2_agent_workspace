@@ -591,22 +591,46 @@ fi
 ISSUE_TITLE=""
 ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
-    # Try git-bug first for issue title and state (offline-capable)
+    # Determine which repo's git-bug cache to query for this issue.
+    # Issues live in the same repo as the code being modified:
+    #   - workspace/skill worktrees → workspace repo
+    #   - layer worktrees           → the project repo (first --packages entry)
+    # Querying the wrong repo's git-bug returns wrong-repo data when issue
+    # numbers collide (see #457). The bridge check below also makes this
+    # forward-compatible: project repos that aren't bridged today fall
+    # through to gh; once they are bridged, the same path picks them up.
+    BUG_QUERY_DIR="$ROOT_DIR"
+    if [ "$WORKTREE_TYPE" = "layer" ] && [ -n "$TARGET_PACKAGES" ]; then
+        _BUG_FIRST_PKG="${TARGET_PACKAGES%%,*}"
+        _BUG_FIRST_PKG="${_BUG_FIRST_PKG#"${_BUG_FIRST_PKG%%[![:space:]]*}"}"
+        _BUG_FIRST_PKG="${_BUG_FIRST_PKG%"${_BUG_FIRST_PKG##*[![:space:]]}"}"
+        _BUG_PKG_PATH="$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/${_BUG_FIRST_PKG}"
+        if [ -d "$_BUG_PKG_PATH" ] && git -C "$_BUG_PKG_PATH" remote get-url origin &>/dev/null; then
+            BUG_QUERY_DIR="$_BUG_PKG_PATH"
+        fi
+    fi
+
+    # Try git-bug first for issue title and state (offline-capable),
+    # but only when the target repo actually has a git-bug bridge.
     _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
     if [ -f "$_GITBUG_HELPERS" ]; then
         # shellcheck source=gitbug_helpers.sh
         source "$_GITBUG_HELPERS"
     fi
     _BUG_TITLE=""
-    if declare -F gitbug_lookup &>/dev/null; then
-        _BUG_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    _GITBUG_ATTEMPTED=false
+    if declare -F gitbug_lookup &>/dev/null && \
+       declare -F gitbug_has_bridge &>/dev/null && \
+       gitbug_has_bridge "$BUG_QUERY_DIR"; then
+        _GITBUG_ATTEMPTED=true
+        _BUG_TITLE=$(gitbug_lookup "$BUG_QUERY_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
     fi
     if [ -n "$_BUG_TITLE" ]; then
         ISSUE_TITLE="$_BUG_TITLE"
-        _BUG_STATE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" status 2>/dev/null || echo "")
+        _BUG_STATE=$(gitbug_lookup "$BUG_QUERY_DIR" "$ISSUE_NUM" status 2>/dev/null || echo "")
         [[ "${_BUG_STATE,,}" == "closed" ]] && ISSUE_STATE="CLOSED"
         [[ "${_BUG_STATE,,}" == "open" ]] && ISSUE_STATE="OPEN"
-    elif command -v git-bug &>/dev/null; then
+    elif [ "$_GITBUG_ATTEMPTED" = true ] && command -v git-bug &>/dev/null; then
         if command -v gh &>/dev/null; then
             echo "⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
         else
