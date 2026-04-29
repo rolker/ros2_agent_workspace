@@ -247,13 +247,13 @@ else
     fi
 
     # Derive the GitHub slug of the issue's repo for gh --repo.
+    # extract_gh_slug (from _worktree_helpers.sh, sourced above) handles
+    # all supported URL forms — HTTPS, SCP, SSH, SSH-over-443 — and
+    # rejects substring/lookalike hosts.
     _GH_SLUG=""
     _BUG_REMOTE=$(git -C "$_BUG_QUERY_DIR" remote get-url origin 2>/dev/null || echo "")
-    if [[ -n "$_BUG_REMOTE" && "$_BUG_REMOTE" == *"github.com"* ]]; then
-        _GH_SLUG=$(echo "$_BUG_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
-        if ! [[ "$_GH_SLUG" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
-            _GH_SLUG=""
-        fi
+    if [ -n "$_BUG_REMOTE" ] && declare -F extract_gh_slug &>/dev/null; then
+        _GH_SLUG=$(extract_gh_slug "$_BUG_REMOTE")
     fi
 
     # Try git-bug first (offline-capable, fast), but only when the

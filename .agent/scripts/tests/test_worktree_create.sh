@@ -40,6 +40,8 @@ setup_mock_workspace() {
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+    # worktree_create.sh sources _worktree_helpers.sh; copy it too.
+    cp "$SCRIPT_DIR/../_worktree_helpers.sh" .agent/scripts/_worktree_helpers.sh
 }
 
 # Cleanup test repository
@@ -183,6 +185,8 @@ setup_mock_layer_workspace() {
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+    # worktree_create.sh sources _worktree_helpers.sh; copy it too.
+    cp "$SCRIPT_DIR/../_worktree_helpers.sh" .agent/scripts/_worktree_helpers.sh
 
     rm -rf "$tmp_clone"
 }
@@ -924,6 +928,65 @@ test_wt_layer_pkg_dir_skips_symlinked_layers() {
     return 0
 }
 run_test "wt_layer_pkg_dir skips symlinked layer dirs" test_wt_layer_pkg_dir_skips_symlinked_layers
+
+# ===== extract_gh_slug tests =====
+#
+# Helper to assert extract_gh_slug returns an exact value (or empty for
+# rejection cases). Sources the helper file once per test for isolation.
+_assert_slug() {
+    local url="$1" expected="$2" label="$3"
+    local actual
+    actual=$(extract_gh_slug "$url")
+    if [ "$actual" = "$expected" ]; then
+        return 0
+    fi
+    echo "    [$label] for url='$url' expected='$expected' got='$actual'"
+    return 1
+}
+
+test_extract_gh_slug_accepts_supported_forms() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    _assert_slug "https://github.com/owner/repo.git" "owner/repo"     "https with .git"     || return 1
+    _assert_slug "https://github.com/owner/repo"     "owner/repo"     "https no .git"       || return 1
+    _assert_slug "https://github.com:443/owner/repo.git" "owner/repo" "https with port"     || return 1
+    _assert_slug "git@github.com:owner/repo.git"     "owner/repo"     "scp form"            || return 1
+    _assert_slug "git@github.com:owner/repo"         "owner/repo"     "scp form no .git"    || return 1
+    _assert_slug "ssh://git@github.com/owner/repo.git" "owner/repo"   "ssh url"             || return 1
+    _assert_slug "ssh://git@github.com:22/owner/repo.git" "owner/repo" "ssh url with port"  || return 1
+    _assert_slug "ssh://git@ssh.github.com:443/owner/repo.git" "owner/repo" "ssh-over-443"  || return 1
+    _assert_slug "github.com/owner/repo.git"         "owner/repo"     "no protocol"         || return 1
+    _assert_slug "https://github.com/owner/repo.foo.git" "owner/repo.foo" "dotted repo name" || return 1
+    return 0
+}
+run_test "extract_gh_slug accepts all supported URL forms" test_extract_gh_slug_accepts_supported_forms
+
+test_extract_gh_slug_rejects_lookalikes() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Substring/lookalike hosts must NOT match.
+    _assert_slug "https://mygithub.com/owner/repo.git"   "" "mygithub.com"   || return 1
+    _assert_slug "https://notgithub.com/owner/repo.git"  "" "notgithub.com"  || return 1
+    _assert_slug "git@mygithub.com:owner/repo.git"       "" "mygithub.com scp" || return 1
+    # Different host entirely.
+    _assert_slug "https://gitlab.com/owner/repo.git"     "" "gitlab.com"     || return 1
+    # Subdomains of github.com other than 'ssh.' (notably gist.) must not match.
+    _assert_slug "https://gist.github.com/owner/file.git" "" "gist.github.com" || return 1
+    _assert_slug "https://api.github.com/repos/owner/repo" "" "api.github.com" || return 1
+    return 0
+}
+run_test "extract_gh_slug rejects lookalike hosts" test_extract_gh_slug_rejects_lookalikes
+
+test_extract_gh_slug_rejects_malformed() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    _assert_slug ""                                  "" "empty string"          || return 1
+    _assert_slug "not a url"                         "" "garbage"               || return 1
+    _assert_slug "https://github.com/onlyowner"      "" "owner without repo"    || return 1
+    _assert_slug "https://github.com/owner/repo/extra" "" "trailing path"       || return 1
+    return 0
+}
+run_test "extract_gh_slug rejects empty/malformed input" test_extract_gh_slug_rejects_malformed
 
 # Summary
 echo "========================================"

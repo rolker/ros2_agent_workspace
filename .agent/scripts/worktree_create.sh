@@ -32,23 +32,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Shared helpers: extract_gh_slug, wt_layer_pkg_dir, find_worktree_by_skill, etc.
+# shellcheck source=_worktree_helpers.sh
+source "$SCRIPT_DIR/_worktree_helpers.sh"
+
 # Try to fetch a specific branch from origin.
 # Returns 0 on successful fetch, non-zero otherwise.
 fetch_remote_branch() {
     local git_path="$1"
     local branch="$2"
     git -C "$git_path" fetch --quiet origin -- "$branch" 2>/dev/null
-}
-
-# Extract a validated owner/repo slug from a GitHub remote URL.
-# Prints the slug on stdout; prints nothing for non-GitHub or malformed URLs.
-extract_gh_slug() {
-    local url="$1"
-    local slug
-    slug=$(echo "$url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
-    if [[ "$slug" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
-        echo "$slug"
-    fi
 }
 
 # Resolve the .repos version (branch/tag) for a package name.

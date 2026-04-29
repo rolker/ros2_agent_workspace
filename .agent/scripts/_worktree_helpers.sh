@@ -40,7 +40,8 @@ wt_layer_branch() {
 # Use this to find the package repo whose origin / git-bug data should be
 # queried for issue metadata (the issue lives in the package's repo, not
 # the workspace).
-# Returns empty (and exit 1) if no inner git worktree is found.
+# Prints the package dir on stdout (with exit status 0); prints nothing
+# and returns a non-zero status if no inner git worktree is found.
 # Usage: pkg_dir=$(wt_layer_pkg_dir "$worktree_dir")
 wt_layer_pkg_dir() {
     local worktree_dir="$1"
@@ -93,6 +94,35 @@ wt_layer_is_dirty() {
     done
 
     return 1  # clean
+}
+
+# Extract a validated owner/repo slug from a GitHub remote URL.
+# Prints the slug on stdout; prints nothing for non-GitHub or malformed URLs.
+#
+# Supported URL forms:
+#   https://github.com/OWNER/REPO[.git]
+#   https://github.com:PORT/OWNER/REPO[.git]
+#   git@github.com:OWNER/REPO[.git]                        (SCP form)
+#   ssh://[user@]github.com[:PORT]/OWNER/REPO[.git]
+#   ssh://[user@]ssh.github.com:443/OWNER/REPO[.git]       (SSH-over-443)
+#
+# Rejects substring/lookalike hosts (e.g. mygithub.com, gist.github.com)
+# by requiring the host to be preceded by a URL boundary (start, '@', or '/').
+#
+# Usage: slug=$(extract_gh_slug "$url")
+extract_gh_slug() {
+    local url="$1"
+    # Strip a single trailing .git so the regex doesn't have to.
+    local cleaned="${url%.git}"
+    # Boundary: ^, @, or / before host
+    # Host:     optional ssh. prefix, then literal github.com
+    # Port:     optional :NNN
+    # Sep:      / (URL form) or : (SCP form)
+    # Path:     OWNER / REPO  (no slashes or whitespace inside either)
+    local re='(^|[@/])(ssh\.)?github\.com(:[0-9]+)?[/:]([^/[:space:]]+)/([^/[:space:]]+)$'
+    if [[ "$cleaned" =~ $re ]]; then
+        echo "${BASH_REMATCH[4]}/${BASH_REMATCH[5]}"
+    fi
 }
 
 # Find the most recent skill worktree matching a skill name.

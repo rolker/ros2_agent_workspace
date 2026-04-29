@@ -97,7 +97,7 @@ whether it happens to be the workspace.
 |------|--------|
 | `.agent/scripts/worktree_create.sh` | Add `BUG_QUERY_DIR` resolution; gate `gitbug_lookup` on `gitbug_has_bridge`; pass `BUG_QUERY_DIR` to `gitbug_lookup` for both title and status; add short explanatory comment. |
 | `.agent/scripts/worktree_enter.sh` | Same fix pattern: resolve `_BUG_QUERY_DIR` per worktree type (uses new `wt_layer_pkg_dir` helper for layer worktrees), gate `gitbug_lookup` on `gitbug_has_bridge`, derive the right GitHub slug for `gh issue view --repo` (drop the workspace-fallback retry that was the gh-side bug). |
-| `.agent/scripts/_worktree_helpers.sh` | Add `wt_layer_pkg_dir` helper — finds the first inner package git worktree in a layer worktree dir. Mirrors `wt_layer_branch`'s iteration pattern. |
+| `.agent/scripts/_worktree_helpers.sh` | Add `wt_layer_pkg_dir` helper — finds the first inner package git worktree in a layer worktree dir. Mirrors `wt_layer_branch`'s iteration pattern. Also moves `extract_gh_slug` here (from `worktree_create.sh`) and hardens it: now correctly handles HTTPS, SCP-form, SSH URL, and SSH-over-443 (`ssh.github.com:443`) remotes, and rejects substring/lookalike hosts (`mygithub.com`, `gist.github.com`, etc.). Both worktree scripts share this implementation. |
 | `.agent/scripts/tests/test_worktree_create.sh` | Add three regression tests (collision, forward-compat, workspace sanity) for `worktree_create.sh` plus a fake-helpers installer; add unit tests for new `wt_layer_pkg_dir` helper (alongside existing `find_worktree_by_skill` tests, matching the file's existing convention of co-locating helper tests); also fix the pre-existing missing-manifest gap in `setup_mock_workspace` / `setup_mock_layer_workspace` (without it, no script-invoking test could run — see Implementation Notes). |
 
 ## Principles Self-Check
@@ -177,3 +177,24 @@ and one test file. No ADR touches, no doc updates.
   the `wt_layer_pkg_dir` helper to `_worktree_helpers.sh` so
   `worktree_enter.sh` can find the package's repo dir from the
   worktree at enter-time (where `--packages` is no longer in scope).
+- **`extract_gh_slug` hardening brought into scope after round-3
+  review**: Copilot pointed out two latent bugs in the existing
+  `extract_gh_slug` (defined in `worktree_create.sh`): (1) substring
+  host matching — `mygithub.com` was incorrectly accepted; (2) the
+  `sed`-based parser produced an invalid 3-segment slug for
+  `ssh://git@ssh.github.com:443/OWNER/REPO.git` (an officially
+  supported form per `AGENTS.md` and `field_mode.sh`'s allowlist),
+  causing validation to fail and leaving `GH_REPO_SLUG` empty. With
+  the new bridge gating, an empty slug means `gh issue view` runs
+  without `--repo`, which can fall back to the workspace repo via
+  cwd inference — re-introducing the wrong-repo bug. Fix: move
+  `extract_gh_slug` to `_worktree_helpers.sh` (single source of truth
+  for both worktree scripts) and replace the `sed` chain with a
+  bash regex anchored on URL boundaries that handles all officially
+  supported forms and rejects lookalike hosts. Quality Standard's
+  "fix it completely" applies: this is the same code path being
+  changed, the SSH-over-443 form is a documented workspace
+  capability, and the test mocks already exercise non-GitHub URLs
+  (so the regression risk is observable). 10 new unit tests cover
+  HTTPS / SCP / SSH / SSH-over-443, dotted repo names,
+  substring-host rejection, and malformed input.
