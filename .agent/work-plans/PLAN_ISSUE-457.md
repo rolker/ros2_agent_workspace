@@ -1,4 +1,4 @@
-# Plan: worktree_create.sh — gate git-bug lookup on workspace-repo target
+# Plan: worktree_create.sh — query the right repo's git-bug, gate on bridge presence
 
 ## Issue
 
@@ -25,40 +25,54 @@ The actual git work (branch, push, PR target) is unaffected — those paths
 correctly use `GH_REPO_SLUG`. The defect is in the human-facing metadata
 display only.
 
+**Forward-compat constraint**: project repos are not currently git-bug-bridged,
+but they will be eventually. The fix must point `gitbug_lookup` at the
+*right* repo for the worktree type (not always the workspace) and must
+fall through to `gh` based on whether *that* repo is bridged — not based on
+whether it happens to be the workspace.
+
 ## Approach
 
-1. **Capture the workspace's GitHub slug once.** Add `WORKSPACE_GH_SLUG`
-   resolution near the existing `GH_REPO_SLUG` logic (around lines 547–567),
-   pulling from `$ROOT_DIR`'s origin via `extract_gh_slug`. This becomes
-   the canonical "where git-bug data lives" identifier.
+1. **Resolve the git-bug target dir per worktree type.** Add a
+   `BUG_QUERY_DIR` variable that points at the repo whose git-bug cache
+   should be queried for this issue:
+   - `workspace` and `skill` types → `$ROOT_DIR`
+   - `layer` type with `TARGET_PACKAGES` → the first package's repo dir
+     (`$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/${FIRST_PKG}`, the
+     same path the slug-resolution block already computes at lines 533
+     and 577)
 
-2. **Gate the git-bug lookup.** At line 601, only call `gitbug_lookup`
-   when `GH_REPO_SLUG` is empty (best-effort fallback for unresolved
-   targets) **or** equals `WORKSPACE_GH_SLUG`. Mirrors the existing
-   cross-repo precedent at line 1192–1193.
+2. **Gate the `gitbug_lookup` call on bridge presence.** Use the existing
+   `gitbug_has_bridge "$BUG_QUERY_DIR"` helper from `gitbug_helpers.sh`.
+   If the target repo has no bridge, skip git-bug entirely and let the
+   `gh` fallback handle it. This is forward-compatible: when project
+   repos start getting bridged, the same code path picks them up
+   automatically.
 
-3. **No change to the `gh` fallback.** Lines 632–642 already correctly use
-   `--repo "$GH_REPO_SLUG"`. With git-bug gated, the fallback engages
-   automatically for project-repo issues and returns the right data.
+3. **Pass `BUG_QUERY_DIR` to `gitbug_lookup`** instead of the hardcoded
+   `$ROOT_DIR`. Both the title call (line 602) and the status call
+   (line 606) need this change.
 
-4. **Regression test.** Add a focused test to
-   `.agent/scripts/tests/test_worktree_create.sh` that simulates the
-   collision: stub `gitbug_lookup` to return a fake title, set
-   `GH_REPO_SLUG` to a non-workspace value, and assert the gh-fallback
-   path is taken (not the git-bug result).
+4. **Add a short comment** at the top of the gating block explaining why
+   the bridge check matters (collision scenario from #457). Per Option C,
+   the constraint isn't being recorded in an ADR — the script comment +
+   regression test + PR description carry the breadcrumb.
 
-5. **ADR-0010 cross-reference addendum.** Add a References section to
-   ADR-0010 noting that `gitbug_lookup` is only valid against the bridged
-   (workspace) repo, with a link to #457 / this PR. Permitted under
-   ADR-0012 (cross-reference addendums).
+5. **Regression test.** Add a focused test to
+   `.agent/scripts/tests/test_worktree_create.sh` covering:
+   - Collision scenario: layer-type worktree, project repo unbridged,
+     stub `gitbug_lookup` to return a wrong-repo title — assert the gh
+     fallback path runs and the right title is reported.
+   - Forward-compat scenario: layer-type worktree, project repo *is*
+     bridged (mocked) — assert `gitbug_lookup` is called against the
+     project repo's dir, not the workspace.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/worktree_create.sh` | Add `WORKSPACE_GH_SLUG` resolution; gate `gitbug_lookup` call on `GH_REPO_SLUG = WORKSPACE_GH_SLUG` (or empty). |
-| `.agent/scripts/tests/test_worktree_create.sh` | Add collision-scenario regression test. |
-| `docs/decisions/0010-adopt-git-bug-for-local-issue-tracking.md` | References-section addendum (ADR-0012-style) noting the workspace-only validity. |
+| `.agent/scripts/worktree_create.sh` | Add `BUG_QUERY_DIR` resolution; gate `gitbug_lookup` on `gitbug_has_bridge`; pass `BUG_QUERY_DIR` to `gitbug_lookup` for both title and status; add short explanatory comment. |
+| `.agent/scripts/tests/test_worktree_create.sh` | Add collision-scenario regression test and forward-compat (bridged-project-repo) test. |
 
 ## Principles Self-Check
 
@@ -66,41 +80,45 @@ display only.
 |---|---|
 | Human control and transparency | Banner stops misleading agents about which task they're on — direct improvement to a transparency surface. |
 | Enforcement over documentation | The doc-only "verify issue matches before first commit" rule survives this fix; the supporting tooling no longer lies. Mechanical enforcement of the verification rule itself is tracked separately (out of scope). |
-| Only what's needed | One gating condition + one slug capture; no new abstractions or helper functions beyond what already exists. |
-| Test what breaks | Regression test added for the exact collision scenario — the kind of "hard to find in the field" defect that justifies a permanent guard. |
-| A change includes its consequences | ADR-0010 addendum captures the workspace-only constraint for future scripts. AGENTS.md script-reference table needs no update (no signature change). |
+| Only what's needed | One new variable + one bridge check + correct argument to existing helpers; no new abstractions. Reuses `gitbug_has_bridge` which already exists. |
+| Test what breaks | Two regression tests: one for the current collision scenario, one for the forward-compat case where project repos become bridged. Catches regressions in both directions. |
+| A change includes its consequences | No doc updates required (no signature change, no ADR touch by design — see Option C decision below). PR description carries the architectural context. |
 
 ## ADR Compliance
 
 | ADR | Triggered | How addressed |
 |---|---|---|
 | 0002 — Worktree isolation | Yes | Decision unchanged; only the metadata-display path of an existing enforcement script. |
-| 0010 — git-bug for local issue tracking | Yes | Lookup priority preserved (git-bug → gh), but constrained to bridged repo. Addendum makes the constraint explicit for future maintainers. |
-| 0012 — Cross-reference addendums | Yes | Used as the mechanism for the ADR-0010 References-section update. |
+| 0010 — git-bug for local issue tracking | Yes (no change required) | The "lookup priority" rule is preserved as-is. The fix queries the *right* repo and falls through to `gh` when no bridge is present — both consistent with the ADR's existing language about graceful degradation. ADR text not modified (Option C, decided in planning). |
 | 0004 — Enforcement hierarchy | Watch (deferred) | The doc-only "verify issue matches" rule is a separate enforcement-layer gap. Out of scope here; see Open Questions for follow-up. |
+
+**ADR change decision (Option C)**: The constraint *"git-bug lookups must
+target the right repo and respect bridge presence"* lives in the script
+code (with an explanatory comment), the regression tests, and the PR
+description. No ADR addendum, no superseding ADR. Rationale: this is an
+implementation invariant, not a workspace-level architectural decision.
+The expectation that project repos may eventually be bridged is exactly
+why the gate is bridge-presence-based rather than workspace-only —
+the architecture already accommodates this without an ADR change.
 
 ## Consequences
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
 | `.agent/scripts/worktree_create.sh` | AGENTS.md script reference table; Makefile target | Not needed — invocation signature and Makefile integration unchanged. |
-| ADR in `docs/decisions/` | Review guide ADR table | Not needed — addendum only adds References, does not change ADR scope or decision. |
 | Worktree scripts | `.agent/WORKTREE_GUIDE.md`; AGENTS.md worktree section | Not needed — no behavior change visible to script users; only the displayed title becomes correct. |
 
 ## Open Questions
 
-- **Land the ADR-0010 addendum in this PR, or split?** Recommend **same PR**:
-  it's a one-paragraph cross-reference change, ADR-0012-permitted, and
-  avoids a follow-up doc-only PR.
-- **File a separate issue for the ADR-0004 enforcement-hierarchy gap?**
-  The "verify issue matches before first commit" rule is currently
-  doc-only. Worth a follow-up issue proposing a mechanical check (e.g.,
-  a one-shot helper invoked at first-commit time). Should I open that
-  issue when this PR lands, or now?
+- **File a follow-up issue for the ADR-0004 enforcement-hierarchy gap?**
+  The "verify issue matches before first commit" rule in AGENTS.md is
+  currently doc-only. A follow-up could propose a mechanical check
+  (e.g., a one-shot helper invoked at first-commit time). Open it now
+  or after this PR lands?
 
 ## Estimated Scope
 
-Single PR. Changes are localized to one script, one test file, and a
-References-section addendum on one ADR. No coordinated rollout, no
-migration. Estimate: ~30 lines of script change, ~40 lines of test,
-~10 lines of ADR addendum.
+Single PR. Changes are localized to one script and one test file. No
+ADR touches, no doc updates. Estimate: ~30 lines of script change
+(`BUG_QUERY_DIR` resolution + gating + helper call updates), ~50–60
+lines of test (two scenarios with mocking).
