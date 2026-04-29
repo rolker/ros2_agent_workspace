@@ -804,6 +804,127 @@ test_find_worktree_by_skill_cross_repo_sort() {
 }
 run_test "find_worktree_by_skill picks newest timestamp across repo slugs" test_find_worktree_by_skill_cross_repo_sort
 
+# ===== wt_layer_pkg_dir tests =====
+
+# Helper: build a minimal layer-worktree shape with controlled inner contents.
+# Creates: <tmpdir>/<layer>_ws/src/<pkg> as either a real git repo, a regular
+# directory, or a symlink, depending on $kind.
+#   kind=git    → directory with a .git subdir (counts as inner git worktree)
+#   kind=plain  → directory without .git
+#   kind=symlink → symlink pointing at /tmp (skipped by the helper)
+_make_layer_pkg() {
+    local layer_root="$1" pkg_name="$2" kind="$3"
+    local pkg_dir="$layer_root/src/$pkg_name"
+    case "$kind" in
+        git)
+            mkdir -p "$pkg_dir"
+            ( cd "$pkg_dir" && git init -q && git config user.email t@e.com && git config user.name t && \
+              git config commit.gpgsign false && echo x > f && git add f && git commit -q -m i ) >/dev/null
+            ;;
+        plain)
+            mkdir -p "$pkg_dir"
+            ;;
+        symlink)
+            mkdir -p "$layer_root/src"
+            ln -s /tmp "$pkg_dir"
+            ;;
+    esac
+}
+
+test_wt_layer_pkg_dir_finds_first_git_worktree() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Layer with one git package
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "real_pkg" git
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"core_ws/src/real_pkg" ]]; then
+        echo "    Expected core_ws/src/real_pkg, got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir finds first inner git worktree" test_wt_layer_pkg_dir_finds_first_git_worktree
+
+test_wt_layer_pkg_dir_skips_symlinks_and_plain_dirs() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Plain dir and symlink come first lexicographically; git package comes last.
+    # Helper must skip the first two and return the git one.
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "a_plain" plain
+    _make_layer_pkg "$tmpdir/core_ws" "b_symlink" symlink
+    _make_layer_pkg "$tmpdir/core_ws" "z_real" git
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"core_ws/src/z_real" ]]; then
+        echo "    Expected core_ws/src/z_real (skipping plain + symlink), got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir skips symlinks and plain dirs" test_wt_layer_pkg_dir_skips_symlinks_and_plain_dirs
+
+test_wt_layer_pkg_dir_returns_failure_with_no_git_inner() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "only_plain" plain
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -eq 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to fail with no inner git worktree"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir returns failure with no inner git worktree" test_wt_layer_pkg_dir_returns_failure_with_no_git_inner
+
+test_wt_layer_pkg_dir_skips_symlinked_layers() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    # Put the backing layer in its own directory so it doesn't get picked up
+    # by the *_ws glob inside $tmpdir.
+    local backing; backing=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # The whole layer dir is a symlink — the helper must skip it.
+    mkdir -p "$backing/real_layer_ws/src"
+    _make_layer_pkg "$backing/real_layer_ws" "a_pkg" git
+    ln -s "$backing/real_layer_ws" "$tmpdir/core_ws"
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir" "$backing"
+
+    if [ $rc -eq 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to fail (only symlinked layer present)"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir skips symlinked layer dirs" test_wt_layer_pkg_dir_skips_symlinked_layers
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"

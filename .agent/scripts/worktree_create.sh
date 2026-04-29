@@ -593,8 +593,10 @@ ISSUE_STATE=""
 if [ -n "$ISSUE_NUM" ]; then
     # Determine which repo's git-bug cache to query for this issue.
     # Issues live in the same repo as the code being modified:
-    #   - workspace/skill worktrees → workspace repo
-    #   - layer worktrees           → the project repo (first --packages entry)
+    #   - workspace worktrees → workspace repo
+    #   - layer worktrees     → the project repo (first --packages entry)
+    # (Skill worktrees set SKILL_NAME instead of ISSUE_NUM and fall into
+    # the else branch below — they don't reach this block.)
     # Querying the wrong repo's git-bug returns wrong-repo data when issue
     # numbers collide (see #457). The bridge check below also makes this
     # forward-compatible: project repos that aren't bridged today fall

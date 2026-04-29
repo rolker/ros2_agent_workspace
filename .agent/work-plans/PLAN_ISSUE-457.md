@@ -17,9 +17,18 @@ _BUG_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo ""
 For layer-type worktrees, the issue lives in a project repo, not the
 workspace — so this returns the workspace repo's issue with the same
 number when one exists, populating both `ISSUE_TITLE` (line 605) and
-`ISSUE_STATE` (lines 606–608) from the wrong source. The `gh` fallback at
-line 632 only engages when both fields are empty, so once git-bug returns
-*anything* the wrong-repo data sticks.
+`ISSUE_STATE` (lines 606–608) from the wrong source. The `gh` fallback
+at line 632 engages only when at least one of those fields is empty
+(`[ -z "$ISSUE_TITLE" ] || [ -z "$ISSUE_STATE" ]`); in the collision
+case git-bug fills both fields with wrong-repo data, so neither is
+empty and the fallback never runs.
+
+The same defect exists in `worktree_enter.sh` (line 243): its
+`gitbug_lookup "$ROOT_DIR" ...` call is hardcoded to the workspace,
+and its `gh` fallback (lines 257–268) explicitly forces
+`--repo "$_WS_SLUG"` so even when git-bug isn't bridged the layer
+worktree's "Title:" line still shows workspace data. This PR fixes
+both scripts.
 
 The actual git work (branch, push, PR target) is unaffected — those paths
 correctly use `GH_REPO_SLUG`. The defect is in the human-facing metadata
@@ -33,14 +42,16 @@ whether it happens to be the workspace.
 
 ## Approach
 
-1. **Resolve the git-bug target dir per worktree type.** Add a
-   `BUG_QUERY_DIR` variable that points at the repo whose git-bug cache
-   should be queried for this issue:
-   - `workspace` and `skill` types → `$ROOT_DIR`
-   - `layer` type with `TARGET_PACKAGES` → the first package's repo dir
-     (`$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/${FIRST_PKG}`, the
-     same path the slug-resolution block already computes at lines 533
-     and 577)
+1. **Resolve the git-bug target dir per worktree type, in both scripts.**
+   Add a `BUG_QUERY_DIR` variable that points at the repo whose git-bug
+   cache should be queried for this issue:
+   - `workspace` (and `skill`, in `worktree_create.sh`) → `$ROOT_DIR`
+   - `layer` worktrees → the first package's repo dir
+     - In `worktree_create.sh`: derived from `--packages` (the same path
+       the slug-resolution block already computes at lines 533 and 577).
+     - In `worktree_enter.sh`: derived from the worktree itself via the
+       new `wt_layer_pkg_dir` helper, which iterates `<wt>/*_ws/src/*`
+       and returns the first inner git worktree.
 
 2. **Gate the `gitbug_lookup` call on bridge presence.** Use the existing
    `gitbug_has_bridge "$BUG_QUERY_DIR"` helper from `gitbug_helpers.sh`.
@@ -50,15 +61,23 @@ whether it happens to be the workspace.
    automatically.
 
 3. **Pass `BUG_QUERY_DIR` to `gitbug_lookup`** instead of the hardcoded
-   `$ROOT_DIR`. Both the title call (line 602) and the status call
-   (line 606) need this change.
+   `$ROOT_DIR`. Covers both title and status fields.
 
-4. **Add a short comment** at the top of the gating block explaining why
-   the bridge check matters (collision scenario from #457). Per Option C,
-   the constraint isn't being recorded in an ADR — the script comment +
-   regression test + PR description carry the breadcrumb.
+4. **Fix the gh fallback in `worktree_enter.sh`.** The pre-fix code first
+   tried `gh issue view` without `--repo` (uses cwd's git context), then
+   on failure forced `--repo "$_WS_SLUG"` to the workspace — wrong for
+   layer worktrees. Replace with: derive the right slug from
+   `BUG_QUERY_DIR`'s origin once, pass it as `--repo` from the start. No
+   workspace-fallback retry. (`worktree_create.sh`'s `gh` fallback was
+   already correct — it uses `--repo "$GH_REPO_SLUG"` which is resolved
+   per worktree type at lines 549/580/584.)
 
-5. **Regression tests.** Add focused tests to
+5. **Add a short comment** at the top of each gating block explaining
+   why the bridge check matters (collision scenario from #457). Per
+   Option C, the constraint isn't being recorded in an ADR — the script
+   comments + regression tests + PR description carry the breadcrumb.
+
+6. **Regression tests.** Add focused tests to
    `.agent/scripts/tests/test_worktree_create.sh` covering:
    - Collision scenario: layer-type worktree, project repo unbridged,
      fake `gitbug_lookup` returns a wrong-repo title — assert the gh
@@ -68,13 +87,18 @@ whether it happens to be the workspace.
      project repo's dir, not the workspace.
    - Sanity scenario: workspace-type worktree, workspace bridged —
      assert the original happy path still uses workspace git-bug data.
+   - Unit tests for the new `wt_layer_pkg_dir` helper: finds the first
+     inner git worktree, skips plain dirs and symlinks, fails when no
+     inner worktree exists, skips symlinked layer dirs.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
 | `.agent/scripts/worktree_create.sh` | Add `BUG_QUERY_DIR` resolution; gate `gitbug_lookup` on `gitbug_has_bridge`; pass `BUG_QUERY_DIR` to `gitbug_lookup` for both title and status; add short explanatory comment. |
-| `.agent/scripts/tests/test_worktree_create.sh` | Add three regression tests (collision, forward-compat, workspace sanity) plus a fake-helpers installer; also fix the pre-existing missing-manifest gap in `setup_mock_workspace` / `setup_mock_layer_workspace` (without it, no script-invoking test could run — see Implementation Notes). |
+| `.agent/scripts/worktree_enter.sh` | Same fix pattern: resolve `_BUG_QUERY_DIR` per worktree type (uses new `wt_layer_pkg_dir` helper for layer worktrees), gate `gitbug_lookup` on `gitbug_has_bridge`, derive the right GitHub slug for `gh issue view --repo` (drop the workspace-fallback retry that was the gh-side bug). |
+| `.agent/scripts/_worktree_helpers.sh` | Add `wt_layer_pkg_dir` helper — finds the first inner package git worktree in a layer worktree dir. Mirrors `wt_layer_branch`'s iteration pattern. |
+| `.agent/scripts/tests/test_worktree_create.sh` | Add three regression tests (collision, forward-compat, workspace sanity) for `worktree_create.sh` plus a fake-helpers installer; add unit tests for new `wt_layer_pkg_dir` helper (alongside existing `find_worktree_by_skill` tests, matching the file's existing convention of co-locating helper tests); also fix the pre-existing missing-manifest gap in `setup_mock_workspace` / `setup_mock_layer_workspace` (without it, no script-invoking test could run — see Implementation Notes). |
 
 ## Principles Self-Check
 
@@ -112,18 +136,17 @@ the architecture already accommodates this without an ADR change.
 
 ## Open Questions
 
-- **File a follow-up issue for the ADR-0004 enforcement-hierarchy gap?**
-  The "verify issue matches before first commit" rule in AGENTS.md is
-  currently doc-only. A follow-up could propose a mechanical check
-  (e.g., a one-shot helper invoked at first-commit time). Open it now
-  or after this PR lands?
+None outstanding. (Decisions taken during plan iteration: Option C for
+the ADR question — no ADR touch — and skip the ADR-0004
+enforcement-hierarchy follow-up issue. Decision taken during review
+triage: fix `worktree_enter.sh` in this same PR rather than splitting
+to a follow-up issue.)
 
 ## Estimated Scope
 
-Single PR. Changes are localized to one script and one test file. No
-ADR touches, no doc updates. Estimate: ~30 lines of script change
-(`BUG_QUERY_DIR` resolution + gating + helper call updates), ~50–60
-lines of test (two scenarios with mocking).
+Single PR. Changes touch two scripts (`worktree_create.sh`,
+`worktree_enter.sh`), one shared helpers file (`_worktree_helpers.sh`),
+and one test file. No ADR touches, no doc updates.
 
 ## Implementation Notes
 
@@ -143,3 +166,14 @@ lines of test (two scenarios with mocking).
   negative assertions that wrong data doesn't leak. The added test
   costs ~15 lines and protects against silently disabling git-bug for
   the workspace.
+- **`worktree_enter.sh` brought into scope after triage**: Copilot's
+  bot review flagged the same defect class in `worktree_enter.sh`
+  (line 243's hardcoded `gitbug_lookup "$ROOT_DIR" ...` plus a worse
+  gh-side bug at line 265 that explicitly forces `--repo "$_WS_SLUG"`
+  for the workspace, so even unbridged layer worktrees got workspace
+  data). User decision: fix in same PR rather than splitting — fixing
+  half would leave the post-create banner correct but the
+  worktree_enter.sh "Title:" line still misleading. Required adding
+  the `wt_layer_pkg_dir` helper to `_worktree_helpers.sh` so
+  `worktree_enter.sh` can find the package's repo dir from the
+  worktree at enter-time (where `--packages` is no longer in scope).

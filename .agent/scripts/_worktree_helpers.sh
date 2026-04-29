@@ -36,6 +36,36 @@ wt_layer_branch() {
     return 1
 }
 
+# Get the directory of the first inner package git worktree in a layer worktree.
+# Use this to find the package repo whose origin / git-bug data should be
+# queried for issue metadata (the issue lives in the package's repo, not
+# the workspace).
+# Returns empty (and exit 1) if no inner git worktree is found.
+# Usage: pkg_dir=$(wt_layer_pkg_dir "$worktree_dir")
+wt_layer_pkg_dir() {
+    local worktree_dir="$1"
+
+    for ws_dir in "$worktree_dir"/*_ws; do
+        [ -d "$ws_dir" ] || continue
+        [ -L "$ws_dir" ] && continue  # skip symlinked layers
+
+        local src_dir="$ws_dir/src"
+        [ -d "$src_dir" ] || continue
+
+        for pkg_dir in "$src_dir"/*; do
+            [ -d "$pkg_dir" ] || continue
+            [ -L "$pkg_dir" ] && continue  # skip symlinked packages
+
+            if git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                echo "$pkg_dir"
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
 # Check if a layer worktree has uncommitted changes in any inner package git worktree.
 # Ignores symlinked layers/packages and infrastructure directories.
 # Returns 0 (true) if dirty, 1 (false) if clean.
