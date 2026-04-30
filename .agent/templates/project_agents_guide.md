@@ -2,6 +2,26 @@
 
 > One-line description from README or `package.xml`.
 
+## Workflow
+
+**When this repo is checked out as part of a
+[ROS 2 Agent Workspace](https://github.com/rolker/ros2_agent_workspace)**,
+workflow rules (worktree vs. field mode, branch naming, etc.) are
+defined in the workspace `AGENTS.md`. To determine the active mode
+before editing, run
+the detection script **from the workspace root** (the script is not on
+PATH, and `.agent/` lives at the workspace root, not inside this repo):
+
+```bash
+# From the workspace root, pass the path to this repo
+.agent/scripts/field_mode.sh --describe <path-to-this-repo>
+# e.g. .agent/scripts/field_mode.sh --describe layers/main/<layer>_ws/src/<this-repo>
+```
+
+**Standalone use** (this repo cloned alone, outside the workspace): only
+this repo's own conventions apply — the workspace-level workflow rules
+don't bind here.
+
 ## Package Inventory
 
 | Package | Language | Description |

@@ -34,9 +34,14 @@ setup_mock_workspace() {
     # Create required directory structure
     mkdir -p .workspace-worktrees
     mkdir -p .agent/scripts
+    # Layer manifest is required by the script's available-layers check
+    mkdir -p configs/manifest
+    echo "core" > configs/manifest/layers.txt
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+    # worktree_create.sh sources _worktree_helpers.sh; copy it too.
+    cp "$SCRIPT_DIR/../_worktree_helpers.sh" .agent/scripts/_worktree_helpers.sh
 }
 
 # Cleanup test repository
@@ -174,9 +179,14 @@ setup_mock_layer_workspace() {
     # Create required directories
     mkdir -p layers/worktrees
     mkdir -p .agent/scripts
+    # Layer manifest is required by the script's available-layers check
+    mkdir -p configs/manifest
+    echo "core" > configs/manifest/layers.txt
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+    # worktree_create.sh sources _worktree_helpers.sh; copy it too.
+    cp "$SCRIPT_DIR/../_worktree_helpers.sh" .agent/scripts/_worktree_helpers.sh
 
     rm -rf "$tmp_clone"
 }
@@ -446,6 +456,144 @@ test_offline_fallback_message() {
 }
 run_test "Offline fallback message when gh fails" test_offline_fallback_message
 
+# ===== git-bug bridge-gating tests (regression for #457) =====
+
+# Install a fake gitbug_helpers.sh next to the copied worktree_create.sh.
+# Behaviour is controlled by env vars:
+#   FAKE_BRIDGE_MODE   = none|workspace_only|project_only|both
+#   FAKE_BUG_WORKSPACE_TITLE / FAKE_BUG_PROJECT_TITLE
+#   FAKE_BUG_WORKSPACE_STATUS / FAKE_BUG_PROJECT_STATUS  (default: open)
+# Workspace vs project repo is distinguished by path: project repos live
+# under .../layers/main/<layer>_ws/src/<pkg>, workspace does not.
+install_fake_gitbug_helpers() {
+    cat > .agent/scripts/gitbug_helpers.sh << 'HELPERS_EOF'
+gitbug_has_bridge() {
+    local repo_dir="$1"
+    case "${FAKE_BRIDGE_MODE:-none}" in
+        workspace_only) [[ "$repo_dir" != *"/layers/main/"*"/src/"* ]] ;;
+        project_only)   [[ "$repo_dir" == *"/layers/main/"*"/src/"* ]] ;;
+        both)           return 0 ;;
+        none|*)         return 1 ;;
+    esac
+}
+gitbug_lookup() {
+    local repo_dir="$1"
+    local field="$3"
+    [ "$field" = "title" ] || [ "$field" = "status" ] || return 1
+    local prefix="WORKSPACE"
+    [[ "$repo_dir" == *"/layers/main/"*"/src/"* ]] && prefix="PROJECT"
+    local field_upper="TITLE"
+    [ "$field" = "status" ] && field_upper="STATUS"
+    local var="FAKE_BUG_${prefix}_${field_upper}"
+    local val="${!var:-}"
+    if [ "$field" = "status" ] && [ -z "$val" ]; then val="open"; fi
+    [ -n "$val" ] && { echo "$val"; return 0; } || return 1
+}
+HELPERS_EOF
+}
+
+# Test: Layer worktree must not show workspace's wrong title when project
+# repo isn't git-bug-bridged (the original #457 collision scenario).
+test_layer_skips_unbridged_project_gitbug() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=workspace_only \
+             FAKE_BUG_WORKSPACE_TITLE="WRONG_TITLE_FROM_WORKSPACE" \
+             FAKE_GH_MODE=open \
+             PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 999 --type layer --layer core --packages test_pkg 2>&1) || true
+
+    cleanup_mock_layer_workspace
+
+    if [[ "$output" == *"WRONG_TITLE_FROM_WORKSPACE"* ]]; then
+        echo "    Workspace git-bug title leaked into layer worktree banner"
+        echo "    Output: $output"
+        return 1
+    fi
+    if [[ "$output" != *"Fix the widget"* ]]; then
+        echo "    Expected gh-fallback title 'Fix the widget' in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Layer worktree skips git-bug when project repo unbridged (#457)" test_layer_skips_unbridged_project_gitbug
+
+# Test: Layer worktree must use project repo's git-bug data when it IS
+# bridged, even if the workspace also has data for the same issue number
+# (forward-compat: project repos will eventually get bridges).
+test_layer_uses_project_gitbug_when_bridged() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    # Stub gh so the script's `gh pr view` PR-check call (run whenever
+    # gh is on PATH, even on the git-bug success path) doesn't hit the
+    # network on dev boxes. FAKE_GH_MODE=fail also makes any unexpected
+    # `gh issue view` fall-through return empty rather than the stub's
+    # default `Fix the widget` title — which would mask a regression.
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=both \
+             FAKE_BUG_PROJECT_TITLE="RIGHT_TITLE_FROM_PROJECT" \
+             FAKE_BUG_WORKSPACE_TITLE="WRONG_TITLE_FROM_WORKSPACE" \
+             FAKE_GH_MODE=fail \
+             PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 888 --type layer --layer core --packages test_pkg 2>&1) || true
+
+    cleanup_mock_layer_workspace
+
+    if [[ "$output" == *"WRONG_TITLE_FROM_WORKSPACE"* ]]; then
+        echo "    Workspace title leaked despite project repo being bridged"
+        echo "    Output: $output"
+        return 1
+    fi
+    if [[ "$output" != *"RIGHT_TITLE_FROM_PROJECT"* ]]; then
+        echo "    Expected project-repo title 'RIGHT_TITLE_FROM_PROJECT' in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Layer worktree uses project repo's git-bug when bridged (#457 forward-compat)" test_layer_uses_project_gitbug_when_bridged
+
+# Test: Workspace worktree continues to use workspace git-bug when bridged
+# (sanity check that the bridge gate doesn't break the original happy path).
+test_workspace_uses_workspace_gitbug_when_bridged() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+    install_fake_gitbug_helpers
+
+    # Stub gh — same rationale as test_layer_uses_project_gitbug_when_bridged.
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
+    local output
+    output=$(FAKE_BRIDGE_MODE=workspace_only \
+             FAKE_BUG_WORKSPACE_TITLE="HAPPY_PATH_TITLE" \
+             FAKE_GH_MODE=fail \
+             PATH="$fake_dir:$PATH" \
+        .agent/scripts/worktree_create.sh --issue 777 --type workspace 2>&1) || true
+
+    cleanup_mock_workspace
+
+    if [[ "$output" != *"HAPPY_PATH_TITLE"* ]]; then
+        echo "    Expected workspace git-bug title in output"
+        echo "    Output: $output"
+        return 1
+    fi
+    return 0
+}
+run_test "Workspace worktree uses workspace git-bug when bridged" test_workspace_uses_workspace_gitbug_when_bridged
+
 # ===== Skill worktree tests =====
 
 # Test 12: Skill mode creates worktree with correct naming
@@ -675,6 +823,201 @@ test_find_worktree_by_skill_cross_repo_sort() {
     return 0
 }
 run_test "find_worktree_by_skill picks newest timestamp across repo slugs" test_find_worktree_by_skill_cross_repo_sort
+
+# ===== wt_layer_pkg_dir tests =====
+
+# Helper: build a minimal layer-worktree shape with controlled inner contents.
+# Creates: <tmpdir>/<layer>_ws/src/<pkg> as either a real git repo, a regular
+# directory, or a symlink, depending on $kind.
+#   kind=git    → directory with a .git subdir (counts as inner git worktree)
+#   kind=plain  → directory without .git
+#   kind=symlink → symlink pointing at /tmp (skipped by the helper)
+_make_layer_pkg() {
+    local layer_root="$1" pkg_name="$2" kind="$3"
+    local pkg_dir="$layer_root/src/$pkg_name"
+    case "$kind" in
+        git)
+            mkdir -p "$pkg_dir"
+            ( cd "$pkg_dir" && git init -q && git config user.email t@e.com && git config user.name t && \
+              git config commit.gpgsign false && echo x > f && git add f && git commit -q -m i ) >/dev/null
+            ;;
+        plain)
+            mkdir -p "$pkg_dir"
+            ;;
+        symlink)
+            mkdir -p "$layer_root/src"
+            ln -s /tmp "$pkg_dir"
+            ;;
+    esac
+}
+
+test_wt_layer_pkg_dir_finds_first_git_worktree() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Layer with one git package
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "real_pkg" git
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"core_ws/src/real_pkg" ]]; then
+        echo "    Expected core_ws/src/real_pkg, got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir finds first inner git worktree" test_wt_layer_pkg_dir_finds_first_git_worktree
+
+test_wt_layer_pkg_dir_skips_symlinks_and_plain_dirs() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Plain dir and symlink come first lexicographically; git package comes last.
+    # Helper must skip the first two and return the git one.
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "a_plain" plain
+    _make_layer_pkg "$tmpdir/core_ws" "b_symlink" symlink
+    _make_layer_pkg "$tmpdir/core_ws" "z_real" git
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -ne 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to succeed"
+        return 1
+    fi
+    if [[ "$result" != *"core_ws/src/z_real" ]]; then
+        echo "    Expected core_ws/src/z_real (skipping plain + symlink), got: $result"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir skips symlinks and plain dirs" test_wt_layer_pkg_dir_skips_symlinks_and_plain_dirs
+
+test_wt_layer_pkg_dir_returns_failure_with_no_git_inner() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    mkdir -p "$tmpdir/core_ws"
+    _make_layer_pkg "$tmpdir/core_ws" "only_plain" plain
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir"
+
+    if [ $rc -eq 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to fail with no inner git worktree"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir returns failure with no inner git worktree" test_wt_layer_pkg_dir_returns_failure_with_no_git_inner
+
+test_wt_layer_pkg_dir_skips_symlinked_layers() {
+    local tmpdir; tmpdir=$(mktemp -d)
+    # Put the backing layer in its own directory so it doesn't get picked up
+    # by the *_ws glob inside $tmpdir.
+    local backing; backing=$(mktemp -d)
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # The whole layer dir is a symlink — the helper must skip it.
+    mkdir -p "$backing/real_layer_ws/src"
+    _make_layer_pkg "$backing/real_layer_ws" "a_pkg" git
+    ln -s "$backing/real_layer_ws" "$tmpdir/core_ws"
+
+    local result rc
+    result=$(wt_layer_pkg_dir "$tmpdir" 2>/dev/null); rc=$?
+    rm -rf "$tmpdir" "$backing"
+
+    if [ $rc -eq 0 ]; then
+        echo "    Expected wt_layer_pkg_dir to fail (only symlinked layer present)"
+        return 1
+    fi
+    return 0
+}
+run_test "wt_layer_pkg_dir skips symlinked layer dirs" test_wt_layer_pkg_dir_skips_symlinked_layers
+
+# ===== extract_gh_slug tests =====
+#
+# Helper to assert extract_gh_slug returns an exact value (or empty for
+# rejection cases). Sources the helper file once per test for isolation.
+_assert_slug() {
+    local url="$1" expected="$2" label="$3"
+    local actual
+    actual=$(extract_gh_slug "$url")
+    if [ "$actual" = "$expected" ]; then
+        return 0
+    fi
+    echo "    [$label] for url='$url' expected='$expected' got='$actual'"
+    return 1
+}
+
+test_extract_gh_slug_accepts_supported_forms() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    _assert_slug "https://github.com/owner/repo.git" "owner/repo"     "https with .git"     || return 1
+    _assert_slug "https://github.com/owner/repo"     "owner/repo"     "https no .git"       || return 1
+    _assert_slug "https://github.com:443/owner/repo.git" "owner/repo" "https with port"     || return 1
+    _assert_slug "git@github.com:owner/repo.git"     "owner/repo"     "scp form"            || return 1
+    _assert_slug "git@github.com:owner/repo"         "owner/repo"     "scp form no .git"    || return 1
+    _assert_slug "ssh://git@github.com/owner/repo.git" "owner/repo"   "ssh url"             || return 1
+    _assert_slug "ssh://git@github.com:22/owner/repo.git" "owner/repo" "ssh url with port"  || return 1
+    _assert_slug "ssh://git@ssh.github.com:443/owner/repo.git" "owner/repo" "ssh-over-443"  || return 1
+    _assert_slug "https://github.com/owner/repo.foo.git" "owner/repo.foo" "dotted repo name" || return 1
+    return 0
+}
+run_test "extract_gh_slug accepts all supported URL forms" test_extract_gh_slug_accepts_supported_forms
+
+test_extract_gh_slug_rejects_lookalikes() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    # Substring/lookalike hosts must NOT match.
+    _assert_slug "https://mygithub.com/owner/repo.git"   "" "mygithub.com"   || return 1
+    _assert_slug "https://notgithub.com/owner/repo.git"  "" "notgithub.com"  || return 1
+    _assert_slug "git@mygithub.com:owner/repo.git"       "" "mygithub.com scp" || return 1
+    # Different host entirely.
+    _assert_slug "https://gitlab.com/owner/repo.git"     "" "gitlab.com"     || return 1
+    # Subdomains of github.com other than 'ssh.' (notably gist.) must not match.
+    _assert_slug "https://gist.github.com/owner/file.git" "" "gist.github.com" || return 1
+    _assert_slug "https://api.github.com/repos/owner/repo" "" "api.github.com" || return 1
+    # github.com appearing inside a URL path (not at host position) must
+    # not match — the boundary class would otherwise pick up the leading
+    # '/' before 'github.com' and accept a non-GitHub remote.
+    _assert_slug "https://example.com/github.com/owner/repo.git" "" "github.com in path"        || return 1
+    _assert_slug "https://gitlab.com/foo/github.com/owner/repo"  "" "github.com deep in path"   || return 1
+    _assert_slug "git@example.com/github.com/owner/repo.git"     "" "github.com in scp-ish path" || return 1
+    # Anchored regex must reject `@github.com` appearing mid-URL — e.g.
+    # an SCP-form remote where the path itself contains `@github.com`.
+    # Without the start-of-string anchor, the `@` boundary would let
+    # these match and produce a wrong slug.
+    _assert_slug "git@example.com:foo@github.com/owner/repo.git" "" "@github.com mid-scp"      || return 1
+    _assert_slug "https://user@example.com/foo@github.com/owner/repo.git" "" "@github.com mid-https" || return 1
+    # No-protocol `github.com/owner/repo` is not a real remote URL form
+    # (`git remote get-url` always returns https/ssh/scp). The anchored
+    # regex requires either a scheme or a SCP-style `:` separator.
+    _assert_slug "github.com/owner/repo.git" "" "no protocol (rejected)" || return 1
+    return 0
+}
+run_test "extract_gh_slug rejects lookalike hosts" test_extract_gh_slug_rejects_lookalikes
+
+test_extract_gh_slug_rejects_malformed() {
+    source "$SCRIPT_DIR/../_worktree_helpers.sh"
+
+    _assert_slug ""                                  "" "empty string"          || return 1
+    _assert_slug "not a url"                         "" "garbage"               || return 1
+    _assert_slug "https://github.com/onlyowner"      "" "owner without repo"    || return 1
+    _assert_slug "https://github.com/owner/repo/extra" "" "trailing path"       || return 1
+    return 0
+}
+run_test "extract_gh_slug rejects empty/malformed input" test_extract_gh_slug_rejects_malformed
 
 # Summary
 echo "========================================"

@@ -233,18 +233,46 @@ else
     # Fetch and display issue title so agents can verify they're on the right issue
     _ISSUE_TITLE=""
 
-    # Try git-bug first (offline-capable, fast)
+    # Determine which repo this issue belongs to (and therefore which
+    # repo's git-bug + gh queries should target). For workspace
+    # worktrees this is the workspace; for layer worktrees it's the
+    # first inner package's repo. Querying the wrong repo returns
+    # workspace data on issue-number collisions (see #457).
+    _BUG_QUERY_DIR="$ROOT_DIR"
+    if [ "$WORKTREE_TYPE" = "layer" ] && declare -F wt_layer_pkg_dir &>/dev/null; then
+        _PKG_DIR=$(wt_layer_pkg_dir "$WORKTREE_DIR" 2>/dev/null || echo "")
+        if [ -n "$_PKG_DIR" ]; then
+            _BUG_QUERY_DIR="$_PKG_DIR"
+        fi
+    fi
+
+    # Derive the GitHub slug of the issue's repo for gh --repo.
+    # extract_gh_slug (from _worktree_helpers.sh, sourced above) handles
+    # all supported URL forms — HTTPS, SCP, SSH, SSH-over-443 — and
+    # rejects substring/lookalike hosts.
+    _GH_SLUG=""
+    _BUG_REMOTE=$(git -C "$_BUG_QUERY_DIR" remote get-url origin 2>/dev/null || echo "")
+    if [ -n "$_BUG_REMOTE" ] && declare -F extract_gh_slug &>/dev/null; then
+        _GH_SLUG=$(extract_gh_slug "$_BUG_REMOTE")
+    fi
+
+    # Try git-bug first (offline-capable, fast), but only when the
+    # target repo actually has a git-bug bridge configured.
     _GITBUG_HELPERS="$(dirname "${BASH_SOURCE[0]}")/gitbug_helpers.sh"
     if [ -f "$_GITBUG_HELPERS" ]; then
         # shellcheck source=gitbug_helpers.sh
         source "$_GITBUG_HELPERS"
     fi
-    if declare -F gitbug_lookup &>/dev/null; then
-        _ISSUE_TITLE=$(gitbug_lookup "$ROOT_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
+    _GITBUG_ATTEMPTED=false
+    if declare -F gitbug_lookup &>/dev/null && \
+       declare -F gitbug_has_bridge &>/dev/null && \
+       gitbug_has_bridge "$_BUG_QUERY_DIR"; then
+        _GITBUG_ATTEMPTED=true
+        _ISSUE_TITLE=$(gitbug_lookup "$_BUG_QUERY_DIR" "$ISSUE_NUM" title 2>/dev/null || echo "")
     fi
 
-    # Fall back to gh API if git-bug didn't return a title
-    if [ -z "$_ISSUE_TITLE" ]; then
+    # Fall back to gh API if git-bug didn't return a title (and was attempted)
+    if [ -z "$_ISSUE_TITLE" ] && [ "$_GITBUG_ATTEMPTED" = true ]; then
         if command -v git-bug &>/dev/null; then
             if command -v gh &>/dev/null; then
                 echo "  ⚠️  git-bug lookup failed for #$ISSUE_NUM, falling back to gh API" >&2
@@ -254,17 +282,11 @@ else
         fi
     fi
     if [ -z "$_ISSUE_TITLE" ] && command -v gh &>/dev/null; then
-        _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
-        # Layer worktrees cd into package repos where gh context may differ;
-        # retry with the workspace repo if the first attempt fails
-        if [ -z "$_ISSUE_TITLE" ]; then
-            _WS_REMOTE=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")
-            if [[ -n "$_WS_REMOTE" && "$_WS_REMOTE" == *"github.com"* ]]; then
-                _WS_SLUG=$(echo "$_WS_REMOTE" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
-                if [[ "$_WS_SLUG" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
-                    _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_WS_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
-                fi
-            fi
+        if [ -n "$_GH_SLUG" ]; then
+            _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --repo "$_GH_SLUG" --json title --jq '.title' 2>/dev/null || echo "")
+        else
+            # No usable slug: best-effort using cwd's gh context
+            _ISSUE_TITLE=$(gh issue view "$ISSUE_NUM" --json title --jq '.title' 2>/dev/null || echo "")
         fi
     fi
     export WORKTREE_ISSUE_TITLE="$_ISSUE_TITLE"
