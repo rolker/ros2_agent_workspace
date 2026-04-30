@@ -533,10 +533,20 @@ test_layer_uses_project_gitbug_when_bridged() {
     cd "$WORKSPACE_DIR" || return 1
     install_fake_gitbug_helpers
 
+    # Stub gh so the script's `gh pr view` PR-check call (run whenever
+    # gh is on PATH, even on the git-bug success path) doesn't hit the
+    # network on dev boxes. FAKE_GH_MODE=fail also makes any unexpected
+    # `gh issue view` fall-through return empty rather than the stub's
+    # default `Fix the widget` title — which would mask a regression.
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
     local output
     output=$(FAKE_BRIDGE_MODE=both \
              FAKE_BUG_PROJECT_TITLE="RIGHT_TITLE_FROM_PROJECT" \
              FAKE_BUG_WORKSPACE_TITLE="WRONG_TITLE_FROM_WORKSPACE" \
+             FAKE_GH_MODE=fail \
+             PATH="$fake_dir:$PATH" \
         .agent/scripts/worktree_create.sh --issue 888 --type layer --layer core --packages test_pkg 2>&1) || true
 
     cleanup_mock_layer_workspace
@@ -562,9 +572,15 @@ test_workspace_uses_workspace_gitbug_when_bridged() {
     cd "$WORKSPACE_DIR" || return 1
     install_fake_gitbug_helpers
 
+    # Stub gh — same rationale as test_layer_uses_project_gitbug_when_bridged.
+    local fake_dir
+    fake_dir=$(setup_fake_gh)
+
     local output
     output=$(FAKE_BRIDGE_MODE=workspace_only \
              FAKE_BUG_WORKSPACE_TITLE="HAPPY_PATH_TITLE" \
+             FAKE_GH_MODE=fail \
+             PATH="$fake_dir:$PATH" \
         .agent/scripts/worktree_create.sh --issue 777 --type workspace 2>&1) || true
 
     cleanup_mock_workspace
