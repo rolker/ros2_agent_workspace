@@ -600,7 +600,13 @@ if [ -n "$ISSUE_NUM" ]; then
         _BUG_FIRST_PKG="${_BUG_FIRST_PKG#"${_BUG_FIRST_PKG%%[![:space:]]*}"}"
         _BUG_FIRST_PKG="${_BUG_FIRST_PKG%"${_BUG_FIRST_PKG##*[![:space:]]}"}"
         _BUG_PKG_PATH="$ROOT_DIR/layers/main/${TARGET_LAYER}_ws/src/${_BUG_FIRST_PKG}"
-        if [ -d "$_BUG_PKG_PATH" ] && git -C "$_BUG_PKG_PATH" remote get-url origin &>/dev/null; then
+        # Use the package repo's dir whenever it's a git worktree, even
+        # if it has no `origin` remote configured. Origin is only needed
+        # for slug derivation (handled elsewhere), not for routing
+        # git-bug to the right repo. Tying this guard to origin would
+        # silently fall back to the workspace and reintroduce the #457
+        # collision for origin-less but otherwise valid project repos.
+        if [ -d "$_BUG_PKG_PATH" ] && git -C "$_BUG_PKG_PATH" rev-parse --git-dir &>/dev/null; then
             BUG_QUERY_DIR="$_BUG_PKG_PATH"
         fi
     fi
