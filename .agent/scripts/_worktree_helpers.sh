@@ -107,25 +107,32 @@ wt_layer_is_dirty() {
 #   ssh://[user@]ssh.github.com:443/OWNER/REPO[.git]       (SSH-over-443)
 #
 # Rejects substring/lookalike hosts (e.g. mygithub.com, gist.github.com)
-# by requiring the host to be preceded by a URL boundary (start, '@', or '/').
+# and `github.com` appearing inside the URL path by anchoring the match
+# at the start of the string and requiring the host to be at a true URL
+# host position — start, after a single `[user@]` auth section, or after
+# the `://` protocol delimiter.
 #
 # Usage: slug=$(extract_gh_slug "$url")
 extract_gh_slug() {
     local url="$1"
-    # Strip a single trailing .git so the regex doesn't have to.
+    # Strip a single trailing .git so the regexes don't have to.
     local cleaned="${url%.git}"
-    # Boundary: must be at URL host position — start-of-string, an '@'
-    # (auth section), or a '://' (protocol delimiter). A bare '/' is
-    # not a valid boundary; otherwise URLs like
-    # https://example.com/github.com/owner/repo would falsely match
-    # github.com inside the path.
-    # Host:     optional ssh. prefix, then literal github.com
-    # Port:     optional :NNN
-    # Sep:      / (URL form) or : (SCP form)
-    # Path:     OWNER / REPO  (no slashes or whitespace inside either)
-    local re='(^|@|://)(ssh\.)?github\.com(:[0-9]+)?[/:]([^/[:space:]]+)/([^/[:space:]]+)$'
-    if [[ "$cleaned" =~ $re ]]; then
-        echo "${BASH_REMATCH[4]}/${BASH_REMATCH[5]}"
+    # Two anchored patterns covering the officially supported remote URL
+    # forms. Anchoring at ^ rejects lookalike hosts and `@github.com`
+    # appearing inside a URL path (e.g.
+    # `git@example.com:foo@github.com/owner/repo`).
+    #
+    # Form 1: explicit scheme (https, http, ssh).
+    #   ^(https?|ssh)://[user@]?(ssh\.)?github.com[:port]?/OWNER/REPO$
+    local re_url='^(https?|ssh)://([^@/[:space:]]+@)?(ssh\.)?github\.com(:[0-9]+)?/([^/[:space:]]+)/([^/[:space:]]+)$'
+    # Form 2: SCP-style `[user@]host:path` (no scheme, no slash between
+    # host and path).
+    #   ^[user@]?(ssh\.)?github.com:OWNER/REPO$
+    local re_scp='^([^@/[:space:]]+@)?(ssh\.)?github\.com:([^/[:space:]]+)/([^/[:space:]]+)$'
+    if [[ "$cleaned" =~ $re_url ]]; then
+        echo "${BASH_REMATCH[5]}/${BASH_REMATCH[6]}"
+    elif [[ "$cleaned" =~ $re_scp ]]; then
+        echo "${BASH_REMATCH[3]}/${BASH_REMATCH[4]}"
     fi
 }
 

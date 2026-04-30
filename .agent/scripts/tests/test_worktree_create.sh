@@ -955,7 +955,6 @@ test_extract_gh_slug_accepts_supported_forms() {
     _assert_slug "ssh://git@github.com/owner/repo.git" "owner/repo"   "ssh url"             || return 1
     _assert_slug "ssh://git@github.com:22/owner/repo.git" "owner/repo" "ssh url with port"  || return 1
     _assert_slug "ssh://git@ssh.github.com:443/owner/repo.git" "owner/repo" "ssh-over-443"  || return 1
-    _assert_slug "github.com/owner/repo.git"         "owner/repo"     "no protocol"         || return 1
     _assert_slug "https://github.com/owner/repo.foo.git" "owner/repo.foo" "dotted repo name" || return 1
     return 0
 }
@@ -979,6 +978,16 @@ test_extract_gh_slug_rejects_lookalikes() {
     _assert_slug "https://example.com/github.com/owner/repo.git" "" "github.com in path"        || return 1
     _assert_slug "https://gitlab.com/foo/github.com/owner/repo"  "" "github.com deep in path"   || return 1
     _assert_slug "git@example.com/github.com/owner/repo.git"     "" "github.com in scp-ish path" || return 1
+    # Anchored regex must reject `@github.com` appearing mid-URL — e.g.
+    # an SCP-form remote where the path itself contains `@github.com`.
+    # Without the start-of-string anchor, the `@` boundary would let
+    # these match and produce a wrong slug.
+    _assert_slug "git@example.com:foo@github.com/owner/repo.git" "" "@github.com mid-scp"      || return 1
+    _assert_slug "https://user@example.com/foo@github.com/owner/repo.git" "" "@github.com mid-https" || return 1
+    # No-protocol `github.com/owner/repo` is not a real remote URL form
+    # (`git remote get-url` always returns https/ssh/scp). The anchored
+    # regex requires either a scheme or a SCP-style `:` separator.
+    _assert_slug "github.com/owner/repo.git" "" "no protocol (rejected)" || return 1
     return 0
 }
 run_test "extract_gh_slug rejects lookalike hosts" test_extract_gh_slug_rejects_lookalikes
