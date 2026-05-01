@@ -62,12 +62,25 @@ post comments or modify the PR unless the user asks.
 
 ### 1. Detect mode and gather diff context
 
-Determine pre-push vs post-PR mode from the argument:
+Determine pre-push vs post-PR mode from the arguments. Parse out the
+optional depth keyword first (`light` / `standard` / `deep` — positional,
+matching the Usage block above), then classify what remains:
 
-- No arg, or `--base <branch>` → **pre-push mode**
-- Argument is a number or `https://github.com/.../pull/<N>` → **post-PR mode**
-- Argument starts with `--depth=` → strip and re-evaluate (depth applies
-  in either mode)
+- Empty, or only `--base <branch>` → **pre-push mode**
+- A number or `https://github.com/.../pull/<N>` → **post-PR mode**
+
+The depth keyword is positional and may appear after the PR number /
+URL or after `--base <branch>`. The same syntax applies in both modes.
+Examples:
+
+```
+/review-code                       # pre-push, auto-classify
+/review-code deep                  # pre-push, force Deep
+/review-code --base develop        # pre-push, override base
+/review-code --base develop deep   # pre-push with override + force Deep
+/review-code 42                    # post-PR, auto-classify
+/review-code 42 standard           # post-PR, force Standard
+```
 
 #### Pre-push mode
 

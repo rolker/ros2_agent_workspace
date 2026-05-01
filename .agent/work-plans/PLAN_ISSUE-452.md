@@ -65,17 +65,21 @@ alone approaches review-fatigue size, split B+C off as a follow-up.
    No ADR — fork landed this recently; we lack experience to commit to
    ADR-level permanence.
 4. **Update `review-code/SKILL.md`:**
-   - Accept `--depth=light|standard|deep` override; auto-classify when
-     omitted using the signal table from step 3.
+   - Accept positional `[light|standard|deep]` depth override (matches
+     the fork verbatim); auto-classify when omitted using the signal
+     table from step 3.
    - Accept pre-push mode: `review-code` (no arg) diffs against the
      current repo's default branch (`gh repo view --json defaultBranchRef`,
      fall back to `main`); `--base <branch>` overrides. `review-code <N>`
      or `<url>` is post-PR mode.
-   - Dispatch specialists by tier; **Adversarial Specialist** at Deep
-     only, launched via `Agent` as a fresh-context subagent with no
-     context from other specialists. Document that Adversarial is
-     **Claude-only** — structural limitation; other frameworks still
-     get depth dispatch + persistence.
+   - Dispatch specialists by tier; **Adversarial Specialist** activates
+     at **Standard + Deep** (Standard prompt covers edge cases /
+     assumptions / subtle bugs / logic; Deep prompt adds security /
+     concurrency / cross-cutting effects), launched via `Agent` as a
+     fresh-context subagent with no context from other specialists.
+     Document that Adversarial is **Claude-only** — structural
+     limitation; other frameworks still get depth dispatch +
+     persistence.
    - Document Adversarial's cross-repo limitation: fresh-context reviewer
      reads only the diff, so it cannot catch cross-repo consequences in
      the layered workspace. The Governance Specialist carries that load
