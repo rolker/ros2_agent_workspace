@@ -7,13 +7,24 @@ applies_to:
 
 # Work Plan Review Instructions
 
-Files in `.agent/work-plans/` are implementation plans, not code. They follow the
-naming convention `PLAN_ISSUE-<N>.md` and are committed as the first step on a
-feature branch — often in a draft PR before implementation begins.
+Files in `.agent/work-plans/` are implementation plans, not code. The
+canonical layout is `.agent/work-plans/issue-<N>/plan.md`, with
+companion artifacts (progress logs, review output, adversarial findings)
+landing alongside under the same per-issue directory. Plans authored
+before the directory convention landed remain at the legacy
+`PLAN_ISSUE-<N>.md` path; each one has a matching symlink at
+`issue-<N>/plan.md` so consumer skills find every plan at the new
+path. Treat the new `issue-<N>/plan.md` form as the authoritative path
+for new work; the flat `PLAN_ISSUE-<N>.md` filename is legacy
+compatibility.
 
-This pattern applies to both the workspace repo and project repos. Plans live in
-whichever repo owns the issue being worked on — project repos maintain their own
-`.agent/work-plans/` directories following the same conventions.
+Plans are committed as the first step on a feature branch — often in a
+draft PR before implementation begins.
+
+This pattern applies to both the workspace repo and project repos.
+Plans live in whichever repo owns the issue being worked on — project
+repos maintain their own `.agent/work-plans/` directories following the
+same conventions.
 
 ## What to Review
 

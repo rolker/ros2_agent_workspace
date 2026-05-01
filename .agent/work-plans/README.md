@@ -56,11 +56,17 @@ accumulate.
 - Format: `issue-<number>/plan.md`
 - Example: `issue-69/plan.md` for issue #69
 
+**Authoritative path for agents**: Create, update, and reference plans
+at `.agent/work-plans/issue-<N>/plan.md`. Any older instructions that
+mention only the flat `PLAN_ISSUE-<N>.md` convention should be treated
+as legacy / deprecated guidance, not the current workflow.
+
 **Legacy flat plans**: Plans created before the directory convention
-landed remain at `.agent/work-plans/PLAN_ISSUE-<N>.md`. Each one has a
-matching symlink at `issue-<N>/plan.md` so consumer skills can always
-look up plans at the new path. The flat files are the canonical
-storage; the symlinks are the access path.
+landed remain at `.agent/work-plans/PLAN_ISSUE-<N>.md` for
+compatibility. Each one has a matching symlink at `issue-<N>/plan.md`
+so consumer skills can always look up plans at the new path. The flat
+files are the canonical on-disk storage; the symlinks are the access
+path.
 
 One plan per issue. Keep plans concise but complete.
 
