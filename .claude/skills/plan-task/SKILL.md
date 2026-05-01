@@ -193,6 +193,10 @@ Summarize:
 - Link to the draft PR
 - Pointer to the "During implementation" section below, so the
   implementer knows to keep the plan in sync with landed code
+- Reminder that `/review-code` (pre-push mode) is the next step after
+  the implementation is complete and before pushing — it catches
+  static-analysis / governance / plan-drift / adversarial findings
+  while they're still cheap to fix locally
 
 ## During implementation
 
