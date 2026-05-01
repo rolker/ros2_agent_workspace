@@ -26,15 +26,23 @@ This doc covers (2). The Adversarial Specialist itself lives in
 
 ### Risk Signals
 
-`review-code` collects these from `gh pr view <N>` output:
+`review-code` collects the same set of signals in either mode, but the
+source path differs:
 
-| Signal | Source | How to measure |
-|--------|--------|----------------|
-| Lines changed | `additions + deletions` | Total lines added and removed |
-| File count | `files` array length | Number of files in the diff |
-| File types | File paths | Categorize each file (see below) |
-| Override triggers | File paths | Check against override-trigger lists below |
-| Tests included | File paths | Whether the diff includes files in `test/`, `tests/`, or named `test_*`, `*_test.*` — absence of tests for code changes is noted in the report but does not, on its own, change the tier |
+- **Post-PR mode** (`/review-code <N>` or URL): from `gh pr view <N>`
+  output — `additions`, `deletions`, `files` array, file paths.
+- **Pre-push mode** (`/review-code` with no PR argument): from the
+  local diff — `git diff origin/<base>...HEAD --numstat` (per-file
+  +/- counts) and `--stat` (totals), plus the file list from the
+  diff itself.
+
+| Signal | Post-PR source | Pre-push source | How to measure |
+|--------|----------------|-----------------|----------------|
+| Lines changed | `additions + deletions` from `gh pr view --json` | Sum of insertions+deletions from `git diff --numstat` (or `--stat`) | Total lines added and removed |
+| File count | Length of `files` array | Line count of `git diff --numstat` | Number of files in the diff |
+| File types | File paths from `files` array | File paths from `git diff --numstat` | Categorize each file (see below) |
+| Override triggers | Same file paths | Same file paths | Check against override-trigger lists below |
+| Tests included | Same file paths | Same file paths | Whether the diff includes files in `test/`, `tests/`, or named `test_*`, `*_test.*` — absence of tests for code changes is noted in the report but does not, on its own, change the tier |
 
 #### File type categories
 
