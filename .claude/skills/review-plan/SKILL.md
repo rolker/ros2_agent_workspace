@@ -16,8 +16,14 @@ description: Independent evaluation of a committed work plan before implementati
 - `<pr-number>` — read the plan from a draft PR (existing behavior)
 - `<path-to-plan.md>` — read the plan directly from a local file
 - `--issue <N>` — resolve to `.agent/work-plans/issue-<N>/plan.md` in
-  the current repo, or in the repo named by `--repo` for cross-repo
-  lookup
+  the current repo's worktree
+
+`--repo <owner/repo>` is an optional adjunct that affects only `gh`
+lookups (issue title, linked PR metadata) — it does **not** change
+where the plan file is read from. To review a plan from a different
+repo, enter that repo's worktree first; `--repo` is for the case where
+the worktree is correct but `gh` would otherwise default to the wrong
+remote.
 
 The file path and `--issue` forms enable offline plan review without a
 PR.
@@ -77,10 +83,12 @@ ls .workspace-worktrees/issue-workspace-<N>/.agent/work-plans/issue-<N>/plan.md 
 ls layers/worktrees/*/issue-*-<N>/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
 ```
 
-For cross-repo plan review (e.g., reviewing a project repo's plan from
-the workspace tree), pass `--repo <owner/repo>` so PR lookups can target
-the right repo. The plan file path is still resolved relative to the
-current repo's worktree.
+**Cross-repo lookups**: `--repo <owner/repo>` redirects only `gh`
+queries (issue title via `gh issue view`, PR metadata via `gh pr view`)
+to the named repo. The plan file is always read from the current
+repo's worktree — there's no cross-repo plan-file resolution. If you
+need to review a plan that lives in a different repo, enter that
+repo's worktree first, then run the skill.
 
 If still not found, stop and inform the user.
 
