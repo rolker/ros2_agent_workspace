@@ -119,10 +119,14 @@ alone approaches review-fatigue size, split B+C off as a follow-up.
 12. **Mark ported pieces in `inspiration_agent_workspace_digest.md`** —
     move the four pieces into a "Ported" section with PR link.
 
-**Validation (smoke test, not CI):** run `/review-code 448 --depth=deep`
-and confirm (a) Adversarial fires, (b) progress.md is written at
-`.agent/work-plans/issue-448/progress.md`, (c) depth auto-classification
-on a medium PR lands on Standard.
+**Validation (smoke test, not CI):** pick a recent PR whose `Closes
+#<N>` reference is unambiguous (some PRs like #448 close *multiple*
+issues; the smoke test should not assume PR # equals issue #). Run
+`/review-code <pr-num> deep` and confirm (a) Adversarial fires, (b)
+`review-code` resolves the linked issue via `closingIssuesReferences`
+(not by grepping the PR body) and writes progress.md at
+`.agent/work-plans/issue-<linked-N>/progress.md` in the issue's owning
+repo, (c) depth auto-classification on a medium PR lands on Standard.
 
 ## Files to Change
 
@@ -212,7 +216,8 @@ Entirely workspace-level.
   generalizing single-repo language is most cleanly done while
   porting each section. No standalone commit for step 5.
 - **Smoke-test validation deferred to post-merge.** The plan's
-  validation checklist (`/review-code 448 --depth=deep` confirming
-  Adversarial fires, progress.md is written, medium PR lands on
-  Standard) can only be run after this PR merges and the new SKILL
-  is loadable. Will be exercised as part of the next real PR review.
+  validation checklist (Adversarial fires, `closingIssuesReferences`
+  resolution writes progress.md to the right `issue-<N>/` directory,
+  medium PR lands on Standard) can only be run after this PR merges
+  and the new SKILL is loadable. Will be exercised as part of the
+  next real PR review.

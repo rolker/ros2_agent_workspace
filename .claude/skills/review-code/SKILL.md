@@ -128,14 +128,21 @@ plan-drift and progress.md persistence are skipped.
 #### Post-PR mode
 
 ```bash
-# PR metadata
-gh pr view <N> --json title,body,baseRefName,headRefName,headRefOid,files,additions,deletions,url,comments,reviews
+# PR metadata (includes the parsed list of closing-issue references)
+gh pr view <N> --json title,body,baseRefName,headRefName,headRefOid,files,additions,deletions,url,comments,reviews,closingIssuesReferences
 
 # Full diff
 gh pr diff <N>
 
-# Linked issue (from "Closes #<N>" in PR body)
-gh pr view <N> --json body --jq '.body' | grep -oE '#[0-9]+' | head -1
+# Primary closing-linked issue. Use `closingIssuesReferences` (parsed
+# by GitHub from `Closes #N` / `Fixes #N` / `Resolves #N` keywords) —
+# do NOT just grep `#[0-9]+` from the body. PRs often mention many
+# issue numbers (cross-references, context); only closing-references
+# represent the issue this PR is actually completing. If a PR has
+# multiple closing references, use the first; if none, treat as no
+# linked issue (review still runs, but plan-drift and progress.md
+# persistence are skipped).
+ISSUE_NUM=$(gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty')
 ```
 
 In both modes, identify:
