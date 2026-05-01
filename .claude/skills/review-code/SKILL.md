@@ -85,13 +85,25 @@ Examples:
 #### Pre-push mode
 
 ```bash
-# Repo root and default branch
+# Repo root and base branch — start from the default, override if
+# the invocation included `--base <branch>`.
 REPO_ROOT=$(git rev-parse --show-toplevel)
 DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo "main")
+# USER_BASE is set by the caller when `--base <branch>` is parsed off
+# the argument list; otherwise it's empty and the default applies.
 BASE="${USER_BASE:-$DEFAULT_BRANCH}"
 
-# Make sure base is current
-git fetch origin "$BASE" --quiet
+# Try to refresh the base from the remote. Tolerate offline / no-remote
+# cases — fetch failure isn't fatal; we'll use whatever local
+# `origin/$BASE` ref exists.
+if ! git fetch origin "$BASE" --quiet 2>/dev/null; then
+    if git rev-parse --verify "origin/$BASE" &>/dev/null; then
+        echo "⚠️  Could not fetch origin/$BASE; reviewing against the local copy (may be stale)." >&2
+    else
+        echo "Error: no local origin/$BASE ref and fetch failed. Pass --base <branch> or run online." >&2
+        exit 1
+    fi
+fi
 
 # Diff and stats
 git diff "origin/$BASE...HEAD" --stat
@@ -103,9 +115,14 @@ BRANCH=$(git branch --show-current)
 ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0-9]+' | head -1)
 ```
 
-If `gh repo view` fails (no GitHub remote, offline), fall back to `main`
-and proceed. If no issue number can be extracted from the branch name,
-note "no linked issue" in the report header — the review still runs but
+`--base <branch>` is parsed from the argument list before the snippet
+runs and exposed as `USER_BASE`. If `gh repo view` fails (no GitHub
+remote, offline) the default falls back to `main`. If `git fetch` then
+also fails and no local `origin/$BASE` ref exists, the snippet stops
+with an error rather than silently diffing against nothing.
+
+If no issue number can be extracted from the branch name, note "no
+linked issue" in the report header — the review still runs but
 plan-drift and progress.md persistence are skipped.
 
 #### Post-PR mode
