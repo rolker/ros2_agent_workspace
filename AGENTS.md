@@ -352,8 +352,15 @@ Before marking a task complete or opening a PR:
 2. Compare changes against requirements
 3. Check consequences: do tests, docs, or dependent references need updating?
 4. List any gaps; complete them or explain in PR description
+5. **Before opening a PR**: run `/review-code` against your diff and
+   address findings before pushing. Catches static-analysis issues,
+   governance gaps, plan drift, and adversarial findings while they're
+   still cheap to fix locally — instead of in PR review rounds. See
+   `.claude/skills/review-code/SKILL.md` (pre-push mode is the default
+   when invoked with no arguments).
 
-**Plan-first workflow**: if the PR opened with a work plan (`.agent/work-plans/PLAN_ISSUE-<N>.md`),
+**Plan-first workflow**: if the PR opened with a work plan (`.agent/work-plans/issue-<N>/plan.md`,
+or legacy `PLAN_ISSUE-<N>.md`),
 the plan is expected to stay in sync with the committed implementation on
 the branch / in the PR as implementation proceeds. Inline edits are the
 default; see the "During implementation" section of

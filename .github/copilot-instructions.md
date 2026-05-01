@@ -6,9 +6,10 @@ That file contains the shared workspace rules for all AI agents.
 ## Code Review Guidelines
 
 This repository uses a plan-first workflow. The first commit on a feature branch
-is often a work plan in `.agent/work-plans/PLAN_ISSUE-<N>.md`. Project repos
-follow the same convention — plans live in whichever repo owns the issue, not
-only in the workspace repo. When reviewing:
+is often a work plan at `.agent/work-plans/issue-<N>/plan.md` (or, for legacy
+plans authored before the directory convention, `PLAN_ISSUE-<N>.md`). Project
+repos follow the same convention — plans live in whichever repo owns the issue,
+not only in the workspace repo. When reviewing:
 
 - If the PR contains only a plan file, review the plan for clarity, completeness,
   and alignment with the principles in `docs/PRINCIPLES.md`.
@@ -17,6 +18,25 @@ only in the workspace repo. When reviewing:
 - Reference `docs/decisions/` for Architecture Decision Records.
 - The principle "Radical simplicity" was renamed to "Only what's needed" — use the
   current name from `docs/PRINCIPLES.md`, not historical references.
+
+## Pre-Push Code Review
+
+The shared rule (see [`AGENTS.md` Post-Task Verification](../AGENTS.md#post-task-verification))
+expects authors to run `/review-code` against their diff before opening a PR.
+This applies to Copilot too when used in **agent / coding-assistant mode** —
+prefer a pre-push pass to catch governance, plan-drift, and adversarial
+findings locally rather than in PR review rounds. See
+[`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md).
+
+**Limitation**: when Copilot runs as a **PR reviewer** (the GitHub
+"review by Copilot" surface), it can't invoke local skills, so the
+pre-push check is the human-or-other-agent author's responsibility.
+The Copilot review surface remains complementary, not a substitute.
+
+**Adversarial Specialist is Claude-only** — it dispatches a fresh
+subagent via Claude Code's `Agent` tool, which Copilot doesn't expose.
+Other specialists (Static Analysis, Governance, Plan Drift) are
+framework-agnostic.
 
 ## Environment Setup
 

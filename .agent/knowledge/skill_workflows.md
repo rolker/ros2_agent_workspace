@@ -2,13 +2,21 @@
 
 ## Per-Issue Lifecycle
 
-The governance skills follow a sequence from idea exploration through pre-merge code review:
+The governance skills follow a sequence from idea exploration through
+post-PR review triage:
 
 ```
-brainstorm → review-issue → plan-task → review-plan → implement → review-code
+brainstorm → review-issue → plan-task → review-plan → implement
+          → review-code → push / open PR → triage-reviews
 ```
 
-Each step is optional — simple issues can skip straight to `plan-task` or implementation.
+Each step is optional — simple issues can skip straight to `plan-task`
+or implementation. `review-code` runs **before pushing** (pre-push mode,
+no arguments) so static-analysis, governance, plan-drift, and
+adversarial findings get caught while still cheap to fix locally; it
+also accepts a PR number / URL for post-PR review of someone else's
+work. `triage-reviews` runs after a PR has accumulated review comments
+(human + bot) and classifies each against the current code.
 
 ## Skill Index
 
@@ -19,8 +27,9 @@ Each step is optional — simple issues can skip straight to `plan-task` or impl
 | `brainstorm` | Before review-issue | Explore possibilities using research digests and project knowledge |
 | `review-issue` | Before plan-task | Evaluate issue scope, principle alignment, and ADR applicability |
 | `plan-task` | Before implementation | Generate a principles-aware work plan, commit to branch |
-| `review-plan` | After plan-task, before implementation | Independent evaluation of a committed work plan |
-| `review-code` | After implementation | Lead reviewer orchestrating specialist sub-reviews (static analysis, governance, plan drift) |
+| `review-plan` | After plan-task, before implementation | Independent evaluation of a committed work plan (accepts PR / file path / `--issue <N>`) |
+| `review-code` | Between implement and push / open PR (also post-PR for someone else's diff) | Lead reviewer orchestrating specialist sub-reviews (static analysis, governance, plan drift, adversarial). Pre-push mode is the default; depth tiers (Light / Standard / Deep) scale specialist count to change risk |
+| `triage-reviews` | After PR review comments arrive | Classifies each comment (human + bot) against current code, persists triage to `progress.md` |
 
 ### Utility skills (on-demand / periodic)
 

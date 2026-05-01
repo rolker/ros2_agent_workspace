@@ -17,10 +17,10 @@ Work plans make agent work-in-progress visible on GitHub through draft PRs. Each
 
 1. Create worktree: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`
 2. Enter worktree: `source .agent/scripts/worktree_enter.sh --issue <N>`
-3. Create plan: write `.agent/work-plans/PLAN_ISSUE-<N>.md`
+3. Create plan directory and plan: `mkdir .agent/work-plans/issue-<N> && write .agent/work-plans/issue-<N>/plan.md`
 4. Commit: `git add .agent/work-plans/ && git commit -m "Add work plan for #<N>"`
 5. Push: `git push -u origin HEAD`
-6. Create draft PR: `gh pr create --draft --title "..." --body-file .agent/work-plans/PLAN_ISSUE-<N>.md`
+6. Create draft PR: `gh pr create --draft --title "..." --body-file .agent/work-plans/issue-<N>/plan.md`
 
 ### Updating Plans
 
@@ -32,7 +32,7 @@ As work progresses, update the plan to:
 
 Commit plan updates regularly:
 ```bash
-git add .agent/work-plans/PLAN_ISSUE-<number>.md
+git add .agent/work-plans/issue-<number>/plan.md
 git commit -m "Update work plan for #<number>"
 git push
 ```
@@ -45,10 +45,28 @@ git push
 4. **Context**: Reviewers see approach before reviewing code
 5. **History**: Plans are versioned alongside code changes
 
-## File Naming Convention
+## Directory Layout
 
-- Format: `PLAN_ISSUE-{number}.md`
-- Example: `PLAN_ISSUE-69.md` for issue #69
+Each issue gets its own subdirectory: `.agent/work-plans/issue-<N>/`. The
+plan itself is `issue-<N>/plan.md`. Other per-issue artifacts (progress
+logs, review output, adversarial findings) live alongside it under the
+same directory — one folder per issue, regardless of how many artifacts
+accumulate.
+
+- Format: `issue-<number>/plan.md`
+- Example: `issue-69/plan.md` for issue #69
+
+**Authoritative path for agents**: Create, update, and reference plans
+at `.agent/work-plans/issue-<N>/plan.md`. Any older instructions that
+mention only the flat `PLAN_ISSUE-<N>.md` convention should be treated
+as legacy / deprecated guidance, not the current workflow.
+
+**Legacy flat plans**: Plans created before the directory convention
+landed remain at `.agent/work-plans/PLAN_ISSUE-<N>.md` for
+compatibility. Each one has a matching symlink at `issue-<N>/plan.md`
+so consumer skills can always look up plans at the new path. The flat
+files are the canonical on-disk storage; the symlinks are the access
+path.
 
 One plan per issue. Keep plans concise but complete.
 
@@ -85,4 +103,4 @@ The workflow is the same — the only difference is which repo you're committing
 
 - `.agent/templates/ISSUE_PLAN.md` - Plan template
 - `.agent/WORKFORCE_PROTOCOL.md` - Multi-agent coordination
-- `.agent/work-plans/PLAN_ISSUE-69.md` - Example plan
+- `.agent/work-plans/issue-69/plan.md` - Example plan

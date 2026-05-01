@@ -84,8 +84,10 @@ If a worktree for the issue already exists, just enter it.
 
 ### 5. Generate the plan
 
-Write a plan to `.agent/work-plans/PLAN_ISSUE-<N>.md` (relative to the current
-repo — workspace repo for workspace issues, project repo for project issues):
+Write a plan to `.agent/work-plans/issue-<N>/plan.md` (relative to the
+current repo — workspace repo for workspace issues, project repo for
+project issues). Create the `issue-<N>/` directory first if it doesn't
+exist:
 
 ```markdown
 # Plan: <issue-title>
@@ -143,7 +145,9 @@ repo — workspace repo for workspace issues, project repo for project issues):
 The plan file path is relative to the current repo (workspace or project):
 
 ```bash
-git add .agent/work-plans/PLAN_ISSUE-<N>.md
+mkdir -p .agent/work-plans/issue-<N>
+# (write plan to .agent/work-plans/issue-<N>/plan.md)
+git add .agent/work-plans/issue-<N>/
 git commit -m "Add work plan for #<N>
 
 <one-line summary of the approach>"
@@ -168,7 +172,7 @@ EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json url --jq '.[0].url // "
 # Build PR body: prepend Closes reference, then plan content
 BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
 printf 'Closes #<N>\n\n' > "$BODY_FILE"
-cat .agent/work-plans/PLAN_ISSUE-<N>.md >> "$BODY_FILE"
+cat .agent/work-plans/issue-<N>/plan.md >> "$BODY_FILE"
 
 if [ -n "$EXISTING_PR" ]; then
     # Update existing PR title and body
@@ -189,6 +193,10 @@ Summarize:
 - Link to the draft PR
 - Pointer to the "During implementation" section below, so the
   implementer knows to keep the plan in sync with landed code
+- Reminder that `/review-code` (pre-push mode) is the next step after
+  the implementation is complete and before pushing — it catches
+  static-analysis / governance / plan-drift / adversarial findings
+  while they're still cheap to fix locally
 
 ## During implementation
 

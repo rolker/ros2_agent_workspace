@@ -9,30 +9,88 @@ description: Independent evaluation of a committed work plan before implementati
 
 ```
 /review-plan <pr-number>
+/review-plan <path-to-plan.md>
+/review-plan --issue <N> [--repo <owner/repo>]
 ```
+
+- `<pr-number>` — read the plan from a draft PR (existing behavior)
+- `<path-to-plan.md>` — read the plan directly from a local file
+- `--issue <N>` — resolve to `.agent/work-plans/issue-<N>/plan.md` in
+  the current repo's worktree
+
+`--repo <owner/repo>` is an optional adjunct that affects only `gh`
+lookups (issue title, linked PR metadata) — it does **not** change
+where the plan file is read from. To review a plan from a different
+repo, enter that repo's worktree first; `--repo` is for the case where
+the worktree is correct but `gh` would otherwise default to the wrong
+remote.
+
+The file path and `--issue` forms enable offline plan review without a
+PR.
 
 ## Overview
 
 **Lifecycle position**: review-issue → plan-task → **review-plan** → implement → review-code
 
-Independent evaluation of a committed work plan. The planner should not grade
-their own work — this skill provides a second opinion before implementation
-begins. Runs on draft PRs created by `plan-task` (typically prefixed `[PLAN]`).
+Independent evaluation of a committed work plan. The planner should not
+grade their own work — this skill provides a second opinion before
+implementation begins. Accepts draft PRs created by `plan-task`
+(typically prefixed `[PLAN]`), local file paths, or issue numbers.
 
 ## Steps
 
-### 1. Read the plan and PR
+### 1. Read the plan
+
+Determine the input form and locate the plan file. Detection heuristic:
+- Argument starts with `--issue` → issue number form
+- Argument contains `/` or ends with `.md` → file path form
+- Otherwise → PR number form
+
+#### PR number (e.g., `/review-plan 127`)
 
 ```bash
-# PR metadata and body (plan is in the PR body)
+# PR metadata and body (plan is often summarised in the PR body)
 gh pr view <N> --json title,body,baseRefName,headRefName,files,url
 
 # Get the linked issue
-gh pr view <N> --json body --jq '.body' | grep -o '#[0-9]*' | head -1
+gh pr view <N> --json body --jq '.body' | grep -oE '#[0-9]+' | head -1
 ```
 
-Find the plan file in the PR's changed files — it will be at
-`.agent/work-plans/PLAN_ISSUE-*.md`. Read it in full.
+Find the plan file in the PR's changed files. It lives at
+`.agent/work-plans/issue-<N>/plan.md` (or, for plans authored before the
+directory convention landed, the legacy
+`.agent/work-plans/PLAN_ISSUE-<N>.md` file — the symlink at the new path
+resolves to it). Read it in full.
+
+#### File path (e.g., `/review-plan .agent/work-plans/issue-45/plan.md`)
+
+Read the plan file directly. Extract the issue number from the path:
+- New layout: `issue-<N>` directory name
+- Legacy layout: `PLAN_ISSUE-<N>.md` filename
+
+#### Issue number (e.g., `/review-plan --issue 45`)
+
+Resolve to `.agent/work-plans/issue-<N>/plan.md` in the current repo. If
+the file doesn't exist, also check the legacy
+`.agent/work-plans/PLAN_ISSUE-<N>.md`. If neither is present, check for
+an active worktree:
+
+```bash
+# Workspace worktree
+ls .workspace-worktrees/issue-workspace-<N>/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
+
+# Layer worktree (project repo)
+ls layers/worktrees/*/issue-*-<N>/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
+```
+
+**Cross-repo lookups**: `--repo <owner/repo>` redirects only `gh`
+queries (issue title via `gh issue view`, PR metadata via `gh pr view`)
+to the named repo. The plan file is always read from the current
+repo's worktree — there's no cross-repo plan-file resolution. If you
+need to review a plan that lives in a different repo, enter that
+repo's worktree first, then run the skill.
+
+If still not found, stop and inform the user.
 
 ### 2. Read the issue and any review-issue comments
 
@@ -114,7 +172,7 @@ Assess each dimension and assign a verdict (**Good** / **Needs work** / **Concer
 
 **PR**: <url>
 **Issue**: #<issue> — <issue-title>
-**Plan file**: `.agent/work-plans/PLAN_ISSUE-<N>.md`
+**Plan file**: `.agent/work-plans/issue-<N>/plan.md`
 
 ### Evaluation
 
@@ -140,6 +198,17 @@ Assess each dimension and assign a verdict (**Good** / **Needs work** / **Concer
 ### Recommended Actions
 
 - [ ] <specific action items before implementation begins>
+```
+
+**PR-less format** — when reviewing via `--issue` or a file path (no PR
+exists), replace the PR header:
+
+```markdown
+## Plan Review: #<N> — <title>
+
+**Issue**: #<N> — <issue-title>
+**Plan file**: `.agent/work-plans/issue-<N>/plan.md`
+**Branch**: `<branch-name>` (if in a worktree, otherwise omit)
 ```
 
 If no findings, output:
