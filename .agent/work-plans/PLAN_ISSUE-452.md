@@ -194,5 +194,21 @@ Entirely workspace-level.
 
 ## Implementation Notes
 
-_Rationale for design pivots that aren't obvious from the diffs alone;
-add one-liners here as implementation proceeds. Empty at plan time._
+- **Branch caught up to main before implementation.** Branch was 32
+  commits behind main when implementation began (had been sitting
+  since plan revision on 2026-04-24). Merged `origin/main` in cleanly
+  with no conflicts before starting commit group A.
+- **Steps 1 (digest refresh) and 11 (mark ported) bundled** into a
+  single commit since both touch
+  `inspiration_agent_workspace_digest.md` and the natural rhythm is
+  to write the file once. The PR taken as a whole leaves the digest
+  consistent with merged reality at merge time.
+- **Step 5 (repo-awareness pass) folded inline** into the SKILL.md
+  updates for steps 4 / 6 / 7 rather than a separate sweep, since
+  generalizing single-repo language is most cleanly done while
+  porting each section. No standalone commit for step 5.
+- **Smoke-test validation deferred to post-merge.** The plan's
+  validation checklist (`/review-code 448 --depth=deep` confirming
+  Adversarial fires, progress.md is written, medium PR lands on
+  Standard) can only be run after this PR merges and the new SKILL
+  is loadable. Will be exercised as part of the next real PR review.
