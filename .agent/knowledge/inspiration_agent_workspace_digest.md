@@ -1,24 +1,41 @@
 # Inspiration Digest: agent_workspace
 
 Type: fork
-Last checked: 2026-04-30
-Repo: rolker/agent_workspace @ c02887e00eecfac31cb442fea47427dc08a02b5c
+Last checked: 2026-05-15
+Repo: rolker/agent_workspace @ 837c24ee64d76a4906140fd262ae9413bc262636
 
 ## Activity Snapshot
 
-- ~14 open issues (mostly enhancements from inspiration runs), 0 open PRs
-- Active development since the previous digest (2026-03-23): the fork landed
-  the depth-tier review pipeline and the cross-model adversarial dispatch in
-  the meantime.
-- Notable since last refresh: `review_depth_classification.md` knowledge doc,
-  Claude + Gemini Adversarial Specialists in `review-code`, `progress.md`
-  persistence in both `review-code` and `triage-reviews`, and a flexible
-  input set on `review-plan` (PR / file / `--issue <N>`).
+- 5 open issues touch the review/skills surface (notably #190 — progress.md
+  convention rework + new `/implement` skill); 0 open PRs.
+- 113 commits since previous snapshot (`c02887e`, 2026-04-26); 3 files in
+  the review-skill area changed.
+- Notable since last refresh: `/review-code` gains an explicit `--branch`
+  mode with `--skip-static`, `--no-progress`, and `--issue <N>` flags
+  (PR #185), plus a `_resolve_default_branch.sh` helper. Cross-model script
+  extended to `--branch` mode (#185) — not applicable here, see "Not
+  adopted".
 
 ## Pending Review
 
-_None._ Items previously listed here have either been ported or moved to
-the appropriate section below.
+Stacked on PR #453 (issue #452) — the items below are upstream refinements
+to the dual-mode `/review-code` we already ported in #453. All four are
+small and additive on top of our existing implementation.
+
+- **`--skip-static` flag** (both modes) — suppress the static-analysis
+  specialist when pre-commit was already clean. Source: upstream
+  `.claude/skills/review-code/SKILL.md` step 5a. (2026-05-15)
+- **`--no-progress` flag** (branch mode) — explicit opt-out for
+  progress.md persistence on skill worktrees / one-off branches that
+  don't have an issue to track against. Source: upstream review-code
+  SKILL steps 1b + 8. (2026-05-15)
+- **`--issue <N>` override** (branch mode) — fallback when the branch
+  name doesn't carry the issue number. Source: upstream review-code
+  SKILL step 1b. (2026-05-15)
+- **Distinct `## Local Review (Pre-Push)` vs `## Local Review`
+  progress.md headers** — allows pre-push and post-PR entries for the
+  same issue to coexist on the timeline. Source: upstream review-code
+  SKILL step 8. (2026-05-15)
 
 ## Roadmapped
 
@@ -63,6 +80,9 @@ of the surrounding tooling.
   on multi-CLI review yet, and the tmux session machinery adds complexity
   beyond the highest-leverage subset (Claude-only adversarial). Revisit
   if multi-CLI review becomes a workflow we actually exercise.
+  - **Update 2026-05-15**: upstream extended the script with `--branch`
+    mode and a `_resolve_default_branch.sh` helper (PR #185). Still not
+    applicable here for the same reason — the script itself isn't ported.
 
 ## Deferred
 
