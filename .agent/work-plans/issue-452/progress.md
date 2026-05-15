@@ -29,19 +29,19 @@ issue: 452
 **CI**: all-pass
 
 ### Actions
-- [ ] Fix `git symbolic-ref | sed` pipefail bug at `.claude/skills/review-code/SKILL.md:95` — pipeline exits with sed's status, so when `git symbolic-ref` fails the fallback chain is silently skipped and `DEFAULT_BRANCH` becomes empty. Use `REMOTE_HEAD=$(git symbolic-ref ...) && echo "${REMOTE_HEAD#refs/remotes/origin/}"` instead (R5-1 / R6-1)
-- [ ] Fix layer-worktree plan lookup in `.claude/skills/review-plan/SKILL.md:87` — current glob `layers/worktrees/*/issue-*-<N>/.agent/work-plans/...` misses project-repo plans which live at `<layer>_ws/src/<project_repo>/.agent/work-plans/...` (R5-2)
-- [ ] Add `[--repo <owner/repo>]` to `gh pr view` / `gh issue view` examples in `.claude/skills/review-plan/SKILL.md:53,60,104` — `--repo` is advertised but examples don't show its use (R5-3)
-- [ ] Add PR-less variant of no-findings template in `.claude/skills/review-plan/SKILL.md:220-225` — currently uses `## Plan Review: PR #<N>` header which is wrong for `--issue`/file-path modes (R5-4)
-- [ ] Replace `write .agent/work-plans/.../plan.md` in `.agent/work-plans/README.md:20` — `write` is a Unix messaging command, not a file-creation command. Rewrite step 3 to separate `mkdir -p` from "create plan.md using your editor/Write tool" (R5-5)
-- [ ] Narrow `applies_to` in `.github/instructions/work-plans.instructions.md:5` from `.agent/work-plans/**` to plan files specifically, OR rewrite prose to distinguish plan files from companion artifacts (progress.md, review output, adversarial findings) (R5-6 / R6-5)
-- [ ] Disambiguate `<#N>` placeholder in `.claude/skills/review-code/SKILL.md:504` template — currently same `<N>` used for issue path and PR ref. Use `<#PR-or-branch>` or split into separate placeholders (R5-8)
-- [ ] Fix `framework_config.sh` path in `.agent/knowledge/review_depth_classification.md:130` — should be `.agent/scripts/framework_config.sh` to match actual location and other entries' path conventions (R5-9)
-- [ ] Update `.agent/knowledge/skill_workflows.md:13` — "Each step is optional" contradicts AGENTS.md Post-Task Verification step 5 which makes `/review-code` expected pre-push. Qualify or restructure (R5-10)
-- [ ] Resolve fail-loud contradiction in `.claude/skills/triage-reviews/SKILL.md`: line 210-220 says fail loud on branch-name mismatch, line 268-270 (preexisting) says skip persistence silently. Pick one. Per local-first direction, fail-loud wins — delete or rewrite the skip-persistence text (R6-2)
-- [ ] Add `.github/instructions/*.md` and `.agent/AGENT_ONBOARDING.md` to workspace governance trigger list in `.agent/knowledge/review_depth_classification.md` (R6-3)
-- [ ] Remove "and adversarial" from `.github/copilot-instructions.md:27` — pre-push pass cannot catch Adversarial findings because Adversarial is Claude-only (per caveat at line 36) (R6-4)
-- [ ] Reword "offline plan review" in `.claude/skills/review-plan/SKILL.md:28` to "PR-less plan review" — `gh issue view` is still called in step 2, so it's not truly offline. Either reword, or add offline fallback using plan's embedded issue context (R6-6)
+- [x] Fixed `git symbolic-ref | sed` pipefail bug at `.claude/skills/review-code/SKILL.md:95` (R5-1 / R6-1, commit 469ade8)
+- [x] Fixed layer-worktree plan lookup glob in `.claude/skills/review-plan/SKILL.md` (R5-2, commit ade3f45)
+- [x] Added `[--repo <owner/repo>]` to gh examples in `.claude/skills/review-plan/SKILL.md` (R5-3, commit ade3f45)
+- [x] Added PR-less variant of no-findings template in `.claude/skills/review-plan/SKILL.md` (R5-4, commit ade3f45)
+- [x] Rewrote `.agent/work-plans/README.md` plan-creation step — removed `write` non-command (R5-5, commit bc2d1d1)
+- [x] Narrowed `applies_to` in `.github/instructions/work-plans.instructions.md` to plan files only; rewrote prose to exclude companion artifacts (R5-6 / R6-5, commit 3f81087)
+- [x] Disambiguated PR/Branch placeholders in `.claude/skills/review-code/SKILL.md` progress template (R5-8, commit 4266a65)
+- [x] Fixed `framework_config.sh` path in `.agent/knowledge/review_depth_classification.md` (R5-9, commit 2b2b873)
+- [x] Updated `.agent/knowledge/skill_workflows.md` — review-code is the exception to "each step is optional" (R5-10, commit db21056)
+- [x] Resolved fail-loud contradiction in `.claude/skills/triage-reviews/SKILL.md` — fail-loud wins per local-first decision (R6-2, commit c049048)
+- [x] Added `.github/instructions/*.md` and `.agent/AGENT_ONBOARDING.md` to workspace governance trigger list (R6-3, commit 2b2b873)
+- [x] Removed "and adversarial" claim from `.github/copilot-instructions.md` pre-push paragraph (R6-4, commit 1bdc093)
+- [x] Reworded "offline plan review" to "PR-less plan review" in `.claude/skills/review-plan/SKILL.md` (R6-6, commit ade3f45)
 
 ### Notes
 - R5-7 (progress.md unchecked items) was self-resolving — commit b7013e9 ticked them off before this round's review-fetch could see it. Already addressed.
