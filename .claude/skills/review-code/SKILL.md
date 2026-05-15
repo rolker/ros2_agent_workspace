@@ -13,7 +13,6 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 /review-code <pr-number>                    # post-PR: diff vs PR base
 /review-code <pr-url>                       # post-PR
 /review-code <pr-number> [light|standard|deep]   # post-PR with depth override
-/review-code <branch-name>                  # pre-push, force a base override
 ```
 
 The optional depth keyword (`light` / `standard` / `deep`) overrides
