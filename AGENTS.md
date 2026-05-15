@@ -14,7 +14,10 @@ setup (environment, identity, features), see your framework's adapter file:
 
 ### Always (proceed autonomously)
 
-- Use worktrees for all feature work — never edit files in the main tree
+- Use worktrees for all feature work — never edit files in the main tree.
+  Exception: **field mode** (origin not on the GitHub allowlist — see
+  [`field_mode.sh`](.agent/scripts/field_mode.sh); GitHub Enterprise is
+  field mode by design). See Worktree Workflow.
 - Run pre-commit hooks before committing
 - Include AI signature on all GitHub Issues/PRs/Comments (`$AGENT_NAME` / `$AGENT_MODEL`)
 - Reference issue numbers in branches and PRs (`Closes #<N>`)
@@ -27,7 +30,8 @@ setup (environment, identity, features), see your framework's adapter file:
 - Verify documentation claims against source code
 - Atomic commits: one logical change per commit
 - Branch naming: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`
-- All changes via Pull Requests
+- All changes via Pull Requests on GitHub-origin repos (field-mode repos
+  push to the field remote without PRs — see Worktree Workflow)
 
 ### Ask First (get human approval)
 
@@ -37,7 +41,10 @@ setup (environment, identity, features), see your framework's adapter file:
 
 ### Never (hard stops)
 
-- Commit to `main` — branch is protected; direct pushes are rejected
+- Commit directly to the default branch (e.g. `main`, `jazzy`) on a
+  GitHub-origin repo — branch protection rejects direct pushes; open a PR
+  from a worktree. Field-origin repos have their own workflow (see
+  Worktree Workflow).
 - `git checkout <branch>` — `setup.bash` blocks it; use worktrees
 - Skip hooks with `--no-verify`
 - Commit secrets or credentials
@@ -45,9 +52,29 @@ setup (environment, identity, features), see your framework's adapter file:
 - Construct GitHub URLs from directory names — use `gh` CLI to look them up
 - Run bare `pip install` or use `--break-system-packages` — use `.venv` for dev tools (see ADR-0009)
 
+## Quality Standard
+
+This is software for autonomous robot boats operating on open water. Robustness
+is not optional. The marginal cost of completeness is near zero with AI — do the
+whole thing, do it right, do it with tests.
+
+- When fixing a bug, fix it completely: add the test, handle the edge case, check
+  the lifecycle transition. Never leave a "good enough" fix when the proper one is
+  within reach.
+- When triaging reviews, do not dismiss concerns about error handling, silent
+  failures, stale data, or missing validation as "nits" unless the failure mode
+  genuinely cannot occur. "Config is under our control" and "pathological input"
+  are not blanket dismissals — field configs change under pressure.
+- When importing field fixes, treat them as drafts: add tests, verify topic names,
+  check for idempotency. The PR is the quality gate.
+- Never offer to "table this for later" when the permanent solve is five minutes
+  away. Never present a workaround when the real fix exists.
+
 ## Worktree Workflow
 
-Every task must use an isolated worktree.
+Every task on a GitHub-origin repo must use an isolated worktree. For
+non-GitHub-origin repos (field mode), the worktree/PR ceremony is
+relaxed — see [Field Mode](#field-mode-origin-not-on-a-github-host) below.
 
 **Project repos**: Directories under `layers/main/*_ws/src/` are typically independent
 git repos, each containing one or more ROS 2 packages. Layer worktrees create git
@@ -85,6 +112,78 @@ source setup.bash                  # set up ROS environment
 
 See [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) for hybrid structure details,
 `--repo-slug` disambiguation, and troubleshooting.
+
+### Field Mode (origin not on a GitHub host)
+
+When a repo's `origin` host is **not** on the GitHub allowlist (currently
+`github.com` and `ssh.github.com` — the SSH-over-443 fallback; see
+[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) for the
+authoritative list), the worktree/PR ceremony is relaxed. Examples of
+field-mode origins: gitcloud, private Forgejo, other non-GitHub remotes.
+**Field-mode repos may**:
+
+- Edit tracked files directly in the main/default tree
+- Commit to the default branch (`main`, `jazzy`, etc.)
+- Push to `origin` without opening a PR
+
+This is the only way field hotfixes can land before the next run — the
+workspace's PR-and-review workflow is GitHub-based, and a field remote
+isn't on GitHub. Other forges (Forgejo, GitLab) may support their own
+PR/CI mechanisms, but those don't plug into this workspace's review
+pipeline, so we treat them as field mode too. Mode is determined per
+repo by origin URL, not by the physical machine: a dev workstation
+working in a gitcloud-origin clone is in field mode for that repo.
+
+**What field mode does NOT change** (all still required):
+
+- Pre-commit hooks run — never `--no-verify`
+- Commits use the configured agent git identity (set via
+  `set_git_identity_env.sh`)
+- Atomic commits (one logical change per commit)
+- No committing secrets
+- No force-push, no destructive ops without explicit user approval
+
+**Hook caveat**: `no-commit-to-branch` is a common pre-commit hook that
+blocks direct commits to listed branches. If a field-mode project repo
+has its default branch in that list, commits will fail at pre-commit —
+even though field mode otherwise permits them. Two templates in this
+workspace configure the hook: the project-repo template
+(`.agent/templates/pre-commit-config.yaml`, where the project substitutes
+`PLACEHOLDER_DEFAULT_BRANCH`), and the workspace's own
+`.pre-commit-config.yaml` (which lists `main`, `jazzy`, `rolling`).
+Field-mode project repos need to remove their default branch from the
+hook's list, or drop the hook. This is a project-repo config concern,
+not a field-mode flag. Never bypass with `--no-verify`.
+
+**Detection**: the mode is inferred from the repo's origin URL. Use
+[`.agent/scripts/field_mode.sh`](.agent/scripts/field_mode.sh) — it isn't
+on PATH, so invoke from the workspace root:
+
+```bash
+# Form A: from workspace root, pass the target repo path
+.agent/scripts/field_mode.sh --describe layers/main/platforms_ws/src/unh_echoboats_project11
+# → field mode  (origin: git@gitcloud:field/unh_echoboats_project11.git)
+
+# Form B: cd into the target repo first, reference the script via the workspace root
+cd layers/main/platforms_ws/src/unh_echoboats_project11
+../../../../../.agent/scripts/field_mode.sh --describe
+
+# Sourced in a script — source by explicit path (the script is not on PATH).
+# is_field_mode takes an optional repo_dir arg, defaulting to $PWD.
+source /path/to/workspace/.agent/scripts/field_mode.sh
+if is_field_mode; then                  # checks current $PWD
+    # field-mode behavior
+fi
+if is_field_mode "/path/to/repo"; then  # check a specific repo
+    # ...
+fi
+```
+
+**Reconciliation**: field commits come back to GitHub via the
+`/import-field-changes` skill on a connected dev machine. Use that skill
+rather than hand-rolling cherry-picks — it creates branches without
+perturbing the main tree HEAD, opens draft PRs with pre-review against
+the Quality Standard, and flags diverged repos for human merge.
 
 ## Issue-First Policy
 
@@ -191,12 +290,22 @@ make dashboard                                   # Unified workspace status
 make dashboard QUICK=1                           # Quick mode (skip sync + GitHub)
 
 # Single package
-cd layers/main/<layer>_ws && colcon build --packages-select <package>
+cd layers/main/<layer>_ws && colcon build --symlink-install --packages-select <package>
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 
 make lint                                        # Lint + hooks (auto-installs pre-commit)
 ```
+
+**Always use `--symlink-install`** for development builds — it symlinks Python
+files and package markers so edits take effect without a rebuild. `make build`,
+the workspace build scripts (`.agent/scripts/build.sh`), and the single-package
+example above pass this flag explicitly. Worktree-generated `<layer>_ws/build.sh`
+enables symlink installs by default via a generated `colcon/defaults.yaml`
+(`symlink-install: true`) rather than via the CLI flag, so raw `colcon build`
+from the layer workspace picks it up automatically. (Note: ament_cmake
+`install(DIRECTORY ...)` directives still copy their contents, so data-file
+edits still need a rebuild.)
 
 **Build in layer directories only** — never `colcon build` from the workspace root.
 
@@ -244,6 +353,14 @@ Before marking a task complete or opening a PR:
 3. Check consequences: do tests, docs, or dependent references need updating?
 4. List any gaps; complete them or explain in PR description
 
+**Plan-first workflow**: if the PR opened with a work plan (`.agent/work-plans/PLAN_ISSUE-<N>.md`),
+the plan is expected to stay in sync with the committed implementation on
+the branch / in the PR as implementation proceeds. Inline edits are the
+default; see the "During implementation" section of
+`.claude/skills/plan-task/SKILL.md` for the full rules. This keeps the
+plan useful as reference material for review and future agents, and
+avoids recurring plan-drift flags from Copilot.
+
 ## Script Reference
 
 `scripts/` at the repo root is a symlink to `.agent/scripts/` for convenience.
@@ -260,6 +377,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) **(source)** |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
+| `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
@@ -271,7 +389,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
 | `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
 | `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
-| `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos |
+| `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos (`--json` for structured output) |
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
 | `.agent/scripts/fetch_pr_reviews.sh` | Fetch all PR reviews and CI status |

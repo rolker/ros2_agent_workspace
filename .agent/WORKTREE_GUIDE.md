@@ -66,6 +66,17 @@ source setup.bash                  # Set up ROS environment
 **Note**: `colcon_defaults.yaml` is placed in the target layer workspace so raw
 `colcon build` from that directory also picks up the correct flags.
 
+## Field Mode
+
+Repos whose `origin` host is not on the GitHub allowlist (currently
+`github.com` and `ssh.github.com` — see
+[`.agent/scripts/field_mode.sh`](../.agent/scripts/field_mode.sh)) don't
+require worktrees for hotfixes. Agents may edit the main tree directly
+and commit to the default branch. See
+[`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-on-a-github-host)
+for the full rule. Field commits are imported back to GitHub via the
+`/import-field-changes` skill on a connected dev machine.
+
 ## Why Worktrees?
 
 ### The Problem

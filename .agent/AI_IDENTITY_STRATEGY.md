@@ -36,9 +36,9 @@ Agent identity is determined from these sources (in order of preference):
    - Template is at `.agent/.identity.template`
 
 **How to determine your identity:**
-1. **Use environment variables** (recommended) - Set by `set_git_identity_env.sh --detect`
+1. **Use environment variables** (recommended) - Set by sourcing `set_git_identity_env.sh` with your agent name, email, and runtime model as the 3rd argument (self-report form). `--detect` is a fallback for agents that cannot introspect their own model.
 2. **Read from** `.agent/.identity` file if it exists (check with `[ -f .agent/.identity ]`)
-3. **Ask the user** if auto-detection fails
+3. **Ask the user** if you cannot self-report and auto-detection fails
 4. **Use fallback** values if necessary: "AI Agent" / "Unknown Model"
 5. **Configure git** with your identity before making any commits
 
@@ -54,15 +54,19 @@ Agent identity is determined from these sources (in order of preference):
 
 **Use for**: Copilot CLI, Gemini CLI, or any agent running directly on the host that shares the working copy with the human user.
 
-**Method**: Source the environment variable script:
+**Method**: Source the environment variable script. Prefer the 3-arg form so the agent
+self-reports its runtime model (`framework_config.sh` entries are stale-prone fallbacks):
 ```bash
-# Auto-detect (recommended)
+# Recommended — agent self-reports its model from its system prompt
+source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu" "<your model>"
+
+# Auto-detect framework + look up model from framework_config.sh (model may be stale)
 source .agent/scripts/set_git_identity_env.sh --detect
 
-# Or specify framework
+# Or specify framework explicitly (also uses framework_config.sh for model)
 source .agent/scripts/set_git_identity_env.sh --agent copilot
 
-# Or manual (not recommended)
+# 2-arg form falls back to framework_config.sh for the model — avoid for signatures
 source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilot-cli@ccom.unh.edu"
 ```
 
@@ -204,16 +208,18 @@ We distinguish the **content** author from the **setup** author.
 1.  **Determine your complete identity** when first starting work in this workspace:
     - **Framework name**: e.g., "Copilot CLI Agent", "Antigravity Agent", "Gemini CLI Agent"
     - **Email format**: `roland+<platform>@ccom.unh.edu`
-    - **Model name**: Your actual runtime model (e.g., "GPT-4o", "Gemini 2.5 Pro")
-    - **Auto-detect** using: `source .agent/scripts/set_git_identity_env.sh --detect`
+    - **Model name**: Your actual runtime model (e.g., "GPT-4o", "Gemini 2.5 Pro") — read it from your system prompt
+    - **Self-report (preferred)**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>" "<your model>"`
+    - **Fallback**: `source .agent/scripts/set_git_identity_env.sh --detect` if you cannot introspect your model
     - **Or read from**: `.agent/.identity` file
-    - **Ask the user** if auto-detection fails
+    - **Ask the user** if self-reporting and auto-detection both fail
 2.  **Choose the appropriate configuration method**:
     - **Host-based agents (Copilot CLI, Gemini CLI)**: Use ephemeral identity (environment variables)
     - **Containerized agents (Antigravity)**: Use persistent identity (.git/config)
     - See "Configuration Methods: Ephemeral vs. Persistent" section above for details
 3.  **Configure git identity** before making any commits:
-    - **Ephemeral**: `source .agent/scripts/set_git_identity_env.sh --detect` (or `--agent <framework>`)
+    - **Ephemeral (preferred)**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>" "<your model>"` (self-report)
+    - **Ephemeral (fallback)**: `source .agent/scripts/set_git_identity_env.sh --detect` or `--agent <framework>` — uses the `framework_config.sh` fallback model, which may be stale
     - **Persistent**: `./.agent/scripts/configure_git_identity.sh "<Name>" "<Email>"`
 4.  **Use correct model name in signatures**:
     - After configuration, `$AGENT_MODEL` environment variable will be set

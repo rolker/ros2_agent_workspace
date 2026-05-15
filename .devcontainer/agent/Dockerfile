@@ -48,6 +48,26 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+# Install git-bug (local-first issue tracking, see ADR-0010)
+# Pinned SHA256 per arch detects tampering or asset substitution.
+# Supports linux amd64 and armhf only; arm64 (Apple Silicon) and other arches
+# are not available upstream for v0.10.1 and fail explicitly below.
+ARG GITBUG_VERSION=v0.10.1
+ARG GITBUG_SHA256_AMD64=3ba2f8b41e526fef1b6e825d5030823be65bb6521a287b1139bd609fed0d54a1
+ARG GITBUG_SHA256_ARM=308b1d17bc4d12685a95c2908baf2b14b77e81737f34b3bd82a8baf10850fd87
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) gitbug_arch=amd64; gitbug_sha256="${GITBUG_SHA256_AMD64}" ;; \
+        armhf) gitbug_arch=arm;   gitbug_sha256="${GITBUG_SHA256_ARM}"   ;; \
+        *)  echo "Unsupported architecture for git-bug ${GITBUG_VERSION}: $(dpkg --print-architecture)" >&2; \
+            echo "Upstream provides amd64, 386, arm only (no arm64)." >&2; \
+            exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/git-bug/git-bug/releases/download/${GITBUG_VERSION}/git-bug_linux_${gitbug_arch}" \
+        -o /usr/local/bin/git-bug; \
+    echo "${gitbug_sha256}  /usr/local/bin/git-bug" | sha256sum -c -; \
+    chmod 755 /usr/local/bin/git-bug
+
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 

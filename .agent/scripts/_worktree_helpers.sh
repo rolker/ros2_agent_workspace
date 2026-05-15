@@ -36,6 +36,37 @@ wt_layer_branch() {
     return 1
 }
 
+# Get the directory of the first inner package git worktree in a layer worktree.
+# Use this to find the package repo whose origin / git-bug data should be
+# queried for issue metadata (the issue lives in the package's repo, not
+# the workspace).
+# Prints the package dir on stdout (with exit status 0); prints nothing
+# and returns a non-zero status if no inner git worktree is found.
+# Usage: pkg_dir=$(wt_layer_pkg_dir "$worktree_dir")
+wt_layer_pkg_dir() {
+    local worktree_dir="$1"
+
+    for ws_dir in "$worktree_dir"/*_ws; do
+        [ -d "$ws_dir" ] || continue
+        [ -L "$ws_dir" ] && continue  # skip symlinked layers
+
+        local src_dir="$ws_dir/src"
+        [ -d "$src_dir" ] || continue
+
+        for pkg_dir in "$src_dir"/*; do
+            [ -d "$pkg_dir" ] || continue
+            [ -L "$pkg_dir" ] && continue  # skip symlinked packages
+
+            if git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
+                echo "$pkg_dir"
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
 # Check if a layer worktree has uncommitted changes in any inner package git worktree.
 # Ignores symlinked layers/packages and infrastructure directories.
 # Returns 0 (true) if dirty, 1 (false) if clean.
@@ -63,6 +94,46 @@ wt_layer_is_dirty() {
     done
 
     return 1  # clean
+}
+
+# Extract a validated owner/repo slug from a GitHub remote URL.
+# Prints the slug on stdout; prints nothing for non-GitHub or malformed URLs.
+#
+# Supported URL forms:
+#   https://github.com/OWNER/REPO[.git]
+#   https://github.com:PORT/OWNER/REPO[.git]
+#   git@github.com:OWNER/REPO[.git]                        (SCP form)
+#   ssh://[user@]github.com[:PORT]/OWNER/REPO[.git]
+#   ssh://[user@]ssh.github.com:443/OWNER/REPO[.git]       (SSH-over-443)
+#
+# Rejects substring/lookalike hosts (e.g. mygithub.com, gist.github.com)
+# and `github.com` appearing inside the URL path by anchoring the match
+# at the start of the string and requiring the host to be at a true URL
+# host position — start, after a single `[user@]` auth section, or after
+# the `://` protocol delimiter.
+#
+# Usage: slug=$(extract_gh_slug "$url")
+extract_gh_slug() {
+    local url="$1"
+    # Strip a single trailing .git so the regexes don't have to.
+    local cleaned="${url%.git}"
+    # Two anchored patterns covering the officially supported remote URL
+    # forms. Anchoring at ^ rejects lookalike hosts and `@github.com`
+    # appearing inside a URL path (e.g.
+    # `git@example.com:foo@github.com/owner/repo`).
+    #
+    # Form 1: explicit scheme (https, http, ssh).
+    #   ^(https?|ssh)://[user@]?(ssh\.)?github.com[:port]?/OWNER/REPO$
+    local re_url='^(https?|ssh)://([^@/[:space:]]+@)?(ssh\.)?github\.com(:[0-9]+)?/([^/[:space:]]+)/([^/[:space:]]+)$'
+    # Form 2: SCP-style `[user@]host:path` (no scheme, no slash between
+    # host and path).
+    #   ^[user@]?(ssh\.)?github.com:OWNER/REPO$
+    local re_scp='^([^@/[:space:]]+@)?(ssh\.)?github\.com:([^/[:space:]]+)/([^/[:space:]]+)$'
+    if [[ "$cleaned" =~ $re_url ]]; then
+        echo "${BASH_REMATCH[5]}/${BASH_REMATCH[6]}"
+    elif [[ "$cleaned" =~ $re_scp ]]; then
+        echo "${BASH_REMATCH[3]}/${BASH_REMATCH[4]}"
+    fi
 }
 
 # Find the most recent skill worktree matching a skill name.

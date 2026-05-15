@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. Immutability rule narrowed by
+[ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md) to permit
+cross-reference addendums (Status-line pointers and References sections)
+to accepted ADRs; substantive changes still require superseding.
 
 ## Context
 

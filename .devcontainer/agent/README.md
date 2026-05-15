@@ -41,9 +41,17 @@ The image is based on `ros:jazzy-perception` and includes:
 - ROS 2 Jazzy dev tools, rosdep, vcstool
 - Node.js 22.x + Claude Code CLI
 - GitHub CLI (`gh`) for read-only access (see [Read-Only GitHub Access](#read-only-github-access))
+- git-bug for local issue access (reads/comments without network, see [ADR-0010](../../docs/decisions/0010-adopt-git-bug-for-local-issue-tracking.md))
 - Git (for local commits only — no SSH keys)
 
 The build passes your host UID/GID to match file ownership.
+
+**Architecture**: the image builds for the host's architecture (no
+`--platform` is set in `make agent-build`). Supported: `amd64` and
+`armhf` (32-bit ARM). Unsupported: `arm64` — git-bug v0.10.1 has no
+upstream arm64 binary, so the build fails explicitly at the git-bug
+install step on any arm64 host (Apple Silicon, AWS Graviton, 64-bit
+Raspberry Pi, etc.).
 
 ## Running
 

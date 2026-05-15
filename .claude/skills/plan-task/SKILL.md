@@ -187,6 +187,77 @@ Summarize:
 - Which principles and ADRs were considered
 - Any open questions that need input
 - Link to the draft PR
+- Pointer to the "During implementation" section below, so the
+  implementer knows to keep the plan in sync with landed code
+
+## During implementation
+
+The `plan-task` skill's primary artifact is the committed plan file
+created in steps 5–6; step 7 publishes that plan into a draft PR.
+Implementation then proceeds on the same branch — and typically deviates
+from the plan: types get refined, functions change signatures, a "pure
+logic" module picks up a dependency. Keep the plan in sync as this
+happens so the file stays usable reference material — for Copilot's
+plan-file review, for `review-code`, and for the next agent who picks
+up the package.
+
+1. **Inline edits are the default.** When implementation diverges from the
+   plan in any way — wording, method names, file paths, dependency
+   choices, a test contract that tightened during coding — edit the plan
+   inline to match the landed code. Git history preserves the original
+   planning state; nobody benefits from stale text at the top of an
+   otherwise-current plan.
+
+2. **Appended "Implementation Notes" only for rationale-bearing design
+   pivots.** If the deviation is a real design decision whose *why* is
+   not obvious from the code diff alone (e.g. "switched from `QGridLayout`
+   to a custom layout because `QGridLayout` can't express slack-to-outside
+   with shared inner edges"), make the inline edit *and* add a one-liner
+   to an `## Implementation Notes` section at the bottom of the plan
+   capturing the rationale. The section is for rationale only, not a
+   changelog.
+
+3. **Never append-only.** Leaving stale text at the top of the plan while
+   listing "changes" in a section below misleads Copilot, human reviewers,
+   and future onboarding agents — all of whom read the top first.
+
+4. **Commit discipline.** Plan edits flow in commits alongside the code
+   changes that triggered them (same commit when caught while coding;
+   follow-up commit if caught later during review triage). Never amend a
+   pushed commit just to update the plan.
+
+This guidance is enforced at the instructions layer only. There is no
+local hook for "did you update the plan"; the enforcement signal is
+review feedback — Copilot's plan-drift flags and `review-code` catching
+misalignment between the plan and the PR. If drift becomes a recurring
+finding across multiple PRs, that's a signal the rule needs more teeth,
+not that the rule is wrong.
+
+### Worked example
+
+From `rolker/rqt_operator_tools@9680d3e` (PR #22 round-8 fix pass —
+the code change and its plan edit landed in the same commit):
+
+**Before** — `.agent/work-plans/PLAN_ISSUE-20.md:108`:
+
+```
+│   │   ├── staleness_tracker.hpp                 # pure logic, no Qt/ROS
+```
+
+**After** — same file, same commit as the `rclcpp::Time` adoption in
+`staleness_tracker.cpp`:
+
+```
+│   │   ├── staleness_tracker.hpp                 # pure logic, uses rclcpp::Time (no Qt)
+```
+
+The edit is inline (rule 1) and co-located with the code change that
+motivated it (rule 4). No `Implementation Notes` entry is needed — the
+*why* (consistent clock math under `use_sim_time`) is visible in the
+`staleness_tracker.cpp` diff in the same commit (rule 2). An
+`Implementation Notes` entry would have been warranted for a case like
+the `QGridLayout` swap cited above, where the rationale doesn't fit in a
+one-line plan edit.
 
 ## Guidelines
 

@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. Scoped exception in [ADR-0011](0011-field-mode-for-non-github-origins.md)
+permits direct default-branch edits in repos whose origin host is not on
+the GitHub allowlist (field-mode repos pulling from gitcloud, private
+Forgejo, etc.).
 
 ## Context
 
@@ -46,3 +49,10 @@ Enforcement:
 - Slightly more complex workflow than simple branch switching
 - Worktrees share ports, databases, and ROS 2 DDS discovery — true isolation requires
   containers (tracked separately as a future enhancement)
+
+## References
+
+- [ADR-0011](0011-field-mode-for-non-github-origins.md) — scoped exception
+  for non-GitHub-origin (field-mode) repos. Worktree isolation remains the
+  default; field mode applies only when the origin URL tells us no PR
+  review is possible on the other side.

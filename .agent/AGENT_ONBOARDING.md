@@ -14,8 +14,9 @@ For agents without a framework-specific instruction file.
 source .agent/scripts/setup.bash
 
 # 2. Configure git identity
-# Host-based (shared workspace):
-source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>"
+# Host-based (shared workspace): pass your actual model as the 3rd argument
+# (from your system prompt — do NOT rely on framework_config.sh defaults).
+source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>" "<your model>"
 # Container/isolated:
 .agent/scripts/configure_git_identity.sh "<Agent Name>" "<email>"
 
@@ -30,7 +31,10 @@ See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity d
 See [`AGENTS.md`](../AGENTS.md) for the shared workspace rules all agents must follow.
 
 Key points:
-- Never commit to `main` — use worktrees for isolation
+- Never commit directly to the default branch (e.g. `main`, `jazzy`) on a
+  GitHub-origin repo — use worktrees for isolation. Repos with non-GitHub
+  origin (field mode) have their own workflow; see
+  [`AGENTS.md` Field Mode](../AGENTS.md#field-mode-origin-not-on-a-github-host).
 - Never `git checkout <branch>` — `setup.bash` blocks it
 - AI signature required on all GitHub Issues/PRs/Comments
 - Use `--body-file` for `gh` CLI, not inline `--body`
@@ -55,7 +59,7 @@ Available workflow skills: `review-issue`, `plan-task`, `review-plan`,
 `review-code`, `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
 `triage-reviews`, `skill-importer`, `document-package`, `issue-triage`,
-`test-engineering`, `inspiration-tracker`.
+`test-engineering`, `inspiration-tracker`, `import-field-changes`.
 
 ## References
 
