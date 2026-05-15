@@ -541,11 +541,15 @@ issue: <N>
 # Issue #<N> — <issue title>
 ```
 
-Append this step entry:
+Append this step entry. Use `## Local Review` in post-PR mode and
+`## Local Review (Pre-Push)` in pre-push mode so the same issue can
+carry both a pre-push and a post-PR entry on its timeline without one
+overwriting the other:
 
 ```markdown
 
-## Local Review
+## Local Review              <!-- post-PR mode -->
+## Local Review (Pre-Push)   <!-- pre-push mode -->
 **Status**: complete
 **When**: <YYYY-MM-DD HH:MM>
 **By**: <agent name> (<model>)
