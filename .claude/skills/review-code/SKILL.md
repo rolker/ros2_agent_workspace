@@ -91,11 +91,15 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # including non-GitHub field-mode origins and non-`main` defaults like
 # `jazzy` or `master`); fall back to gh on GitHub-origin repos that
 # haven't had `git remote set-head` run; final fallback is `main`.
-DEFAULT_BRANCH=$(
-    git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||' \
-    || gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null \
-    || echo "main"
-)
+# Capture symbolic-ref's exit status BEFORE applying any transformation,
+# because `git symbolic-ref ... | sed ...` exits with sed's status —
+# sed reads an empty pipe successfully when symbolic-ref fails, which
+# would silently leave DEFAULT_BRANCH empty and skip the fallback chain.
+if REMOTE_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then
+    DEFAULT_BRANCH="${REMOTE_HEAD#refs/remotes/origin/}"
+else
+    DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo "main")
+fi
 # USER_BASE is set by the caller when `--base <branch>` is parsed off
 # the argument list; otherwise it's empty and the default applies.
 BASE="${USER_BASE:-$DEFAULT_BRANCH}"
