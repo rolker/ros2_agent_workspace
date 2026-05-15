@@ -37,6 +37,18 @@ setup_mock_workspace() {
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+
+    # Layer manifest is required by worktree_create.sh
+    mkdir -p configs/manifest
+    cat > configs/manifest/layers.txt << 'LAYERS_EOF'
+underlay
+core
+platforms
+site
+sensors
+simulation
+ui
+LAYERS_EOF
 }
 
 # Cleanup test repository
@@ -177,6 +189,18 @@ setup_mock_layer_workspace() {
     # Copy the script under test into the mock workspace
     cp "$CREATE_SCRIPT" .agent/scripts/worktree_create.sh
     chmod +x .agent/scripts/worktree_create.sh
+
+    # Layer manifest is required by worktree_create.sh
+    mkdir -p configs/manifest
+    cat > configs/manifest/layers.txt << 'LAYERS_EOF'
+underlay
+core
+platforms
+site
+sensors
+simulation
+ui
+LAYERS_EOF
 
     rm -rf "$tmp_clone"
 }
@@ -675,6 +699,151 @@ test_find_worktree_by_skill_cross_repo_sort() {
     return 0
 }
 run_test "find_worktree_by_skill picks newest timestamp across repo slugs" test_find_worktree_by_skill_cross_repo_sort
+
+# ===== #427 path-priority block tests =====
+
+# Test 21: Layer worktree setup.bash contains the #427 prioritization block
+test_layer_setup_bash_has_path_priority_block() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    .agent/scripts/worktree_create.sh --issue 427001 --type layer --layer core --packages test_pkg >/dev/null 2>&1 || true
+
+    local wt_setup="$WORKSPACE_DIR/layers/worktrees/issue-pkg_origin-427001/setup.bash"
+    if [ ! -f "$wt_setup" ]; then
+        echo "    setup.bash missing: $wt_setup"
+        cleanup_mock_layer_workspace
+        return 1
+    fi
+
+    local fail=0
+    grep -Fq "# 5. Prioritize worktree target layer over main tree symlink-install paths (#427)" "$wt_setup" \
+        || { echo "    missing #427 header"; fail=1; }
+    grep -Fq "core_ws/install" "$wt_setup" \
+        || { echo "    missing core_ws/install reference"; fail=1; }
+    grep -Fq "core_ws/build" "$wt_setup" \
+        || { echo "    missing core_ws/build reference"; fail=1; }
+    grep -Fq "_wt_path_prepend AMENT_PREFIX_PATH" "$wt_setup" \
+        || { echo "    AMENT_PREFIX_PATH not routed through idempotency helper"; fail=1; }
+    grep -Fq "_wt_path_prepend PYTHONPATH" "$wt_setup" \
+        || { echo "    PYTHONPATH not routed through idempotency helper"; fail=1; }
+
+    cleanup_mock_layer_workspace
+    return $fail
+}
+run_test "Layer setup.bash has #427 path priority block with idempotent helper" \
+    test_layer_setup_bash_has_path_priority_block
+
+# Test 22: Workspace worktree does NOT emit the #427 block
+# Workspace worktrees don't generate setup.bash at all (only layer worktrees do),
+# so the override block — which is layer-specific — must never appear in any
+# file the workspace worktree creates.
+test_workspace_no_path_priority_block() {
+    setup_mock_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    local output
+    output=$(.agent/scripts/worktree_create.sh --issue 427002 --type workspace 2>&1) || true
+
+    if [[ "$output" != *"Worktree Created Successfully"* ]]; then
+        echo "    workspace worktree creation failed"
+        echo "    output: $output"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # The slug is derived from origin basename ("origin" for the bare repo path).
+    local wt_dir="$WORKSPACE_DIR/.workspace-worktrees/issue-origin-427002"
+    if [ ! -d "$wt_dir" ]; then
+        echo "    workspace worktree dir missing: $wt_dir"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    # The override block uses a distinctive header — if it appears anywhere
+    # under the worktree (including a stray setup.bash), the negative invariant
+    # is broken.
+    if grep -Frq "Prioritize worktree target layer" "$wt_dir" 2>/dev/null; then
+        echo "    workspace worktree contains the #427 priority block"
+        cleanup_mock_workspace
+        return 1
+    fi
+    if grep -Frq "_wt_path_prepend" "$wt_dir" 2>/dev/null; then
+        echo "    workspace worktree contains the path-prepend helper"
+        cleanup_mock_workspace
+        return 1
+    fi
+
+    cleanup_mock_workspace
+    return 0
+}
+run_test "Workspace worktree omits #427 path priority block" \
+    test_workspace_no_path_priority_block
+
+# Test 23: Re-sourcing the override block is idempotent (no path growth)
+test_layer_setup_bash_idempotent_resourcing() {
+    setup_mock_layer_workspace
+    cd "$WORKSPACE_DIR" || return 1
+
+    .agent/scripts/worktree_create.sh --issue 427003 --type layer --layer core --packages test_pkg >/dev/null 2>&1 || true
+
+    local wt_dir="$WORKSPACE_DIR/layers/worktrees/issue-pkg_origin-427003"
+    if [ ! -d "$wt_dir" ]; then
+        echo "    worktree not created"
+        cleanup_mock_layer_workspace
+        return 1
+    fi
+
+    # Fabricate a build/install pair so the override loop has matching dirs.
+    local pkg=fake_pkg
+    mkdir -p "$wt_dir/core_ws/install/$pkg/lib/python3.99/site-packages"
+    mkdir -p "$wt_dir/core_ws/build/$pkg"
+
+    # Extract the override block from the generated setup.bash and source it twice.
+    local block_file
+    block_file=$(mktemp "$TEST_DIR/block_XXXXXX.sh")
+    sed -n '/# 5\. Prioritize worktree target layer/,/^unset -f _wt_path_prepend$/p' \
+        "$wt_dir/setup.bash" > "$block_file"
+
+    local out
+    out=$(bash -c "
+        set -u
+        WORKTREE_DIR='$wt_dir'
+        AMENT_PREFIX_PATH=''
+        PYTHONPATH=''
+        source '$block_file'
+        source '$block_file'
+        echo \"AMENT_PREFIX_PATH=\$AMENT_PREFIX_PATH\"
+        echo \"PYTHONPATH=\$PYTHONPATH\"
+    " 2>&1)
+
+    local fail=0
+    local ament_count py_sp_count py_build_count
+    ament_count=$(echo "$out" | grep '^AMENT_PREFIX_PATH=' | grep -o "install/$pkg" | wc -l)
+    py_sp_count=$(echo "$out"  | grep '^PYTHONPATH='       | grep -o "site-packages" | wc -l)
+    py_build_count=$(echo "$out" | grep '^PYTHONPATH='     | grep -o "build/$pkg" | wc -l)
+
+    if [ "$ament_count" -ne 1 ]; then
+        echo "    AMENT_PREFIX_PATH grew on re-source (count=$ament_count, expected 1)"
+        echo "    out: $out"
+        fail=1
+    fi
+    if [ "$py_sp_count" -ne 1 ]; then
+        echo "    PYTHONPATH site-packages grew on re-source (count=$py_sp_count, expected 1)"
+        echo "    out: $out"
+        fail=1
+    fi
+    if [ "$py_build_count" -ne 1 ]; then
+        echo "    PYTHONPATH build dir grew on re-source (count=$py_build_count, expected 1)"
+        echo "    out: $out"
+        fail=1
+    fi
+
+    cleanup_mock_layer_workspace
+    return $fail
+}
+run_test "Layer setup.bash override block is idempotent on re-sourcing" \
+    test_layer_setup_bash_idempotent_resourcing
 
 # Summary
 echo "========================================"

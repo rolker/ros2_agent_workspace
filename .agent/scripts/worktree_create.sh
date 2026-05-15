@@ -185,7 +185,20 @@ SETUP_PRECOMMIT
 # Colcon's setup.bash bakes absolute paths to layers/main/ at build time. Symlinked
 # higher layers re-source the main tree's install, bringing in stale develop hooks
 # and AMENT_PREFIX_PATH entries. Force-prepend the worktree's target layer paths
-# so they win.
+# so they win. Idempotent on re-source: strips any prior occurrence of the entry
+# before prepending, so vars don't grow on repeated sourcing.
+_wt_path_prepend() {
+    local _v=\$1 _e=\$2 _c
+    _c=\${!_v}
+    _c=":\$_c:"
+    _c=\${_c//:\$_e:/:}
+    _c=\${_c#:}; _c=\${_c%:}
+    if [ -n "\$_c" ]; then
+        export "\$_v=\$_e:\$_c"
+    else
+        export "\$_v=\$_e"
+    fi
+}
 _wt_target_install="\$WORKTREE_DIR/${target_layer}_ws/install"
 for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
     [ -d "\$_wt_pkg_build" ] || continue
@@ -193,17 +206,18 @@ for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
     _wt_pkg_prefix="\$_wt_target_install/\$_wt_pkg"
     # AMENT_PREFIX_PATH: ensure worktree install prefix is found before main tree
     if [ -d "\$_wt_pkg_prefix" ]; then
-        export AMENT_PREFIX_PATH="\$_wt_pkg_prefix\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}"
+        _wt_path_prepend AMENT_PREFIX_PATH "\$_wt_pkg_prefix"
     fi
     # PYTHONPATH: prepend site-packages and build dir for Python packages
     for _wt_sp in "\$_wt_pkg_prefix"/lib/python3.*/site-packages; do
         [ -d "\$_wt_sp" ] || continue
-        export PYTHONPATH="\$_wt_sp\${PYTHONPATH:+:\$PYTHONPATH}"
-        export PYTHONPATH="\${_wt_pkg_build%/}\${PYTHONPATH:+:\$PYTHONPATH}"
+        _wt_path_prepend PYTHONPATH "\$_wt_sp"
+        _wt_path_prepend PYTHONPATH "\${_wt_pkg_build%/}"
         break
     done
 done
 unset _wt_target_install _wt_pkg_build _wt_pkg _wt_pkg_prefix _wt_sp
+unset -f _wt_path_prepend
 SETUP_PATH_FIX
     fi
 
