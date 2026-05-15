@@ -505,7 +505,8 @@ Append this step entry:
 **By**: <agent name> (<model>)
 **Verdict**: <approved|changes-requested>
 
-**PR / Branch**: <#N or branch> at `<short-sha>`
+**PR**: #<pr-number> at `<short-sha>`       <!-- post-PR mode; omit in pre-push -->
+**Branch**: <branch-name> at `<short-sha>`  <!-- pre-push mode; omit in post-PR -->
 **Mode**: <pre-push | post-PR>
 **Depth**: <tier> (reason: <signal>)
 **Must-fix**: <count> | **Suggestions**: <count>
