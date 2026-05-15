@@ -17,7 +17,10 @@ Work plans make agent work-in-progress visible on GitHub through draft PRs. Each
 
 1. Create worktree: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`
 2. Enter worktree: `source .agent/scripts/worktree_enter.sh --issue <N>`
-3. Create plan directory and plan: `mkdir -p .agent/work-plans/issue-<N> && write .agent/work-plans/issue-<N>/plan.md`
+3. Create the plan directory: `mkdir -p .agent/work-plans/issue-<N>`
+   Then author `plan.md` inside it using your editor or your agent's
+   file-write tool. (`write` is a Unix messaging command, not a
+   file-creation command — don't shell-execute it.)
 4. Commit: `git add .agent/work-plans/ && git commit -m "Add work plan for #<N>"`
 5. Push: `git push -u origin HEAD`
 6. Create draft PR: `gh pr create --draft --title "..." --body-file .agent/work-plans/issue-<N>/plan.md`
