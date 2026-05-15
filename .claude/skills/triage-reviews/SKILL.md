@@ -265,9 +265,10 @@ git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
 git -C <worktree-path> commit -m "progress: external review for #<N>"
 ```
 
-If the PR has no linked issue resolvable from its branch name (rare
-field-mode case), skip persistence and note it in the report Summary
-("Triage not persisted: no linked issue").
+(The fail-loud rule above already covers the case where the branch
+name doesn't carry an issue number — the skill stops with an error
+rather than silently writing to the wrong path or skipping
+persistence.)
 
 ## Guidelines
 
