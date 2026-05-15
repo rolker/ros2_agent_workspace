@@ -52,8 +52,12 @@ Determine the input form and locate the plan file. Detection heuristic:
 # PR metadata and body (plan is often summarised in the PR body)
 gh pr view <N> --json title,body,baseRefName,headRefName,files,url
 
-# Get the linked issue
-gh pr view <N> --json body --jq '.body' | grep -oE '#[0-9]+' | head -1
+# Primary closing-linked issue (parsed by GitHub from `Closes #N` /
+# `Fixes #N` / `Resolves #N` in the PR body). Mirrors review-code's
+# resolution — a body grep for `#[0-9]+` mis-resolves PRs that mention
+# multiple issues (e.g., #448 closes #247 and #445 but body-grep would
+# return #247).
+ISSUE_NUM=$(gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty')
 ```
 
 Find the plan file in the PR's changed files. It lives at
