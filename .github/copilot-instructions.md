@@ -24,8 +24,10 @@ not only in the workspace repo. When reviewing:
 The shared rule (see [`AGENTS.md` Post-Task Verification](../AGENTS.md#post-task-verification))
 expects authors to run `/review-code` against their diff before opening a PR.
 This applies to Copilot too when used in **agent / coding-assistant mode** —
-prefer a pre-push pass to catch governance, plan-drift, and adversarial
-findings locally rather than in PR review rounds. See
+prefer a pre-push pass to catch static-analysis, governance, and
+plan-drift findings locally rather than in PR review rounds. (The
+Adversarial Specialist is Claude-only — see caveat below — so Copilot's
+pre-push pass cannot catch adversarial findings.) See
 [`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md).
 
 **Limitation**: when Copilot runs as a **PR reviewer** (the GitHub
