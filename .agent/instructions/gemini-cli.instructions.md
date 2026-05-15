@@ -20,6 +20,20 @@ Verify with `echo "$AGENT_MODEL"` — it should echo exactly what you passed. Do
 - **Google Cloud**: If Gemini CLI has access to Google Cloud services, check your environment for available integrations.
 - If `gh` CLI is installed, use it for GitHub operations.
 
+## Pre-Push Code Review
+
+The shared rule (see [`AGENTS.md` Post-Task Verification](../../AGENTS.md#post-task-verification))
+expects authors to run `/review-code` against their diff before opening
+a PR. This applies to Gemini CLI sessions too. The skill body is plain
+markdown at [`.claude/skills/review-code/SKILL.md`](../../.claude/skills/review-code/SKILL.md);
+follow its steps as you would any other governance skill.
+
+**Adversarial Specialist is Claude-only** — its dispatch relies on
+Claude Code's `Agent` tool to launch a fresh subagent with no shared
+context. Gemini doesn't expose an equivalent. Run the other specialists
+(Static Analysis, Governance, Plan Drift) and note in the report header
+that Adversarial was skipped because the runtime is Gemini.
+
 
 ## Workflow Skills
 

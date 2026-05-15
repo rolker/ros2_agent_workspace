@@ -48,6 +48,19 @@ Key points:
 source .agent/scripts/worktree_enter.sh --issue <N>
 ```
 
+## Pre-Push Code Review
+
+The shared rule (see [`AGENTS.md` Post-Task Verification](../AGENTS.md#post-task-verification))
+expects authors to run `/review-code` against their diff before opening
+a PR. The skill body is plain markdown at
+[`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md);
+follow its steps regardless of framework.
+
+**Adversarial Specialist is Claude-only** — its dispatch relies on
+Claude Code's `Agent` tool. Other frameworks should run the remaining
+specialists (Static Analysis, Governance, Plan Drift) and note that
+Adversarial was skipped due to the runtime.
+
 ## Workflow Skills
 
 Reusable workflow procedures are documented at the repo root in `.claude/skills/*/SKILL.md`.

@@ -2,18 +2,33 @@
 name: work-plan-review
 description: Instructions for reviewing work plans committed as the first step of feature branches
 applies_to:
-  - ".agent/work-plans/**"
+  - ".agent/work-plans/**/plan.md"
+  - ".agent/work-plans/PLAN_ISSUE-*.md"
 ---
 
 # Work Plan Review Instructions
 
-Files in `.agent/work-plans/` are implementation plans, not code. They follow the
-naming convention `PLAN_ISSUE-<N>.md` and are committed as the first step on a
-feature branch — often in a draft PR before implementation begins.
+These instructions apply to **plan files** under `.agent/work-plans/`:
+the canonical `.agent/work-plans/issue-<N>/plan.md` form for new work,
+and the legacy `PLAN_ISSUE-<N>.md` form for plans authored before the
+per-issue directory convention landed. Each legacy plan has a matching
+symlink at `issue-<N>/plan.md` so consumer skills find every plan at
+the new path; treat the nested form as authoritative for new work.
 
-This pattern applies to both the workspace repo and project repos. Plans live in
-whichever repo owns the issue being worked on — project repos maintain their own
-`.agent/work-plans/` directories following the same conventions.
+Companion artifacts (`progress.md`, review output, adversarial
+findings, etc.) live in the same per-issue directory but are **not**
+plan files — they have their own conventions and are not in scope for
+this review skill. The `applies_to` glob above intentionally excludes
+them.
+
+Plan files are implementation plans, not code. They are committed as
+the first step on a feature branch — often in a draft PR before
+implementation begins.
+
+This pattern applies to both the workspace repo and project repos.
+Plans live in whichever repo owns the issue being worked on — project
+repos maintain their own `.agent/work-plans/` directories following the
+same conventions.
 
 ## What to Review
 

@@ -1,6 +1,6 @@
 ---
 name: triage-reviews
-description: Evaluate PR review comments (human and bot) against local code, principles, and ADRs. Includes CI check status. Classifies each as valid or false positive and presents a fix plan.
+description: Evaluate PR review comments (human and bot) against local code, principles, and ADRs. Includes CI check status. Classifies each as valid or false positive, presents a fix plan, and persists the triage to progress.md.
 ---
 
 # Triage Reviews
@@ -118,12 +118,13 @@ d. **Assess the comment** against the actual code:
    - Is the concern valid? Does the code actually have the issue flagged?
    - Is it a false positive? (e.g., comparing against stale `main`, or
      misunderstanding the intent)
-   - **Plan files** (`PLAN_ISSUE-*.md`): If the comment targets a file in
-     `.agent/work-plans/`, it is a planning artifact. Check whether the
-     concern is addressed in the implementation files changed in the same PR.
-     If so, classify as "Addressed" and note that the concern is satisfied
-     by the implementation. Plan wording does not need to be updated to
-     match implementation.
+   - **Plan files** (`issue-*/plan.md` or legacy `PLAN_ISSUE-*.md`): If
+     the comment targets a file in `.agent/work-plans/`, it is a
+     planning artifact. Check whether the concern is addressed in the
+     implementation files changed in the same PR. If so, classify as
+     "Addressed" and note that the concern is satisfied by the
+     implementation. Plan wording does not need to be updated to match
+     implementation.
 e. **Evaluate conversation comments** — `conversation_comments` are PR-level
    comments (not attached to specific files or lines). Treat them as general PR
    feedback:
@@ -189,6 +190,86 @@ Output a structured report:
 <1-3 sentence overall assessment>
 ```
 
+### 7. Persist triage to progress.md
+
+Resolve the linked issue number from the PR branch name (same extraction
+as step 1: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`).
+This intentionally couples progress.md placement to the worktree's
+plan.md location — both live under `.agent/work-plans/issue-<N>/` in
+the worktree the branch belongs to.
+
+The reviewer's `closingIssuesReferences` is **not** used here, even
+though `review-code`'s post-PR mode and `review-plan`'s PR-number form
+both prefer it. Rationale: those skills resolve an issue to **look up**
+information (the issue body, the plan file); `triage-reviews` resolves
+an issue to **co-locate** the timeline entry with plan.md. Branch-name
+is the right signal because it identifies the worktree, not the
+GitHub-closing semantics — and it works offline / pre-PR, consistent
+with the rest of the local-first skill set.
+
+**Fail loud, don't fall back**: if the branch name doesn't match the
+`feature/issue-<N>` / `feature/ISSUE-<N>-<desc>` pattern, stop with an
+explicit error rather than silently picking a default or attempting a
+GitHub-side lookup. Example message:
+
+```
+Cannot resolve issue number from branch name '<branch>'. Expected
+'feature/issue-<N>' or 'feature/ISSUE-<N>-<description>'. Rename the
+branch to follow the convention, or skip the persistence step manually
+if the worktree intentionally has no associated issue.
+```
+
+Once resolved, determine which repo owns the linked issue and check
+`.agent/work-plans/issue-<N>/progress.md` in the owning repo's worktree
+first, falling back to the current worktree. If `progress.md` doesn't
+exist in either location, create it in the owning repo's worktree (or
+the current worktree if no owning worktree exists). Fetch the issue
+title from the correct repo via:
+
+```bash
+gh issue view <N> --repo <owner/repo> --json title --jq '.title'
+```
+
+Frontmatter for new files:
+
+```yaml
+---
+issue: <N>
+---
+
+# Issue #<N> — <issue title>
+```
+
+Append this step entry:
+
+```markdown
+
+## External Review
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM>
+**By**: <agent name> (<model>)
+
+**PR**: #<N> — <total> review(s), <valid-count> valid, <false-positive-count> false positives
+**CI**: <all-pass | failures-noted>
+
+### Actions
+- [ ] <each recommended action from the triage>
+```
+
+Commit `progress.md` after appending. Run `git add` and `git commit` in
+the worktree where progress.md was found or created (which may differ
+from the current working directory):
+
+```bash
+git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
+git -C <worktree-path> commit -m "progress: external review for #<N>"
+```
+
+(The fail-loud rule above already covers the case where the branch
+name doesn't carry an issue number — the skill stops with an error
+rather than silently writing to the wrong path or skipping
+persistence.)
+
 ## Guidelines
 
 - **Triage, don't fix** — output the classified plan in the conversation. The user
@@ -218,13 +299,16 @@ Output a structured report:
     about error handling, stale data, or silent failures, classify as Valid unless
     you can prove the failure mode is impossible
   - If you cannot articulate why it's safe, classify as Valid and suggest the fix
-- **No comments posted** — this skill is read-only. It does not post review comments,
-  dismiss reviews, or modify the PR in any way.
+- **No GitHub review actions** — this skill does not post review
+  comments, dismiss reviews, or modify the PR on GitHub. The only
+  side-effect on disk is appending to `progress.md` and committing it
+  (step 7).
 - **Plan-first workflow PRs** — In the plan-first workflow, a PR starts with a
   plan commit and later receives implementation commits. When triaging these PRs:
-  - Comments on `.agent/work-plans/PLAN_ISSUE-*.md` files are low priority —
-    the plan is a pre-implementation artifact and the implementation is the
-    source of truth.
+  - Comments on plan files (`.agent/work-plans/issue-*/plan.md` or
+    legacy `PLAN_ISSUE-*.md`) are low priority — the plan is a
+    pre-implementation artifact and the implementation is the source of
+    truth.
   - Reviews submitted against the plan-only commit (`commit_id` differs from
     `head_sha`) are likely stale once implementation lands. Evaluate the
     reviewer's concern against the current implementation code, not the plan text.

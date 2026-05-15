@@ -1,21 +1,68 @@
 # Inspiration Digest: agent_workspace
 
 Type: fork
-Last checked: 2026-03-23
-Repo: rolker/agent_workspace @ cebd918bacf69e1651e028c7b4182472e33ba4e1
+Last checked: 2026-04-30
+Repo: rolker/agent_workspace @ c02887e00eecfac31cb442fea47427dc08a02b5c
 
 ## Activity Snapshot
 
-- 14 open issues (mostly enhancements from inspiration runs), 0 open PRs
-- 16 recently merged PRs — active development
-- Notable: gstack-inspired review enhancements (#47-61), workspace UX roadmap (#63, #73),
-  crash recovery (#70), workflow modes (#67), tmux session strategy (#65-66)
+- ~14 open issues (mostly enhancements from inspiration runs), 0 open PRs
+- Active development since the previous digest (2026-03-23): the fork landed
+  the depth-tier review pipeline and the cross-model adversarial dispatch in
+  the meantime.
+- Notable since last refresh: `review_depth_classification.md` knowledge doc,
+  Claude + Gemini Adversarial Specialists in `review-code`, `progress.md`
+  persistence in both `review-code` and `triage-reviews`, and a flexible
+  input set on `review-plan` (PR / file / `--issue <N>`).
 
 ## Pending Review
 
+_None._ Items previously listed here have either been ported or moved to
+the appropriate section below.
+
 ## Roadmapped
 
+_None outstanding._
+
 ## Skipped
+
+_None outstanding._
+
+## Ported
+
+Pieces imported into this workspace via PR #453 (issue #452). All adapted
+for the layered/multi-repo workspace and for Claude-only operation. The
+fork's items remain the upstream source if we later decide to pull more
+of the surrounding tooling.
+
+- **Review depth classification** (`review_depth_classification.md`).
+  Knowledge doc with risk signals, override-trigger files, Light /
+  Standard / Deep tier criteria, and user-override syntax. Adapted to
+  workspace-and-project repo paths and framed **experimental** until
+  thresholds are validated against real PR data.
+- **Adversarial Specialist (Claude-only)** in `review-code`. Fresh-context
+  subagent dispatched at Standard and Deep tiers via `Agent`, with no
+  context from other specialists. Cross-model variant deliberately not
+  ported (see "Not adopted" below).
+- **`review-code` dual-mode + depth dispatch.** Pre-push mode (no arg)
+  diffs against the current repo's default branch; post-PR mode
+  (`<N>` or URL) diffs against the PR base. Specialists dispatched per
+  tier from `review_depth_classification.md`.
+- **`progress.md` persistence** in `review-code` and `triage-reviews`.
+  Both skills append a step entry to
+  `.agent/work-plans/issue-<N>/progress.md` in the issue's owning repo
+  so findings survive across sessions.
+- **`review-plan` flexible inputs.** Accepts `<pr-number>`, a path to a
+  plan file, or `--issue <N>` (resolved to
+  `.agent/work-plans/issue-<N>/plan.md`).
+
+## Not adopted
+
+- **Cross-Model Adversarial Specialist** (`.agent/scripts/cross_model_review.sh`,
+  Gemini/Codex/Copilot tmux dispatch). The workspace doesn't standardize
+  on multi-CLI review yet, and the tmux session machinery adds complexity
+  beyond the highest-leverage subset (Claude-only adversarial). Revisit
+  if multi-CLI review becomes a workflow we actually exercise.
 
 ## Deferred
 
