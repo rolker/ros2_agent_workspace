@@ -8,15 +8,19 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code                                # pre-push: diff vs default branch
-/review-code --base <branch>                # pre-push, override default base
-/review-code <pr-number>                    # post-PR: diff vs PR base
-/review-code <pr-url>                       # post-PR
-/review-code <pr-number> [light|standard|deep]   # post-PR with depth override
+/review-code [--base <branch>] [--skip-static] [light|standard|deep]
+                                            # pre-push: diff vs default branch
+/review-code <pr-number-or-url> [--skip-static] [light|standard|deep]
+                                            # post-PR: diff vs PR base
 ```
 
-The optional depth keyword (`light` / `standard` / `deep`) overrides
-automatic classification.
+Flags:
+- **depth keyword** (`light` / `standard` / `deep`, positional) overrides
+  automatic classification.
+- **`--base <branch>`** (pre-push only) overrides the default base branch.
+- **`--skip-static`** (both modes) suppresses the Static Analysis
+  Specialist. Useful when pre-commit was already clean or linters were
+  run separately; the report header notes the skip.
 
 ## Overview
 
@@ -61,24 +65,28 @@ post comments or modify the PR unless the user asks.
 
 ### 1. Detect mode and gather diff context
 
-Determine pre-push vs post-PR mode from the arguments. Parse out the
-optional depth keyword first (`light` / `standard` / `deep` — positional,
-matching the Usage block above), then classify what remains:
+Parse the arguments in this order: extract `--skip-static` (sets
+`SKIP_STATIC=true`), then `--base <branch>` (sets `USER_BASE`), then
+the optional depth keyword (`light` / `standard` / `deep` — positional).
+Classify what remains:
 
-- Empty, or only `--base <branch>` → **pre-push mode**
+- Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
 
-The depth keyword is positional and may appear after the PR number /
-URL or after `--base <branch>`. The same syntax applies in both modes.
-Examples:
+The depth keyword and `--skip-static` may appear in any order around
+the PR number / URL or `--base <branch>`. The same syntax applies in
+both modes. Examples:
 
 ```
-/review-code                       # pre-push, auto-classify
-/review-code deep                  # pre-push, force Deep
-/review-code --base develop        # pre-push, override base
-/review-code --base develop deep   # pre-push with override + force Deep
-/review-code 42                    # post-PR, auto-classify
-/review-code 42 standard           # post-PR, force Standard
+/review-code                                # pre-push, auto-classify
+/review-code deep                           # pre-push, force Deep
+/review-code --base develop                 # pre-push, override base
+/review-code --base develop deep            # pre-push with override + force Deep
+/review-code --skip-static                  # pre-push, skip static analysis
+/review-code --skip-static light            # pre-push, light + skip static
+/review-code 42                             # post-PR, auto-classify
+/review-code 42 standard                    # post-PR, force Standard
+/review-code 42 --skip-static               # post-PR, skip static analysis
 ```
 
 #### Pre-push mode
@@ -261,9 +269,16 @@ lifecycle checklist).
 
 #### 5a. Static Analysis Specialist
 
-Run linters on **changed files only**, using the config profile from
-step 4. See `.agent/knowledge/review_static_analysis.md` for exact
-commands and flags.
+**Skip if `SKIP_STATIC=true`** (`--skip-static` flag passed in step 1):
+emit no findings for this specialist and note "Static analysis skipped
+(--skip-static)" so the report header can surface it. At Light tier
+with `--skip-static`, zero specialists run and the silence filter
+produces the "No findings" output — that's the documented behavior,
+not a bug.
+
+Otherwise, run linters on **changed files only**, using the config
+profile from step 4. See `.agent/knowledge/review_static_analysis.md`
+for exact commands and flags.
 
 If **no linter profile matches any changed file**, report this
 explicitly: "No static analysis profile configured for these file types
@@ -395,6 +410,7 @@ Collect all findings from all dispatched specialists and filter:
 **Repo**: workspace | <project-repo>
 **Files changed**: <count> (+<additions> -<deletions>)
 **Review depth**: <Light|Standard|Deep> (reason: <primary signal>)
+**Static analysis**: <run | skipped (--skip-static)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
