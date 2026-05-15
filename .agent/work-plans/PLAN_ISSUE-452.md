@@ -185,7 +185,7 @@ All resolved during discussion:
 1. **Directory convention** → legacy flat plans stay as-is; all new
    artifacts nest under `.agent/work-plans/issue-<N>/`; eager symlink
    migration bridges legacy plans so skills only check one path.
-2. **Depth override syntax** → `/review-code <N> --depth=light|standard|deep`.
+2. **Depth override syntax** → `/review-code <N> light|standard|deep` (positional).
 3. **ADR vs knowledge doc** → knowledge doc, experimental framing. No
    ADR until thresholds stabilize with real-PR data.
 4. **Pre-push mode base detection** → inferred from default branch
