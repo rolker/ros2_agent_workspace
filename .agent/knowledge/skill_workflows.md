@@ -10,10 +10,15 @@ brainstorm → review-issue → plan-task → review-plan → implement
           → review-code → push / open PR → triage-reviews
 ```
 
-Each step is optional — simple issues can skip straight to `plan-task`
-or implementation. `review-code` runs **before pushing** (pre-push mode,
-no arguments) so static-analysis, governance, plan-drift, and
-adversarial findings get caught while still cheap to fix locally; it
+Most steps are optional — simple issues can skip straight to
+`plan-task` or implementation. **`review-code` is the exception**:
+AGENTS.md Post-Task Verification step 5 makes a pre-push `review-code`
+pass an expected check before opening a PR (the framework adapters in
+`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`,
+and `.agent/AGENT_ONBOARDING.md` mirror this for non-Claude runtimes
+with the Adversarial-Claude-only caveat). Pre-push mode (no
+arguments) catches static-analysis, governance, plan-drift, and
+Adversarial findings while still cheap to fix locally; `review-code`
 also accepts a PR number / URL for post-PR review of someone else's
 work. `triage-reviews` runs after a PR has accumulated review comments
 (human + bot) and classifies each against the current code.
