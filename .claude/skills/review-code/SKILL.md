@@ -87,7 +87,15 @@ Examples:
 # Repo root and base branch — start from the default, override if
 # the invocation included `--base <branch>`.
 REPO_ROOT=$(git rev-parse --show-toplevel)
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo "main")
+# Default branch — try local git first (works for any remote type,
+# including non-GitHub field-mode origins and non-`main` defaults like
+# `jazzy` or `master`); fall back to gh on GitHub-origin repos that
+# haven't had `git remote set-head` run; final fallback is `main`.
+DEFAULT_BRANCH=$(
+    git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||' \
+    || gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null \
+    || echo "main"
+)
 # USER_BASE is set by the caller when `--base <branch>` is parsed off
 # the argument list; otherwise it's empty and the default applies.
 BASE="${USER_BASE:-$DEFAULT_BRANCH}"
@@ -115,10 +123,16 @@ ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0
 ```
 
 `--base <branch>` is parsed from the argument list before the snippet
-runs and exposed as `USER_BASE`. If `gh repo view` fails (no GitHub
-remote, offline) the default falls back to `main`. If `git fetch` then
-also fails and no local `origin/$BASE` ref exists, the snippet stops
-with an error rather than silently diffing against nothing.
+runs and exposed as `USER_BASE`. Default-branch resolution prefers
+`git symbolic-ref refs/remotes/origin/HEAD` (the locally cached default
+that `git clone` sets up) so project repos with non-`main` defaults
+(`jazzy`, `master`) and non-GitHub field-mode origins resolve
+correctly without an internet round-trip. If the local symbolic ref is
+missing (older clone, or `git remote set-head` was never run), the
+snippet tries `gh repo view`, then falls back to `main` as a last
+resort. If `git fetch` then also fails and no local `origin/$BASE`
+ref exists, the snippet stops with an error rather than silently
+diffing against nothing.
 
 If no issue number can be extracted from the branch name, note "no
 linked issue" in the report header — the review still runs but
