@@ -13,9 +13,9 @@ issue: 452
 **CI**: all-pass (Lint × 2, Validate Documentation × 2)
 
 ### Actions
-- [ ] Fix `<branch-name>` ambiguity in `.claude/skills/review-code/SKILL.md` Usage block (line 16) — either drop the form or document the non-numeric-arg → `--base` mapping (R4-1)
-- [ ] Make pre-push default-branch resolution prefer local `git symbolic-ref refs/remotes/origin/HEAD` over `gh repo view` for field-mode / non-`main` defaults (`.claude/skills/review-code/SKILL.md:91`) (R4-2)
-- [ ] Change `mkdir .agent/work-plans/issue-<N>` to `mkdir -p ...` in `.agent/work-plans/README.md:20` for idempotency (R4-3)
-- [ ] Replace `grep -oE '#[0-9]+' | head -1` linked-issue resolution in `.claude/skills/review-plan/SKILL.md:56` with `gh pr view --json closingIssuesReferences` (matches review-code's round-2 fix) (R4-4)
-- [ ] Update `.agent/work-plans/PLAN_ISSUE-452.md:188` Open Questions entry — strip `--depth=` (the positional form is the final interface) (R4-5)
-- [ ] Decide: keep branch-name extraction in `.claude/skills/triage-reviews/SKILL.md:195` (worktree-aligned, what progress.md location follows), or switch to `closingIssuesReferences` (PR-aligned, may decouple from worktree)? (R4-6)
+- [x] Dropped ambiguous `<branch-name>` Usage form from `.claude/skills/review-code/SKILL.md` (R4-1, commit 33c3be0)
+- [x] Default-branch resolution prefers local `git symbolic-ref refs/remotes/origin/HEAD` (R4-2, commit 3bc9d63)
+- [x] Changed `mkdir` → `mkdir -p` in `.agent/work-plans/README.md` workflow snippet (R4-3, commit 8c5433d)
+- [x] `review-plan` PR-number path uses `closingIssuesReferences` (R4-4, commit 3623c41)
+- [x] Stripped stale `--depth=` from PLAN Open Questions (R4-5, commit a02b180)
+- [x] R4-6 resolved Option A + fail-loud: documented branch-name extraction in `triage-reviews` as deliberate (worktree-aligned, local-first); added explicit error when branch name doesn't match pattern instead of silent fallback (commit 767a53e)
