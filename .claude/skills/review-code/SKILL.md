@@ -8,7 +8,7 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code [--base <branch>] [--skip-static] [--no-progress] [light|standard|deep]
+/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [light|standard|deep]
                                             # pre-push: diff vs default branch
 /review-code <pr-number-or-url> [--skip-static] [light|standard|deep]
                                             # post-PR: diff vs PR base
@@ -26,6 +26,12 @@ Flags:
   have an associated issue. Does not apply to post-PR mode — a PR with
   no closing references is already handled by step 8's no-issue
   fallthrough.
+- **`--issue <N>`** (pre-push only) explicit issue number override.
+  Use when the branch name doesn't match `feature/issue-<N>` /
+  `feature/ISSUE-<N>-…` (e.g., skill worktrees, manually named
+  branches). When passed, the branch-name extraction at step 1 is
+  skipped. Mutually compatible with `--no-progress` — `--no-progress`
+  wins (no persistence regardless of issue number).
 
 ## Overview
 
@@ -72,9 +78,11 @@ post comments or modify the PR unless the user asks.
 
 Parse the arguments in this order: extract `--skip-static` (sets
 `SKIP_STATIC=true`), `--no-progress` (sets `NO_PROGRESS=true`, pre-push
-only — emit an error if passed in post-PR mode), `--base <branch>`
-(sets `USER_BASE`), then the optional depth keyword (`light` /
-`standard` / `deep` — positional). Classify what remains:
+only — emit an error if passed in post-PR mode), `--issue <N>` (sets
+`USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
+mode, where `closingIssuesReferences` is authoritative), `--base
+<branch>` (sets `USER_BASE`), then the optional depth keyword (`light`
+/ `standard` / `deep` — positional). Classify what remains:
 
 - Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
@@ -91,6 +99,7 @@ both modes. Examples:
 /review-code --skip-static                  # pre-push, skip static analysis
 /review-code --skip-static light            # pre-push, light + skip static
 /review-code --no-progress                  # pre-push, don't write progress.md
+/review-code --issue 460                    # pre-push, override branch-name issue extraction
 /review-code 42                             # post-PR, auto-classify
 /review-code 42 standard                    # post-PR, force Standard
 /review-code 42 --skip-static               # post-PR, skip static analysis
@@ -136,9 +145,14 @@ git diff "origin/$BASE...HEAD" --stat
 git diff "origin/$BASE...HEAD"
 git diff "origin/$BASE...HEAD" --numstat   # per-file +/- counts
 
-# Linked issue from branch name (feature/issue-<N> or feature/ISSUE-<N>-...)
+# Linked issue: explicit --issue <N> wins; otherwise extract from branch
+# name (feature/issue-<N> or feature/ISSUE-<N>-...).
 BRANCH=$(git branch --show-current)
-ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0-9]+' | head -1)
+if [[ -n "$USER_ISSUE" ]]; then
+    ISSUE_NUM="$USER_ISSUE"
+else
+    ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0-9]+' | head -1)
+fi
 ```
 
 `--base <branch>` is parsed from the argument list before the snippet
