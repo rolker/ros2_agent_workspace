@@ -127,13 +127,15 @@ workspace-level and project-level governance and enforcement files.
 - `.repos` (workspace repo manifest)
 - `.agent/scripts/setup_layers.sh` (layer bootstrap)
 - `Makefile` (build/test orchestration)
-- `framework_config.sh` (agent identity defaults)
+- `.agent/scripts/framework_config.sh` (agent identity defaults)
 
 **Governance** (rules people read and follow):
 
 - `AGENTS.md`, `CLAUDE.md`
 - `.github/copilot-instructions.md`
+- `.github/instructions/*.md` (per-path Copilot review instructions)
 - `.agent/instructions/*.md`
+- `.agent/AGENT_ONBOARDING.md` (generic-agent onboarding)
 - `docs/PRINCIPLES.md`
 - `docs/decisions/*.md` (ADRs)
 - `.claude/skills/*/SKILL.md` (skill definitions)
