@@ -41,7 +41,9 @@ the main tree first.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/worktree_create.sh` | Pass `TARGET_LAYER` to `generate_worktree_scripts()`; emit PYTHONPATH override block in generated `setup.bash` |
+| `.agent/scripts/worktree_create.sh` | Pass `TARGET_LAYER` to `generate_worktree_scripts()`; emit prefix-path override block in generated `setup.bash` covering both `PYTHONPATH` and `AMENT_PREFIX_PATH`; idempotent re-sourcing via a `_wt_path_prepend` helper |
+| `.agent/scripts/tests/test_worktree_create.sh` | Add `configs/manifest/layers.txt` to the mock workspace/layer setup helpers (manifest is required since #417); add three regression tests — (1) layer worktree's generated `setup.bash` contains the #427 priority block + helper, (2) workspace worktrees never emit the block, (3) functional idempotency: source the extracted block twice in a sub-bash and assert each prefix appears exactly once |
+| `.agent/work-plans/PLAN_ISSUE-427.md` | This plan |
 
 ## Principles Self-Check
 
@@ -72,4 +74,4 @@ the main tree first.
 
 ## Estimated Scope
 
-Single PR, one file changed.
+Single PR, two implementation files changed (`worktree_create.sh` + `tests/test_worktree_create.sh`) plus this plan file.
