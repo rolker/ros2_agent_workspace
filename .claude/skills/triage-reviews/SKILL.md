@@ -192,8 +192,34 @@ Output a structured report:
 
 ### 7. Persist triage to progress.md
 
-Resolve the linked issue number from the PR (same branch-name extraction
-as step 1). Determine which repo owns the linked issue and check
+Resolve the linked issue number from the PR branch name (same extraction
+as step 1: `feature/issue-<N>` or `feature/ISSUE-<N>-<description>`).
+This intentionally couples progress.md placement to the worktree's
+plan.md location — both live under `.agent/work-plans/issue-<N>/` in
+the worktree the branch belongs to.
+
+The reviewer's `closingIssuesReferences` is **not** used here, even
+though `review-code`'s post-PR mode and `review-plan`'s PR-number form
+both prefer it. Rationale: those skills resolve an issue to **look up**
+information (the issue body, the plan file); `triage-reviews` resolves
+an issue to **co-locate** the timeline entry with plan.md. Branch-name
+is the right signal because it identifies the worktree, not the
+GitHub-closing semantics — and it works offline / pre-PR, consistent
+with the rest of the local-first skill set.
+
+**Fail loud, don't fall back**: if the branch name doesn't match the
+`feature/issue-<N>` / `feature/ISSUE-<N>-<desc>` pattern, stop with an
+explicit error rather than silently picking a default or attempting a
+GitHub-side lookup. Example message:
+
+```
+Cannot resolve issue number from branch name '<branch>'. Expected
+'feature/issue-<N>' or 'feature/ISSUE-<N>-<description>'. Rename the
+branch to follow the convention, or skip the persistence step manually
+if the worktree intentionally has no associated issue.
+```
+
+Once resolved, determine which repo owns the linked issue and check
 `.agent/work-plans/issue-<N>/progress.md` in the owning repo's worktree
 first, falling back to the current worktree. If `progress.md` doesn't
 exist in either location, create it in the owning repo's worktree (or
