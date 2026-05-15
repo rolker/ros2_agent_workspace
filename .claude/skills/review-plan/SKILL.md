@@ -25,8 +25,11 @@ repo, enter that repo's worktree first; `--repo` is for the case where
 the worktree is correct but `gh` would otherwise default to the wrong
 remote.
 
-The file path and `--issue` forms enable offline plan review without a
-PR.
+The file path and `--issue` forms enable **PR-less** plan review —
+useful before pushing or when working on a plan that won't get a draft
+PR. (Not fully offline: step 2 still calls `gh issue view` to fetch the
+linked issue's body and review-issue comments. The plan file itself is
+read locally.)
 
 ## Overview
 
@@ -49,15 +52,17 @@ Determine the input form and locate the plan file. Detection heuristic:
 #### PR number (e.g., `/review-plan 127`)
 
 ```bash
-# PR metadata and body (plan is often summarised in the PR body)
-gh pr view <N> --json title,body,baseRefName,headRefName,files,url
+# PR metadata and body (plan is often summarised in the PR body).
+# Pass `--repo <owner/repo>` when reviewing a PR from a different repo
+# than the current worktree.
+gh pr view <N> [--repo <owner/repo>] --json title,body,baseRefName,headRefName,files,url
 
 # Primary closing-linked issue (parsed by GitHub from `Closes #N` /
 # `Fixes #N` / `Resolves #N` in the PR body). Mirrors review-code's
 # resolution — a body grep for `#[0-9]+` mis-resolves PRs that mention
 # multiple issues (e.g., #448 closes #247 and #445 but body-grep would
 # return #247).
-ISSUE_NUM=$(gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty')
+ISSUE_NUM=$(gh pr view <N> [--repo <owner/repo>] --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty')
 ```
 
 Find the plan file in the PR's changed files. It lives at
@@ -83,8 +88,11 @@ an active worktree:
 # Workspace worktree
 ls .workspace-worktrees/issue-workspace-<N>/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
 
-# Layer worktree (project repo)
-ls layers/worktrees/*/issue-*-<N>/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
+# Layer worktree (project repo) — plans live inside the project repo,
+# not at the worktree root. The path is
+# `layers/worktrees/issue-<repo>-<N>/<layer>_ws/src/<project_repo>/.agent/work-plans/...`,
+# so glob through the layer-workspace and project-repo tiers:
+ls layers/worktrees/issue-*-<N>/*_ws/src/*/.agent/work-plans/issue-<N>/plan.md 2>/dev/null
 ```
 
 **Cross-repo lookups**: `--repo <owner/repo>` redirects only `gh`
@@ -99,9 +107,9 @@ If still not found, stop and inform the user.
 ### 2. Read the issue and any review-issue comments
 
 ```bash
-# The linked issue
+# The linked issue (pass --repo to target a non-current-worktree repo)
 ISSUE_NUM=<extracted from step 1>
-gh issue view "$ISSUE_NUM" --json title,body,labels,comments,url
+gh issue view "$ISSUE_NUM" [--repo <owner/repo>] --json title,body,labels,comments,url
 ```
 
 Check for `review-issue` comments on the issue — they contain scope assessment,
@@ -215,12 +223,22 @@ exists), replace the PR header:
 **Branch**: `<branch-name>` (if in a worktree, otherwise omit)
 ```
 
-If no findings, output:
+If no findings, output (PR mode):
 
 ```markdown
 ## Plan Review: PR #<N> — <title>
 
 **PR**: <url>
+Plan looks solid. Ready for implementation.
+```
+
+PR-less no-findings variant (`--issue` or file path):
+
+```markdown
+## Plan Review: #<N> — <title>
+
+**Issue**: #<N> — <issue-title>
+**Plan file**: `.agent/work-plans/issue-<N>/plan.md`
 Plan looks solid. Ready for implementation.
 ```
 
