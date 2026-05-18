@@ -485,6 +485,7 @@ Existing Review Comments sections. Use:
 
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
+**Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 
 ### Static Analysis
 
@@ -495,6 +496,8 @@ Existing Review Comments sections. Use:
 No governance concerns for a change of this scope.
 ```
 
+When `SKIP_STATIC=true` and no other specialists fire (Light + `--skip-static` = zero specialists), drop the `### Static Analysis` table entirely and use the No-findings format below — the `**Static analysis**: skipped` header line carries the only signal that needs to surface.
+
 **No findings format** — if no findings exist across all sections:
 
 ```markdown
@@ -502,6 +505,7 @@ No governance concerns for a change of this scope.
 
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
+**Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 No issues found. LGTM.
 ```
 
@@ -541,15 +545,15 @@ issue: <N>
 # Issue #<N> — <issue title>
 ```
 
-Append this step entry. Use `## Local Review` in post-PR mode and
-`## Local Review (Pre-Push)` in pre-push mode so the same issue can
-carry both a pre-push and a post-PR entry on its timeline without one
-overwriting the other:
+Append this step entry. The snippet below shows the post-PR header; in
+pre-push mode change just the header to `## Local Review (Pre-Push)` so
+the same issue can carry both a pre-push and a post-PR entry on its
+timeline without one overwriting the other. Append only one header line
+— never both.
 
 ```markdown
 
-## Local Review              <!-- post-PR mode -->
-## Local Review (Pre-Push)   <!-- pre-push mode -->
+## Local Review
 **Status**: complete
 **When**: <YYYY-MM-DD HH:MM>
 **By**: <agent name> (<model>)
@@ -582,7 +586,8 @@ Key points:
   git -C <worktree-path> commit -m "progress: local review for #<N>"
   ```
 - If no issue number was resolved in step 1, skip persistence and note
-  this in the report Summary ("Findings not persisted: no linked issue").
+  this in the report Summary ("Progress persistence skipped (no linked
+  issue)") — the same canonical wording used in the step-8 intro above.
 
 ## Guidelines
 
