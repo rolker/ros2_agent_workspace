@@ -28,13 +28,37 @@ A + B + C below). Belt-and-suspenders from the start.
 
 1. **Mechanism A — tighten `.agent/hooks/check-commit-identity.py`
    to be branch-and-env aware.** When `$AGENT_NAME` is set AND the
-   current branch matches the agent-branch convention
-   (`feature/issue-*` or `skill/<name>-<timestamp>`), require an
-   agent-pattern email (`roland+*@ccom.unh.edu`) and reject the human
-   patterns. Otherwise preserve current permissive behavior so the
-   human can edit interactively and field-mode hotfixes still work.
-   Branch detection uses `git symbolic-ref --short HEAD` (fail-safe to
-   permissive on detached HEAD).
+   current branch matches the agent-branch convention (defined in
+   shared module; see step 1a), require an agent-pattern email
+   (`roland+*@ccom.unh.edu`) and reject the human patterns. Otherwise
+   preserve current permissive behavior so the human can edit
+   interactively and field-mode hotfixes still work. Branch detection
+   uses `git symbolic-ref --short HEAD` (fail-safe to permissive on
+   detached HEAD).
+
+   **Honest acknowledgement**: Mechanism A is bypassed by the same
+   root cause #468 describes — an unset `$AGENT_NAME` in a subshell
+   silently triggers permissive mode. The hook helps when agents
+   *do* set the env var; it can't defend against agents that don't.
+   Mechanism C is therefore **load-bearing**, not optional
+   belt-and-suspenders — it's the only layer immune to the
+   subshell-env-var failure mode.
+
+1a. **Extract shared identity patterns and agent-branch regex to a new
+    module** `.agent/hooks/identity_patterns.py`. Both Mechanism A's
+    hook and Mechanism C's CI script (and the existing
+    `verify-issue-branch.py`) consume it. Contents:
+    - `ACCEPTED_AGENT_PATTERNS = ["roland+*@ccom.unh.edu"]`
+    - `HUMAN_PATTERNS = ["roland@ccom.unh.edu", "roland@rolker.net"]`
+    - `PERMISSIVE_ACCEPTED_PATTERNS = ACCEPTED_AGENT_PATTERNS + HUMAN_PATTERNS`
+    - Agent-branch regex reused from `verify-issue-branch.py:27`:
+      `^feature/[iI][sS][sS][uU][eE]-(\d+)`, plus
+      `^skill/[^/]+-\d{8}-\d{6}-\d{9}$` for the skill-worktree
+      convention from AGENTS.md.
+    - `is_agent_branch(name: str) -> bool` helper.
+    Single source of truth eliminates DRY drift between A and C.
+    `verify-issue-branch.py` refactored to import from this module
+    on the same PR to ensure the regex stays consistent.
 
 2. **Mechanism A regression test —**
    `.agent/scripts/test_check_commit_identity.sh` mirroring the
@@ -60,22 +84,26 @@ A + B + C below). Belt-and-suspenders from the start.
    - Cross-reference to `set_git_identity_env.sh` which still exports
      `$AGENT_NAME` / `$AGENT_EMAIL` for the `-c` flags to reference.
 
-4. **Mechanism B cascade —** add `$AGENT_EMAIL` export to
-   `set_git_identity_env.sh` if not already present (so step 3's
-   recommended invocation works without the agent having to know
-   their own email). Verify the three framework adapters
-   (`.github/copilot-instructions.md`,
+4. **Mechanism B cascade —** verify `$AGENT_EMAIL` is exported by
+   `set_git_identity_env.sh` (it is, at line 184 — no edit needed).
+   Cascade the new "Agent Commit Identity" section to the three
+   framework adapters (`.github/copilot-instructions.md`,
    `.agent/instructions/gemini-cli.instructions.md`,
-   `.agent/AGENT_ONBOARDING.md`) mirror the new section per ADR-0006
-   and the consequences map.
+   `.agent/AGENT_ONBOARDING.md`) per ADR-0006 and the consequences map.
+   Also update `.agent/AI_IDENTITY_STRATEGY.md` (the canonical
+   multi-framework identity doc — references the env-var pattern and
+   should mention the `git -c` pattern alongside).
 
-5. **Mechanism C — CI step.** Add a job to
-   `.github/workflows/validate.yml` that fetches the PR commits via
-   `gh api` and fails if any author email matches the human patterns
-   (`roland@ccom.unh.edu`, `roland@rolker.net`) on a branch matching
-   the agent convention. Runs on `pull_request` only (the existing
-   workflow already filters there). Independent of `$AGENT_NAME`
-   env-var context, which CI doesn't have.
+5. **Mechanism C — CI step.** Add a new CI-callable Python script
+   `.agent/hooks/check_pr_authors.py` that takes a PR number, fetches
+   commits via `gh api`, and exits non-zero if any commit on an
+   agent-convention branch (per `identity_patterns.is_agent_branch`)
+   has an author email matching `HUMAN_PATTERNS`. The script imports
+   from `identity_patterns.py` so A and C share the source of truth.
+   Then add a new `validate-commit-identity` job to
+   `.github/workflows/validate.yml` that invokes the script on
+   `pull_request` events. Independent of `$AGENT_NAME` env-var context
+   (CI runners don't have it) — operates on git author email alone.
 
 6. **Self-test on the fix-pass commit.** Before merging this PR, run
    the regression test script + verify CI's new step catches a
@@ -86,14 +114,19 @@ A + B + C below). Belt-and-suspenders from the start.
 
 | File | Change |
 |------|--------|
-| `.agent/hooks/check-commit-identity.py` | Add branch-detection (`git symbolic-ref --short HEAD`) + `$AGENT_NAME` check. When both gates fire, swap `ACCEPTED_PATTERNS` to agent-only (`roland+*@ccom.unh.edu`). |
-| `.agent/scripts/test_check_commit_identity.sh` | NEW. Five-case regression test (agent-branch×agent-env matrix + detached HEAD). |
-| `.agent/scripts/set_git_identity_env.sh` | Verify/add `AGENT_EMAIL` export so `git -c user.email="$AGENT_EMAIL"` works downstream. |
-| `AGENTS.md` | New "Agent Commit Identity" subsection after "AI Signature" documenting the `git -c` pattern + rationale. |
+| `.agent/hooks/identity_patterns.py` | **NEW** shared module: `ACCEPTED_AGENT_PATTERNS`, `HUMAN_PATTERNS`, `PERMISSIVE_ACCEPTED_PATTERNS`, agent-branch regex (`feature/[iI][sS][sS][uU][eE]-N` + `skill/<name>-<timestamp>`), `is_agent_branch(name)` helper. Single source of truth for A and C. |
+| `.agent/hooks/check-commit-identity.py` | Import from `identity_patterns`. Add branch-detection (`git symbolic-ref --short HEAD`) + `$AGENT_NAME` check. When both gates fire, restrict to `ACCEPTED_AGENT_PATTERNS`; otherwise use `PERMISSIVE_ACCEPTED_PATTERNS` (current behavior). |
+| `.agent/hooks/verify-issue-branch.py` | Refactor to import the feature/issue regex from `identity_patterns` (same source of truth). Behavior preserved. |
+| `.agent/hooks/check_pr_authors.py` | **NEW** CI-callable script. Takes a PR number, fetches commits via `gh api`, fails if any commit on an agent-convention branch has an author email matching `HUMAN_PATTERNS`. Uses `identity_patterns`. |
+| `.agent/scripts/test_check_commit_identity.sh` | **NEW**. Five-case regression test (agent-branch × agent-env matrix + detached HEAD). |
+| `.agent/scripts/set_git_identity_env.sh` | No change — `$AGENT_EMAIL` already exported at line 184. (Verified before plan-edit, not a TODO.) |
+| `AGENTS.md` | New "Agent Commit Identity" subsection after "AI Signature" documenting the `git -c` pattern + Bash-tool-state rationale. Add `check_pr_authors.py`, `identity_patterns.py`, and `test_check_commit_identity.sh` to the Script Reference table. |
+| `.agent/AI_IDENTITY_STRATEGY.md` | Add a section noting the `git -c` per-commit pattern alongside the existing env-var setup. Cross-reference AGENTS.md. |
 | `.github/copilot-instructions.md` | Mirror new section. Per ADR-0006. |
 | `.agent/instructions/gemini-cli.instructions.md` | Mirror new section. Per ADR-0006. |
 | `.agent/AGENT_ONBOARDING.md` | Mirror new section. Per ADR-0006. |
-| `.github/workflows/validate.yml` | New `validate-commit-identity` job: on `pull_request`, iterate PR commits, fail if author email matches human pattern on agent-convention branch. |
+| `.github/workflows/validate.yml` | New `validate-commit-identity` job: on `pull_request`, invokes `check_pr_authors.py` against the PR. |
+| `Makefile` | Verify `make test` / `make lint` runs the new shell test (or add explicit target). Confirm during implementation. |
 
 ## Principles Self-Check
 
@@ -122,20 +155,61 @@ A + B + C below). Belt-and-suspenders from the start.
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
-| `check-commit-identity.py` | `.agent/hooks/README.md` (if it documents the hook's accepted patterns) | Verify during implementation; doc fix folds into the hook commit if needed |
-| `AGENTS.md` (new section) | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Yes — listed in Files to Change |
-| `set_git_identity_env.sh` (add AGENT_EMAIL export) | None known; the new var is additive | Verify with `rg -F '$AGENT_EMAIL'` before commit |
-| `.github/workflows/validate.yml` (new job) | Branch protection rules (which checks block merge) — if the new check should be required to merge, update branch protection separately | Flag as follow-up if user wants the new check required for merge |
+| `check-commit-identity.py` | `.agent/hooks/README.md` (if it documents accepted patterns) | Verify during implementation; doc fix folds into the hook commit if needed |
+| `AGENTS.md` (new section) | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`, `.agent/AI_IDENTITY_STRATEGY.md` | Yes — all four listed in Files to Change |
+| `AGENTS.md` Script Reference table | New scripts added there (`check_pr_authors.py`, `identity_patterns.py`, `test_check_commit_identity.sh`) | Yes — included in the AGENTS.md row above |
+| New shell test (`test_check_commit_identity.sh`) | `Makefile` — verify it's picked up by `make test` / `make lint` | Yes — Makefile in Files to Change with verify-during-implementation note |
+| `.github/workflows/validate.yml` (new job) | Branch protection rules — if the new check should be required to merge, update branch protection separately (per AGENTS.md "Ask First") | Flagged as Open Question 1, not in this PR |
 | Sub-agent dispatch prompt prose in skill bodies (`plan-task` SKILL.md, `review-code` SKILL.md) | Adopt the `git -c` pattern when documenting commit examples for sub-agents | Yes — verify via workspace grep during implementation |
 
 ## Open Questions
 
 1. **Branch protection** — should the new CI check be a *required* status check for merging into `main`, or just informational? If required, that's a separate config change in the repo's GitHub settings (per AGENTS.md "Ask First" — modifying branch protection requires human approval). Flag for the user at PR open time, not now.
-2. **Hook escape hatch** — should there be an explicit `GIT_IDENTITY_OVERRIDE=1` env var that lets a maintainer commit as themselves on an agent branch (e.g., to fix something the agent broke in-place)? Open question, default: no — the user can always cd out of the agent branch or rebase, and the override creates a foot-gun. Decide based on whether the user wants it.
+
+**Resolved during plan-revision (2026-05-18, after review-plan pass)**:
+
+- **Hook escape hatch (Q2)**: **No.** A `GIT_IDENTITY_OVERRIDE=1` env-var bypass creates a foot-gun without solving a real workflow problem — a maintainer who needs to commit as themselves on an agent branch can either rebase off the branch, cherry-pick to a non-agent branch, or `unset AGENT_NAME` in the current shell (which already triggers permissive mode). Decision: no escape hatch.
 
 ## Estimated Scope
 
-Single PR, ~8 file edits + 1 new test script. Atomic commits suggested
-grouping: (1) hook tighten + test, (2) AGENTS.md + 3 adapter cascade
-+ AGENT_EMAIL export, (3) CI job. Three commits, each independently
-revertable.
+Single PR, ~12 file edits + 3 new files (`identity_patterns.py`,
+`check_pr_authors.py`, `test_check_commit_identity.sh`). Atomic
+commits suggested grouping:
+
+1. Shared module + hook tighten + regression test (new
+   `identity_patterns.py`, modified `check-commit-identity.py`,
+   refactored `verify-issue-branch.py`, new
+   `test_check_commit_identity.sh`, Makefile if needed)
+2. AGENTS.md "Agent Commit Identity" section + 4-doc cascade
+   (3 framework adapters + `AI_IDENTITY_STRATEGY.md`) +
+   AGENTS.md Script Reference table updates
+3. CI: new `check_pr_authors.py` + new `validate-commit-identity`
+   job in `validate.yml`
+
+Three commits, each independently revertable.
+
+## Implementation Notes
+
+- **Shared `identity_patterns.py` module (Step 1a)** — added after the
+  review-plan pass surfaced a DRY concern: the human-email pattern
+  list would otherwise be hard-coded in both `check-commit-identity.py`
+  (Mechanism A) and `check_pr_authors.py` (Mechanism C), and future
+  updates would silently desync. The shared module also absorbs the
+  agent-branch regex (`^feature/[iI][sS][sS][uU][eE]-(\d+)` from
+  `verify-issue-branch.py` plus the skill-worktree pattern from
+  AGENTS.md). User explicitly chose "extract to shared config" over
+  the alternatives (hard-code-with-comments / defer-to-follow-up).
+
+- **Honest acknowledgement of Mechanism A's bypass surface (Step 1)** —
+  the carve-out for permissive mode (`AGENT_NAME` unset → permissive)
+  is bypassed by the exact root cause #468 describes. This is not a
+  flaw in the plan — it's a fundamental limit of pre-commit hooks that
+  read env vars in the commit-time shell. Mechanism C (CI) is the only
+  layer immune to this bypass. The rationale shift: C is not optional
+  belt-and-suspenders; it's load-bearing for the principal failure
+  mode this issue addresses. Plan now states this explicitly.
+
+- **Resolved Open Question 2 (escape hatch)** during plan revision
+  rather than deferring to implementation. The plan's own rationale
+  already implied "no" — explicit resolution avoids scope churn during
+  implementation.
