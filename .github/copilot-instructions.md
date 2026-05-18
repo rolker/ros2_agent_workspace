@@ -24,10 +24,14 @@ not only in the workspace repo. When reviewing:
 The shared rule (see [`AGENTS.md` Post-Task Verification](../AGENTS.md#post-task-verification))
 expects authors to run `/review-code` against their diff before opening a PR.
 This applies to Copilot too when used in **agent / coding-assistant mode** —
-prefer a pre-push pass to catch static-analysis, governance, and
-plan-drift findings locally rather than in PR review rounds. (The
-Adversarial Specialist is Claude-only — see caveat below — so Copilot's
-pre-push pass cannot catch adversarial findings.) See
+prefer a pre-push pass to catch findings locally rather than in PR
+review rounds. The specialists that actually run depend on the
+auto-classified tier: Light tier dispatches Static Analysis + Copilot
+Adversarial only, while Standard and Deep also dispatch Governance and
+Plan Drift. (The Claude Adversarial Specialist is Claude-only — see
+caveat below — so a Copilot-only pre-push pass cannot catch Claude-side
+adversarial findings; the Copilot Adversarial Specialist runs natively
+and remains in scope.) See
 [`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md).
 
 **Limitation**: when Copilot runs as a **PR reviewer** (the GitHub
@@ -35,10 +39,14 @@ pre-push pass cannot catch adversarial findings.) See
 pre-push check is the human-or-other-agent author's responsibility.
 The Copilot review surface remains complementary, not a substitute.
 
-**Adversarial Specialist is Claude-only** — it dispatches a fresh
-subagent via Claude Code's `Agent` tool, which Copilot doesn't expose.
-Other specialists (Static Analysis, Governance, Plan Drift) are
-framework-agnostic.
+**Claude Adversarial Specialist is Claude-only** — it dispatches a
+fresh subagent via Claude Code's `Agent` tool, which Copilot doesn't
+expose. The other specialists (Static Analysis, Governance, Plan
+Drift, **Copilot Adversarial**) are framework-agnostic and run
+regardless of host runtime, provided the relevant CLI tools are
+installed and authenticated where applicable (Copilot Adversarial
+additionally requires `copilot` CLI authentication — unauthenticated
+hosts route to the skipped-with-notice path automatically).
 
 ## Environment Setup
 
