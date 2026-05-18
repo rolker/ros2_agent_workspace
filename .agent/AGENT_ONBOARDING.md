@@ -26,6 +26,23 @@ source .agent/scripts/set_git_identity_env.sh "<Agent Name>" "<email>" "<your mo
 
 See [`AI_IDENTITY_STRATEGY.md`](AI_IDENTITY_STRATEGY.md) for the full identity decision tree.
 
+**Commit pattern** (host-based agents): the env vars exported by
+`set_git_identity_env.sh` may not survive across separate bash
+invocations (most agent runtimes spawn fresh subshells per call). Use
+per-commit `-c` overrides as the canonical pattern:
+
+```bash
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "…"
+```
+
+The `-c` flags propagate to git's subprocesses (including the
+pre-commit hook) via `GIT_CONFIG_PARAMETERS`, so the identity is
+robust regardless of subshell semantics. Enforced on agent-convention
+branches by `.agent/hooks/check-commit-identity.py` and the CI check.
+See AGENTS.md "Agent Commit Identity" for full rationale.
+
 ## Core Rules
 
 See [`AGENTS.md`](../AGENTS.md) for the shared workspace rules all agents must follow.

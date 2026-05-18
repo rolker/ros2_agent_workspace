@@ -243,6 +243,41 @@ AI signature, pre-commit hooks) still apply.
 Use your actual runtime identity — never copy example model names from docs.
 Check `$AGENT_NAME` / `$AGENT_MODEL` environment variables.
 
+## Agent Commit Identity
+
+For commits on agent-convention branches (`feature/issue-<N>`,
+`feature/ISSUE-<N>-<desc>`, `skill/<name>-<timestamp>`), the canonical
+pattern is per-invocation `-c` overrides:
+
+```bash
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "…"
+```
+
+**Why per-commit `-c`, not the env-var script alone**: agent tool runtimes
+(Claude Code, Copilot CLI, etc.) typically run each bash invocation in a
+fresh subshell. `set_git_identity_env.sh`'s exports
+(`GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`) are bound to the shell that sourced
+the script — they don't propagate to a separate `git commit` subshell run
+later. The `-c` flags travel with the command and propagate to git's
+subprocesses (including pre-commit hooks) via `GIT_CONFIG_PARAMETERS`,
+so the identity is robust regardless of which subshell does the commit.
+
+`set_git_identity_env.sh` is still useful — it exports `$AGENT_NAME`,
+`$AGENT_EMAIL`, `$AGENT_MODEL`, `$AGENT_FRAMEWORK` for `gh` signatures
+and as values for the `-c` flags above. Source it once at session start
+and the env vars feed every commit.
+
+**Enforcement**: `.agent/hooks/check-commit-identity.py` (pre-commit)
+rejects human-pattern emails on agent-convention branches when
+`$AGENT_NAME` is set. A CI check
+(`.agent/hooks/check_pr_authors.py`, run from `validate.yml`) catches
+the same condition on PRs and is the load-bearing defense when the
+hook's env-var gate is bypassed (e.g., `$AGENT_NAME` lost across
+subshells). The shared patterns and branch regex live in
+`.agent/hooks/identity_patterns.py`.
+
 ## GitHub CLI Patterns
 
 ### Use `--body-file`, Not `--body`
@@ -400,6 +435,9 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
 | `.agent/scripts/fetch_pr_reviews.sh` | Fetch all PR reviews and CI status |
+| `.agent/scripts/test_check_commit_identity.sh` | Regression test for `check-commit-identity.py` branch+env gate |
+| `.agent/hooks/identity_patterns.py` | Shared agent/human email patterns + agent-branch regex (imported by commit-identity hooks + CI script) |
+| `.agent/hooks/check_pr_authors.py` | CI-callable PR-commit author validator (Mechanism C from issue #468) |
 
 ## Layered Architecture
 
