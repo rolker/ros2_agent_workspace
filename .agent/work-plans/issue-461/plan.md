@@ -35,14 +35,26 @@ acceptance-criteria questions were resolved 2026-05-18:
    lifecycle / cross-cutting effects). Update the Light condensed
    report format (review-code SKILL.md lines 444–459) to include a
    Copilot Adversarial findings slot.
-2. **Implement availability detection.** Before invoking, probe with
-   `command -v copilot` and a quick auth check
-   (`copilot --version` succeeds without prompting). On failure, emit a
-   one-line `Copilot Adversarial skipped: <reason>` finding and
-   continue. No flag needed.
+2. **Implement availability detection + post-invocation guard.**
+   Before invoking, probe with `command -v copilot` and a sanity check
+   `copilot --version` (presence-only — explicitly not an auth check;
+   real auth detection happens after the call). After invoking, route
+   timeout (exit 124), non-zero exit, empty output, or auth-error
+   text in the output to the skipped-with-notice path so
+   unauthenticated hosts never surface as silent zero-finding reviews.
+   Wrap the invocation in `timeout 300` so a hung CLI cannot block
+   the whole review. (Post-review hardening; see Implementation Notes.)
+2a. **Implement untrusted-PR safety gate** (post-PR mode only). Before
+    dispatching 5e, check whether the PR head is from a fork or the
+    author lacks OWNER/MEMBER/COLLABORATOR association. If so, route to
+    the skipped-with-notice path unless `--allow-untrusted-copilot` is
+    set. Rationale: `--allow-all-tools` exposes file/shell access to
+    Copilot, and an external contributor's diff is attacker-controlled
+    prompt content. (Post-review hardening; see Implementation Notes.)
 3. **Add `--no-copilot` flag** to the `review-code` Usage block and
    argument parser. When set, skip dispatch entirely without the
-   "skipped" notice.
+   "skipped" notice. Also add `--allow-untrusted-copilot` (post-PR only)
+   as the explicit bypass for step 2a's gate.
 4. **Update the Specialists overview** in step 5 to list 5a–5e and
    remove the "Cross-model adversarial is intentionally not wired here"
    note from 5d (replace with a pointer to 5e).
@@ -83,19 +95,23 @@ acceptance-criteria questions were resolved 2026-05-18:
 
 | File | Change |
 |------|--------|
-| `.claude/skills/review-code/SKILL.md` | Add 5e Copilot Adversarial subsection (Standard prompt reused on Light + Deep adds existing Deep focus areas); add `--no-copilot` to Usage + arg parser; update step-5 tier dispatch to fire 5e on all tiers; update Light condensed report format to include Copilot findings slot; rename 5d to "Claude Adversarial Specialist"; replace 5d cross-model-not-wired note with pointer to 5e |
+| `.claude/skills/review-code/SKILL.md` | Add 5e Copilot Adversarial subsection (Standard prompt reused on Light + Deep adds existing Deep focus areas); add `--no-copilot` and `--allow-untrusted-copilot` to Usage + arg parser; update step-5 tier dispatch to fire 5e on all tiers; update Light condensed report format to include Copilot findings slot; rename 5d to "Claude Adversarial Specialist"; replace 5d cross-model-not-wired note with pointer to 5e. Post-review hardening: `timeout 300` wrapper, post-invocation guard (empty / auth-error / non-zero exit / timeout → skipped path), untrusted-PR safety gate, `**Copilot Adversarial**:` parallel header line in both standard and Light condensed report templates, qualified "Light + --skip-static = zero specialists" predicate to require Copilot also suppressed. |
 | `.agent/knowledge/inspiration_agent_workspace_digest.md` | Move Cross-Model entry from "Not adopted" → new "Partially adopted" entry; preserve non-Copilot non-adoption rationale; fix the "Ported → Adversarial Specialist" stale "Cross-model variant deliberately not ported" sentence |
 | `.agent/knowledge/review_depth_classification.md` | Add Copilot Adversarial to Light/Standard/Deep specialist lists; invert the "Note on cross-model adversarial" block; add Copilot slot to Light condensed report description |
-| `.agent/knowledge/skill_workflows.md` | Reword the "Adversarial-Claude-only caveat" reference to "the Claude Adversarial Specialist still requires Claude Code's `Agent` tool, but the Copilot Adversarial Specialist runs from any runtime that has the `copilot` CLI" |
-| `.github/copilot-instructions.md` | Rename "Adversarial Specialist is Claude-only" to "Claude Adversarial Specialist is Claude-only"; add Copilot Adversarial to framework-agnostic list; update the pre-push caveat (Copilot's pre-push pass cannot catch *Claude*-side adversarial findings — Copilot Adversarial runs natively) |
+| `.agent/knowledge/skill_workflows.md` | Reword the "Adversarial-Claude-only caveat" reference to "the Claude Adversarial Specialist still requires Claude Code's `Agent` tool, but the Copilot Adversarial Specialist runs from any runtime that has the `copilot` CLI"; qualify the pre-push coverage claim by tier (Light = SA+Copilot only; Standard/Deep add Governance + Plan Drift + Claude Adversarial). |
+| `.github/copilot-instructions.md` | Rename "Adversarial Specialist is Claude-only" to "Claude Adversarial Specialist is Claude-only"; add Copilot Adversarial to framework-agnostic list; update the pre-push caveat (Copilot's pre-push pass cannot catch *Claude*-side adversarial findings — Copilot Adversarial runs natively); qualify the pre-push coverage claim by tier. |
 | `.agent/instructions/gemini-cli.instructions.md` | Same rename + Copilot Adversarial addition pattern as the Copilot adapter |
 | `.agent/AGENT_ONBOARDING.md` | Same rename + Copilot Adversarial addition pattern as the Copilot adapter |
 
-No new script file. The invocation is small enough (3–4 lines: probe,
-call, strip trailing block) to live inline in SKILL.md as part of step
-5e, matching how 5a–5d are documented. If the inline shell grows past
-~15 lines during implementation, factor into
-`.agent/scripts/run_copilot_adversarial.sh`.
+No new script file. The inline shell in SKILL.md grew past the
+original ~15-line threshold during post-review hardening (now ~60
+lines across probe + gate + invocation + post-call guard), but the
+content is kept inline rather than factored to
+`.agent/scripts/run_copilot_adversarial.sh` because the security model
+(`--allow-all-tools` + the untrusted-PR gate) needs to be visible to
+the next agent reading 5e — not buried behind a script reference.
+Revisit the factor-out decision if 5e accumulates non-security
+elaboration in a future change.
 
 ## Principles Self-Check
 
@@ -144,8 +160,11 @@ derived questions that the original four didn't directly address:
 ## Estimated Scope
 
 Single PR. Four-plus knowledge/skill file edits, three framework-adapter
-edits, and two new issues filed (one upstream, one follow-up). No new
-scripts — inline shell stayed under 15 lines as anticipated.
+edits, and two new issues filed (one upstream, one follow-up). Inline
+shell grew past the original ~15-line threshold during post-review
+hardening (timeout + post-invocation guard + untrusted-PR gate) but
+is kept inline; see the note under "Files to Change" and Implementation
+Notes for rationale.
 
 ## Implementation Notes
 
@@ -159,3 +178,33 @@ scripts — inline shell stayed under 15 lines as anticipated.
   knowledge-doc commit since the prose change is identical
   (rename to "Claude Adversarial Specialist", add Copilot Adversarial
   as framework-agnostic).
+
+- **Untrusted-PR safety gate added during post-PR review pass.**
+  The original Step 2 only covered availability detection (binary
+  missing / auth failure). Post-PR review of PR #464 surfaced that
+  `--allow-all-tools` + post-PR mode on contributor diffs grants
+  Copilot file/shell access to prompt content that originated outside
+  the repo's trust boundary. User chose the "explicit confirmation
+  gate" option: external PRs (fork head OR author association below
+  COLLABORATOR) route to the skipped path unless
+  `--allow-untrusted-copilot` is passed. Implemented as a new step 2a
+  in 5e between the availability probe and the invocation. The flag
+  is post-PR only (an error if passed in pre-push, where the gate
+  doesn't apply).
+
+- **Post-invocation guard formalized.** Step 2's original prose said
+  "post-call empty findings or auth-text routes to skipped-notice
+  path" but the snippet didn't actually enforce that. Post-PR review
+  flagged this as a discrepancy between the documented contract and
+  the shown code. The hardened snippet now includes explicit checks
+  for timeout (exit 124), non-zero exit, empty findings file, and
+  auth-error grep patterns — each routes to the skipped path with a
+  specific reason. Plus a `timeout 300` wrapper so a hung CLI cannot
+  block the whole review (field-mode-relevant when connectivity is
+  flaky).
+
+- **Light-tier zero-specialist predicate corrected.** With 5e firing
+  at Light, the prior "Light + --skip-static = zero specialists"
+  predicate became conditional on Copilot also being suppressed. Both
+  the Step 5a comment and the Step 7 report-format guidance updated
+  to reflect the new precondition.

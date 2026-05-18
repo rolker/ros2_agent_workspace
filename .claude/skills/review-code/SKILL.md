@@ -10,7 +10,7 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ```
 /review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--no-copilot] [light|standard|deep]
                                             # pre-push: diff vs default branch
-/review-code <pr-number-or-url> [--skip-static] [--no-copilot] [light|standard|deep]
+/review-code <pr-number-or-url> [--skip-static] [--no-copilot] [--allow-untrusted-copilot] [light|standard|deep]
                                             # post-PR: diff vs PR base
 ```
 
@@ -36,6 +36,14 @@ Flags:
   Specialist (5e) for this invocation. Useful when the Copilot CLI is
   installed but you want to avoid the Premium-request cost on a
   specific run.
+- **`--allow-untrusted-copilot`** (post-PR only) overrides the
+  external-PR safety gate that suppresses Copilot Adversarial when the
+  PR head is from a fork or a non-collaborator author. Without this
+  flag, the specialist routes to the skipped-with-notice path on such
+  PRs because `--allow-all-tools` grants Copilot file/shell access to
+  the local worktree; running it against an untrusted contributor's
+  diff exposes that capability to attacker-controlled prompt content.
+  Pass only when you have read the diff and accept the risk.
 
 ## Overview
 
@@ -92,9 +100,11 @@ only — emit an error if passed in post-PR mode), `--issue <N>` (sets
 `USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
 mode, where `closingIssuesReferences` is authoritative), `--no-copilot`
 (sets `NO_COPILOT=1`, suppresses the Copilot Adversarial Specialist in
-step 5e), `--base <branch>` (sets `USER_BASE`), then the optional depth
-keyword (`light` / `standard` / `deep` — positional). Classify what
-remains:
+step 5e), `--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
+post-PR only — emit an error if passed in pre-push mode, where the
+gate doesn't apply), `--base <branch>` (sets `USER_BASE`), then the
+optional depth keyword (`light` / `standard` / `deep` — positional).
+Classify what remains:
 
 - Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
@@ -312,9 +322,12 @@ lifecycle checklist).
 **Skip if `SKIP_STATIC=true`** (`--skip-static` flag passed in step 1):
 emit no findings for this specialist and note "Static analysis skipped
 (--skip-static)" so the report header can surface it. At Light tier
-with `--skip-static`, zero specialists run and the silence filter
-produces the "No findings" output — that's the documented behavior,
-not a bug.
+with `--skip-static` **and** Copilot Adversarial also suppressed
+(`--no-copilot` or the CLI unavailable), zero specialists run and the
+silence filter produces the "No findings" output — that's the
+documented behavior, not a bug. If only `--skip-static` is set on
+Light, the Copilot Adversarial Specialist (5e) still runs and may
+produce findings.
 
 Otherwise, run linters on **changed files only**, using the config
 profile from step 4. See `.agent/knowledge/review_static_analysis.md`
@@ -446,24 +459,44 @@ elif ! command -v copilot >/dev/null 2>&1; then
 elif ! copilot --version >/dev/null 2>&1; then
     # `copilot --version` is a presence check, not an auth check —
     # `--version` typically prints without contacting the API. We keep
-    # it as a "binary at least runs" sanity guard. Auth failures
-    # surface from the actual invocation below: if the
-    # post-strip findings file is empty, contains only error text
-    # (e.g., `Please run \`copilot\` to authenticate`), or the
-    # command exits non-zero, switch the report line to
-    # `Copilot Adversarial skipped: copilot CLI not authenticated`
-    # rather than presenting empty findings.
+    # it as a "binary at least runs" sanity guard. Real auth failures
+    # are detected after the invocation below.
     COPILOT_SKIP_REASON="copilot --version failed (binary broken or missing dependencies)"
     SKIP_COPILOT=1
+fi
+```
+
+**Untrusted-PR safety gate** (post-PR mode only). Because
+`--allow-all-tools` grants Copilot file/shell access to the local
+worktree, do not invoke it against attacker-controlled prompt content.
+Before dispatch, check whether the PR head is from a fork or a
+non-collaborator author and gate accordingly:
+
+```bash
+if [[ "$MODE" == "post-PR" && "$SKIP_COPILOT" != "1" ]]; then
+    PR_AUTHOR_ASSOC=$(gh pr view "$PR" --json authorAssociation --jq '.authorAssociation')
+    PR_HEAD_REPO=$(gh pr view "$PR" --json headRepository,baseRepository \
+        --jq 'if .headRepository.nameWithOwner == .baseRepository.nameWithOwner then "owner" else "fork" end')
+    # Trusted: PR head is the base repo AND author is OWNER/MEMBER/COLLABORATOR.
+    # Anything else (fork, contributor, first-time contributor, none) is gated.
+    if [[ "$PR_HEAD_REPO" == "fork" ]] || \
+       [[ "$PR_AUTHOR_ASSOC" != "OWNER" && "$PR_AUTHOR_ASSOC" != "MEMBER" && "$PR_AUTHOR_ASSOC" != "COLLABORATOR" ]]; then
+        if [[ "$ALLOW_UNTRUSTED_COPILOT" == "1" ]]; then
+            : # User explicitly bypassed the gate. Proceed.
+        else
+            COPILOT_SKIP_REASON="external PR (head=$PR_HEAD_REPO, author=$PR_AUTHOR_ASSOC); pass --allow-untrusted-copilot after reviewing the diff to bypass"
+            SKIP_COPILOT=1
+        fi
+    fi
 fi
 ```
 
 When `SKIP_COPILOT=1` and `NO_COPILOT` is unset, the report includes:
 `Copilot Adversarial skipped: <COPILOT_SKIP_REASON>`. When
 `NO_COPILOT=1`, the specialist is omitted from the report entirely.
-A post-call empty-findings or "Please run `copilot` to authenticate"
-output also routes to the skipped-notice path so unauthenticated
-hosts don't surface as silent zero-finding reviews.
+Post-call empty findings or auth-error output also route to the
+skipped-notice path (see the post-invocation guard below) so
+unauthenticated hosts don't surface as silent zero-finding reviews.
 
 **Prompt body**. Light + Standard reuse the same prompt as the Standard
 Claude Adversarial prompt (the four focus areas under 5d: missed edge
@@ -474,20 +507,45 @@ pair keeps the two adversarial specialists comparable — the cross-model
 signal is "two vendors reading the same brief", not "two prompts on
 the same diff".
 
-**Invocation**.
+**Invocation** (only when `SKIP_COPILOT` is unset after both probes
+above).
 
 ```bash
 PROMPT_FILE=$(mktemp /tmp/copilot_adv_prompt.XXXXXX)
 FINDINGS_FILE=$(mktemp /tmp/copilot_adv_findings.XXXXXX)
 trap 'rm -f "$PROMPT_FILE" "$FINDINGS_FILE"' EXIT  # tempfile cleanup
 # Build $PROMPT_FILE from the diff + the tier-appropriate prompt body above.
-copilot -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
+
+# Bound the call so a hung Copilot CLI (network drop, model overload,
+# stuck stdin negotiation) doesn't block the entire review. 300 s is
+# generous for a single-diff prompt; tune if Deep-tier prompts on
+# large diffs need more.
+timeout 300 copilot -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
+COPILOT_EXIT=$?
+
 # Strip the trailing `Changes / Requests / Tokens` metadata block. The
 # block starts with a "Changes" line and runs to EOF; cut from there.
 # If a future Copilot CLI version changes the footer format, this is
 # a no-op (no `^Changes$` line to match) and the metadata will leak
 # into the report — visible enough to prompt a regex update.
 sed -i '/^Changes$/,$d' "$FINDINGS_FILE"
+
+# Post-invocation guard: route timeout / non-zero exit / empty output /
+# auth-error text to the skipped-notice path rather than surfacing the
+# stderr (captured via 2>&1) verbatim as findings.
+if [[ "$COPILOT_EXIT" == "124" ]]; then
+    SKIP_COPILOT=1
+    COPILOT_SKIP_REASON="copilot CLI timed out after 300s"
+elif [[ "$COPILOT_EXIT" != "0" ]]; then
+    SKIP_COPILOT=1
+    COPILOT_SKIP_REASON="copilot CLI exited $COPILOT_EXIT (see $FINDINGS_FILE)"
+elif [[ ! -s "$FINDINGS_FILE" ]]; then
+    SKIP_COPILOT=1
+    COPILOT_SKIP_REASON="copilot produced no output (likely not authenticated)"
+elif grep -qiE 'please run .copilot. to authenticate|not authenticated|sign in to GitHub' "$FINDINGS_FILE"; then
+    SKIP_COPILOT=1
+    COPILOT_SKIP_REASON="copilot CLI not authenticated"
+fi
 # Read $FINDINGS_FILE before the EXIT trap fires.
 ```
 
@@ -498,14 +556,26 @@ locally on `@github/copilot` v1.0.48.
 
 **Security note on `--allow-all-tools`**. The flag grants Copilot
 permission to execute any tool the CLI exposes (file reads, shell
-commands, etc.) on this host. The review-code use case — Copilot
-reading a diff that the invoking user just authored in their own
-worktree — accepts that threat model: the prompt is constructed
-locally, not received over a network, and the worktree is already
-under the user's control. Don't reuse this invocation pattern for
-prompts that include untrusted input (e.g., reviewing an unvetted PR
-from an external contributor with arbitrary diff content) until
-Copilot CLI grows scoped permissions.
+commands, etc.) on this host. The two main use cases have different
+threat models:
+
+- **Pre-push mode** — the diff is the user's own authored work in
+  their own worktree. The prompt is constructed locally, the worktree
+  is already under the user's control. Accepted threat model.
+- **Post-PR mode on owner / collaborator PRs** — same threat model as
+  pre-push: the diff was authored by someone whose code we already
+  treat as trusted.
+- **Post-PR mode on external contributor PRs** — diff content is
+  attacker-controlled. `--allow-all-tools` exposes file/shell access
+  to that content's prompt-injection surface. The "untrusted-PR
+  safety gate" above auto-suppresses 5e in this case; the
+  `--allow-untrusted-copilot` flag is the explicit bypass after the
+  reviewer has read the diff and accepted the risk. Don't add the flag
+  to a CI config or a wrapper script that auto-invokes review-code on
+  contributor PRs — that defeats the gate.
+
+Reuse of this invocation pattern outside `review-code` should retain
+the same trusted-input precondition or supply its own gate.
 
 **Context cost**. Copilot autoloads workspace context on launch — a
 trivial prompt floors at ~25.5k tokens and consumes one Premium
@@ -552,6 +622,7 @@ Collect all findings from all dispatched specialists and filter:
 **Files changed**: <count> (+<additions> -<deletions>)
 **Review depth**: <Light|Standard|Deep> (reason: <primary signal>)
 **Static analysis**: <run | skipped (--skip-static)>
+**Copilot Adversarial**: <run | skipped (<reason>) | suppressed (--no-copilot)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
@@ -606,6 +677,7 @@ Existing Review Comments sections. Use:
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
+**Copilot Adversarial**: <run | skipped (<reason>) | suppressed (--no-copilot)>
 
 ### Static Analysis
 
@@ -626,7 +698,7 @@ Existing Review Comments sections. Use:
 No governance concerns for a change of this scope.
 ```
 
-When `SKIP_STATIC=true` and no other specialists fire (Light + `--skip-static` = zero specialists), drop the `### Static Analysis` table entirely and use the No-findings format below — the `**Static analysis**: skipped` header line carries the only signal that needs to surface.
+When `SKIP_STATIC=true` and **both** `SKIP_COPILOT=1` (from `--no-copilot` or the availability/gate probes in 5e) — i.e., Light + `--skip-static` with Copilot also suppressed = zero specialists — drop the `### Static Analysis` and `### Copilot Adversarial` tables entirely and use the No-findings format below. The two `<header>: skipped` lines carry the only signals that need to surface.
 
 **No findings format** — if no findings exist across all sections:
 
@@ -636,6 +708,7 @@ When `SKIP_STATIC=true` and no other specialists fire (Light + `--skip-static` =
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
+**Copilot Adversarial**: <skipped (<reason>) | suppressed (--no-copilot)>  <!-- include only when SKIP_COPILOT=1 -->
 No issues found. LGTM.
 ```
 

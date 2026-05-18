@@ -57,7 +57,7 @@ of the surrounding tooling.
   Standard / Deep tier criteria, and user-override syntax. Adapted to
   workspace-and-project repo paths and framed **experimental** until
   thresholds are validated against real PR data.
-- **Adversarial Specialist (Claude)** in `review-code`. Fresh-context
+- **Claude Adversarial Specialist** in `review-code`. Fresh-context
   subagent dispatched at Standard and Deep tiers via `Agent`, with no
   context from other specialists. A Copilot-only slice of the upstream
   cross-model variant is also ported — see "Partially adopted" below.

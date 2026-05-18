@@ -19,9 +19,11 @@ and `.agent/AGENT_ONBOARDING.md` mirror this for non-Claude runtimes;
 the Claude Adversarial Specialist still requires Claude Code's `Agent`
 tool, but the Copilot Adversarial Specialist runs from any runtime
 that has the `copilot` CLI available). Pre-push mode (no arguments)
-catches static-analysis, governance, plan-drift, and Adversarial
-findings while still cheap to fix locally; `review-code` also accepts
-a PR number / URL for post-PR review of someone else's work.
+catches issues while still cheap to fix locally; the specialists that
+actually run depend on the auto-classified depth tier — Light runs
+Static Analysis + Copilot Adversarial only, while Standard and Deep
+add Governance, Plan Drift, and Claude Adversarial. `review-code` also
+accepts a PR number / URL for post-PR review of someone else's work.
 `triage-reviews` runs after a PR has accumulated review comments
 (human + bot) and classifies each against the current code.
 
