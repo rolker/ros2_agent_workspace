@@ -7,9 +7,15 @@ Informational only — always returns 0.
 """
 
 import os
-import re
 import subprocess
 import sys
+from pathlib import Path
+
+# Reuse the shared agent-branch regex so this hook and check-commit-identity.py
+# never disagree on what counts as a feature/issue-N branch.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from identity_patterns import FEATURE_ISSUE_BRANCH_RE  # noqa: E402
 
 
 def get_branch_name():
@@ -24,7 +30,7 @@ def get_branch_name():
 
 def extract_issue_number(branch_name):
     """Extract issue number from branch name like feature/issue-42 or feature/ISSUE-42-desc."""
-    match = re.match(r"^feature/[iI][sS][sS][uU][eE]-(\d+)", branch_name)
+    match = FEATURE_ISSUE_BRANCH_RE.match(branch_name)
     if match:
         return match.group(1)
     return None
