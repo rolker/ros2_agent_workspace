@@ -19,3 +19,28 @@ issue: 461
 - [x] (suggestion) `copilot --version` is a presence check, not an auth check — `.claude/skills/review-code/SKILL.md` step 5e probe
 - [x] (suggestion) `--allow-all-tools` threat-model documentation missing — `.claude/skills/review-code/SKILL.md` step 5e invocation
 - [x] (suggestion) Tempfile cleanup missing — `.claude/skills/review-code/SKILL.md` step 5e invocation
+
+## Local Review
+**Status**: complete
+**When**: 2026-05-18 17:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: approved
+
+**PR**: #464 at `67a7f46`
+**Mode**: post-PR
+**Depth**: Standard (reason: governance-touching, 9 files, no ADR add)
+**Must-fix**: 0 | **Suggestions**: 8
+
+### Findings
+- [ ] (suggestion) Light + --skip-static = zero-specialist predicate is stale post-5e — `.claude/skills/review-code/SKILL.md:629` and `:316-317`
+- [ ] (suggestion) No timeout on synchronous Copilot invocation — `.claude/skills/review-code/SKILL.md:484`
+- [ ] (suggestion) Post-invocation auth/empty-output detection in prose but not in snippet — `.claude/skills/review-code/SKILL.md:461-466`
+- [ ] (suggestion) Pre-push progress.md entry header mismatch (`## Local Review` vs `(Pre-Push)`) — `.agent/work-plans/issue-461/progress.md:15`
+- [ ] (suggestion) Pre-push coverage over-claim (tier semantics) — `.agent/knowledge/skill_workflows.md:24`, `.github/copilot-instructions.md:32`
+- [ ] (suggestion) Naming inconsistency "Adversarial Specialist (Claude)" vs "Claude Adversarial Specialist" — `.agent/knowledge/inspiration_agent_workspace_digest.md:60`
+- [ ] (suggestion) No `**Copilot Adversarial**:` parallel header line in Standard/Deep full report format — `.claude/skills/review-code/SKILL.md:554` area
+- [ ] (suggestion) `--allow-all-tools` security caveat scope ambiguous on post-PR contributor diffs — `.claude/skills/review-code/SKILL.md:508`
+
+### False positives dismissed
+- Copilot bot claimed duplicate adapter at `custom-instructions/repo/.github/copilot-instructions.md` — file does not exist (`find` empty).
+- `sed -i` BSD/macOS portability — workspace is Linux-only (Ubuntu/ROS 2 Jazzy).
