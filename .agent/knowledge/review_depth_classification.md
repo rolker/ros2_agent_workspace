@@ -66,10 +66,14 @@ source path differs:
 - No Deep promotion triggers
 
 **Specialists dispatched**:
-- Static Analysis only
+- Static Analysis
+- Copilot Adversarial (synchronous Copilot CLI; skipped with notice if
+  unavailable; suppressed entirely by `--no-copilot`)
 
-**Report format**: Condensed — static analysis findings plus a one-line
-governance note ("No governance concerns for a change of this scope").
+**Report format**: Condensed — static analysis findings, Copilot
+Adversarial findings (or a one-line skip notice / omitted entirely
+when `--no-copilot` was used), plus a one-line governance note
+("No governance concerns for a change of this scope").
 
 #### Standard
 
@@ -82,7 +86,9 @@ governance note ("No governance concerns for a change of this scope").
 - Static Analysis
 - Governance
 - Plan Drift
-- Adversarial (Claude, fresh context)
+- Claude Adversarial (fresh context)
+- Copilot Adversarial (synchronous Copilot CLI; skipped with notice if
+  unavailable; suppressed entirely by `--no-copilot`)
 
 **Report format**: Full report with all sections.
 
@@ -96,19 +102,21 @@ governance note ("No governance concerns for a change of this scope").
 - Any Deep promotion trigger
 
 **Specialists dispatched**:
-- Same as Standard. The Adversarial Specialist is already running at
-  Standard; Deep adds extra emphasis in the prompt (longer file horizon,
-  explicit security/concurrency/lifecycle checklist) but uses the same
-  fresh-context dispatch mechanism.
+- Same as Standard. Both adversarial specialists (Claude and Copilot)
+  are already running at Standard; Deep adds extra emphasis in the
+  prompt (longer file horizon, explicit security/concurrency/lifecycle
+  checklist) but uses the same fresh-context dispatch mechanism.
 
 **Report format**: Full report with all sections.
 
-> **Note on cross-model adversarial**: The fork runs a Cross-Model
-> Adversarial Specialist at Deep tier (`cross_model_review.sh` —
-> Gemini/Codex/Copilot via tmux). That dispatch is not adopted here (see
-> the "Not adopted" entry in `inspiration_agent_workspace_digest.md`).
-> When we want a second model's read on a Deep PR, run that agent's
-> review-code skill manually.
+> **Note on cross-model adversarial**: The Copilot-only slice of
+> upstream's Cross-Model Adversarial Specialist is wired in as
+> `review-code` step 5e (synchronous Copilot CLI, no tmux,
+> default-on at all tiers, `--no-copilot` opt-out) — see the
+> "Partially adopted" entry in `inspiration_agent_workspace_digest.md`.
+> The Gemini/Codex tmux dispatch from upstream `cross_model_review.sh`
+> remains unadopted. When you want a third or fourth model's read on a
+> Deep PR, run that agent's review-code skill manually.
 
 ## Override-Trigger Files
 

@@ -57,10 +57,10 @@ of the surrounding tooling.
   Standard / Deep tier criteria, and user-override syntax. Adapted to
   workspace-and-project repo paths and framed **experimental** until
   thresholds are validated against real PR data.
-- **Adversarial Specialist (Claude-only)** in `review-code`. Fresh-context
+- **Adversarial Specialist (Claude)** in `review-code`. Fresh-context
   subagent dispatched at Standard and Deep tiers via `Agent`, with no
-  context from other specialists. Cross-model variant deliberately not
-  ported (see "Not adopted" below).
+  context from other specialists. A Copilot-only slice of the upstream
+  cross-model variant is also ported — see "Partially adopted" below.
 - **`review-code` dual-mode + depth dispatch.** Pre-push mode (no arg)
   diffs against the current repo's default branch; post-PR mode
   (`<N>` or URL) diffs against the PR base. Specialists dispatched per
@@ -73,16 +73,41 @@ of the surrounding tooling.
   plan file, or `--issue <N>` (resolved to
   `.agent/work-plans/issue-<N>/plan.md`).
 
-## Not adopted
+## Partially adopted
 
-- **Cross-Model Adversarial Specialist** (`.agent/scripts/cross_model_review.sh`,
-  Gemini/Codex/Copilot tmux dispatch). The workspace doesn't standardize
-  on multi-CLI review yet, and the tmux session machinery adds complexity
-  beyond the highest-leverage subset (Claude-only adversarial). Revisit
-  if multi-CLI review becomes a workflow we actually exercise.
+- **Copilot Adversarial Specialist** (`review-code` step 5e). Ported in
+  PR #464 (issue #461). Synchronous Copilot CLI dispatch (`copilot -p ""
+  --allow-all-tools < prompt`), no tmux, default-on at Light + Standard
+  + Deep, opt-out via `--no-copilot`, graceful skip when the CLI is
+  missing or unauthenticated (covers field hosts gabby/salmon). The
+  v1 context choice is the Copilot CLI default (~25.5k token floor) —
+  scheduled for evaluation against real-PR cost data; see the
+  cost-evaluation follow-up issue
+  ([#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
+  Light-tier activation produces a deliberate resource inversion (a
+  trivial PR's Light review now consumes more external token budget
+  than yesterday's Standard) — accepted as a v1 tradeoff for the
+  cross-model second-read signal, revisited once cost data is in.
+- **What remains unadopted**: the tmux-orchestrated multi-CLI dispatch
+  in `cross_model_review.sh` and the Gemini/Codex specialists. The
+  tmux session machinery adds complexity beyond the highest-leverage
+  subset and the workspace doesn't standardize on Gemini or Codex.
+  Revisit if multi-CLI parallel review (beyond Claude + Copilot)
+  becomes a workflow we actually exercise.
   - **Update 2026-05-15**: upstream extended the script with `--branch`
     mode and a `_resolve_default_branch.sh` helper (PR #185). Still not
-    applicable here for the same reason — the script itself isn't ported.
+    applicable to the unadopted slice — the script itself isn't ported,
+    only the Copilot single-CLI invocation pattern was lifted.
+  - **Upstream invocation report**:
+    [rolker/agent_workspace#212](https://github.com/rolker/agent_workspace/issues/212)
+    flags that upstream's `copilot -p < prompt` likely misses
+    `-p ""` and `--allow-all-tools`; the Copilot dispatch may be
+    silently broken or version-dependent. Decoupled from this
+    workspace's adoption.
+
+## Not adopted
+
+_None outstanding._
 
 ## Deferred
 

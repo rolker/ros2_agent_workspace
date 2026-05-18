@@ -83,10 +83,13 @@ acceptance-criteria questions were resolved 2026-05-18:
 
 | File | Change |
 |------|--------|
-| `.claude/skills/review-code/SKILL.md` | Add 5e Copilot Adversarial subsection (Standard prompt reused on Light + Deep adds existing Deep focus areas); add `--no-copilot` to Usage + arg parser; update step-5 tier dispatch to fire 5e on all tiers; update Light condensed report format (lines 444–459) to include Copilot findings slot; replace 5d cross-model-not-wired note with pointer to 5e |
-| `.agent/knowledge/inspiration_agent_workspace_digest.md` | Move Cross-Model entry from "Not adopted" → new "Partially adopted" entry; preserve non-Copilot non-adoption rationale; fix line ~62 ("Ported → Adversarial Specialist") stale "Cross-model variant deliberately not ported" sentence |
+| `.claude/skills/review-code/SKILL.md` | Add 5e Copilot Adversarial subsection (Standard prompt reused on Light + Deep adds existing Deep focus areas); add `--no-copilot` to Usage + arg parser; update step-5 tier dispatch to fire 5e on all tiers; update Light condensed report format to include Copilot findings slot; rename 5d to "Claude Adversarial Specialist"; replace 5d cross-model-not-wired note with pointer to 5e |
+| `.agent/knowledge/inspiration_agent_workspace_digest.md` | Move Cross-Model entry from "Not adopted" → new "Partially adopted" entry; preserve non-Copilot non-adoption rationale; fix the "Ported → Adversarial Specialist" stale "Cross-model variant deliberately not ported" sentence |
 | `.agent/knowledge/review_depth_classification.md` | Add Copilot Adversarial to Light/Standard/Deep specialist lists; invert the "Note on cross-model adversarial" block; add Copilot slot to Light condensed report description |
-| `.agent/knowledge/skill_workflows.md` | Reword or remove line 18 "Adversarial-Claude-only caveat" reference |
+| `.agent/knowledge/skill_workflows.md` | Reword the "Adversarial-Claude-only caveat" reference to "the Claude Adversarial Specialist still requires Claude Code's `Agent` tool, but the Copilot Adversarial Specialist runs from any runtime that has the `copilot` CLI" |
+| `.github/copilot-instructions.md` | Rename "Adversarial Specialist is Claude-only" to "Claude Adversarial Specialist is Claude-only"; add Copilot Adversarial to framework-agnostic list; update the pre-push caveat (Copilot's pre-push pass cannot catch *Claude*-side adversarial findings — Copilot Adversarial runs natively) |
+| `.agent/instructions/gemini-cli.instructions.md` | Same rename + Copilot Adversarial addition pattern as the Copilot adapter |
+| `.agent/AGENT_ONBOARDING.md` | Same rename + Copilot Adversarial addition pattern as the Copilot adapter |
 
 No new script file. The invocation is small enough (3–4 lines: probe,
 call, strip trailing block) to live inline in SKILL.md as part of step
@@ -120,7 +123,7 @@ call, strip trailing block) to live inline in SKILL.md as part of step
 |---|---|---|
 | `review-code` specialist set (add 5e) | `inspiration_agent_workspace_digest.md` "Not adopted" → "Partially adopted" | Yes — Step 5 |
 | `review-code` Usage (`--no-copilot`) | None — `review-code` is invoked as a skill; no other consumers of its CLI surface | Verify via workspace grep before commit |
-| `review-code` specialist set | `AGENTS.md` / `CLAUDE.md` references to review-code | Workspace grep planned during implementation (no specialist-list enumeration found in earlier passes) |
+| `review-code` specialist set | Framework adapters that reference "Adversarial Specialist is Claude-only" | Yes — Files-to-Change row added during implementation for `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`. The original plan said "no specialist-list enumeration found"; that was wrong — three adapters carried the stale phrasing |
 | Cross-model "not adopted" / "Claude-only" prose in knowledge docs | `review_depth_classification.md`, `skill_workflows.md`, `inspiration_agent_workspace_digest.md` (line ~62 in "Ported" section) | Yes — listed in Files to Change + Step 5a/5b |
 | Default-on Premium-request consumption | Cost-evaluation follow-up issue | Yes — Step 7 |
 | Upstream `cross_model_review.sh` invocation suspected broken | Issue filed on `rolker/agent_workspace` | Yes — Step 6 |
@@ -140,6 +143,19 @@ derived questions that the original four didn't directly address:
 
 ## Estimated Scope
 
-Single PR. Two file edits + two new issues filed (one upstream, one
-follow-up). No new scripts unless inline shell exceeds ~15 lines
-during implementation.
+Single PR. Four-plus knowledge/skill file edits, three framework-adapter
+edits, and two new issues filed (one upstream, one follow-up). No new
+scripts — inline shell stayed under 15 lines as anticipated.
+
+## Implementation Notes
+
+- **Framework adapters carried stale "Claude-only" phrasing.** Plan-time
+  workspace grep was scoped narrowly; in-flight grep
+  (`grep -rln -E "cross-model|cross_model|Claude.{0,5}only|..."`) found
+  three additional consumers: `.github/copilot-instructions.md`,
+  `.agent/instructions/gemini-cli.instructions.md`, and
+  `.agent/AGENT_ONBOARDING.md`. All three said "Adversarial Specialist
+  is Claude-only" — actively wrong after this PR. Folded into the same
+  knowledge-doc commit since the prose change is identical
+  (rename to "Claude Adversarial Specialist", add Copilot Adversarial
+  as framework-agnostic).

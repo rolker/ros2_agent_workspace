@@ -56,10 +56,12 @@ a PR. The skill body is plain markdown at
 [`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md);
 follow its steps regardless of framework.
 
-**Adversarial Specialist is Claude-only** — its dispatch relies on
-Claude Code's `Agent` tool. Other frameworks should run the remaining
-specialists (Static Analysis, Governance, Plan Drift) and note that
-Adversarial was skipped due to the runtime.
+**Claude Adversarial Specialist is Claude-only** — its dispatch
+relies on Claude Code's `Agent` tool. Other frameworks should run the
+remaining specialists (Static Analysis, Governance, Plan Drift,
+**Copilot Adversarial** — provided the `copilot` CLI is installed and
+authenticated) and note that Claude Adversarial was skipped due to
+the runtime.
 
 ## Workflow Skills
 
