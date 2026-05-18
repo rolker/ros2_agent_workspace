@@ -433,9 +433,8 @@ stronger signal than the same model agreeing with itself) is the
 reason this runs at every tier, not just Deep.
 
 **Availability probe**. Skip with a one-line notice (not a failure)
-when the CLI is missing or unauthenticated, so field-mode hosts
-(gabby, salmon — no GitHub credentials) don't block the rest of the
-review:
+when the CLI is missing, so field-mode hosts (gabby, salmon — no
+GitHub credentials) don't block the rest of the review:
 
 ```bash
 if [[ "$NO_COPILOT" == "1" ]]; then
@@ -445,7 +444,16 @@ elif ! command -v copilot >/dev/null 2>&1; then
     COPILOT_SKIP_REASON="copilot CLI not installed"
     SKIP_COPILOT=1
 elif ! copilot --version >/dev/null 2>&1; then
-    COPILOT_SKIP_REASON="copilot CLI not authenticated (run \`copilot\` interactively to log in)"
+    # `copilot --version` is a presence check, not an auth check —
+    # `--version` typically prints without contacting the API. We keep
+    # it as a "binary at least runs" sanity guard. Auth failures
+    # surface from the actual invocation below: if the
+    # post-strip findings file is empty, contains only error text
+    # (e.g., `Please run \`copilot\` to authenticate`), or the
+    # command exits non-zero, switch the report line to
+    # `Copilot Adversarial skipped: copilot CLI not authenticated`
+    # rather than presenting empty findings.
+    COPILOT_SKIP_REASON="copilot --version failed (binary broken or missing dependencies)"
     SKIP_COPILOT=1
 fi
 ```
@@ -453,6 +461,9 @@ fi
 When `SKIP_COPILOT=1` and `NO_COPILOT` is unset, the report includes:
 `Copilot Adversarial skipped: <COPILOT_SKIP_REASON>`. When
 `NO_COPILOT=1`, the specialist is omitted from the report entirely.
+A post-call empty-findings or "Please run `copilot` to authenticate"
+output also routes to the skipped-notice path so unauthenticated
+hosts don't surface as silent zero-finding reviews.
 
 **Prompt body**. Light + Standard reuse the same prompt as the Standard
 Claude Adversarial prompt (the four focus areas under 5d: missed edge
@@ -468,17 +479,33 @@ the same diff".
 ```bash
 PROMPT_FILE=$(mktemp /tmp/copilot_adv_prompt.XXXXXX)
 FINDINGS_FILE=$(mktemp /tmp/copilot_adv_findings.XXXXXX)
+trap 'rm -f "$PROMPT_FILE" "$FINDINGS_FILE"' EXIT  # tempfile cleanup
 # Build $PROMPT_FILE from the diff + the tier-appropriate prompt body above.
 copilot -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
 # Strip the trailing `Changes / Requests / Tokens` metadata block. The
 # block starts with a "Changes" line and runs to EOF; cut from there.
+# If a future Copilot CLI version changes the footer format, this is
+# a no-op (no `^Changes$` line to match) and the metadata will leak
+# into the report — visible enough to prompt a regex update.
 sed -i '/^Changes$/,$d' "$FINDINGS_FILE"
+# Read $FINDINGS_FILE before the EXIT trap fires.
 ```
 
 The empty-value form `-p ""` plus stdin is what activates Copilot's
 headless mode; `--allow-all-tools` is required so the CLI doesn't
 prompt for permission (which would hang on stdin). Smoke-tested
 locally on `@github/copilot` v1.0.48.
+
+**Security note on `--allow-all-tools`**. The flag grants Copilot
+permission to execute any tool the CLI exposes (file reads, shell
+commands, etc.) on this host. The review-code use case — Copilot
+reading a diff that the invoking user just authored in their own
+worktree — accepts that threat model: the prompt is constructed
+locally, not received over a network, and the worktree is already
+under the user's control. Don't reuse this invocation pattern for
+prompts that include untrusted input (e.g., reviewing an unvetted PR
+from an external contributor with arbitrary diff content) until
+Copilot CLI grows scoped permissions.
 
 **Context cost**. Copilot autoloads workspace context on launch — a
 trivial prompt floors at ~25.5k tokens and consumes one Premium
