@@ -48,3 +48,22 @@ jobs:
           use-quiet-mode: 'yes'
           config-file: '.github/markdown-link-check.json'
         continue-on-error: true
+
+  validate-commit-identity:
+    name: Validate commit identity (Mechanism C)
+    runs-on: ubuntu-latest
+    # Only run on PRs — there's no PR number to check against on bare pushes.
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Validate PR commit authors against agent-branch convention
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .agent/hooks/check_pr_authors.py "${{ github.event.pull_request.number }}"
