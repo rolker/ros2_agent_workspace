@@ -54,6 +54,6 @@ issue: 461
 **CI**: all-pass (8 checks)
 
 ### Actions
-- [ ] (suggestion) Drop the broken `see $FINDINGS_FILE` pointer from non-zero-exit skip reason — `.claude/skills/review-code/SKILL.md:516` (file deleted by EXIT trap)
-- [ ] (suggestion) Qualify framework-agnostic specialist claim to mention authentication — `.github/copilot-instructions.md:47`
+- [x] (suggestion) Drop the broken `see $FINDINGS_FILE` pointer from non-zero-exit skip reason — `.claude/skills/review-code/SKILL.md` (replaced with inline `head -c 200` capture of findings file contents into the reason string itself)
+- [x] (suggestion) Qualify framework-agnostic specialist claim to mention authentication — `.github/copilot-instructions.md:47`
 - [ ] (Optional, web-UI-only) Dismiss addressed + FP Copilot comments on GitHub

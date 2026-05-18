@@ -44,7 +44,9 @@ fresh subagent via Claude Code's `Agent` tool, which Copilot doesn't
 expose. The other specialists (Static Analysis, Governance, Plan
 Drift, **Copilot Adversarial**) are framework-agnostic and run
 regardless of host runtime, provided the relevant CLI tools are
-installed.
+installed and authenticated where applicable (Copilot Adversarial
+additionally requires `copilot` CLI authentication — unauthenticated
+hosts route to the skipped-with-notice path automatically).
 
 ## Environment Setup
 

@@ -538,7 +538,9 @@ if [[ "$COPILOT_EXIT" == "124" ]]; then
     COPILOT_SKIP_REASON="copilot CLI timed out after 300s"
 elif [[ "$COPILOT_EXIT" != "0" ]]; then
     SKIP_COPILOT=1
-    COPILOT_SKIP_REASON="copilot CLI exited $COPILOT_EXIT (see $FINDINGS_FILE)"
+    # Capture findings-file contents in the reason itself — the EXIT
+    # trap will delete the tempfile before the user can inspect it.
+    COPILOT_SKIP_REASON="copilot CLI exited $COPILOT_EXIT: $(head -c 200 "$FINDINGS_FILE")"
 elif [[ ! -s "$FINDINGS_FILE" ]]; then
     SKIP_COPILOT=1
     COPILOT_SKIP_REASON="copilot produced no output (likely not authenticated)"
