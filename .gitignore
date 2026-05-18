@@ -33,6 +33,9 @@ COLCON_IGNORE
 # Generated Claude Code skills (regenerate with: make generate-skills)
 .claude/skills/make_*/
 
+# Claude Code harness runtime state (per-session lock files)
+.claude/*.lock
+
 # Agent Scratchpad (Temporary files and artifacts)
 .agent/scratchpad/*
 !.agent/scratchpad/README.md
