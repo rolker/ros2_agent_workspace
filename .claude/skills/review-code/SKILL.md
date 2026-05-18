@@ -8,15 +8,30 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code                                # pre-push: diff vs default branch
-/review-code --base <branch>                # pre-push, override default base
-/review-code <pr-number>                    # post-PR: diff vs PR base
-/review-code <pr-url>                       # post-PR
-/review-code <pr-number> [light|standard|deep]   # post-PR with depth override
+/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [light|standard|deep]
+                                            # pre-push: diff vs default branch
+/review-code <pr-number-or-url> [--skip-static] [light|standard|deep]
+                                            # post-PR: diff vs PR base
 ```
 
-The optional depth keyword (`light` / `standard` / `deep`) overrides
-automatic classification.
+Flags:
+- **depth keyword** (`light` / `standard` / `deep`, positional) overrides
+  automatic classification.
+- **`--base <branch>`** (pre-push only) overrides the default base branch.
+- **`--skip-static`** (both modes) suppresses the Static Analysis
+  Specialist. Useful when pre-commit was already clean or linters were
+  run separately; the report header notes the skip.
+- **`--no-progress`** (pre-push only) opts out of `progress.md`
+  persistence. Use for skill worktrees and one-off branches that don't
+  have an associated issue. Does not apply to post-PR mode — a PR with
+  no closing references is already handled by step 8's no-issue
+  fallthrough.
+- **`--issue <N>`** (pre-push only) explicit issue number override.
+  Use when the branch name doesn't match `feature/issue-<N>` /
+  `feature/ISSUE-<N>-…` (e.g., skill worktrees, manually named
+  branches). When passed, the branch-name extraction at step 1 is
+  skipped. Mutually compatible with `--no-progress` — `--no-progress`
+  wins (no persistence regardless of issue number).
 
 ## Overview
 
@@ -61,24 +76,33 @@ post comments or modify the PR unless the user asks.
 
 ### 1. Detect mode and gather diff context
 
-Determine pre-push vs post-PR mode from the arguments. Parse out the
-optional depth keyword first (`light` / `standard` / `deep` — positional,
-matching the Usage block above), then classify what remains:
+Parse the arguments in this order: extract `--skip-static` (sets
+`SKIP_STATIC=true`), `--no-progress` (sets `NO_PROGRESS=true`, pre-push
+only — emit an error if passed in post-PR mode), `--issue <N>` (sets
+`USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
+mode, where `closingIssuesReferences` is authoritative), `--base
+<branch>` (sets `USER_BASE`), then the optional depth keyword (`light`
+/ `standard` / `deep` — positional). Classify what remains:
 
-- Empty, or only `--base <branch>` → **pre-push mode**
+- Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
 
-The depth keyword is positional and may appear after the PR number /
-URL or after `--base <branch>`. The same syntax applies in both modes.
-Examples:
+The depth keyword and `--skip-static` may appear in any order around
+the PR number / URL or `--base <branch>`. The same syntax applies in
+both modes. Examples:
 
 ```
-/review-code                       # pre-push, auto-classify
-/review-code deep                  # pre-push, force Deep
-/review-code --base develop        # pre-push, override base
-/review-code --base develop deep   # pre-push with override + force Deep
-/review-code 42                    # post-PR, auto-classify
-/review-code 42 standard           # post-PR, force Standard
+/review-code                                # pre-push, auto-classify
+/review-code deep                           # pre-push, force Deep
+/review-code --base develop                 # pre-push, override base
+/review-code --base develop deep            # pre-push with override + force Deep
+/review-code --skip-static                  # pre-push, skip static analysis
+/review-code --skip-static light            # pre-push, light + skip static
+/review-code --no-progress                  # pre-push, don't write progress.md
+/review-code --issue 460                    # pre-push, override branch-name issue extraction
+/review-code 42                             # post-PR, auto-classify
+/review-code 42 standard                    # post-PR, force Standard
+/review-code 42 --skip-static               # post-PR, skip static analysis
 ```
 
 #### Pre-push mode
@@ -121,9 +145,14 @@ git diff "origin/$BASE...HEAD" --stat
 git diff "origin/$BASE...HEAD"
 git diff "origin/$BASE...HEAD" --numstat   # per-file +/- counts
 
-# Linked issue from branch name (feature/issue-<N> or feature/ISSUE-<N>-...)
+# Linked issue: explicit --issue <N> wins; otherwise extract from branch
+# name (feature/issue-<N> or feature/ISSUE-<N>-...).
 BRANCH=$(git branch --show-current)
-ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0-9]+' | head -1)
+if [[ -n "$USER_ISSUE" ]]; then
+    ISSUE_NUM="$USER_ISSUE"
+else
+    ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'issue-[0-9]+|ISSUE-[0-9]+' | grep -oE '[0-9]+' | head -1)
+fi
 ```
 
 `--base <branch>` is parsed from the argument list before the snippet
@@ -261,9 +290,16 @@ lifecycle checklist).
 
 #### 5a. Static Analysis Specialist
 
-Run linters on **changed files only**, using the config profile from
-step 4. See `.agent/knowledge/review_static_analysis.md` for exact
-commands and flags.
+**Skip if `SKIP_STATIC=true`** (`--skip-static` flag passed in step 1):
+emit no findings for this specialist and note "Static analysis skipped
+(--skip-static)" so the report header can surface it. At Light tier
+with `--skip-static`, zero specialists run and the silence filter
+produces the "No findings" output — that's the documented behavior,
+not a bug.
+
+Otherwise, run linters on **changed files only**, using the config
+profile from step 4. See `.agent/knowledge/review_static_analysis.md`
+for exact commands and flags.
 
 If **no linter profile matches any changed file**, report this
 explicitly: "No static analysis profile configured for these file types
@@ -395,6 +431,7 @@ Collect all findings from all dispatched specialists and filter:
 **Repo**: workspace | <project-repo>
 **Files changed**: <count> (+<additions> -<deletions>)
 **Review depth**: <Light|Standard|Deep> (reason: <primary signal>)
+**Static analysis**: <run | skipped (--skip-static)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
@@ -448,6 +485,7 @@ Existing Review Comments sections. Use:
 
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
+**Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 
 ### Static Analysis
 
@@ -458,6 +496,8 @@ Existing Review Comments sections. Use:
 No governance concerns for a change of this scope.
 ```
 
+When `SKIP_STATIC=true` and no other specialists fire (Light + `--skip-static` = zero specialists), drop the `### Static Analysis` table entirely and use the No-findings format below — the `**Static analysis**: skipped` header line carries the only signal that needs to surface.
+
 **No findings format** — if no findings exist across all sections:
 
 ```markdown
@@ -465,6 +505,7 @@ No governance concerns for a change of this scope.
 
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
+**Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 No issues found. LGTM.
 ```
 
@@ -472,6 +513,15 @@ No issues found. LGTM.
 
 After outputting the report to the conversation, append a step entry to
 `progress.md` so findings survive across sessions.
+
+**Skip this entire step** when `NO_PROGRESS=true` (`--no-progress` flag,
+pre-push only). Add a one-line note to the report Summary: "Progress
+persistence skipped (--no-progress)." Use this when the review is on a
+skill worktree or one-off branch that doesn't have an associated issue
+and shouldn't accumulate a timeline. Step 8 also no-ops naturally when
+no issue number can be resolved (rare field-mode case) — that's
+distinct from the explicit opt-out and gets a different Summary
+message: "Progress persistence skipped (no linked issue)."
 
 **Locate or create progress.md**: Use the issue number resolved in step 1.
 Determine which repo owns the linked issue (workspace repo for workspace
@@ -495,7 +545,11 @@ issue: <N>
 # Issue #<N> — <issue title>
 ```
 
-Append this step entry:
+Append this step entry. The snippet below shows the post-PR header; in
+pre-push mode change just the header to `## Local Review (Pre-Push)` so
+the same issue can carry both a pre-push and a post-PR entry on its
+timeline without one overwriting the other. Append only one header line
+— never both.
 
 ```markdown
 
@@ -532,7 +586,8 @@ Key points:
   git -C <worktree-path> commit -m "progress: local review for #<N>"
   ```
 - If no issue number was resolved in step 1, skip persistence and note
-  this in the report Summary ("Findings not persisted: no linked issue").
+  this in the report Summary ("Progress persistence skipped (no linked
+  issue)") — the same canonical wording used in the step-8 intro above.
 
 ## Guidelines
 
