@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CI check: reject PRs where an agent-convention branch has commits
-authored under a human email (Mechanism C from issue #468).
+whose primary author email matches a human pattern (Mechanism C from
+issue #468).
 
 The pre-commit hook `check-commit-identity.py` enforces the same rule
 locally, but it depends on `$AGENT_NAME` being set in the commit
@@ -9,14 +10,22 @@ subshells) can defeat. This script is the load-bearing defense: it
 runs in CI, has no env-var dependency, and operates only on the commit
 authorship that GitHub records.
 
+**Primary-author semantics.** The check inspects only the primary
+author (the `author` of record on the commit). Co-Authored-By trailers
+— which GitHub surfaces alongside the primary author in
+`gh pr view --json commits` — are **not** evaluated. This is
+deliberate: legitimate agent commits often credit Roland as
+Co-Authored-By for pair-work, and #468's actual failure mode is
+primary-author drift (the worked example on PR #464 had four commits
+whose primary author was the human user, not their coauthor).
+
 Usage:
     check_pr_authors.py <pr-number>
 
 Exits 0 if:
 - The PR head branch is not an agent-convention branch (nothing to
   check), or
-- All commits have authors matching `ACCEPTED_AGENT_PATTERNS` (or
-  github-bot author types that are explicitly allowlisted).
+- Every commit's primary author email is NOT in `HUMAN_PATTERNS`.
 
 Exits 1 (and prints offending commits) otherwise.
 
@@ -62,6 +71,13 @@ def main():
         return 2
 
     pr_number = sys.argv[1]
+    if not pr_number.isdigit():
+        print(
+            f"ERROR: <pr-number> must be a positive integer; got: {pr_number!r}",
+            file=sys.stderr,
+        )
+        print(f"usage: {sys.argv[0]} <pr-number>", file=sys.stderr)
+        return 2
 
     # Pull PR metadata + commit list in one gh call (fewer round trips).
     pr_info = gh_json(
@@ -96,13 +112,19 @@ def main():
     offending = []
     for c in commits:
         sha = c.get("oid", "")[:7]
-        # gh returns a list of authors per commit (GitHub coauthor model).
-        # Reject if any author's email is in HUMAN_PATTERNS.
-        for author in c.get("authors") or []:
-            email = (author.get("email") or "").strip()
-            name = (author.get("name") or "").strip()
-            if matches_any(email, HUMAN_PATTERNS):
-                offending.append((sha, name, email, c.get("messageHeadline", "")))
+        # gh's `commits` field returns an `authors` list where authors[0]
+        # is the primary commit author and authors[1:] are Co-Authored-By
+        # trailers. #468 is about *primary* author drift — we deliberately
+        # do not evaluate coauthors so legitimate pair-work attribution
+        # (e.g., agent commit crediting Roland as coauthor) isn't blocked.
+        authors = c.get("authors") or []
+        if not authors:
+            continue
+        primary = authors[0]
+        email = (primary.get("email") or "").strip()
+        name = (primary.get("name") or "").strip()
+        if matches_any(email, HUMAN_PATTERNS):
+            offending.append((sha, name, email, c.get("messageHeadline", "")))
 
     if not offending:
         print(
@@ -113,7 +135,7 @@ def main():
 
     print(
         f"❌ PR #{pr_number}: {len(offending)} of {len(commits)} commit(s) "
-        f"on agent branch '{head_branch}' are authored under a human email.",
+        f"on agent branch '{head_branch}' have a human-pattern primary author.",
         file=sys.stderr,
     )
     print(file=sys.stderr)

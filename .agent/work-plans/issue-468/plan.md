@@ -186,7 +186,7 @@ commits suggested grouping:
 3. CI: new `check_pr_authors.py` + new `validate-commit-identity`
    job in `validate.yml`
 
-Three commits, each independently revertable.
+Three commits, each independently revertible.
 
 ## Implementation Notes
 

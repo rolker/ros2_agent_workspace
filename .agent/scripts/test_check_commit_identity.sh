@@ -125,6 +125,60 @@ run_case "permissive: unknown email → reject (current behavior preserved)" \
 run_case "strict: unknown email → reject" \
     "feature/issue-100" "Claude Code Agent" "stranger@example.com" 1
 
+# --- Canonical Mechanism B pattern: git -c user.email=... propagation ---
+# This tests that the hook correctly sees the agent email when the user
+# invokes `git -c user.email=$AGENT_EMAIL commit` against a repo whose
+# .git/config carries the human identity. Git propagates -c overrides
+# to subprocesses (including the pre-commit hook) via the
+# GIT_CONFIG_PARAMETERS env var. This is the pattern documented in
+# AGENTS.md "Agent Commit Identity"; pin it here so any regression in
+# the hook's email resolution (e.g., bypassing the override) trips the
+# test.
+echo ""
+echo "--- Mechanism B canonical -c propagation ---"
+
+# Pre-set the on-disk config to a human email (simulating the failure
+# mode where a sub-agent inherits .git/config from the user's setup).
+git config user.email "roland@ccom.unh.edu"
+git checkout -B "feature/issue-100" --quiet
+
+# Simulate `git -c user.email=$AGENT_EMAIL commit`: git would set
+# GIT_CONFIG_PARAMETERS for the hook subprocess so it sees the override.
+actual_exit=0
+output=$(
+    AGENT_NAME="Claude Code Agent" \
+    GIT_CONFIG_PARAMETERS="'user.email=roland+claude-code@ccom.unh.edu'" \
+    python3 "$HOOK" 2>&1
+) || actual_exit=$?
+
+if [[ "$actual_exit" == "0" ]]; then
+    echo "✅ strict: agent branch + AGENT_NAME + on-disk human email + -c agent override → accept (GIT_CONFIG_PARAMETERS propagation works)"
+    PASS=$((PASS + 1))
+else
+    echo "❌ strict: -c agent override should have been seen by hook, got exit=$actual_exit"
+    FAIL=$((FAIL + 1))
+    FAIL_DETAILS+=("git -c propagation")
+    while IFS= read -r line; do echo "     $line"; done <<<"$output"
+fi
+
+# Sanity check the inverse: without the -c override but with the same
+# on-disk human config, strict mode rejects.
+actual_exit=0
+output=$(
+    AGENT_NAME="Claude Code Agent" \
+    python3 "$HOOK" 2>&1
+) || actual_exit=$?
+
+if [[ "$actual_exit" == "1" ]]; then
+    echo "✅ strict: agent branch + AGENT_NAME + on-disk human email (no -c) → reject (no propagation, hook sees human)"
+    PASS=$((PASS + 1))
+else
+    echo "❌ strict: should have rejected on-disk human email without override, got exit=$actual_exit"
+    FAIL=$((FAIL + 1))
+    FAIL_DETAILS+=("no propagation rejection")
+    while IFS= read -r line; do echo "     $line"; done <<<"$output"
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 
