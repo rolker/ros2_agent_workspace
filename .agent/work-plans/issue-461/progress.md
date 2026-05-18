@@ -44,3 +44,16 @@ issue: 461
 ### False positives dismissed
 - Copilot bot claimed duplicate adapter at `custom-instructions/repo/.github/copilot-instructions.md` — file does not exist (`find` empty).
 - `sed -i` BSD/macOS portability — workspace is Linux-only (Ubuntu/ROS 2 Jazzy).
+
+## External Review
+**Status**: complete
+**When**: 2026-05-18 21:10
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #464 — 4 review(s), 2 new valid (on current head 922d1ea), 14 prior comments triaged in Local Review above
+**CI**: all-pass (8 checks)
+
+### Actions
+- [ ] (suggestion) Drop the broken `see $FINDINGS_FILE` pointer from non-zero-exit skip reason — `.claude/skills/review-code/SKILL.md:516` (file deleted by EXIT trap)
+- [ ] (suggestion) Qualify framework-agnostic specialist claim to mention authentication — `.github/copilot-instructions.md:47`
+- [ ] (Optional, web-UI-only) Dismiss addressed + FP Copilot comments on GitHub
