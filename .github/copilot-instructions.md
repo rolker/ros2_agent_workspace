@@ -52,6 +52,22 @@ Replace `<your model>` with your actual runtime model (e.g. `Claude Sonnet 4.5`,
 Verify with `echo "$AGENT_MODEL"` — it should echo exactly what you passed. Do not edit
 `framework_config.sh` to match your model; the entries there are fallback-only.
 
+**Commit pattern**: sourcing `set_git_identity_env.sh` exports the env
+vars for this shell, but Copilot CLI typically runs each bash command
+in a fresh subshell — the exports don't reach a separate `git commit`
+invocation later. Use per-commit `-c` overrides instead:
+
+```bash
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "…"
+```
+
+This is enforced on `feature/issue-<N>` / `feature/ISSUE-<N>-<desc>` /
+`skill/*` branches by `.agent/hooks/check-commit-identity.py` (pre-commit)
+and `.agent/hooks/check_pr_authors.py` (CI). See AGENTS.md "Agent
+Commit Identity" for the full rationale.
+
 ## Copilot-Specific Notes
 
 - **Native GitHub access**: Use `gh` CLI for fast PR/issue operations.

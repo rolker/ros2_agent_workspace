@@ -79,6 +79,23 @@ source .agent/scripts/set_git_identity_env.sh "Copilot CLI Agent" "roland+copilo
 
 **How it works**: Sets `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` environment variables which take precedence over `.git/config`. Also exports `AGENT_NAME`, `AGENT_EMAIL`, `AGENT_MODEL`, `AGENT_FRAMEWORK` for use in GitHub API signatures.
 
+**Subshell caveat**: agent tool runtimes typically run each bash
+invocation in a fresh subshell, so the env-var exports from this script
+don't reach a separate `git commit` subshell run later. The robust
+agent-commit pattern combines the env-var exports (for signatures)
+with **per-commit `-c` overrides** (for the commit itself):
+
+```bash
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "…"
+```
+
+The `-c` flags propagate to git's subprocesses via `GIT_CONFIG_PARAMETERS`
+so pre-commit hooks see the agent identity even when the bash subshell
+running the commit didn't inherit the sourced exports. See AGENTS.md
+"Agent Commit Identity" for the full pattern + rationale.
+
 #### When to Use Persistent Identity (Containerized Agents)
 
 **Use for**: Antigravity, containerized agents, or dedicated agent-only checkouts.
