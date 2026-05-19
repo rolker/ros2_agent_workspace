@@ -188,7 +188,7 @@ rm -f "$BODY_FILE"
 
 Append a `## Plan Authored` entry to
 `.agent/work-plans/issue-<N>/progress.md` in the same worktree the
-plan lives in. Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+plan lives in. Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
 This step runs **between** the PR creation (step 7) and the report
 (step 9) so the report can cite the progress.md commit SHA.
 
@@ -225,16 +225,18 @@ Append:
 If the plan has no Open Questions, write
 `No open questions — plan is review-plan-ready.` under that header.
 
-Commit:
+Commit and push:
 
 ```bash
 git add .agent/work-plans/issue-<N>/progress.md
 git commit -m "progress: plan authored for #<N>"
+git push
 ```
 
-The progress.md commit lands on the same `feature/issue-<N>` branch
-as the plan, so it shows up on the draft PR alongside the plan
-itself.
+The push is required — step 7 already pushed and opened the draft PR,
+so the new commit needs its own push to appear on the PR alongside
+the plan. Without it the report (step 9) would cite a SHA that's only
+local.
 
 ### 9. Report to user
 

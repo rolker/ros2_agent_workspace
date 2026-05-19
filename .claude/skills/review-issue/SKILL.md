@@ -144,7 +144,7 @@ rm "$BODY_FILE"
 After posting the comment, append a `## Issue Review` entry to
 `.agent/work-plans/issue-<N>/progress.md` so the timeline reflects
 that the issue has been governance-reviewed before plan-task starts.
-Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
 
 **`review-issue` is typically the *first* skill in the lifecycle, so a
 worktree may not exist yet.** Since progress.md commits cannot land on

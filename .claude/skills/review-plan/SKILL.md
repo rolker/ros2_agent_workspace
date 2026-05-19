@@ -246,14 +246,18 @@ Plan looks solid. Ready for implementation.
 
 Append a `## Plan Review` entry to
 `.agent/work-plans/issue-<N>/progress.md` in the worktree that owns
-the plan. Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+the plan. Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
 The entry lets implementation skills and downstream consumers (notably
 `triage-reviews` as integrator) see what the plan review concluded
 without re-reading the entire PR conversation.
 
-When the review ran via `--in-context` (the plan author re-reading
-their own work), still persist — annotate the `**By**` field so
-downstream consumers know the review wasn't independent.
+**Independence annotation.** If this review is the *plan author*
+re-reading their own work — detect by checking whether `$AGENT_NAME`
+matches the `**By**` field of the existing `## Plan Authored` entry
+in the same `progress.md` — annotate the entry's `**By**` field with
+`(in-context — author self-review)` so downstream consumers can weight
+the entry appropriately. Otherwise the review is independent (fresh
+context or different agent) and no annotation is needed.
 
 Append:
 
@@ -262,7 +266,7 @@ Append:
 ## Plan Review
 **Status**: complete
 **When**: <YYYY-MM-DD HH:MM>
-**By**: <agent name> (<model>)<-- annotate `(in-context — author self-review)` if applicable -->
+**By**: <agent name> (<model>)<-- append `(in-context — author self-review)` per the detection above -->
 
 **Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
 **PR**: <plan PR URL, or "PR-less" if --issue / file path mode>
