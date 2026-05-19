@@ -252,6 +252,9 @@ Summarize:
 - Which principles and ADRs were considered
 - Any open questions that need input
 - Link to the draft PR
+- **Cite the `progress.md` commit SHA from step 8** (`progress: plan
+  authored for #<N>`) so the report references the durable timeline
+  artifact, not just the PR
 - Pointer to the "During implementation" section below, so the
   implementer knows to keep the plan in sync with landed code
 - Reminder that `/review-code` (pre-push mode) is the next step after
