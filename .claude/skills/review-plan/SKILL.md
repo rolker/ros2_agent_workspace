@@ -258,10 +258,24 @@ appending, resolve the right place to write:
 
 1. **Resolve the owning repo and issue number** — `<N>` already came
    from step 1 (the PR's `closingIssuesReferences`, the issue argument,
-   or extracted from the plan path). Determine the owning repo with
-   `gh issue view <N> --repo <owner/repo> --json repository --jq
-   '.repository.nameWithOwner'` if it isn't already known from the
-   step-1 PR metadata.
+   or extracted from the plan path). The owning-repo resolution
+   depends on the invocation mode:
+
+   - **PR-number mode**: take the owning repo from step 1's PR
+     metadata (`closingIssuesReferences[].repository.nameWithOwner`)
+     — already in hand, no extra lookup needed.
+   - **`--issue` or file-path mode**: no PR metadata available. Use
+     `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
+     against the current directory's origin (don't pass `--repo
+     <owner/repo>` — that's the value we're resolving). If the
+     workspace lookup fails with `NotFound`, probe each project repo
+     under `layers/main/*/src/*` with `(cd <path> && gh issue view <N>
+     ...)`; first success wins. If all probes fail, stop with an
+     error.
+
+   This mirrors `review-issue` step 8a.1 and `plan-task` step 4 in
+   using cwd-based `gh` resolution rather than the circular `--repo
+   <owner/repo>` form.
 2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
    *and* `$WORKTREE_REPO` matches the owning repo's short slug, the
    current directory is the right worktree. Skip to "Append" below.

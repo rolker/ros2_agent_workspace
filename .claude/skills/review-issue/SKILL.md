@@ -154,10 +154,24 @@ default branch, this step creates a worktree on demand:
 **8a.1.** **Resolve the owning repo first.** Issue numbers can collide
 across the workspace repo and project repos (e.g., workspace `#42` is
 a different issue from `unh_echoboats_project11#42`), so the issue
-number alone is not enough to identify a worktree. Determine the
-owning repo via `gh issue view <N> --repo <owner/repo> --json
-repository --jq '.repository.nameWithOwner'`, mirroring `plan-task`
-step 4's resolution.
+number alone is not enough to identify a worktree.
+
+`gh issue view <N>` without `--repo` resolves against the current
+directory's origin (don't pass `--repo <owner/repo>` — that's the
+value we're trying to determine). Probe in order:
+
+1. **Workspace first** — from the workspace root,
+   `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
+   succeeds if `<N>` is a workspace issue.
+2. **Project repos next** — if the workspace lookup returns
+   `NotFound`, try each project repo under `layers/main/*/src/*`:
+   `(cd <path> && gh issue view <N> --json repository --jq '.repository.nameWithOwner')`.
+   First success wins; record both the path and `owner/repo`.
+3. **No match** — stop with an error; the issue may live in a repo
+   not currently checked out, or `<N>` is wrong.
+
+This mirrors `plan-task` step 4's cwd-based `gh issue view <N>`
+pattern.
 
 **8a.2.** Check `$WORKTREE_ISSUE` **and** `$WORKTREE_REPO`. If
 `$WORKTREE_ISSUE` matches `<N>` *and* `$WORKTREE_REPO` matches the

@@ -52,6 +52,7 @@ following entry types:
 | `## Local Review` | `review-code` post-PR | Local pre-merge review of an existing PR. |
 | `## Local Review (Pre-Push)` | `review-code` pre-push | Local review of unpushed commits before opening / updating a PR. |
 | `## Integrated Review` | `triage-reviews` (post phase B of #470) | Unified findings table integrating local-review entries + GitHub-side reviews; flags cross-source confirmations. |
+| `## External Review` | `triage-reviews` (pre phase B of #470 — *transitional predecessor* of `## Integrated Review`) | Per-PR findings table from a single source. Phase B of [#470](https://github.com/rolker/ros2_agent_workspace/issues/470) renames new writes to `## Integrated Review`; see Predecessor recognition below. |
 | `## Implementation` | future `implement` skill | Marker that implementation completed; references final commit SHA. |
 
 ### Schema

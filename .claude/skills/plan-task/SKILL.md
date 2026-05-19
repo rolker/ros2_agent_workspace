@@ -148,10 +148,18 @@ The plan file path is relative to the current repo (workspace or project):
 mkdir -p .agent/work-plans/issue-<N>
 # (write plan to .agent/work-plans/issue-<N>/plan.md)
 git add .agent/work-plans/issue-<N>/
-git commit -m "Add work plan for #<N>
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "Add work plan for #<N>
 
 <one-line summary of the approach>"
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity).
+Step 8 (progress.md) uses the same pattern; both commits land on
+`feature/issue-<N>` and would otherwise trip the `check_pr_authors.py`
+CI check (Mechanism C from [#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
 
 ### 7. Create or update a draft PR
 
