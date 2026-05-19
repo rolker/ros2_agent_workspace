@@ -36,6 +36,17 @@ umbrella scope is right; phasing A → B → C; ADR is action-needed.
    and the consume-by-entry-type-filter rule. References from
    `principles_review_guide.md` ADR table.
 
+   **Predecessor recognition**: ADR-0013 explicitly states that
+   `## External Review` (the pre-phase-B triage-reviews entry name)
+   is the recognized predecessor of `## Integrated Review`. Existing
+   `## External Review` entries on closed PRs remain as historical
+   artifacts and are NOT migrated. The semantic shift (triage-reviews
+   as integrator, not just external-review classifier) happens in
+   phase B; until then, triage-reviews continues to write
+   `## External Review` and the ADR acknowledges this transitional
+   state. Phase B's redesign retires the predecessor name for new
+   entries.
+
 2. **Commit 2**: Add `## 8. Persist to progress.md` final step to
    `review-issue`, `plan-task`, and `review-plan` SKILL.md files
    (mirroring `review-code` step 8). Each gets its own entry type
@@ -51,6 +62,14 @@ findings table with `sources` column (cross-source confirmations
 flagged). Step 7's entry renamed `## Integrated Review` per the
 ADR. Optional `.agent/scripts/progress_read.sh` helper.
 
+**Reference output format**: `.agent/work-plans/issue-468/progress.md`
+contains a hand-written `## Integrated Review` entry (from the manual
+triage-reviews-as-integrator emulation that motivated this umbrella).
+Phase B's redesigned skill should produce entries matching that shape:
+findings table with a `sources` column, cross-source confirmations
+flagged as the strongest signal, false-positive dismissals with
+justification listed separately.
+
 ### Phase C (file as sub-issue after phase B)
 
 `.agent/scripts/dispatch_subagent.sh` wrapper. Each workflow skill's
@@ -63,9 +82,9 @@ final step gains a "Next step" handoff prompt with `git -c` boilerplate.
 |------|------|--------|
 | A.1 | `docs/decisions/0013-progress-md-entry-type-vocabulary.md` | **NEW** ADR. Context: composable-timeline vision (#470 + #469's reframe). Decision: canonical entry types + schema + consume-by-filter rule. Consequences: workflow skills must include a progress.md persist step. |
 | A.1 | `.agent/knowledge/principles_review_guide.md` | Add ADR-0013 to applicability table. Add consequences-map row: "workflow skill added → also persist to progress.md per ADR-0013." Add a short vocab reference block listing the entry types. |
-| A.2 | `.claude/skills/review-issue/SKILL.md` | Add step 8: persist `## Issue Review` entry to `.agent/work-plans/issue-<N>/progress.md` in the owning repo, commit. Mirror review-code step 8's locate-or-create + commit logic. |
-| A.2 | `.claude/skills/plan-task/SKILL.md` | Add step (after step 7 PR creation): persist `## Plan Authored` entry. Schema includes plan file path + initial-commit SHA. |
-| A.2 | `.claude/skills/review-plan/SKILL.md` | Add final step: persist `## Plan Review` entry with verdict + findings checklist. |
+| A.2 | `.claude/skills/review-issue/SKILL.md` | Add **new step 8: "Persist to progress.md"** (current step 7 "Post findings as a comment" stays; new step 8 added after). Persist `## Issue Review` entry to `.agent/work-plans/issue-<N>/progress.md` in the owning repo, commit. Mirror review-code step 8's locate-or-create + commit logic. |
+| A.2 | `.claude/skills/plan-task/SKILL.md` | **Insert new step 8 "Persist to progress.md"; renumber existing step 8 "Report to user" → step 9.** New step persists `## Plan Authored` entry between PR creation (step 7) and reporting (step 9 / formerly 8), so the report can cite the progress.md commit SHA. Schema includes plan file path + initial-commit SHA. |
+| A.2 | `.claude/skills/review-plan/SKILL.md` | **Add new step 6: "Persist to progress.md"** (current ends at step 5 "Produce the report"). Persist `## Plan Review` entry with verdict + findings checklist. |
 
 No changes to `review-code` (already writes `## Local Review`) or
 `triage-reviews` (step-7 entry will be renamed in phase B, not now).
@@ -98,7 +117,7 @@ No changes to `review-code` (already writes `## Local Review`) or
 |---|---|---|
 | Add ADR-0013 | `principles_review_guide.md` ADR table | Yes — A.1 |
 | Skill SKILL.md files add progress.md persistence | `principles_review_guide.md` consequences-map row for "new workflow skill" | Yes — A.1 |
-| New entry-type vocabulary | Existing progress.md entries in merged work — they use `## Local Review` / `## Local Review (Pre-Push)` / `## Integrated Review` which the ADR already canonicalizes; no migration needed | Yes — verified PRs #464, #471 progress entries match the ADR's vocabulary |
+| New entry-type vocabulary | Existing progress.md entries on closed PRs. Verification: `## Local Review`, `## Local Review (Pre-Push)` are already canonical (used by review-code). `## External Review` from issue-452/460/461 progress.md is the **predecessor name for `## Integrated Review`** — ADR-0013's predecessor-recognition clause covers it; no migration of historical files. New `## External Review` writes continue from the pre-phase-B triage-reviews until phase B retires the name. | Yes — explicit in ADR-0013 predecessor recognition; no migration commit needed |
 | Sub-agent dispatch model (phase C) | Adapter docs (3 framework files) | Phase C — out of scope for this PR |
 | Workflow skill list grows | Skill index in adapter docs (`copilot-instructions.md`, `gemini-cli.instructions.md`, `AGENT_ONBOARDING.md`) | Verify no new skill in phase A — only edits to existing skills, so no skill-list cascade. Phase B/C may need cascade. |
 
