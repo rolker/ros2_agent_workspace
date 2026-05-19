@@ -146,44 +146,53 @@ After posting the comment, append a `## Issue Review` entry to
 that the issue has been governance-reviewed before plan-task starts.
 Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
 
-**`review-issue` is typically the *first* skill in the lifecycle, so a
-worktree may not exist yet.** Since progress.md commits cannot land on
-a protected default branch, this step creates a worktree on demand:
+**8a. Locate-or-create the owning worktree.** `review-issue` is
+typically the *first* skill in the lifecycle, so a worktree may not
+exist yet. Since progress.md commits cannot land on a protected
+default branch, this step creates a worktree on demand:
 
-1. **Resolve the owning repo first.** Issue numbers can collide across
-   the workspace repo and project repos (e.g., workspace `#42` is a
-   different issue from `unh_echoboats_project11#42`), so the issue
-   number alone is not enough to identify a worktree. Determine the
-   owning repo via `gh issue view <N> --repo <owner/repo> --json
-   repository --jq '.repository.nameWithOwner'`, mirroring `plan-task`
-   step 4's resolution.
-2. Check `$WORKTREE_ISSUE` **and** `$WORKTREE_REPO`. If `$WORKTREE_ISSUE`
-   matches `<N>` *and* `$WORKTREE_REPO` matches the owning repo's short
-   slug, you're already in the right worktree — skip to step 8b. If
-   only the number matches, treat it as a miss and continue to step 3
-   (you're in the wrong-repo worktree for a colliding number).
-3. If not, check whether a worktree for the issue already exists. Use
-   an anchored, repo-aware pattern so neighbouring issue numbers
-   (e.g. `4700` for `<N>=470`) and unrelated repo worktrees don't
-   match:
-   ```bash
-   # Workspace worktree (path ends in `/issue-workspace-<N>` exactly)
-   ls -d "/path/to/workspace/.workspace-worktrees/issue-workspace-<N>" 2>/dev/null
-   # Layer worktree for a specific project repo
-   ls -d "/path/to/workspace/layers/worktrees/issue-<repo-slug>-<N>" 2>/dev/null
-   ```
-   Or grep `worktree_list.sh` output with a numeric boundary:
-   ```bash
-   .agent/scripts/worktree_list.sh \
-     | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
-   ```
-4. If a worktree exists, source `worktree_enter.sh --issue <N>` to
-   enter it (or `cd` to the path directly when sourcing isn't
-   possible). When the issue number collides across repos, pass
-   `--repo-slug <slug>` to disambiguate (see `WORKTREE_GUIDE.md`).
-5. If neither: determine worktree type from the owning repo (workspace
-   for issues in the workspace repo, layer for project-repo issues —
-   same logic as `plan-task` step 4). Create the worktree:
+**8a.1.** **Resolve the owning repo first.** Issue numbers can collide
+across the workspace repo and project repos (e.g., workspace `#42` is
+a different issue from `unh_echoboats_project11#42`), so the issue
+number alone is not enough to identify a worktree. Determine the
+owning repo via `gh issue view <N> --repo <owner/repo> --json
+repository --jq '.repository.nameWithOwner'`, mirroring `plan-task`
+step 4's resolution.
+
+**8a.2.** Check `$WORKTREE_ISSUE` **and** `$WORKTREE_REPO`. If
+`$WORKTREE_ISSUE` matches `<N>` *and* `$WORKTREE_REPO` matches the
+owning repo's short slug, you're already in the right worktree — skip
+to step 8b. If only the number matches, treat it as a miss and
+continue to step 8a.3 (you're in the wrong-repo worktree for a
+colliding number).
+
+**8a.3.** If not, check whether a worktree for the issue already
+exists. Use an anchored, repo-aware pattern so neighbouring issue
+numbers (e.g. `4700` for `<N>=470`) and unrelated repo worktrees don't
+match:
+```bash
+# Workspace worktree (path ends in `/issue-workspace-<N>` exactly)
+ls -d "/path/to/workspace/.workspace-worktrees/issue-workspace-<N>" 2>/dev/null
+# Layer worktree for a specific project repo
+ls -d "/path/to/workspace/layers/worktrees/issue-<repo-slug>-<N>" 2>/dev/null
+```
+Or grep `worktree_list.sh` output with a numeric boundary:
+```bash
+.agent/scripts/worktree_list.sh \
+  | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
+```
+
+**8a.4.** If a worktree exists, source it to enter:
+```bash
+source .agent/scripts/worktree_enter.sh --issue <N> [--repo-slug <slug>]
+```
+(Or `cd` to the path directly when sourcing isn't possible.) When the
+issue number collides across repos, pass `--repo-slug <slug>` to
+disambiguate (see `WORKTREE_GUIDE.md`).
+
+**8a.5.** If neither: determine worktree type from the owning repo
+(workspace for issues in the workspace repo, layer for project-repo
+issues — same logic as `plan-task` step 4). Create the worktree:
    ```bash
    # Workspace issue
    .agent/scripts/worktree_create.sh --issue <N> --type workspace
