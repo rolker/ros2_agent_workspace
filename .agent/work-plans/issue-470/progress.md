@@ -80,6 +80,23 @@ issue: 470
 - [x] (should-fix, #3) `review-issue/SKILL.md` step 8a.1 rewritten — dropped circular `--repo <owner/repo>`, now describes a 3-step probe (workspace first via cwd-based `gh issue view <N>`, then project repos under `layers/main/*/src/*`, then error). Corrected the "mirrors plan-task step 4" claim.
 - [x] (should-fix, #4) `review-plan/SKILL.md` step 6 sub-step 1 rewritten with mode-split — PR-number mode reuses step-1 metadata, `--issue`/file-path mode uses the same cwd-based probe as #3. Mirror relationship now actually holds.
 
+## External Review
+**Status**: complete
+**When**: 2026-05-19 18:45
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 — 6 review(s) from `copilot-pull-request-reviewer[bot]` (3 fresh comments on HEAD `c2cd4a6`), 3 valid (1 must-fix, 2 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` continues to fail in the artifact-deletion infra job — unrelated, not blocking.
+
+### Actions
+- [ ] (must-fix, #1) Add `## External Review` row to ADR-0013 correlation-key table at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:83-87` — same PR/branch-head-SHA correlation key as `## Integrated Review`. Corrects oversight in commit `c2cd4a6` which only updated the Decision table.
+- [ ] (should-fix, #2) Extend ADR-0013 schema text (L67-73) to canonicalize `### Open questions` alongside `### Findings` / `### Actions`. `plan-task/SKILL.md:221` Plan Authored template uses `### Open questions` which has distinct semantics (decisions needed before implementation, not findings or completed actions).
+- [ ] (should-fix, #3) Reword `review-plan/SKILL.md:311-317` self-review detection to compare `$AGENT_NAME` to the agent-name portion of the `**By**` field (prefix before ` (`), not the whole field. As written the check never triggers because `**By**` includes the model suffix.
+
+### Notes
+- Finding #1 is a self-inflicted regression — the previous round's ADR-0013 fix updated the Decision table but missed the correlation-key table directly below it. Cross-checked the rest of ADR-0013 for similar misses: no further omissions.
+- Finding #2 is borderline — Open Questions is an established Plan-Authored pattern with different semantics than Findings/Actions. The fix extends the canonical set rather than collapsing semantics.
+
 ### Notes
 - Findings #3 and #4 are the same underlying defect across two skill files — fix together to maintain the "mirror" relationship the docs claim.
 - All 40 inline comments on earlier commits (a1d67cd / c89cdfe / 44343da / 8a4687f) were classified in the prior two `## External Review` rounds. Cross-checked: none reopened by HEAD changes.
