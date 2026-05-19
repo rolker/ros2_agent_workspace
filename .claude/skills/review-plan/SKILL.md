@@ -251,6 +251,49 @@ The entry lets implementation skills and downstream consumers (notably
 `triage-reviews` as integrator) see what the plan review concluded
 without re-reading the entire PR conversation.
 
+**Locate-or-create the owning worktree.** `review-plan` supports
+PR-number, file-path, and `--issue` invocations, none of which
+guarantee the agent is already inside the owning worktree. Before
+appending, resolve the right place to write:
+
+1. **Resolve the owning repo and issue number** — `<N>` already came
+   from step 1 (the PR's `closingIssuesReferences`, the issue argument,
+   or extracted from the plan path). Determine the owning repo with
+   `gh issue view <N> --repo <owner/repo> --json repository --jq
+   '.repository.nameWithOwner'` if it isn't already known from the
+   step-1 PR metadata.
+2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
+   *and* `$WORKTREE_REPO` matches the owning repo's short slug, the
+   current directory is the right worktree. Skip to "Append" below.
+3. **Find an existing worktree** with an anchored, repo-aware match —
+   same pattern as `review-issue` step 8a.3:
+   ```bash
+   .agent/scripts/worktree_list.sh \
+     | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
+   ```
+   If one exists, record its path as `<plan-worktree-path>` (used in
+   the commit commands below). When the issue number collides across
+   repos, pass `--repo-slug <slug>` if entering via
+   `worktree_enter.sh`.
+4. **Otherwise create one on demand**, mirroring `review-issue` step
+   8a.5: `.agent/scripts/worktree_create.sh --issue <N> --type
+   workspace` for workspace issues, or `--type layer --layer <layer>
+   --packages <project_repo>` for project-repo issues. No `--plan-file`
+   — the plan already exists, we just need a branch to commit
+   progress.md on.
+5. **Initialise progress.md if absent** — if
+   `<plan-worktree-path>/.agent/work-plans/issue-<N>/progress.md`
+   doesn't exist, create it with the standard frontmatter:
+   ```yaml
+   ---
+   issue: <N>
+   ---
+
+   # Issue #<N> — <issue title>
+   ```
+   (Fetch the issue title from the owning repo via `gh issue view <N>
+   --repo <owner/repo> --json title --jq '.title'`.)
+
 **Independence annotation.** If this review is the *plan author*
 re-reading their own work — detect by checking whether `$AGENT_NAME`
 matches the `**By**` field of the existing `## Plan Authored` entry
