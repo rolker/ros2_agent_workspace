@@ -229,9 +229,16 @@ Commit and push:
 
 ```bash
 git add .agent/work-plans/issue-<N>/progress.md
-git commit -m "progress: plan authored for #<N>"
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: plan authored for #<N>"
 git push
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
+agents run each bash invocation in a fresh subshell, so the env
+exports from `set_git_identity_env.sh` aren't reliable here.
 
 The push is required — step 7 already pushed and opened the draft PR,
 so the new commit needs its own push to appear on the PR alongside

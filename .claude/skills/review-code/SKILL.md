@@ -788,8 +788,14 @@ Key points:
   from the current working directory):
   ```bash
   git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-  git -C <worktree-path> commit -m "progress: local review for #<N>"
+  git -C <worktree-path> \
+      -c user.name="$AGENT_NAME" \
+      -c user.email="$AGENT_EMAIL" \
+      commit -m "progress: local review for #<N>"
   ```
+  The per-invocation `-c` overrides are required by
+  [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+  on agent-convention branches.
 - If no issue number was resolved in step 1, skip persistence and note
   this in the report Summary ("Progress persistence skipped (no linked
   issue)") — the same canonical wording used in the step-8 intro above.

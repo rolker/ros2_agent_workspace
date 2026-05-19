@@ -284,8 +284,18 @@ Commit:
 
 ```bash
 git -C <plan-worktree-path> add .agent/work-plans/issue-<N>/progress.md
-git -C <plan-worktree-path> commit -m "progress: plan review for #<N>"
+git -C <plan-worktree-path> \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: plan review for #<N>"
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+to keep commits on agent-convention branches. Plain `git commit` in
+a fresh subshell can fall back to the human git config and trip the
+[`check_pr_authors.py`](../../../.agent/hooks/check_pr_authors.py)
+CI check.
 
 If the review found anything must-fix or substantive, the
 implementation step (or the plan author) should address them and amend

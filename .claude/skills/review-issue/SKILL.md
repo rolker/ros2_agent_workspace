@@ -209,8 +209,18 @@ Commit:
 
 ```bash
 git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-git -C <worktree-path> commit -m "progress: issue review for #<N>"
+git -C <worktree-path> \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: issue review for #<N>"
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+because the skill instructions run in fresh subshells where the
+`set_git_identity_env.sh` exports may not be in scope; without them
+`check_pr_authors.py` (CI mechanism C, [#468](https://github.com/rolker/ros2_agent_workspace/issues/468))
+will reject the commit.
 
 The branch (`feature/issue-<N>`) now exists with one commit. If the
 user decides not to proceed (and so plan-task never runs), they can
