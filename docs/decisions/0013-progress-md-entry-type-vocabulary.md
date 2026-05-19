@@ -68,10 +68,13 @@ Every entry begins with:
 
 After that, skill-specific fields are permitted but should follow
 existing precedents (PR/Branch + SHA, verdict, must-fix/suggestion
-counts, sources column for integrated entries, etc.). Findings or
-actions go in a `### Findings` or `### Actions` sub-section as a
-checkbox list — sources for each item should be inline (e.g.,
-`- [ ] (suggestion, Copilot R2) …`) when known.
+counts, sources column for integrated entries, etc.). Findings,
+actions, or open questions go in a `### Findings`, `### Actions`,
+or `### Open questions` sub-section as a checkbox list — sources for
+each item should be inline (e.g., `- [ ] (suggestion, Copilot R2) …`)
+when known. `### Open questions` is reserved for decisions that need
+human input before implementation (used by `## Plan Authored`);
+`### Findings` and `### Actions` are the general-purpose forms.
 
 ### Consume by entry-type filter
 
@@ -84,7 +87,7 @@ type**, not by re-classifying:
 |---|---|
 | `## Issue Review` | issue number (no SHA — issue body is the reference) |
 | `## Plan Authored`, `## Plan Review` | plan-file SHA (the plan, not the PR head) |
-| `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## Implementation` | PR / branch head SHA |
+| `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## External Review`, `## Implementation` | PR / branch head SHA |
 
 A finding present in both a `## Local Review` at head `<sha>` and a
 GitHub-side Copilot review at the same head is a **cross-source

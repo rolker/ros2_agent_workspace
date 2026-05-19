@@ -309,9 +309,11 @@ appending, resolve the right place to write:
    --repo <owner/repo> --json title --jq '.title'`.)
 
 **Independence annotation.** If this review is the *plan author*
-re-reading their own work — detect by checking whether `$AGENT_NAME`
-matches the `**By**` field of the existing `## Plan Authored` entry
-in the same `progress.md` — annotate the entry's `**By**` field with
+re-reading their own work — detect by comparing `$AGENT_NAME` to the
+agent-name portion of the `## Plan Authored` entry's `**By**` field
+(the prefix before the first ` (`, since `**By**` is written as
+`<agent name> (<model>)` per ADR-0013) in the same `progress.md` —
+annotate the entry's `**By**` field with
 `(in-context — author self-review)` so downstream consumers can weight
 the entry appropriately. Otherwise the review is independent (fresh
 context or different agent) and no annotation is needed.

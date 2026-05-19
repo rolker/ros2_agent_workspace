@@ -89,9 +89,9 @@ issue: 470
 **CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` continues to fail in the artifact-deletion infra job — unrelated, not blocking.
 
 ### Actions
-- [ ] (must-fix, #1) Add `## External Review` row to ADR-0013 correlation-key table at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:83-87` — same PR/branch-head-SHA correlation key as `## Integrated Review`. Corrects oversight in commit `c2cd4a6` which only updated the Decision table.
-- [ ] (should-fix, #2) Extend ADR-0013 schema text (L67-73) to canonicalize `### Open questions` alongside `### Findings` / `### Actions`. `plan-task/SKILL.md:221` Plan Authored template uses `### Open questions` which has distinct semantics (decisions needed before implementation, not findings or completed actions).
-- [ ] (should-fix, #3) Reword `review-plan/SKILL.md:311-317` self-review detection to compare `$AGENT_NAME` to the agent-name portion of the `**By**` field (prefix before ` (`), not the whole field. As written the check never triggers because `**By**` includes the model suffix.
+- [x] (must-fix, #1) Added `## External Review` to ADR-0013 correlation-key table (PR/branch-head-SHA row, alongside `## Integrated Review`). Corrects oversight from commit `c2cd4a6`.
+- [x] (should-fix, #2) Extended ADR-0013 schema to canonicalize `### Open questions` alongside `### Findings` / `### Actions`, with a sentence noting `### Open questions` is reserved for `## Plan Authored`'s pre-implementation decisions.
+- [x] (should-fix, #3) Reworded `review-plan` self-review detection to compare `$AGENT_NAME` to the agent-name portion of `**By**` (prefix before ` (`), with explicit note about the `<agent name> (<model>)` format from ADR-0013.
 
 ### Notes
 - Finding #1 is a self-inflicted regression — the previous round's ADR-0013 fix updated the Decision table but missed the correlation-key table directly below it. Cross-checked the rest of ADR-0013 for similar misses: no further omissions.
