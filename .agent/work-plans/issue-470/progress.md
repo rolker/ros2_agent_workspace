@@ -53,3 +53,15 @@ issue: 470
 - review-plan `--in-context` flag undefined — replaced with behavioral detection
 - review-issue fallback making persistence optional — addressed by worktree-on-demand pivot in `c89cdfe`
 - Plan-only commit findings on `a1d67cd` — resolved by subsequent implementation
+
+## External Review
+**Status**: complete
+**When**: 2026-05-19 02:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 — 4 review(s) (2 fresh comments on HEAD `8a4687f`), 2 valid, 0 false positives
+**CI**: all-pass (incl. Mechanism C — field-validated the must-fix #1 fix from commit `2787d23`)
+
+### Actions
+- [ ] (small, #1) Add `.agent/scripts/` path prefix to `worktree_enter.sh` invocation in `review-issue/SKILL.md:180` — as written it requires the script on PATH
+- [ ] (small, #2) Label review-issue's step 8a bullets as `**8a.1.**` through `**8a.5.**` so the cross-references from `review-plan/SKILL.md:269, 278` (introduced in commit `3833d6a`) resolve for readers
