@@ -113,10 +113,12 @@ name for new entries; no migration of historical files.
   document is short and the canonical-vocab decision is what makes
   the timeline composable.
 - A future workflow skill author has to either pick an existing
-  entry type or amend this ADR (via supersession or
-  [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md)-style
-  cross-reference) to introduce a new one. This is the intended
-  friction.
+  entry type or introduce a new one via a **superseding ADR**.
+  [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md) does
+  *not* apply here: adding an entry type changes this ADR's Decision
+  table and Consequences, which §52-58 of ADR-0012 explicitly excludes
+  from the cross-reference-addendum carve-out. The supersession-only
+  rule is the intended friction.
 
 ## References
 

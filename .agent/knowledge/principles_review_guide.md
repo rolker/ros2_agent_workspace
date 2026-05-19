@@ -46,7 +46,7 @@ humans use it as a checklist.
 | A template in `.agent/templates/` | Docs that reference the template; skills that use it |
 | A framework skill (e.g., `.claude/skills/`) | That framework's adapter file; regenerate skills if needed |
 | Workflow skill list (add/remove a skill) | Skill list in non-Claude adapters (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`) |
-| Add a workflow skill that produces durable findings | Persist a typed entry to `progress.md` per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md); pick an existing entry type or amend ADR-0013 to add one |
+| Add a workflow skill that produces durable findings | Persist a typed entry to `progress.md` per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md); pick an existing entry type or introduce a new one via a **superseding ADR** (ADR-0012's cross-reference-addendum carve-out does not cover changes to ADR-0013's Decision table) |
 | Package interfaces (`.msg`/`.srv`) | Downstream packages, documentation, tests |
 | Worktree scripts | `.agent/WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
 
