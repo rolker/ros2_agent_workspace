@@ -139,6 +139,63 @@ gh issue comment <N> --body-file "$BODY_FILE"
 rm "$BODY_FILE"
 ```
 
+### 8. Persist to progress.md
+
+After posting the comment, append a `## Issue Review` entry to
+`.agent/work-plans/issue-<N>/progress.md` so the timeline reflects
+that the issue has been governance-reviewed before plan-task starts.
+Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+
+**Locate or create progress.md**: Determine which repo owns the issue
+(workspace repo for workspace issues, project repo for project issues).
+Check `.agent/work-plans/issue-<N>/progress.md` in the owning repo's
+worktree first; if it doesn't exist, create it. Use frontmatter:
+
+```yaml
+---
+issue: <N>
+---
+
+# Issue #<N> — <issue title>
+```
+
+Append:
+
+```markdown
+
+## Issue Review
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM>
+**By**: <agent name> (<model>)
+
+**Comment**: <URL of the posted issue comment from step 7>
+**Scope verdict**: <well-scoped | needs-splitting | needs-more-detail>
+
+### Action items
+- [ ] <each "Action needed" principle finding>
+- [ ] <each "Recommendation" worth following up on>
+```
+
+If the scope verdict is `well-scoped` and there were no Action-needed
+principle findings, set `### Action items` to a single line:
+`No action items — issue is plan-task-ready.`
+
+Commit progress.md after appending:
+
+```bash
+git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
+git -C <worktree-path> commit -m "progress: issue review for #<N>"
+```
+
+If the issue is on a repo for which no worktree exists yet (i.e.,
+plan-task hasn't run), create the progress.md in the owning repo's
+main checkout and commit it via a quick worktree on a fresh branch
+(`feature/issue-<N>-progress`) — or, if `WORKTREE_ISSUE_TITLE` /
+`WORKTREE_ISSUE` is not yet set, **skip persistence and note in the
+posted comment** that progress.md will be created when plan-task
+opens the worktree. This avoids littering the default branch with
+review entries.
+
 ## Guidelines
 
 - **Comment, don't edit** — the issue body is the authoritative spec. Review

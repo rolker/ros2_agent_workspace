@@ -242,6 +242,52 @@ PR-less no-findings variant (`--issue` or file path):
 Plan looks solid. Ready for implementation.
 ```
 
+### 6. Persist to progress.md
+
+Append a `## Plan Review` entry to
+`.agent/work-plans/issue-<N>/progress.md` in the worktree that owns
+the plan. Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+The entry lets implementation skills and downstream consumers (notably
+`triage-reviews` as integrator) see what the plan review concluded
+without re-reading the entire PR conversation.
+
+When the review ran via `--in-context` (the plan author re-reading
+their own work), still persist — annotate the `**By**` field so
+downstream consumers know the review wasn't independent.
+
+Append:
+
+```markdown
+
+## Plan Review
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM>
+**By**: <agent name> (<model>)<-- annotate `(in-context — author self-review)` if applicable -->
+
+**Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
+**PR**: <plan PR URL, or "PR-less" if --issue / file path mode>
+**Verdict**: <approve | approve-with-suggestions | changes-requested>
+
+### Findings
+- [ ] (must-fix) <one-line summary> — `plan.md:<line>`
+- [ ] (suggestion) <one-line summary> — `plan.md:<line>`
+```
+
+If the review surfaced no findings, set `**Verdict**: approve` and
+write `Plan looks solid. Ready for implementation.` under `### Findings`.
+
+Commit:
+
+```bash
+git -C <plan-worktree-path> add .agent/work-plans/issue-<N>/progress.md
+git -C <plan-worktree-path> commit -m "progress: plan review for #<N>"
+```
+
+If the review found anything must-fix or substantive, the
+implementation step (or the plan author) should address them and amend
+the plan inline per `plan-task`'s "During implementation" rules before
+work continues. The `## Plan Review` entry stays as a historical record.
+
 ## Guidelines
 
 - **Evaluate, don't rewrite** — flag gaps and concerns. Don't generate an

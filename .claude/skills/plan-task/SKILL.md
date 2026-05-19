@@ -184,7 +184,58 @@ fi
 rm -f "$BODY_FILE"
 ```
 
-### 8. Report to user
+### 8. Persist to progress.md
+
+Append a `## Plan Authored` entry to
+`.agent/work-plans/issue-<N>/progress.md` in the same worktree the
+plan lives in. Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+This step runs **between** the PR creation (step 7) and the report
+(step 9) so the report can cite the progress.md commit SHA.
+
+If `progress.md` doesn't exist yet (review-issue didn't run, or ran
+without a worktree and skipped persistence), create it with the
+standard frontmatter:
+
+```yaml
+---
+issue: <N>
+---
+
+# Issue #<N> — <issue title>
+```
+
+Append:
+
+```markdown
+
+## Plan Authored
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM>
+**By**: <agent name> (<model>)
+
+**Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
+**PR**: <draft-PR-URL> (`[PLAN]` prefix)
+**Phases**: <count, if the plan describes a stacked-PR breakdown; else "single">
+
+### Open questions
+- [ ] <each Open Question from the plan, condensed to one line>
+```
+
+If the plan has no Open Questions, write
+`No open questions — plan is review-plan-ready.` under that header.
+
+Commit:
+
+```bash
+git add .agent/work-plans/issue-<N>/progress.md
+git commit -m "progress: plan authored for #<N>"
+```
+
+The progress.md commit lands on the same `feature/issue-<N>` branch
+as the plan, so it shows up on the draft PR alongside the plan
+itself.
+
+### 9. Report to user
 
 Summarize:
 - What the plan proposes
