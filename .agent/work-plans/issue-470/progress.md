@@ -34,18 +34,18 @@ issue: 470
 **CI**: all-pass
 
 ### Actions
-- [ ] (must-fix, #1) Add `-c user.name/user.email` overrides to the 3 new commit commands in `review-issue/SKILL.md:211`, `plan-task/SKILL.md:232`, `review-plan/SKILL.md:287` — CI-blocking via `check_pr_authors.py` (mechanism C from #468); 3-source confirmation across all reviews
-- [ ] (must-fix, #2) Remove "ADR-0012-style cross-reference" option from ADR-0013 Consequences (lines 116-119); require supersession only. Update `principles_review_guide.md:49` to match — ADR-0012 §52-58 forbids substantive addendums; 2-source confirmation
-- [ ] (must-fix, #3) Resolve owning repo before `$WORKTREE_ISSUE` check in `review-issue/SKILL.md:153-157`; fix worktree-list regex to handle layer worktrees (`issue-<repo>-<N>`) + numeric boundary
-- [ ] (should-fix, #4) Rename `### Action items` → `### Actions` in `review-issue/SKILL.md:199` to match ADR-0013 §70-71 canonical vocab; 2-source confirmation
-- [ ] (should-fix, #5) Fix `progress.md:9` timestamp `2026-05-18 EOD` → `2026-05-19 01:00` per ADR-0013 schema
-- [ ] (should-fix, #6) Add locate-or-create flow to `review-plan/SKILL.md` step 6 for PR-number / file-path modes; 2-source confirmation
-- [ ] (should-fix, #7) Fix invalid HTML comment marker on `review-plan/SKILL.md:269` (`<--` → `<!--`)
-- [ ] (should-fix, #8) Scope ADR-0013 "head SHA filter" rule to PR-correlated entry types (issue/plan entries use issue number + plan-file SHA)
-- [ ] (nice-to-fix, #9) Fix `review-issue` "no action items" condition to not drop Recommendations when Action-needed findings absent
-- [ ] (nice-to-fix, #10) Update plan.md Estimated Scope (line 134-139) — actual landed diff is +505/-1 across 7 files
-- [ ] (nice-to-fix, #11) Add SHA-citation bullet to `plan-task` step 9 (report should cite progress.md commit SHA per step 8)
-- [ ] (nice-to-fix, #12) Add `## External Review` transitional row to `principles_review_guide.md:36`
+- [x] (must-fix, #1) Add `-c user.name/user.email` overrides to the 3 new commit commands in `review-issue/SKILL.md:211`, `plan-task/SKILL.md:232`, `review-plan/SKILL.md:287` — CI-blocking via `check_pr_authors.py` (mechanism C from #468); 3-source confirmation across all reviews → landed in `2787d23` (also extended to `review-code` for consistency)
+- [x] (must-fix, #2) Remove "ADR-0012-style cross-reference" option from ADR-0013 Consequences (lines 116-119); require supersession only. Update `principles_review_guide.md:49` to match — ADR-0012 §52-58 forbids substantive addendums; 2-source confirmation → landed in `4effba5`
+- [x] (must-fix, #3) Resolve owning repo before `$WORKTREE_ISSUE` check in `review-issue/SKILL.md:153-157`; fix worktree-list regex to handle layer worktrees (`issue-<repo>-<N>`) + numeric boundary → landed in `8fff314`
+- [x] (should-fix, #4) Rename `### Action items` → `### Actions` in `review-issue/SKILL.md:199` to match ADR-0013 §70-71 canonical vocab; 2-source confirmation → landed in `5525c42`
+- [x] (should-fix, #5) Fix `progress.md:9` timestamp `2026-05-18 EOD` → `2026-05-19 01:00` per ADR-0013 schema → landed in `5525c42`
+- [x] (should-fix, #6) Add locate-or-create flow to `review-plan/SKILL.md` step 6 for PR-number / file-path modes; 2-source confirmation → landed in `3833d6a`
+- [x] (should-fix, #7) Fix invalid HTML comment marker on `review-plan/SKILL.md:269` (`<--` → `<!--`) → landed in `5525c42`
+- [x] (should-fix, #8) Scope ADR-0013 "head SHA filter" rule to PR-correlated entry types (issue/plan entries use issue number + plan-file SHA) → landed in `5525c42`
+- [x] (nice-to-fix, #9) Fix `review-issue` "no action items" condition to not drop Recommendations when Action-needed findings absent → landed in `5525c42` (folded into the `### Actions` rename — Recommendations now preserved under the same heading)
+- [x] (nice-to-fix, #10) Update plan.md Estimated Scope (line 134-139) — actual landed diff is +505/-1 across 7 files → landed in `4126cb1`
+- [x] (nice-to-fix, #11) Add SHA-citation bullet to `plan-task` step 9 (report should cite progress.md commit SHA per step 8) → landed in `4126cb1`
+- [x] (nice-to-fix, #12) Add `## External Review` transitional row to `principles_review_guide.md:36` → landed in `4126cb1`
 
 ### False positives (addressed in `44343da`)
 - ADR-0013 relative-link depth in 3 SKILL.md files — fixed
