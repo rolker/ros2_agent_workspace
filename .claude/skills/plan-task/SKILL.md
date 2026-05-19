@@ -192,9 +192,10 @@ plan lives in. Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-v
 This step runs **between** the PR creation (step 7) and the report
 (step 9) so the report can cite the progress.md commit SHA.
 
-If `progress.md` doesn't exist yet (review-issue didn't run, or ran
-without a worktree and skipped persistence), create it with the
-standard frontmatter:
+If `review-issue` already ran for this issue, `progress.md` exists
+with a `## Issue Review` entry — just append after it. If
+`review-issue` didn't run, create `progress.md` with the standard
+frontmatter:
 
 ```yaml
 ---

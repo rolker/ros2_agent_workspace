@@ -146,10 +146,35 @@ After posting the comment, append a `## Issue Review` entry to
 that the issue has been governance-reviewed before plan-task starts.
 Per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
 
-**Locate or create progress.md**: Determine which repo owns the issue
-(workspace repo for workspace issues, project repo for project issues).
-Check `.agent/work-plans/issue-<N>/progress.md` in the owning repo's
-worktree first; if it doesn't exist, create it. Use frontmatter:
+**`review-issue` is typically the *first* skill in the lifecycle, so a
+worktree may not exist yet.** Since progress.md commits cannot land on
+a protected default branch, this step creates a worktree on demand:
+
+1. Check `$WORKTREE_ISSUE`. If it matches `<N>`, you're already in the
+   right worktree — skip to step 8b.
+2. If not, check whether a worktree for the issue already exists:
+   ```bash
+   .agent/scripts/worktree_list.sh | grep -E "issue-(workspace-)?<N>"
+   ```
+3. If a worktree exists, source `worktree_enter.sh --issue <N>` to
+   enter it (or `cd` to the path directly when sourcing isn't
+   possible).
+4. If neither: determine worktree type from the issue's owning repo
+   (workspace for issues in the workspace repo, layer for project-repo
+   issues — same logic as `plan-task` step 4). Create the worktree:
+   ```bash
+   # Workspace issue
+   .agent/scripts/worktree_create.sh --issue <N> --type workspace
+
+   # Project repo issue
+   .agent/scripts/worktree_create.sh --issue <N> --type layer \
+       --layer <layer> --packages <project_repo>
+   ```
+   `worktree_create.sh` does NOT open a draft PR when invoked without
+   `--plan-file`; only the worktree + branch are created. A draft PR
+   will follow when `plan-task` runs.
+
+**8b. Append the entry.** Use frontmatter for a new file:
 
 ```yaml
 ---
@@ -180,21 +205,16 @@ If the scope verdict is `well-scoped` and there were no Action-needed
 principle findings, set `### Action items` to a single line:
 `No action items — issue is plan-task-ready.`
 
-Commit progress.md after appending:
+Commit:
 
 ```bash
 git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
 git -C <worktree-path> commit -m "progress: issue review for #<N>"
 ```
 
-If the issue is on a repo for which no worktree exists yet (i.e.,
-plan-task hasn't run), create the progress.md in the owning repo's
-main checkout and commit it via a quick worktree on a fresh branch
-(`feature/issue-<N>-progress`) — or, if `WORKTREE_ISSUE_TITLE` /
-`WORKTREE_ISSUE` is not yet set, **skip persistence and note in the
-posted comment** that progress.md will be created when plan-task
-opens the worktree. This avoids littering the default branch with
-review entries.
+The branch (`feature/issue-<N>`) now exists with one commit. If the
+user decides not to proceed (and so plan-task never runs), they can
+remove the worktree + branch via `worktree_remove.sh --issue <N>`.
 
 ## Guidelines
 

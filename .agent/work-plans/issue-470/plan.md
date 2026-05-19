@@ -82,7 +82,7 @@ final step gains a "Next step" handoff prompt with `git -c` boilerplate.
 |------|------|--------|
 | A.1 | `docs/decisions/0013-progress-md-entry-type-vocabulary.md` | **NEW** ADR. Context: composable-timeline vision (#470 + #469's reframe). Decision: canonical entry types + schema + consume-by-filter rule. Consequences: workflow skills must include a progress.md persist step. |
 | A.1 | `.agent/knowledge/principles_review_guide.md` | Add ADR-0013 to applicability table. Add consequences-map row: "workflow skill added → also persist to progress.md per ADR-0013." Add a short vocab reference block listing the entry types. |
-| A.2 | `.claude/skills/review-issue/SKILL.md` | Add **new step 8: "Persist to progress.md"** (current step 7 "Post findings as a comment" stays; new step 8 added after). Persist `## Issue Review` entry to `.agent/work-plans/issue-<N>/progress.md` in the owning repo, commit. Mirror review-code step 8's locate-or-create + commit logic. |
+| A.2 | `.claude/skills/review-issue/SKILL.md` | Add **new step 8: "Persist to progress.md"** (current step 7 "Post findings as a comment" stays; new step 8 added after). Persist `## Issue Review` entry to `.agent/work-plans/issue-<N>/progress.md` in the owning repo, commit. **Step 8 creates the worktree on demand if none exists** — review-issue is typically the first lifecycle skill, so no worktree exists yet, and progress.md commits cannot land on the protected default branch. Worktree creation uses `worktree_create.sh` without `--plan-file` (no draft PR — that comes when plan-task runs). |
 | A.2 | `.claude/skills/plan-task/SKILL.md` | **Insert new step 8 "Persist to progress.md"; renumber existing step 8 "Report to user" → step 9.** New step persists `## Plan Authored` entry between PR creation (step 7) and reporting (step 9 / formerly 8), so the report can cite the progress.md commit SHA. Schema includes plan file path + initial-commit SHA. |
 | A.2 | `.claude/skills/review-plan/SKILL.md` | **Add new step 6: "Persist to progress.md"** (current ends at step 5 "Produce the report"). Persist `## Plan Review` entry with verdict + findings checklist. |
 
@@ -142,3 +142,17 @@ lines of additions total (ADR is ~50 lines; each skill SKILL.md gets
 worth splitting" section. Sub-issues filed during phase A
 implementation so the umbrella doesn't stall behind issue-filing
 ceremony.
+
+## Implementation Notes
+
+- **review-issue now creates the worktree on demand.** During phase A
+  implementation the user redirected: rather than gracefully skipping
+  persistence when no worktree exists, `review-issue` should be the
+  first lifecycle skill to *create* the worktree. Rationale: progress.md
+  is canonical per ADR-0013; commits to it cannot land on the protected
+  default branch; the "skip persistence" carve-out would have meant
+  review-issue's findings live only as a GitHub comment until plan-task
+  runs (asymmetric with the other skills' write semantics). The cost is
+  the user may abandon a review-only worktree — handled by
+  `worktree_remove.sh --issue <N>`. plan-task step 4's existing "if a
+  worktree exists, enter it" branch handles the hand-off cleanly.
