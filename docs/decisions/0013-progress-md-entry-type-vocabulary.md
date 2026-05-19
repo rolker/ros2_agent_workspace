@@ -76,10 +76,21 @@ checkbox list — sources for each item should be inline (e.g.,
 
 Downstream skills that aggregate or react to prior work (notably the
 phase-B redesign of `triage-reviews`) MUST consume prior entries by
-**filtering on entry type and head SHA**, not by re-classifying. A
-finding present in both a `## Local Review` at head `<sha>` and a
+**filtering on entry type and the correlation key appropriate to that
+type**, not by re-classifying:
+
+| Entry type | Correlation key |
+|---|---|
+| `## Issue Review` | issue number (no SHA — issue body is the reference) |
+| `## Plan Authored`, `## Plan Review` | plan-file SHA (the plan, not the PR head) |
+| `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## Implementation` | PR / branch head SHA |
+
+A finding present in both a `## Local Review` at head `<sha>` and a
 GitHub-side Copilot review at the same head is a **cross-source
 confirmation** — keep both with a sources column, do not collapse.
+For entries keyed by issue or plan-file SHA, cross-source
+confirmation is by entry type + issue number (e.g., a `## Plan Review`
+and a `## Plan Authored` for the same plan SHA agree on a finding).
 
 ### Predecessor recognition
 

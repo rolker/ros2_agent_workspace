@@ -218,14 +218,17 @@ Append:
 **Comment**: <URL of the posted issue comment from step 7>
 **Scope verdict**: <well-scoped | needs-splitting | needs-more-detail>
 
-### Action items
+### Actions
 - [ ] <each "Action needed" principle finding>
 - [ ] <each "Recommendation" worth following up on>
 ```
 
 If the scope verdict is `well-scoped` and there were no Action-needed
-principle findings, set `### Action items` to a single line:
-`No action items — issue is plan-task-ready.`
+principle findings *and* no Recommendations, set `### Actions` to a
+single line: `No actions — issue is plan-task-ready.` If there are
+Recommendations but no Action-needed findings, list the Recommendations
+under `### Actions` so the timeline preserves them — they're follow-up
+candidates downstream consumers should be able to see.
 
 Commit:
 

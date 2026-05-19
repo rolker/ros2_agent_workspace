@@ -309,7 +309,7 @@ Append:
 ## Plan Review
 **Status**: complete
 **When**: <YYYY-MM-DD HH:MM>
-**By**: <agent name> (<model>)<-- append `(in-context — author self-review)` per the detection above -->
+**By**: <agent name> (<model>)  <!-- append ` (in-context — author self-review)` per the detection above when applicable -->
 
 **Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
 **PR**: <plan PR URL, or "PR-less" if --issue / file path mode>
