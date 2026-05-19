@@ -65,3 +65,21 @@ issue: 470
 ### Actions
 - [x] (small, #1) Add `.agent/scripts/` path prefix to `worktree_enter.sh` invocation in `review-issue/SKILL.md:180` — as written it requires the script on PATH → landed in `ce1e85a`
 - [x] (small, #2) Label review-issue's step 8a bullets as `**8a.1.**` through `**8a.5.**` so the cross-references from `review-plan/SKILL.md:269, 278` (introduced in commit `3833d6a`) resolve for readers → landed in `ce1e85a`
+
+## External Review
+**Status**: complete
+**When**: 2026-05-19 17:30
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 — 5 review(s) from `copilot-pull-request-reviewer[bot]` (4 fresh comments on HEAD `5d57910`), 4 valid (2 must-fix, 2 should-fix), 0 false positives. Earlier-round comments addressed in the prior two `## External Review` entries.
+**CI**: all-pass on Workspace Validation (Lint, Validate Documentation, Mechanism C). `Copilot code review / Cleanup artifacts` step failure is in Copilot's own artifact-deletion job — unrelated to PR code, not blocking.
+
+### Actions
+- [ ] (must-fix, #1) Resolve ADR-0013 normative contradiction at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:44-46` — Decision says workflow skills writing to `progress.md` MUST use one of the listed entry types, but Predecessor recognition (L95-105) says `triage-reviews` continues to write `## External Review` until phase B. Fix: add a transitional row to the Decision table (writer: `triage-reviews` pre-phase-B), or rephrase the MUST to permit documented predecessors.
+- [ ] (must-fix, #2) Add `-c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL"` overrides to `plan-task/SKILL.md:151` step 6 plan-commit example. Step 8 already documents the identity rule; step 6 violates it. Same `check_pr_authors.py` Mechanism C failure mode the previous round just fixed for progress.md commits.
+- [ ] (should-fix, #3) Fix circular `--repo <owner/repo>` in `review-issue/SKILL.md:154-160` step 8a.1 — `<owner/repo>` is the value we're trying to resolve. The claim that this "mirrors plan-task step 4's resolution" is also wrong: plan-task step 4 (L75-77) uses `gh issue view <N> --json url` without `--repo`. Fix: drop `--repo`, rely on cwd resolution, document the workspace→project-repo probe fallback for when cwd doesn't own the issue.
+- [ ] (should-fix, #4) Mirror #3 fix in `review-plan/SKILL.md:259-264` step 6 sub-step 1 (cross-source confirmation with #3). Note that PR-number mode can pull the repo from step-1 metadata; `--issue` and file-path modes need cwd-based resolution.
+
+### Notes
+- Findings #3 and #4 are the same underlying defect across two skill files — fix together to maintain the "mirror" relationship the docs claim.
+- All 40 inline comments on earlier commits (a1d67cd / c89cdfe / 44343da / 8a4687f) were classified in the prior two `## External Review` rounds. Cross-checked: none reopened by HEAD changes.
