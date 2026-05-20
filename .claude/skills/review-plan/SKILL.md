@@ -278,7 +278,8 @@ appending, resolve the right place to write:
    <owner/repo>` form.
 2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
    *and* `$WORKTREE_REPO` matches the owning repo's short slug, the
-   current directory is the right worktree. Skip to "Append" below.
+   current directory is the right worktree. Record `<plan-worktree-path>`
+   as `$PWD` (used in the commit commands below) and skip to "Append".
 3. **Find an existing worktree** with an anchored, repo-aware match —
    same pattern as `review-issue` step 8a.3:
    ```bash
@@ -309,14 +310,19 @@ appending, resolve the right place to write:
    --repo <owner/repo> --json title --jq '.title'`.)
 
 **Independence annotation.** If this review is the *plan author*
-re-reading their own work — detect by comparing `$AGENT_NAME` to the
-agent-name portion of the `## Plan Authored` entry's `**By**` field
-(the prefix before the first ` (`, since `**By**` is written as
-`<agent name> (<model>)` per ADR-0013) in the same `progress.md` —
-annotate the entry's `**By**` field with
+re-reading their own work, annotate the entry's `**By**` field with
 `(in-context — author self-review)` so downstream consumers can weight
-the entry appropriately. Otherwise the review is independent (fresh
-context or different agent) and no annotation is needed.
+the entry appropriately.
+
+To detect: find the most recent `## Plan Authored` entry in this
+`progress.md`. If one exists, compare `$AGENT_NAME` to the agent-name
+portion of its `**By**` field (the prefix before the first ` (`, since
+`**By**` is written as `<agent name> (<model>)` per ADR-0013). Match →
+annotate. No match → independent, no annotation.
+
+If no `## Plan Authored` entry exists (PR-less invocation, or an older
+plan that pre-dates `plan-task`'s persistence step), omit the
+annotation — the review is independent by default.
 
 Append:
 

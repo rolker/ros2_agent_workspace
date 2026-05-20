@@ -272,7 +272,8 @@ will reject the commit.
 
 The branch (`feature/issue-<N>`) now exists with one commit. If the
 user decides not to proceed (and so plan-task never runs), they can
-remove the worktree + branch via `worktree_remove.sh --issue <N>`.
+remove the worktree + branch via
+`.agent/scripts/worktree_remove.sh --issue <N>`.
 
 ## Guidelines
 

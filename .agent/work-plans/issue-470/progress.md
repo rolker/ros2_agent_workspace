@@ -96,9 +96,7 @@ issue: 470
 ### Notes
 - Finding #1 is a self-inflicted regression — the previous round's ADR-0013 fix updated the Decision table but missed the correlation-key table directly below it. Cross-checked the rest of ADR-0013 for similar misses: no further omissions.
 - Finding #2 is borderline — Open Questions is an established Plan-Authored pattern with different semantics than Findings/Actions. The fix extends the canonical set rather than collapsing semantics.
-
-### Notes
-- Findings #3 and #4 are the same underlying defect across two skill files — fix together to maintain the "mirror" relationship the docs claim.
+- Findings #3 and #4 (from the R5 round) are the same underlying defect across two skill files — fix together to maintain the "mirror" relationship the docs claim.
 - All 40 inline comments on earlier commits (a1d67cd / c89cdfe / 44343da / 8a4687f) were classified in the prior two `## External Review` rounds. Cross-checked: none reopened by HEAD changes.
 
 ## Local Review
@@ -113,13 +111,13 @@ issue: 470
 **Must-fix**: 3 | **Suggestions**: 9
 
 ### Findings
-- [ ] (must-fix) `review-plan/SKILL.md` self-review detection assumes `## Plan Authored` entry exists — add fallback: omit annotation when entry missing (PR-less / pre-plan-task case) — `review-plan/SKILL.md:319` (3-source confirmation: Copilot R7 + Copilot Adversarial + Claude Adversarial)
-- [ ] (must-fix) `<plan-worktree-path>` undefined when sub-step 2's "skip to Append" branch is taken — either define as `$PWD` in that branch or provide commit form without `-C` — `review-plan/SKILL.md:281` (Copilot R7)
-- [ ] (must-fix) `worktree_remove.sh` invocation missing `.agent/scripts/` prefix; other invocations in same file use full path — `review-issue/SKILL.md:275` (Copilot R7)
-- [ ] (suggestion) Duplicate `### Notes` headings within the same `## External Review` entry — merge into one — `progress.md:96` and `progress.md:100` (Copilot R7)
-- [ ] (suggestion) Plan drift: plan.md line 89 still says "No changes to `review-code`" but the diff adds 7 lines (the `-c user.name/user.email` overrides). Plan's Estimated Scope acknowledges the broader landed shape but the "Files to Change" / "No changes to" claim is stale per `plan-task` "During implementation" rule 1 — `.agent/work-plans/issue-470/plan.md:89`
+- [x] (must-fix) `review-plan/SKILL.md` self-review detection assumes `## Plan Authored` entry exists — added explicit "if no `## Plan Authored` entry exists, omit the annotation" fallback for PR-less / pre-plan-task invocations.
+- [x] (must-fix) `<plan-worktree-path>` undefined when sub-step 2's "skip to Append" branch is taken — sub-step 2 now records `<plan-worktree-path>` as `$PWD` before skipping.
+- [x] (must-fix) `worktree_remove.sh` invocation missing `.agent/scripts/` prefix — added.
+- [x] (suggestion) Duplicate `### Notes` headings within the R5 `## External Review` entry — merged into one.
+- [x] (suggestion) Plan drift: `plan.md:89` "No changes to `review-code`" claim updated to reflect the consistency change landed in commit `2787d23` and the `-c` override extension to `triage-reviews` in this commit. Per `plan-task` "During implementation" rule 1.
+- [x] (suggestion) Forward-pointer added: `triage-reviews/SKILL.md` step 7 now references ADR-0013 in the commit-pattern paragraph (also notes the phase-B rename to `## Integrated Review`).
 - [ ] (suggestion) ADR-0013 schema is silent on the canonical field that carries the PR-head-SHA correlation key. Existing `## External Review` entries put SHAs in prose; a consumer filtering by entry-type + SHA can't rely on a stable field. Recommend canonicalizing `**PR**: #<N> at \`<sha>\`` in the schema — `docs/decisions/0013-progress-md-entry-type-vocabulary.md:69-77`
-- [ ] (suggestion) `triage-reviews/SKILL.md` step 7 writes `## External Review` without referencing ADR-0013. ADR-0013 explicitly addresses this as transitional, but the writer's own SKILL.md has no forward pointer — a future agent modifying triage-reviews could change the entry name without noticing the ADR — `.claude/skills/triage-reviews/SKILL.md:193-247`
 - [ ] (suggestion) ADR-0013 cites "§52-58 of ADR-0012" by line range — fragile to ADR-0012 edits. Cite by section heading ("Still requires a new/superseding ADR" section) instead — `docs/decisions/0013-progress-md-entry-type-vocabulary.md:134`
 - [ ] (suggestion) `review-plan/SKILL.md` step 6's "create one on demand" sub-step says "mirroring `review-issue` step 8a.5" but doesn't restate (or cross-reference) `plan-task` step 4's "infer the layer and package" guidance. Agent with only an issue number has no inline path to layer/package determination — `review-plan/SKILL.md:292-297`
 - [ ] (suggestion) `plan-task` step 8 push says "step 7 already pushed and opened the draft PR" — true only in the PR-create branch of step 7. The `gh pr edit` (update) branch may not push new commits; the second push is then the first push of the new commit, not "another push alongside it" — `.claude/skills/plan-task/SKILL.md:251-254`

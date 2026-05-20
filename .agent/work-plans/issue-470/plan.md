@@ -86,8 +86,12 @@ final step gains a "Next step" handoff prompt with `git -c` boilerplate.
 | A.2 | `.claude/skills/plan-task/SKILL.md` | **Insert new step 8 "Persist to progress.md"; renumber existing step 8 "Report to user" → step 9.** New step persists `## Plan Authored` entry between PR creation (step 7) and reporting (step 9 / formerly 8), so the report can cite the progress.md commit SHA. Schema includes plan file path + initial-commit SHA. |
 | A.2 | `.claude/skills/review-plan/SKILL.md` | **Add new step 6: "Persist to progress.md"** (current ends at step 5 "Produce the report"). Persist `## Plan Review` entry with verdict + findings checklist. |
 
-No changes to `review-code` (already writes `## Local Review`) or
-`triage-reviews` (step-7 entry will be renamed in phase B, not now).
+`review-code` already writes `## Local Review`; phase A picked up a
+small consistency change there (extending the `-c user.name/user.email`
+override pattern to its commit example, landed in commit `2787d23`).
+`triage-reviews` step-7 entry rename is deferred to phase B, but
+phase A added the same `-c` override pattern to its commit example
+for Mechanism C compliance.
 
 ## Principles Self-Check
 
