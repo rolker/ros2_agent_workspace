@@ -305,8 +305,8 @@ issue: 470
 **Must-fix**: 1 | **Suggestions**: 1
 
 ### Findings
-- [ ] (must-fix, Claude+Copilot converged) Empty-case under `### Findings` is still prose `No issues found. LGTM.`, not a checkbox — violates ADR-0013's checkbox-list schema and is the same defect class fixed in the three sibling skills by `bc9266f` — `.claude/skills/review-code/SKILL.md:813-814`
-- [ ] (suggestion, Claude+Copilot) R14 External Review note overclaims "Empty sections now parse the same way as populated ones" while `review-code` still has the prose path; resolved by addressing must-fix #1 or by scoping the wording to the three skills — `.agent/work-plans/issue-470/progress.md:289,292`
+- [x] (must-fix, Claude+Copilot converged) `review-code/SKILL.md:813-814` empty-case prose converted to `- [ ] No issues found. LGTM.` checkbox + ADR-0013 schema link, matching the pattern landed in the three sibling skills. The cascade is now complete across all four skills that write progress.md entries.
+- [x] (suggestion) Overclaim in the R14 External Review note ("consumers can use one code path") is now accurate after fixing must-fix #1 — review-code joins plan-task / review-issue / review-plan in the uniform checkbox-list shape. No wording change needed.
 
 ### Notes
 - Cascade pattern bounded: this pre-push pass caught exactly what the user predicted — the empty-case checkbox conversion in `bc9266f` correctly propagated across `plan-task` / `review-issue` / `review-plan` but missed `review-code/SKILL.md` itself, the skill that *is* the load-bearing consumer of the schema. One more propagation hop closes it.

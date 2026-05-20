@@ -810,8 +810,10 @@ timeline without one overwriting the other. Append only one header line
 ```
 
 If no findings survived the silence filter, set `**Verdict**: approved`,
-`**Must-fix**: 0 | **Suggestions**: 0`, and write `No issues found.
-LGTM.` under Findings.
+`**Must-fix**: 0 | **Suggestions**: 0`, and write a single checkbox
+item under `### Findings` so the section stays uniformly parseable
+per ADR-0013's checkbox-list schema:
+`- [ ] No issues found. LGTM.`
 
 Key points:
 - Use `- [ ]` checkboxes so findings can be checked off as addressed.
