@@ -230,3 +230,24 @@ issue: 470
 - Cross-model signal: Copilot also flagged the glob ordering issue (only finding worth keeping after silence filter). Its other two findings (`command -v` returning non-absolute paths; `WORKTREE_SLUG="workspace"` colliding with a project named `workspace`) dropped — first is moot for real binaries, second is prevented by the basename-discriminator pattern in worktree naming.
 - Plan adherence: no drift. Both commits remain within Phase A scope (cascade-fix + probe hardening).
 - This is the first pre-push review to actually exercise Copilot Adversarial end-to-end on #470. The previous Pre-Push entry's "Copilot Adversarial unavailable" note is what the `3b415a0` fix targets — recursion is intentional.
+
+## External Review
+**Status**: complete
+**When**: 2026-05-20 03:35
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `ceab6b1`
+**Reviews**: 12 total from `copilot-pull-request-reviewer[bot]` (4 fresh at R11 `1d883d8`, 1 fresh at R12 `ceab6b1`), 5 valid (0 must-fix, 5 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
+
+### Actions
+- [ ] (should-fix, #1) ADR-0013:112 — generalize cross-source-confirmation rule from "entry type + issue number" to "entry type + the entry's correlation key". 3rd-order cascade from the correlation-key requirement chain (R8/R9/R10 caught earlier instances in Decision table / Consume table / wording).
+- [ ] (should-fix, #2) AGENTS.md:283 — my recently-added subshell-caveat example hardcodes `"Claude Code Agent"` / `"roland+claude-code@ccom.unh.edu"` literally. Replace with `<agent name>` / `<agent email>` placeholders so other agents don't accidentally commit under my identity. **AGENTS.md is "Ask First" — needs explicit user approval before editing.**
+- [ ] (should-fix, #3) review-issue/SKILL.md step 8a.5 — symmetric to R8 fix #4: add layer/package derivation block mirroring `review-plan` step 6.4. Currently just says "same logic as `plan-task` step 4" without restating.
+- [ ] (should-fix, #4) plan.md:114 — plan still says Phase A doesn't touch AGENTS.md, but `75cc3ea` updated it. Update ADR-0006 row + Estimated Scope per `plan-task` "During implementation" rule 1.
+- [ ] (cleanup, #5) Fix sub-agent Pre-Push entry timestamps at progress.md:199 (`2026-05-19 12:00` → actual 2026-05-20 02:40) and :214 (`2026-05-19 23:10` → actual 2026-05-20 03:10). Both runs were on 2026-05-20; sub-agents used incorrect dates.
+
+### Notes
+- **Severity trend**: must-fixes per round are R5=2, R6=1, R7=3, R8=0, R9=0, R10=0, R11=0, R12=0. The cascade-bounding strategy (option-2 pre-push review) is paying off — bug velocity has fallen to small consistency / cosmetic issues. PR functionally complete; remaining work is tidiness.
+- Finding #1 is the **third** explicit reference to "plan-file SHA" / "issue number" semantics that needed updating after the R8 correlation-key-fields addition — same root issue, three locations. ADR-0013 has been the recurring source of cascades because the schema rules I added in R8 had implications I didn't trace through the whole document.
+- Finding #3 is a missed-symmetric-edit: R8 fix #4 added the layer/package derivation block to `review-plan` step 6 (project-repo "create on demand" branch); the parallel block in `review-issue` step 8a.5 was never updated. The skills' parallel structure is desirable but breaks when fixes don't traverse both files.
