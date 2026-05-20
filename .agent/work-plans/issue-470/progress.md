@@ -130,3 +130,24 @@ issue: 470
 - All three must-fix items were on the latest Copilot review (R7) at HEAD `c0aa9d0`. Suggestions #5-#11 are net-new findings from this review.
 - CI: all-pass (Lint, Validate Documentation, Mechanism C). No blocking CI signal.
 - Static analysis: no profile for `.md` (no findings reported, as documented in `review-code/SKILL.md` step 5a).
+
+## External Review
+**Status**: complete
+**When**: 2026-05-20 00:30
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 — 8 review(s) from `copilot-pull-request-reviewer[bot]` (5 fresh comments on HEAD `bd19a5a`), 5 valid (0 must-fix, 5 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` artifact-deletion infra failure unchanged, not blocking.
+
+### Actions
+- [ ] (should-fix, #1) Canonicalize correlation-key fields in ADR-0013 schema — `**PR**: #<N> at \`<sha>\`` for PR-head-SHA entries, `**Issue**: #<N>` for issue-keyed, `**Plan**: <path> at \`<sha>\`` for plan-keyed. **Cross-source confirmation** with sub-agent's R7-round suggestion.
+- [ ] (should-fix, #2) Replace fragile `§52-58 of ADR-0012` line-range cite with section-heading reference at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:134`. **Cross-source confirmation** with sub-agent suggestion.
+- [ ] (should-fix, #3) Mirror `review-issue` 8a.1's "workspace root first" wording in `review-plan/SKILL.md:267-278` — my R5 fix said "current directory's origin" which is wrong when agent is cd'd into a project repo. New finding from Copilot R8, sub-agent missed it.
+- [ ] (should-fix, #4) Document how to derive `<layer>` / `<project_repo>` from resolved `owner/repo` in `review-plan/SKILL.md:293-298` "create on demand" branch — cross-reference `plan-task` step 4's inference guidance, or restate inline. **Cross-source confirmation** with sub-agent suggestion.
+- [ ] (should-fix, #5) Reword `plan-task/SKILL.md:251-254` step 8 push rationale from "step 7 already pushed and opened the draft PR" to "step 7 already pushed the branch" — covers both PR-create and PR-update branches of step 7. **Cross-source confirmation** with sub-agent suggestion.
+
+### Notes
+- **Pattern validated**: 4 of 5 R8 findings cross-source-confirm sub-agent suggestions deferred from the previous round. Exactly the cross-source-confirmation signal ADR-0013 / phase-B `triage-reviews` is designed to surface; the deferred list collapses naturally.
+- Finding #3 is net-new from Copilot — sub-agent verified my R5 review-plan fix but didn't catch the asymmetry with review-issue 8a.1. A reminder that fresh-context review and external review surface different defects.
+- Still-deferred sub-agent suggestions (unconfirmed by Copilot): `Phases` schema-vs-usage gap (`plan-task` step 8 schema includes Phases field but no example), ADR-0013 silent on in-progress-PR `## External Review` consumption (phase-B planning question).
+- Skill env-var docs guardrail (sub-agent's "ergonomic gap" finding) still deferred pending user decision on whether to amend AGENTS.md (Ask First per AGENTS.md itself) or add per-skill clarifiers.
