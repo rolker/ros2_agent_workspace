@@ -147,6 +147,24 @@ issue: 470
 - [x] (should-fix, #5) Reworded `plan-task` step 8 push rationale: "step 7 already pushed the branch (whether it created a new draft PR or updated an existing one)" — covers both branches of step 7.
 - [x] **Skill env-var subshell caveat** (sub-agent's "ergonomic gap"): added a paragraph + literal-value example to `AGENTS.md § Agent Commit Identity`. The five SKILL.md files reference this section, so the single edit propagates without per-file drift. Landed in commit `75cc3ea`.
 
+## External Review
+**Status**: complete
+**When**: 2026-05-20 01:45
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `6c8cfc5`
+**Reviews**: 9 total from `copilot-pull-request-reviewer[bot]`, 3 fresh comments at HEAD, 3 valid (0 must-fix, 3 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
+
+### Actions
+- [ ] (should-fix, #1) Clarify "plan-file SHA" → "plan-commit SHA (the commit SHA where `plan.md` was last updated)" in ADR-0013's Consume-by-filter table (`docs/decisions/0013-progress-md-entry-type-vocabulary.md:51`), and align the required-fields table wording.
+- [ ] (should-fix, #2) Add `**Issue**: #<N>` field to the `## Issue Review` template in `review-issue/SKILL.md:240` (immediately after `**By**`).
+- [ ] (should-fix, #3) Add `at \`<sha>\`` to the `## External Review` template in `triage-reviews/SKILL.md:252`; split the review-count summary onto its own `**Reviews**:` line.
+
+### Notes
+- All 3 findings are cascade consequences of R8 fix #1 (added correlation-key-fields requirement to ADR-0013) — I updated the ADR's required-fields table but didn't update the 2 templates that needed new fields. Audit of all 5 templates confirms only review-issue and triage-reviews are missing fields; plan-task, review-plan, and review-code already match.
+- This is the kind of cascade defect the ADR-0013 / phase-B integrator is designed to surface and prevent — a "change requires consequences" principle violation caught one round later by external review instead of pre-push.
+
 ### Notes
 - **Pattern validated**: 4 of 5 R8 findings cross-source-confirm sub-agent suggestions deferred from the previous round. Exactly the cross-source-confirmation signal ADR-0013 / phase-B `triage-reviews` is designed to surface; the deferred list collapses naturally.
 - Finding #3 is net-new from Copilot — sub-agent verified my R5 review-plan fix but didn't catch the asymmetry with review-issue 8a.1. A reminder that fresh-context review and external review surface different defects.
