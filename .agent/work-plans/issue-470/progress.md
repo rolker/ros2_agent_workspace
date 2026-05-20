@@ -165,8 +165,22 @@ issue: 470
 - All 3 findings are cascade consequences of R8 fix #1 (added correlation-key-fields requirement to ADR-0013) — I updated the ADR's required-fields table but didn't update the 2 templates that needed new fields. Audit of all 5 templates confirms only review-issue and triage-reviews are missing fields; plan-task, review-plan, and review-code already match.
 - This is the kind of cascade defect the ADR-0013 / phase-B integrator is designed to surface and prevent — a "change requires consequences" principle violation caught one round later by external review instead of pre-push.
 
+## External Review
+**Status**: complete
+**When**: 2026-05-20 02:20
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `e3d4ba8`
+**Reviews**: 10 total from `copilot-pull-request-reviewer[bot]`, 5 fresh at HEAD, 5 valid (0 must-fix, 5 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
+
+### Actions
+- [ ] (should-fix, #1) ADR-0013 Decision table row for `## Plan Authored` still says "References the plan file SHA" — partial cascade from R9 fix #1 which only updated the Consume-by-filter table. Replace with "plan-commit SHA" for consistency. `docs/decisions/0013-progress-md-entry-type-vocabulary.md:50`.
+- [ ] (should-fix, #2) Relax "immediately after the standard header" requirement at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:73` — current `## Local Review` template puts `**Verdict**` between `**By**` and `**PR**`, contradicting the strict rule. Rephrase to "in the entry's header section (typically near the top, before sub-sections)."
+- [ ] (should-fix, #3) Drop `$WORKTREE_REPO` reference in `review-issue/SKILL.md` step 8a.2 — that env var is never exported by `worktree_enter.sh`. Use `basename "$WORKTREE_ROOT"` parsing instead (paths are `issue-workspace-<N>` or `issue-<repo-slug>-<N>`). Bug has been sitting in the code since R5 — Copilot R10 is the round that called it cleanly.
+- [ ] (should-fix, #4) Same `$WORKTREE_REPO` fix in `review-plan/SKILL.md` step 6.2 — cross-file consistency with #3.
+- [ ] (cleanup, #5) Move orphaned `### Notes` block (currently appearing as a duplicate inside the R9 entry) up into the R8 entry where it belongs. Trim outdated "skill env-var docs guardrail still deferred" line — landed in `75cc3ea`.
+
 ### Notes
-- **Pattern validated**: 4 of 5 R8 findings cross-source-confirm sub-agent suggestions deferred from the previous round. Exactly the cross-source-confirmation signal ADR-0013 / phase-B `triage-reviews` is designed to surface; the deferred list collapses naturally.
-- Finding #3 is net-new from Copilot — sub-agent verified my R5 review-plan fix but didn't catch the asymmetry with review-issue 8a.1. A reminder that fresh-context review and external review surface different defects.
-- Still-deferred sub-agent suggestions (unconfirmed by Copilot): `Phases` schema-vs-usage gap (`plan-task` step 8 schema includes Phases field but no example), ADR-0013 silent on in-progress-PR `## External Review` consumption (phase-B planning question).
-- Skill env-var docs guardrail (sub-agent's "ergonomic gap" finding) still deferred pending user decision on whether to amend AGENTS.md (Ask First per AGENTS.md itself) or add per-skill clarifiers.
+- **Pattern recognition**: 3 of 5 findings are direct consequences of edits I made in earlier rounds (R8 fix #1 over-tight rule, R9 fix #1 partial cascade, R5 introduction of `$WORKTREE_REPO` that never existed). ADR/template changes have wider blast radius than I'm catching pre-push; review-code's plan-drift specialist would have caught #3+#4 if I'd ever re-run it on the recent commits.
+- Still-deferred (not raised this round): `Phases` schema-vs-usage gap (defer naturally), ADR-0013 silent on in-progress-PR `## External Review` consumption (phase-B planning question).
