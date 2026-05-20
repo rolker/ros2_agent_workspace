@@ -280,9 +280,22 @@ appending, resolve the right place to write:
      3. **No match** — stop with an error; the issue may live in a
         repo not currently checked out, or `<N>` is wrong.
 2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
-   *and* `$WORKTREE_REPO` matches the owning repo's short slug, the
-   current directory is the right worktree. Record `<plan-worktree-path>`
-   as `$PWD` (used in the commit commands below) and skip to "Append".
+   *and* the worktree's repo slug matches the owning repo's short
+   slug, the current directory is the right worktree. Record
+   `<plan-worktree-path>` as `$PWD` (used in the commit commands
+   below) and skip to "Append".
+
+   `worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`,
+   and `$WORKTREE_ISSUE` — but not the repo slug. Derive it from
+   `$WORKTREE_ROOT`'s basename (same pattern as `review-issue` step
+   8a.2):
+   ```bash
+   WT_BASENAME=$(basename "$WORKTREE_ROOT")
+   case "$WT_BASENAME" in
+       issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+       issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+   esac
+   ```
 3. **Find an existing worktree** with an anchored, repo-aware match —
    same pattern as `review-issue` step 8a.3:
    ```bash

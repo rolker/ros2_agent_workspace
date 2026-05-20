@@ -147,6 +147,10 @@ issue: 470
 - [x] (should-fix, #5) Reworded `plan-task` step 8 push rationale: "step 7 already pushed the branch (whether it created a new draft PR or updated an existing one)" — covers both branches of step 7.
 - [x] **Skill env-var subshell caveat** (sub-agent's "ergonomic gap"): added a paragraph + literal-value example to `AGENTS.md § Agent Commit Identity`. The five SKILL.md files reference this section, so the single edit propagates without per-file drift. Landed in commit `75cc3ea`.
 
+### Notes
+- **Pattern validated**: 4 of 5 R8 findings cross-source-confirm sub-agent suggestions deferred from the previous round. Exactly the cross-source-confirmation signal ADR-0013 / phase-B `triage-reviews` is designed to surface; the deferred list collapses naturally.
+- Finding #3 is net-new from Copilot — the sub-agent verified my R5 review-plan fix but didn't catch the asymmetry with review-issue 8a.1. A reminder that fresh-context review and external review surface different defects.
+
 ## External Review
 **Status**: complete
 **When**: 2026-05-20 01:45
@@ -175,11 +179,11 @@ issue: 470
 **CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
 
 ### Actions
-- [ ] (should-fix, #1) ADR-0013 Decision table row for `## Plan Authored` still says "References the plan file SHA" — partial cascade from R9 fix #1 which only updated the Consume-by-filter table. Replace with "plan-commit SHA" for consistency. `docs/decisions/0013-progress-md-entry-type-vocabulary.md:50`.
-- [ ] (should-fix, #2) Relax "immediately after the standard header" requirement at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:73` — current `## Local Review` template puts `**Verdict**` between `**By**` and `**PR**`, contradicting the strict rule. Rephrase to "in the entry's header section (typically near the top, before sub-sections)."
-- [ ] (should-fix, #3) Drop `$WORKTREE_REPO` reference in `review-issue/SKILL.md` step 8a.2 — that env var is never exported by `worktree_enter.sh`. Use `basename "$WORKTREE_ROOT"` parsing instead (paths are `issue-workspace-<N>` or `issue-<repo-slug>-<N>`). Bug has been sitting in the code since R5 — Copilot R10 is the round that called it cleanly.
-- [ ] (should-fix, #4) Same `$WORKTREE_REPO` fix in `review-plan/SKILL.md` step 6.2 — cross-file consistency with #3.
-- [ ] (cleanup, #5) Move orphaned `### Notes` block (currently appearing as a duplicate inside the R9 entry) up into the R8 entry where it belongs. Trim outdated "skill env-var docs guardrail still deferred" line — landed in `75cc3ea`.
+- [x] (should-fix, #1) ADR-0013 Decision table row for `## Plan Authored`: "References the plan file SHA" → "References the plan-commit SHA". Closes the cascade left by R9 fix #1 (Consume-by-filter table only).
+- [x] (should-fix, #2) Relaxed "immediately after the standard header" to "in the entry's header section (typically near the top, before any `### Findings` / `### Actions` / `### Notes` sub-sections)". Explicitly noted exact position isn't constrained — consumers locate by field name. Closes the contradiction with `## Local Review` template's `**Verdict**`-before-`**PR**` layout.
+- [x] (should-fix, #3) `review-issue/SKILL.md` step 8a.2: dropped `$WORKTREE_REPO` reference; added explicit `basename "$WORKTREE_ROOT"` parsing block to derive the repo slug (`issue-workspace-<N>` → `workspace`; `issue-<repo>-<N>` → `<repo>`). Bug had been sitting since R5.
+- [x] (should-fix, #4) Same `$WORKTREE_REPO` fix in `review-plan/SKILL.md` step 6.2 (cross-file consistency with #3 — derivation block mirrored).
+- [x] (cleanup, #5) Restored R8 entry's `### Notes` section with the two still-relevant observations (pattern-validated cross-source confirmation; sub-agent vs Copilot complementarity). Outdated lines ("Skill env-var docs guardrail still deferred", "Still-deferred sub-agent suggestions" — all now closed) trimmed.
 
 ### Notes
 - **Pattern recognition**: 3 of 5 findings are direct consequences of edits I made in earlier rounds (R8 fix #1 over-tight rule, R9 fix #1 partial cascade, R5 introduction of `$WORKTREE_REPO` that never existed). ADR/template changes have wider blast radius than I'm catching pre-push; review-code's plan-drift specialist would have caught #3+#4 if I'd ever re-run it on the recent commits.

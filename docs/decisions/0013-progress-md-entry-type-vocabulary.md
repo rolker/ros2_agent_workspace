@@ -47,7 +47,7 @@ following entry types:
 | Entry type | Writer | Purpose |
 |---|---|---|
 | `## Issue Review` | `review-issue` | Result of evaluating an issue against principles + ADRs before work begins. |
-| `## Plan Authored` | `plan-task` | Marker that a plan was committed and a draft PR opened. References the plan file SHA. |
+| `## Plan Authored` | `plan-task` | Marker that a plan was committed and a draft PR opened. References the plan-commit SHA. |
 | `## Plan Review` | `review-plan` | Independent evaluation of a committed plan; verdict + findings checklist. |
 | `## Local Review` | `review-code` post-PR | Local pre-merge review of an existing PR. |
 | `## Local Review (Pre-Push)` | `review-code` pre-push | Local review of unpushed commits before opening / updating a PR. |
@@ -66,10 +66,14 @@ Every entry begins with:
 **By**: <agent name> (<model>)
 ```
 
-Immediately after the standard header, every entry MUST include the
-canonical correlation-key field for its entry type, so consumers
-(notably the phase-B `triage-reviews` integrator) can filter by
-entry-type + correlation-key without parsing prose:
+In the entry's header section (typically near the top, before any
+`### Findings` / `### Actions` / `### Notes` sub-sections), every
+entry MUST include the canonical correlation-key field for its entry
+type, so consumers (notably the phase-B `triage-reviews` integrator)
+can filter by entry-type + correlation-key without parsing prose.
+Exact position within the header is not constrained — skill-specific
+fields like `**Verdict**` may appear before or after the canonical
+field; consumers locate by field name, not by line offset.
 
 | Entry type | Required field |
 |---|---|

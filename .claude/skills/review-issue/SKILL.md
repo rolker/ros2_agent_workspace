@@ -173,12 +173,25 @@ value we're trying to determine). Probe in order:
 This mirrors `plan-task` step 4's cwd-based `gh issue view <N>`
 pattern.
 
-**8a.2.** Check `$WORKTREE_ISSUE` **and** `$WORKTREE_REPO`. If
-`$WORKTREE_ISSUE` matches `<N>` *and* `$WORKTREE_REPO` matches the
-owning repo's short slug, you're already in the right worktree — skip
-to step 8b. If only the number matches, treat it as a miss and
-continue to step 8a.3 (you're in the wrong-repo worktree for a
-colliding number).
+**8a.2.** Check `$WORKTREE_ISSUE` and the worktree's repo slug. If
+`$WORKTREE_ISSUE` matches `<N>` *and* the worktree's repo slug
+matches the owning repo's short slug, you're already in the right
+worktree — skip to step 8b. If only the number matches, treat it as a
+miss and continue to step 8a.3 (you're in the wrong-repo worktree for
+a colliding number).
+
+`worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`, and
+`$WORKTREE_ISSUE` — but not the repo slug. Derive it from
+`$WORKTREE_ROOT`'s basename:
+```bash
+WT_BASENAME=$(basename "$WORKTREE_ROOT")
+# Workspace worktree: basename is `issue-workspace-<N>` → slug is "workspace"
+# Layer worktree:     basename is `issue-<repo-slug>-<N>` → slug is the middle field
+case "$WT_BASENAME" in
+    issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+    issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+esac
+```
 
 **8a.3.** If not, check whether a worktree for the issue already
 exists. Use an anchored, repo-aware pattern so neighbouring issue
