@@ -36,8 +36,9 @@ cwd is mismatched, but the comment-and-view steps will already have
 hit the wrong repo by then. If you don't know which repo owns `<N>`,
 use step 8a.1's probe pattern up front (probe workspace, then project
 repos under `layers/main/*/src/*`) and `cd` to the match before
-invoking. **Cwd-independent owning-repo resolution is tracked as a
-follow-up** — until then, the precondition is load-bearing.
+invoking. Cwd-independent owning-repo resolution is tracked as
+[#478](https://github.com/rolker/ros2_agent_workspace/issues/478) —
+until that lands, the precondition is load-bearing.
 
 ## Steps
 
