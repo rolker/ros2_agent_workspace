@@ -62,9 +62,19 @@ Every entry begins with:
 ```markdown
 ## <Entry Type>
 **Status**: complete | partial | failed
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 ```
+
+The `**When**` value MUST carry an explicit numeric UTC offset
+(e.g. `2026-05-20 01:45 -04:00`, `2026-05-20 05:45 +00:00`). Local-time
+display is preferred — agents write the wall-clock time of the host
+that produced the entry, and the offset records the rule (including
+DST) that was in effect. Bare `HH:MM` without an offset is not
+schema-conformant: cross-host handoff and post-DST reads both depend
+on the offset being present. Use a numeric offset rather than a TZ
+abbreviation (`EDT`, `PST`, etc.) — the abbreviations are ambiguous
+across regions and silently shift across DST boundaries.
 
 In the entry's header section (typically near the top, before any
 `### Findings` / `### Actions` / `### Notes` sub-sections), every
