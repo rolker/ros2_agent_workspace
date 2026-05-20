@@ -219,7 +219,7 @@ Append:
 
 ## Plan Authored
 **Status**: complete
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
 **Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`

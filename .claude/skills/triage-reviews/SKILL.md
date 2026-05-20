@@ -246,7 +246,7 @@ Append this step entry:
 
 ## External Review
 **Status**: complete
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
 **PR**: #<N> at `<short-sha>`

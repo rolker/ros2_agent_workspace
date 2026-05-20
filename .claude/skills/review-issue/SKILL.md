@@ -287,7 +287,7 @@ Append:
 
 ## Issue Review
 **Status**: complete
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
 **Issue**: #<N>
