@@ -292,3 +292,25 @@ issue: 470
 - All 5 findings are cleanup-level — no must-fix, no functional risk. #1 is a missed-replace from R13's sweep; #2 is a leftover propagation from #470's predecessor-recognition work that didn't reach the principles guide; #3/#4/#5 are a single pattern (empty-case prose instead of checkbox) across the three skills that gained progress.md persistence in this PR.
 - Cross-source pattern: #3+#4+#5 is the same defect class across three sibling skill files — exactly the symmetric-edit class of bug that R8 fix #4 / R11 finding #3 already demonstrated. The fix needs to propagate across all three.
 - Severity trend continues to flatten: R5=2 must-fixes → ... → R8=0 → R9=0 → R10=0 → R11=0 → R12=0 → R13=0 → R14=0. Bug velocity is now zero must-fixes and decreasing should-fix volume.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-20 01:45
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-470 at `bc9266f`
+**Mode**: pre-push
+**Depth**: Light (reason: tiny doc-only diff, no code, no ADR; cascade-pattern follow-up)
+**Must-fix**: 1 | **Suggestions**: 1
+
+### Findings
+- [ ] (must-fix, Claude+Copilot converged) Empty-case under `### Findings` is still prose `No issues found. LGTM.`, not a checkbox — violates ADR-0013's checkbox-list schema and is the same defect class fixed in the three sibling skills by `bc9266f` — `.claude/skills/review-code/SKILL.md:813-814`
+- [ ] (suggestion, Claude+Copilot) R14 External Review note overclaims "Empty sections now parse the same way as populated ones" while `review-code` still has the prose path; resolved by addressing must-fix #1 or by scoping the wording to the three skills — `.agent/work-plans/issue-470/progress.md:289,292`
+
+### Notes
+- Cascade pattern bounded: this pre-push pass caught exactly what the user predicted — the empty-case checkbox conversion in `bc9266f` correctly propagated across `plan-task` / `review-issue` / `review-plan` but missed `review-code/SKILL.md` itself, the skill that *is* the load-bearing consumer of the schema. One more propagation hop closes it.
+- Negative findings: ADR-0013 enumeration at `principles_review_guide.md:36` now matches the canonical ADR table at `0013-progress-md-entry-type-vocabulary.md:82` — no other stale enumerations found in normative docs.
+- `triage-reviews/SKILL.md` `### Actions` template has no empty-case at all; pre-existing gap naturally subsumed by #470 phase B's `External Review` → `Integrated Review` migration. Out of scope here.
+- Copilot Adversarial activated cleanly (PATH-discovered via nvm-installed binary, no auth issue, no glob issue). Cross-model convergence on the same finding strengthens signal.
+- Minor regex observation (not a review finding, just a heads-up): the `sed -i '/^Changes$/,$d'` strip in review-code's step 5e didn't trim Copilot v1.0.49's trailing `Changes / Requests / Tokens` block in this run — block had leading blank lines + indented columns. The SKILL.md acknowledges this as a self-revealing no-op; flagging here for awareness.
