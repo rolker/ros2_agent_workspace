@@ -140,11 +140,12 @@ issue: 470
 **CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` artifact-deletion infra failure unchanged, not blocking.
 
 ### Actions
-- [ ] (should-fix, #1) Canonicalize correlation-key fields in ADR-0013 schema — `**PR**: #<N> at \`<sha>\`` for PR-head-SHA entries, `**Issue**: #<N>` for issue-keyed, `**Plan**: <path> at \`<sha>\`` for plan-keyed. **Cross-source confirmation** with sub-agent's R7-round suggestion.
-- [ ] (should-fix, #2) Replace fragile `§52-58 of ADR-0012` line-range cite with section-heading reference at `docs/decisions/0013-progress-md-entry-type-vocabulary.md:134`. **Cross-source confirmation** with sub-agent suggestion.
-- [ ] (should-fix, #3) Mirror `review-issue` 8a.1's "workspace root first" wording in `review-plan/SKILL.md:267-278` — my R5 fix said "current directory's origin" which is wrong when agent is cd'd into a project repo. New finding from Copilot R8, sub-agent missed it.
-- [ ] (should-fix, #4) Document how to derive `<layer>` / `<project_repo>` from resolved `owner/repo` in `review-plan/SKILL.md:293-298` "create on demand" branch — cross-reference `plan-task` step 4's inference guidance, or restate inline. **Cross-source confirmation** with sub-agent suggestion.
-- [ ] (should-fix, #5) Reword `plan-task/SKILL.md:251-254` step 8 push rationale from "step 7 already pushed and opened the draft PR" to "step 7 already pushed the branch" — covers both PR-create and PR-update branches of step 7. **Cross-source confirmation** with sub-agent suggestion.
+- [x] (should-fix, #1) Added a required-fields table to ADR-0013 schema mapping each entry type to its canonical correlation-key field (`**Issue**: #<N>`, `**Plan**: \`<path>\` at \`<sha>\``, `**PR**: #<N> at \`<sha>\``). Consumers can now filter by entry type + correlation-key without parsing prose.
+- [x] (should-fix, #2) Replaced `§52-58 of ADR-0012` with a section-heading anchor link to ADR-0012's "Still requires a new/superseding ADR" section — stable across ADR-0012 edits.
+- [x] (should-fix, #3) Reworked `review-plan` `--issue`/file-path mode resolution to mirror `review-issue` 8a.1 exactly — explicit "Workspace root first → project repos → no match" probe order, with a note that agent's `cwd` can't be relied on.
+- [x] (should-fix, #4) Documented `<layer>` / `<project_repo>` derivation in `review-plan` "create on demand" branch: parse from the local path that matched in step 1's probe; PR-number mode re-runs the probe to discover the path. Mirrors `plan-task` step 4's inference.
+- [x] (should-fix, #5) Reworded `plan-task` step 8 push rationale: "step 7 already pushed the branch (whether it created a new draft PR or updated an existing one)" — covers both branches of step 7.
+- [x] **Skill env-var subshell caveat** (sub-agent's "ergonomic gap"): added a paragraph + literal-value example to `AGENTS.md § Agent Commit Identity`. The five SKILL.md files reference this section, so the single edit propagates without per-file drift. Landed in commit `75cc3ea`.
 
 ### Notes
 - **Pattern validated**: 4 of 5 R8 findings cross-source-confirm sub-agent suggestions deferred from the previous round. Exactly the cross-source-confirmation signal ADR-0013 / phase-B `triage-reviews` is designed to surface; the deferred list collapses naturally.

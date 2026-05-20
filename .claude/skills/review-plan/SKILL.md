@@ -264,18 +264,21 @@ appending, resolve the right place to write:
    - **PR-number mode**: take the owning repo from step 1's PR
      metadata (`closingIssuesReferences[].repository.nameWithOwner`)
      — already in hand, no extra lookup needed.
-   - **`--issue` or file-path mode**: no PR metadata available. Use
-     `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
-     against the current directory's origin (don't pass `--repo
-     <owner/repo>` — that's the value we're resolving). If the
-     workspace lookup fails with `NotFound`, probe each project repo
-     under `layers/main/*/src/*` with `(cd <path> && gh issue view <N>
-     ...)`; first success wins. If all probes fail, stop with an
-     error.
+   - **`--issue` or file-path mode**: no PR metadata available. Don't
+     pass `--repo <owner/repo>` — that's the value we're resolving.
+     Probe in order (matches `review-issue` step 8a.1):
 
-   This mirrors `review-issue` step 8a.1 and `plan-task` step 4 in
-   using cwd-based `gh` resolution rather than the circular `--repo
-   <owner/repo>` form.
+     1. **Workspace root first** — from the workspace root,
+        `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
+        succeeds if `<N>` is a workspace issue. (Don't rely on the
+        agent's `cwd` — it might be a project repo already, which
+        would skip the workspace.)
+     2. **Project repos next** — if the workspace lookup returns
+        `NotFound`, try each project repo under `layers/main/*/src/*`:
+        `(cd <path> && gh issue view <N> --json repository --jq '.repository.nameWithOwner')`.
+        First success wins; record both the path and `owner/repo`.
+     3. **No match** — stop with an error; the issue may live in a
+        repo not currently checked out, or `<N>` is wrong.
 2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
    *and* `$WORKTREE_REPO` matches the owning repo's short slug, the
    current directory is the right worktree. Record `<plan-worktree-path>`
@@ -291,11 +294,23 @@ appending, resolve the right place to write:
    repos, pass `--repo-slug <slug>` if entering via
    `worktree_enter.sh`.
 4. **Otherwise create one on demand**, mirroring `review-issue` step
-   8a.5: `.agent/scripts/worktree_create.sh --issue <N> --type
-   workspace` for workspace issues, or `--type layer --layer <layer>
-   --packages <project_repo>` for project-repo issues. No `--plan-file`
-   — the plan already exists, we just need a branch to commit
-   progress.md on.
+   8a.5:
+   - **Workspace issues**: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`.
+   - **Project-repo issues**: derive `<layer>` and `<project_repo>`
+     from the project repo's path. Step 1 returned the owning
+     `owner/repo` and (for the probe-success path in `--issue` /
+     file-path mode) the local path under `layers/main/<layer>_ws/src/<project_repo>/`
+     where the gh probe matched. Parse `<layer>` (the directory name
+     before `_ws/src/`) and `<project_repo>` (the leaf directory) from
+     that path. Then:
+     `.agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <project_repo>`.
+     This mirrors `plan-task` step 4's layer/package inference. In
+     PR-number mode where step 1 didn't probe a local path, run the
+     workspace-root → project-repos probe from step 1 now (it's
+     idempotent) to discover the local path.
+
+   No `--plan-file` — the plan already exists, we just need a branch
+   to commit progress.md on.
 5. **Initialise progress.md if absent** — if
    `<plan-worktree-path>/.agent/work-plans/issue-<N>/progress.md`
    doesn't exist, create it with the standard frontmatter:

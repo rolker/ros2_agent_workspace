@@ -248,10 +248,10 @@ The per-invocation `-c` overrides are required by
 agents run each bash invocation in a fresh subshell, so the env
 exports from `set_git_identity_env.sh` aren't reliable here.
 
-The push is required — step 7 already pushed and opened the draft PR,
-so the new commit needs its own push to appear on the PR alongside
-the plan. Without it the report (step 9) would cite a SHA that's only
-local.
+The push is required — step 7 already pushed the branch (whether it
+created a new draft PR or updated an existing one), so the new commit
+needs its own push to appear on the PR alongside the plan. Without it
+the report (step 9) would cite a SHA that's only local.
 
 ### 9. Report to user
 

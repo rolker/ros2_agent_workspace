@@ -66,11 +66,22 @@ Every entry begins with:
 **By**: <agent name> (<model>)
 ```
 
-After that, skill-specific fields are permitted but should follow
-existing precedents (PR/Branch + SHA, verdict, must-fix/suggestion
-counts, sources column for integrated entries, etc.). Findings,
-actions, or open questions go in a `### Findings`, `### Actions`,
-or `### Open questions` sub-section as a checkbox list — sources for
+Immediately after the standard header, every entry MUST include the
+canonical correlation-key field for its entry type, so consumers
+(notably the phase-B `triage-reviews` integrator) can filter by
+entry-type + correlation-key without parsing prose:
+
+| Entry type | Required field |
+|---|---|
+| `## Issue Review` | `**Issue**: #<N>` |
+| `## Plan Authored`, `## Plan Review` | `` **Plan**: `<path>` at `<sha>` `` |
+| `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## External Review`, `## Implementation` | `` **PR**: #<N> at `<sha>` `` (or `` **Branch**: <name> at `<sha>` `` if no PR exists yet) |
+
+After that, additional skill-specific fields are permitted but should
+follow existing precedents (verdict, must-fix/suggestion counts,
+sources column for integrated entries, etc.). Findings, actions, or
+open questions go in a `### Findings`, `### Actions`, or
+`### Open questions` sub-section as a checkbox list — sources for
 each item should be inline (e.g., `- [ ] (suggestion, Copilot R2) …`)
 when known. `### Open questions` is reserved for decisions that need
 human input before implementation (used by `## Plan Authored`);
@@ -131,9 +142,10 @@ name for new entries; no migration of historical files.
   entry type or introduce a new one via a **superseding ADR**.
   [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md) does
   *not* apply here: adding an entry type changes this ADR's Decision
-  table and Consequences, which §52-58 of ADR-0012 explicitly excludes
-  from the cross-reference-addendum carve-out. The supersession-only
-  rule is the intended friction.
+  table and Consequences, which ADR-0012's
+  [§ Still requires a new/superseding ADR (substantive changes)](0012-permit-cross-reference-addendums-in-adrs.md#still-requires-a-newsuperseding-adr-substantive-changes)
+  explicitly excludes from the cross-reference-addendum carve-out.
+  The supersession-only rule is the intended friction.
 
 ## References
 
