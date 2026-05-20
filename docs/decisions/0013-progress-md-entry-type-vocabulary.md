@@ -74,7 +74,7 @@ entry-type + correlation-key without parsing prose:
 | Entry type | Required field |
 |---|---|
 | `## Issue Review` | `**Issue**: #<N>` |
-| `## Plan Authored`, `## Plan Review` | `` **Plan**: `<path>` at `<sha>` `` |
+| `## Plan Authored`, `## Plan Review` | `` **Plan**: `<path>` at `<plan-commit-sha>` `` (commit SHA, not blob SHA — see [Consume by entry-type filter](#consume-by-entry-type-filter)) |
 | `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## External Review`, `## Implementation` | `` **PR**: #<N> at `<sha>` `` (or `` **Branch**: <name> at `<sha>` `` if no PR exists yet) |
 
 After that, additional skill-specific fields are permitted but should
@@ -97,7 +97,7 @@ type**, not by re-classifying:
 | Entry type | Correlation key |
 |---|---|
 | `## Issue Review` | issue number (no SHA — issue body is the reference) |
-| `## Plan Authored`, `## Plan Review` | plan-file SHA (the plan, not the PR head) |
+| `## Plan Authored`, `## Plan Review` | plan-commit SHA — the SHA of the commit that last updated `plan.md` (not the PR head, not the file's blob SHA) |
 | `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## External Review`, `## Implementation` | PR / branch head SHA |
 
 A finding present in both a `## Local Review` at head `<sha>` and a

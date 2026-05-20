@@ -157,9 +157,9 @@ issue: 470
 **CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
 
 ### Actions
-- [ ] (should-fix, #1) Clarify "plan-file SHA" → "plan-commit SHA (the commit SHA where `plan.md` was last updated)" in ADR-0013's Consume-by-filter table (`docs/decisions/0013-progress-md-entry-type-vocabulary.md:51`), and align the required-fields table wording.
-- [ ] (should-fix, #2) Add `**Issue**: #<N>` field to the `## Issue Review` template in `review-issue/SKILL.md:240` (immediately after `**By**`).
-- [ ] (should-fix, #3) Add `at \`<sha>\`` to the `## External Review` template in `triage-reviews/SKILL.md:252`; split the review-count summary onto its own `**Reviews**:` line.
+- [x] (should-fix, #1) ADR-0013 Consume-by-filter table: replaced "plan-file SHA" with "plan-commit SHA — the SHA of the commit that last updated `plan.md` (not the PR head, not the file's blob SHA)". Required-fields table now uses `<plan-commit-sha>` and links to the Consume section.
+- [x] (should-fix, #2) Added `**Issue**: #<N>` immediately after `**By**` in the `## Issue Review` template (`review-issue/SKILL.md`).
+- [x] (should-fix, #3) `## External Review` template in `triage-reviews/SKILL.md` now uses `**PR**: #<N> at \`<short-sha>\`` on its own line; review-count summary moved to a `**Reviews**:` line below.
 
 ### Notes
 - All 3 findings are cascade consequences of R8 fix #1 (added correlation-key-fields requirement to ADR-0013) — I updated the ADR's required-fields table but didn't update the 2 templates that needed new fields. Audit of all 5 templates confirms only review-issue and triage-reviews are missing fields; plan-task, review-plan, and review-code already match.

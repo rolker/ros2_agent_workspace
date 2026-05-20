@@ -238,6 +238,7 @@ Append:
 **When**: <YYYY-MM-DD HH:MM>
 **By**: <agent name> (<model>)
 
+**Issue**: #<N>
 **Comment**: <URL of the posted issue comment from step 7>
 **Scope verdict**: <well-scoped | needs-splitting | needs-more-detail>
 

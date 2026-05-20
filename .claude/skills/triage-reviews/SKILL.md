@@ -249,7 +249,8 @@ Append this step entry:
 **When**: <YYYY-MM-DD HH:MM>
 **By**: <agent name> (<model>)
 
-**PR**: #<N> — <total> review(s), <valid-count> valid, <false-positive-count> false positives
+**PR**: #<N> at `<short-sha>`
+**Reviews**: <total> review(s), <valid-count> valid, <false-positive-count> false positives
 **CI**: <all-pass | failures-noted>
 
 ### Actions
