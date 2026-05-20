@@ -233,17 +233,26 @@ disambiguate (see `WORKTREE_GUIDE.md`).
 **8a.5.** If neither: determine worktree type from the owning repo
 (workspace for issues in the workspace repo, layer for project-repo
 issues — same logic as `plan-task` step 4). Create the worktree:
-   ```bash
-   # Workspace issue
-   .agent/scripts/worktree_create.sh --issue <N> --type workspace
 
-   # Project repo issue
-   .agent/scripts/worktree_create.sh --issue <N> --type layer \
-       --layer <layer> --packages <project_repo>
-   ```
-   `worktree_create.sh` does NOT open a draft PR when invoked without
-   `--plan-file`; only the worktree + branch are created. A draft PR
-   will follow when `plan-task` runs.
+- **Workspace issue** (`owner/repo` from step 8a.1 matches the
+  workspace repo's `nameWithOwner`):
+  ```bash
+  .agent/scripts/worktree_create.sh --issue <N> --type workspace
+  ```
+- **Project-repo issue**: derive `<layer>` and `<project_repo>` from
+  the local path the step 8a.1 probe matched (under
+  `layers/main/<layer>_ws/src/<project_repo>/`). Parse `<layer>` as
+  the directory name before `_ws/src/` and `<project_repo>` as the
+  leaf directory. This mirrors `plan-task` step 4 and `review-plan`
+  step 6.4. Then:
+  ```bash
+  .agent/scripts/worktree_create.sh --issue <N> --type layer \
+      --layer <layer> --packages <project_repo>
+  ```
+
+`worktree_create.sh` does NOT open a draft PR when invoked without
+`--plan-file`; only the worktree + branch are created. A draft PR
+will follow when `plan-task` runs.
 
 **8b. Append the entry.** Use frontmatter for a new file:
 

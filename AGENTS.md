@@ -279,10 +279,15 @@ that broke `GIT_AUTHOR_NAME`. In that case, either source
 substitute the literal values directly into the `-c` flags:
 
 ```bash
-git -c user.name="Claude Code Agent" \
-    -c user.email="roland+claude-code@ccom.unh.edu" \
+git -c user.name="<agent name>" \
+    -c user.email="<agent email>" \
     commit -m "…"
 ```
+
+Substitute your own runtime identity for the placeholders — the same
+values `set_git_identity_env.sh` exports as `$AGENT_NAME` and
+`$AGENT_EMAIL`. Don't copy-paste another agent's identity from
+examples elsewhere; commits would land under the wrong author.
 
 **Enforcement**: `.agent/hooks/check-commit-identity.py` (pre-commit)
 rejects human-pattern emails on agent-convention branches when

@@ -111,7 +111,7 @@ for Mechanism C compliance.
 | 0001 — Adopt ADRs | Yes | Phase A.1 adds ADR-0013 capturing the new vocabulary as a workspace decision rather than scattered skill-level prose. |
 | 0002 — Worktree isolation | Yes | Plan + implementation on `feature/issue-470` workspace worktree. |
 | 0003 — Workspace infra project-agnostic | Yes | Vocabulary + skills are framework-agnostic; not coupled to any project. |
-| 0006 — Shared AGENTS.md | Watch (phase C, not A) | Phase C's handoff-prompt boilerplate will cascade to framework adapters per consequences map. Phase A doesn't touch AGENTS.md. |
+| 0006 — Shared AGENTS.md | Yes (small) | Phase A added a "Subshell caveat" paragraph to § Agent Commit Identity (commit `75cc3ea`) — clarifies that `$AGENT_NAME` / `$AGENT_EMAIL` must be live in the same shell as the `git -c` invocation, with the literal-substitute fallback for fresh-subshell harnesses. Single edit, single source of truth — propagates to all five SKILL.md files via their existing cross-references. Phase C's handoff-prompt boilerplate will cascade further per consequences map. |
 | 0010 — git-bug | Watch | Sub-agent local-first publishing model (decision #1) is consistent with ADR-0010's direction; sub-agents could optionally file git-bug issues for newly discovered work, but that's parent-discretion not in-skill — flag in phase C. |
 | 0012 — Cross-reference addendums | Yes (mechanism) | If ADR-0013's relationship to ADR-0010 / ADR-0006 matters later, use cross-reference addendums per ADR-0012's mechanism rather than rewriting. |
 
