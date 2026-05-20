@@ -23,6 +23,22 @@ the issue — does not modify the issue body.
 repo? conflicting with ADRs?). For evaluating an implementation plan, use
 `plan-task`. For evaluating a completed PR, use `review-code`.
 
+**Precondition: invoke from the owning repo's cwd.** Issue numbers are
+scoped per-repo (`rolker/ros2_agent_workspace#42` and
+`rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 7
+(`gh issue view <N>` and `gh issue comment <N>`) resolve the repo via
+the current directory's origin — so `cd` into the repo that owns the
+issue before invoking `/review-issue <N>`. From the wrong cwd the
+skill will either fail loudly (`NotFound`) or silently query/comment
+on a colliding-number issue in the wrong repo. Step 8's
+owning-repo probe creates the right worktree for progress.md even if
+cwd is mismatched, but the comment-and-view steps will already have
+hit the wrong repo by then. If you don't know which repo owns `<N>`,
+use step 8a.1's probe pattern up front (probe workspace, then project
+repos under `layers/main/*/src/*`) and `cd` to the match before
+invoking. **Cwd-independent owning-repo resolution is tracked as a
+follow-up** — until then, the precondition is load-bearing.
+
 ## Steps
 
 ### 1. Read the issue

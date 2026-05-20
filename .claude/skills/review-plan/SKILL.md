@@ -334,7 +334,7 @@ appending, resolve the right place to write:
 
    No `--plan-file` — the plan already exists, we just need a branch
    to commit progress.md on.
-5. **Initialise progress.md if absent** — if
+5. **Initialize progress.md if absent** — if
    `<plan-worktree-path>/.agent/work-plans/issue-<N>/progress.md`
    doesn't exist, create it with the standard frontmatter:
    ```yaml

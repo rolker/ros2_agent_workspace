@@ -422,7 +422,7 @@ Deep-tier prompt adds:
 - Concurrency / lifecycle (lock ordering, init/destroy ordering, signal
   handling, shutdown paths)
 - Cross-cutting effects (does this change interact with caching,
-  retries, error propagation, or other system-wide behaviour?)
+  retries, error propagation, or other system-wide behavior?)
 
 Report findings in the same format as other specialists (file, line,
 severity, description). The silence filter (step 6) deduplicates overlap
@@ -461,11 +461,13 @@ COPILOT_BIN=""
 if [[ "$NO_COPILOT" == "1" ]]; then
     # User opted out for this invocation; no "skipped" notice needed.
     SKIP_COPILOT=1
-elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -n "$COPILOT_BIN" ]; then
-    : # Found on current PATH.
+elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -x "$COPILOT_BIN" ]; then
+    : # Found on current PATH. `[ -x ]` filters out alias/function
+      # returns from `command -v` (e.g., "alias copilot='...'" or a
+      # shell function name) — only an actual executable path passes.
 elif [ -s "$HOME/.nvm/nvm.sh" ] && \
      COPILOT_BIN=$(bash -c '. "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; command -v copilot' 2>/dev/null) && \
-     [ -n "$COPILOT_BIN" ]; then
+     [ -x "$COPILOT_BIN" ]; then
     : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
 else
     # Glob fallback for nvm installs where nvm.sh sourcing didn't help

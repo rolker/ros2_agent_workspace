@@ -12,7 +12,7 @@ the workspace's per-issue lifecycle timeline. The
 [triage-reviews](../../.claude/skills/triage-reviews/SKILL.md) skills
 already write entries to these files (step 8 and step 7
 respectively). [#470](https://github.com/rolker/ros2_agent_workspace/issues/470)
-generalises the pattern: every workflow skill should write a typed
+generalizes the pattern: every workflow skill should write a typed
 entry, and downstream skills (notably the integrator redesign of
 `triage-reviews`) should consume prior entries as input rather than
 re-doing work or losing signal.
@@ -40,7 +40,7 @@ Two failure modes motivate this ADR:
 
 ## Decision
 
-Canonicalise the `progress.md` entry-type vocabulary as a workspace
+Canonicalize the `progress.md` entry-type vocabulary as a workspace
 decision. Workflow skills writing to `progress.md` MUST use one of the
 following entry types:
 
@@ -116,7 +116,7 @@ finding.
 
 ### Predecessor recognition
 
-`## External Review` is the recognised predecessor of
+`## External Review` is the recognized predecessor of
 `## Integrated Review`. Until [#470](https://github.com/rolker/ros2_agent_workspace/issues/470)'s
 phase B retires the name, `triage-reviews` continues to write
 `## External Review` and existing entries (e.g.,
