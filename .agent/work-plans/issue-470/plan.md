@@ -137,16 +137,18 @@ for Mechanism C compliance.
 
 ## Estimated Scope
 
-**Phase A (this PR)**: landed as ~+560/-15 across 7 files in
+**Phase A (this PR)**: landed as ~+1208/-16 across 10 files in
 multiple atomic commits (initial estimate of "~150–200 lines / 2
 atomic commits" was a substantial underestimate — ADR-0013 alone is
-137 lines; each skill SKILL.md persist step is ~50–90 lines; locate-
+~190 lines; each skill SKILL.md persist step is ~50–90 lines; locate-
 or-create flows in review-issue and review-plan added another ~75
-lines combined; triage-driven fixes added the rest). Markdown-only.
-The original two-commit shape didn't survive review — implementation
-revisions (worktree-on-demand pivot, pre-push adversarial findings,
-Copilot triage fixes) each became their own atomic commit on the
-branch.
+lines combined; triage-driven fixes added the rest, including an
+in-PR schema refinement to make `**When**` carry an explicit numeric
+UTC offset and the corresponding 16-line `progress.md` backfill).
+Markdown-only. The original two-commit shape didn't survive review —
+implementation revisions (worktree-on-demand pivot, pre-push
+adversarial findings, Copilot triage fixes, offset-schema refinement)
+each became their own atomic commit on the branch.
 
 **Phase B + C**: separate stacked PRs per umbrella's "Sub-issues
 worth splitting" section. Sub-issues filed during phase A
