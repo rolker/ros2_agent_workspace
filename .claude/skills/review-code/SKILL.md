@@ -469,14 +469,21 @@ elif [ -s "$HOME/.nvm/nvm.sh" ] && \
     : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
 else
     # Glob fallback for nvm installs where nvm.sh sourcing didn't help
-    # (e.g., multiple node versions, default-alias misconfigured).
-    for candidate in "$HOME"/.nvm/versions/node/*/bin/copilot; do
-        if [ -x "$candidate" ]; then
-            COPILOT_BIN="$candidate"
-            break
-        fi
-    done
-    if [ -z "$COPILOT_BIN" ]; then
+    # (e.g., multiple node versions, default-alias misconfigured). Use
+    # `sort -V` to pick the newest node version — `v18.12.1` sorts
+    # before `v24.12.0` lexicographically (1<2), but a Copilot version
+    # installed under newer node is what the user almost certainly
+    # wants. All same-platform copilot shims symlink to the same
+    # npm-loader.js so the choice is mostly theoretical; it matters
+    # only when older nvm-managed node versions have different copilot
+    # versions installed under them.
+    # printf is used instead of ls so the no-match case is bash's
+    # literal unmatched-glob string (caught below by `[ -x ]` failing)
+    # rather than ls's stderr.
+    candidate=$(printf '%s\n' "$HOME"/.nvm/versions/node/*/bin/copilot | sort -V | tail -1)
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        COPILOT_BIN="$candidate"
+    else
         COPILOT_SKIP_REASON="copilot CLI not installed (probed PATH, nvm.sh, and ~/.nvm glob)"
         SKIP_COPILOT=1
     fi

@@ -223,7 +223,7 @@ issue: 470
 **Must-fix**: 0 | **Suggestions**: 1
 
 ### Findings
-- [ ] (suggestion) Copilot probe's `~/.nvm/versions/node/*/bin/copilot` glob fallback picks the first lexicographic match (e.g., `v18.12.1` before `v24.12.0`). All candidates symlink to the same `npm-loader.js` in practice, so risk is theoretical — but `sort -V` over the candidates or honouring `~/.nvm/alias/default` would harden it. — `.claude/skills/review-code/SKILL.md:473-478`
+- [x] (suggestion) Copilot probe glob fallback now uses `printf … | sort -V | tail -1` to pick the newest installed node version. Confirmed on this machine: 3 node versions installed (v18.12.1, v24.12.0, v25.2.1); old for-loop would have picked v18 (first lexicographic), now picks v25 (newest by version sort). Active-nvm version (v24, what PATH probe returns) is unchanged; the fix only affects the fallback-arm behaviour when PATH and nvm.sh probes both fail.
 
 ### Notes
 - **Copilot Adversarial activated this run** via the PATH probe arm (`COPILOT_BIN=/home/roland/.nvm/versions/node/v24.12.0/bin/copilot`). The previous round's "copilot CLI not installed" diagnosis turns out to be environment-specific — this Claude Code Bash-tool subshell already inherits the parent shell's nvm-injected PATH, so the first probe arm wins without needing the `nvm.sh` source or glob fallback. The hardening still pays off for the harness configurations where PATH doesn't carry forward (which is what the previous sub-agent hit). Verified the probe order works in this environment.
