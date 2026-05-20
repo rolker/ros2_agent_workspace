@@ -381,7 +381,9 @@ Append:
 ```
 
 If the review surfaced no findings, set `**Verdict**: approve` and
-write `Plan looks solid. Ready for implementation.` under `### Findings`.
+write a single checkbox item under `### Findings` so the section
+stays uniformly parseable per ADR-0013's checkbox-list schema:
+`- [ ] Plan looks solid. Ready for implementation.`
 
 Commit:
 

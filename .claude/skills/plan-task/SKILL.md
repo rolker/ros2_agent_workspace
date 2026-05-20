@@ -230,8 +230,10 @@ Append:
 - [ ] <each Open Question from the plan, condensed to one line>
 ```
 
-If the plan has no Open Questions, write
-`No open questions — plan is review-plan-ready.` under that header.
+If the plan has no Open Questions, write a single checkbox item
+under that header so the section stays uniformly parseable per
+ADR-0013's checkbox-list schema:
+`- [ ] No open questions — plan is review-plan-ready.`
 
 Commit and push:
 

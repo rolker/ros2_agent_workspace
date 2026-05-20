@@ -280,9 +280,13 @@ issue: 470
 **CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
 
 ### Actions
-- [ ] (should-fix, #1) `principles_review_guide.md:36` — "recognised" → "recognized". R13 spelling-pass leak (I caught it in ADR-0013 but missed the matching instance in the principles guide).
-- [ ] (should-fix, #2) `principles_review_guide.md:36` — add `## External Review` (transitional) to the enumerated canonical entry types in the ADR-0013 row. Currently the guide lists the 7 canonical names but omits the recognized predecessor that the same sentence acknowledges `triage-reviews` continues to write — readers could read this as "External Review is forbidden".
-- [ ] (should-fix, #3+#4+#5) Three-skill cross-source pattern: empty-case prose sentences in `plan-task/SKILL.md:234` (`No open questions — plan is review-plan-ready.`), `review-issue/SKILL.md:307` (`No actions — issue is plan-task-ready.`), and `review-plan/SKILL.md:384` (`Plan looks solid. Ready for implementation.`) violate ADR-0013's "Findings/Actions/Open questions go in a checkbox list" requirement. Convert each to a single checkbox item (`- [ ] No open questions — plan is review-plan-ready.` etc.) so all entries are uniformly parseable.
+- [x] (should-fix, #1) `principles_review_guide.md:36`: "recognised" → "recognized". Caught R13's spelling-pass leak in the principles guide.
+- [x] (should-fix, #2) `principles_review_guide.md:36`: added `## External Review` (transitional, until #470 phase B retires it) to the ADR-0013 row's enumerated entry-type list, between `## Integrated Review` and `## Implementation`.
+- [x] (should-fix, #3+#4+#5) Three-skill empty-case checkbox conversion:
+  - `plan-task/SKILL.md:233-234`: `No open questions — plan is review-plan-ready.` → `- [ ] No open questions — plan is review-plan-ready.`
+  - `review-issue/SKILL.md:302-306`: `No actions — issue is plan-task-ready.` → `- [ ] No actions — issue is plan-task-ready.`
+  - `review-plan/SKILL.md:383-384`: `Plan looks solid. Ready for implementation.` → `- [ ] Plan looks solid. Ready for implementation.`
+  - Each surrounded by a sentence linking to ADR-0013's checkbox-list schema requirement. Empty sections now parse the same way as populated ones — consumers can use one code path.
 
 ### Notes
 - All 5 findings are cleanup-level — no must-fix, no functional risk. #1 is a missed-replace from R13's sweep; #2 is a leftover propagation from #470's predecessor-recognition work that didn't reach the principles guide; #3/#4/#5 are a single pattern (empty-case prose instead of checkbox) across the three skills that gained progress.md persistence in this PR.

@@ -301,7 +301,9 @@ Append:
 
 If the scope verdict is `well-scoped` and there were no Action-needed
 principle findings *and* no Recommendations, set `### Actions` to a
-single line: `No actions — issue is plan-task-ready.` If there are
+single checkbox item (keeping ADR-0013's checkbox-list schema
+uniform for downstream consumers):
+`- [ ] No actions — issue is plan-task-ready.` If there are
 Recommendations but no Action-needed findings, list the Recommendations
 under `### Actions` so the timeline preserves them — they're follow-up
 candidates downstream consumers should be able to see.
