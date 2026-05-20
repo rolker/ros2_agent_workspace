@@ -206,7 +206,7 @@ issue: 470
 - [x] (suggestion) Added explicit `if [ -z "${WORKTREE_ROOT:-}" ]` guard and `*)` fallthrough arm setting `WORKTREE_SLUG=""` — fail-closed is now explicit, not silent.
 
 ### Notes
-- Specialist coverage: governance + plan-drift + adversarial run in this thread. Static analysis skipped (markdown only, no profile). Copilot Adversarial unavailable on this runtime.
+- Specialist coverage: governance + plan-drift + adversarial run in this thread. Static analysis skipped (markdown only, no profile). Copilot Adversarial unavailable on this runtime — root cause: nvm-managed copilot binary lives at `~/.nvm/versions/node/*/bin/copilot`, PATH-injected by `~/.bashrc`, but `.bashrc` early-returns for non-interactive shells, so Agent-tool sub-shells never load nvm. Fixed in follow-up commit: `review-code`'s probe now falls back to sourcing `nvm.sh` directly + a `~/.nvm` glob before declaring copilot unavailable. Same root-cause family as the `$AGENT_NAME` subshell caveat already documented in AGENTS.md.
 - Plan adherence: no drift. R10 fixes are all within Phase A scope (Commit 1 ADR + Commit 2 SKILL.md persistence steps).
 - Cross-file consistency check: `$WORKTREE_REPO` grep confirms no remaining doc references outside historical progress.md notes. `worktree_enter.sh` exports the three env vars the snippet claims it exports (verified lines 221-230).
 - Cross-source pattern: the must-fix is exactly the cascade-blast-radius pattern the R10 narrative identifies. Catching it pre-push is the value the review was meant to add.

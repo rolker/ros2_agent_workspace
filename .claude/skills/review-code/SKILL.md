@@ -450,13 +450,38 @@ when the CLI is missing, so field-mode hosts (gabby, salmon — no
 GitHub credentials) don't block the rest of the review:
 
 ```bash
+# Resolve copilot to an absolute path so invocation survives subshells
+# that didn't load the user's shell init. nvm-managed copilot binaries
+# (~/.nvm/versions/node/*/bin/copilot) are PATH-injected by ~/.bashrc,
+# but ~/.bashrc early-returns for non-interactive shells — so Agent-tool
+# sub-shells (and non-interactive `bash -l`) never load nvm even though
+# the binary is installed. Probe in order: current PATH, then explicit
+# nvm sourcing, then a glob for nvm-managed installs.
+COPILOT_BIN=""
 if [[ "$NO_COPILOT" == "1" ]]; then
     # User opted out for this invocation; no "skipped" notice needed.
     SKIP_COPILOT=1
-elif ! command -v copilot >/dev/null 2>&1; then
-    COPILOT_SKIP_REASON="copilot CLI not installed"
-    SKIP_COPILOT=1
-elif ! copilot --version >/dev/null 2>&1; then
+elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -n "$COPILOT_BIN" ]; then
+    : # Found on current PATH.
+elif [ -s "$HOME/.nvm/nvm.sh" ] && \
+     COPILOT_BIN=$(bash -c '. "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; command -v copilot' 2>/dev/null) && \
+     [ -n "$COPILOT_BIN" ]; then
+    : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
+else
+    # Glob fallback for nvm installs where nvm.sh sourcing didn't help
+    # (e.g., multiple node versions, default-alias misconfigured).
+    for candidate in "$HOME"/.nvm/versions/node/*/bin/copilot; do
+        if [ -x "$candidate" ]; then
+            COPILOT_BIN="$candidate"
+            break
+        fi
+    done
+    if [ -z "$COPILOT_BIN" ]; then
+        COPILOT_SKIP_REASON="copilot CLI not installed (probed PATH, nvm.sh, and ~/.nvm glob)"
+        SKIP_COPILOT=1
+    fi
+fi
+if [[ "$SKIP_COPILOT" != "1" ]] && ! "$COPILOT_BIN" --version >/dev/null 2>&1; then
     # `copilot --version` is a presence check, not an auth check —
     # `--version` typically prints without contacting the API. We keep
     # it as a "binary at least runs" sanity guard. Real auth failures
@@ -520,7 +545,7 @@ trap 'rm -f "$PROMPT_FILE" "$FINDINGS_FILE"' EXIT  # tempfile cleanup
 # stuck stdin negotiation) doesn't block the entire review. 300 s is
 # generous for a single-diff prompt; tune if Deep-tier prompts on
 # large diffs need more.
-timeout 300 copilot -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
+timeout 300 "$COPILOT_BIN" -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
 COPILOT_EXIT=$?
 
 # Strip the trailing `Changes / Requests / Tokens` metadata block. The
