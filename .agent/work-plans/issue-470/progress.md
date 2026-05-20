@@ -331,3 +331,28 @@ issue: 470
 - R15 has a single low-severity finding; no must-fix, no functional risk. The "near-zero must-fix volume" trend continues — R8 onward each had 0 must-fix findings.
 - R1–R14 verified addressed by spot-checking: 8 prior `## External Review` entries in this file, 61 checked action items, every review's `commit_id` is reachable in linear history (no force-push complications). No reopened concerns at HEAD.
 - Fix decision recorded for future similar choices: when a Copilot finding surfaces a schema-shaped bug AND the load-bearing ADR is being landed in the same PR, prefer the schema fix in the ADR over the one-off cleanup. Costs ~30 lines of edit across ADR + templates + backfill; benefits ship with the ADR itself rather than as a follow-up. Out-of-PR backfill (other `progress.md` files at `.agent/work-plans/issue-{452,460,461,468}/`) deferred to phase B's `triage-reviews` → `Integrated Review` migration since those entries are historical and won't change.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-20 09:55 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-470 at `845ddef`
+**Mode**: pre-push
+**Depth**: Standard (reason: ADR-touching, doc-only, 7 files, governance-relevant)
+**Must-fix**: 1 | **Suggestions**: 5
+
+### Findings
+- [ ] (must-fix, Claude Adv. + Copilot Adv. cross-source) R15 Notes ¶2 overclaims certainty: "backfilled with the offset that was in use at write time" is unverifiable for lines 9/30/59 — both UTC and EDT interpretations produce forward chronology, the choice is genuinely ambiguous — `progress.md:321-322`
+- [ ] (suggestion, Claude Adv.) ADR rationale para frames numeric-offset rule as prohibition of TZ abbreviations, but prior schema didn't permit abbreviations either; reword as establishing the rule — `0013-progress-md-entry-type-vocabulary.md:75-79`
+- [ ] (suggestion, Claude Adv.) Sibling-`progress.md` deferral in R15 Notes ¶3 should surface as an open question to user (per `feedback_surface_scope_deferrals` pattern), not silently parked in Notes — `progress.md:333`
+- [ ] (suggestion, Copilot Adv.) ADR schema silent on backfill / inferred-offset guidance — future migrations could encode uncertain timestamps as authoritative — `0013-progress-md-entry-type-vocabulary.md:65-81`
+- [ ] (suggestion, Claude Adv.) ADR schema silent on `Z` as UTC shorthand; one-line include/exclude clarification — `0013-progress-md-entry-type-vocabulary.md:65`
+- [ ] (suggestion, Plan Drift) plan.md Estimated Scope says `+560/-15 across 7 files` but actual landed is `+1208/-16 across 10 files` after the offset refinement — `plan.md:140-149`
+
+### Notes
+- Cross-source convergence: Claude Adv. and Copilot Adv. — running with no shared context — both flagged the lines-9/30/59 backfill ambiguity. Per ADR-0013, cross-source confirmation is the strongest signal class; promoting from "suggestion" to "must-fix" on the strength of two independent reviewers reading the same diff cold.
+- Plan Drift specialist confirmed no architectural drift — the 4-commit batch fits within Phase A.1 + A.2 scope. Only stale claim is the Estimated Scope line counts.
+- Governance: ADR-0012 supersession rule does NOT apply — ADR-0013 is unmerged in this PR; in-PR refinement is the iteration loop until merge.
+- Static analysis skipped (markdown-only diff, no linter profile applies).
