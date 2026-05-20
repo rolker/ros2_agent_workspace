@@ -188,3 +188,25 @@ issue: 470
 ### Notes
 - **Pattern recognition**: 3 of 5 findings are direct consequences of edits I made in earlier rounds (R8 fix #1 over-tight rule, R9 fix #1 partial cascade, R5 introduction of `$WORKTREE_REPO` that never existed). ADR/template changes have wider blast radius than I'm catching pre-push; review-code's plan-drift specialist would have caught #3+#4 if I'd ever re-run it on the recent commits.
 - Still-deferred (not raised this round): `Phases` schema-vs-usage gap (defer naturally), ADR-0013 silent on in-progress-PR `## External Review` consumption (phase-B planning question).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-19 12:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-470 at `b7f174e`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching files — `docs/decisions/` ADR + two `.claude/skills/*/SKILL.md`)
+**Must-fix**: 1 | **Suggestions**: 2
+
+### Findings
+- [ ] (must-fix) ADR-0013 line 110 still says "plan-file SHA" — verbatim cascade leak from the same series that R10 fix #1 (Decision table) and R9 fix #1 (Consume table) closed. One-word fix: "file" → "commit". — `docs/decisions/0013-progress-md-entry-type-vocabulary.md:110`
+- [ ] (suggestion) New `WORKTREE_SLUG` snippet doesn't document the comparison mechanism: how the derived slug maps to the `owner/repo` form returned by step 8a.1 (especially workspace-repo → literal `workspace`). — `.claude/skills/review-issue/SKILL.md:176-194`, `.claude/skills/review-plan/SKILL.md:282-298`
+- [ ] (suggestion) `case` has no fallthrough — if `$WORKTREE_ROOT` is unset, `WORKTREE_SLUG` is left unset and the 8a.2 / 6.2 equality check silently fails-closed (acceptable but undocumented). — same snippets
+
+### Notes
+- Specialist coverage: governance + plan-drift + adversarial run in this thread. Static analysis skipped (markdown only, no profile). Copilot Adversarial unavailable on this runtime.
+- Plan adherence: no drift. R10 fixes are all within Phase A scope (Commit 1 ADR + Commit 2 SKILL.md persistence steps).
+- Cross-file consistency check: `$WORKTREE_REPO` grep confirms no remaining doc references outside historical progress.md notes. `worktree_enter.sh` exports the three env vars the snippet claims it exports (verified lines 221-230).
+- Cross-source pattern: the must-fix is exactly the cascade-blast-radius pattern the R10 narrative identifies. Catching it pre-push is the value the review was meant to add.
