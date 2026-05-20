@@ -267,7 +267,22 @@ so the identity is robust regardless of which subshell does the commit.
 `set_git_identity_env.sh` is still useful — it exports `$AGENT_NAME`,
 `$AGENT_EMAIL`, `$AGENT_MODEL`, `$AGENT_FRAMEWORK` for `gh` signatures
 and as values for the `-c` flags above. Source it once at session start
-and the env vars feed every commit.
+and the env vars feed every commit — provided the commits run in the
+same shell as the source (or one of its descendants).
+
+**Subshell caveat**: `$AGENT_NAME` / `$AGENT_EMAIL` themselves must be
+live in the shell that runs the `git -c` command. Runtimes that start
+each command in a fresh subshell (Claude Code's Bash tool, Copilot CLI,
+similar harnesses) lose the exports between turns — the same mechanism
+that broke `GIT_AUTHOR_NAME`. In that case, either source
+`set_git_identity_env.sh` in the same command as the commit, or
+substitute the literal values directly into the `-c` flags:
+
+```bash
+git -c user.name="Claude Code Agent" \
+    -c user.email="roland+claude-code@ccom.unh.edu" \
+    commit -m "…"
+```
 
 **Enforcement**: `.agent/hooks/check-commit-identity.py` (pre-commit)
 rejects human-pattern emails on agent-convention branches when
