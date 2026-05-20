@@ -290,12 +290,22 @@ appending, resolve the right place to write:
    `$WORKTREE_ROOT`'s basename (same pattern as `review-issue` step
    8a.2):
    ```bash
-   WT_BASENAME=$(basename "$WORKTREE_ROOT")
-   case "$WT_BASENAME" in
-       issue-workspace-*) WORKTREE_SLUG="workspace" ;;
-       issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
-   esac
+   if [ -z "${WORKTREE_ROOT:-}" ]; then
+       # Not in a worktree — fall through to sub-step 3 (find or create)
+       WORKTREE_SLUG=""
+   else
+       WT_BASENAME=$(basename "$WORKTREE_ROOT")
+       case "$WT_BASENAME" in
+           issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+           issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+           *)                 WORKTREE_SLUG="" ;;
+       esac
+   fi
    ```
+
+   Comparison against step 1's `owner/repo`: workspace issue matches
+   iff `WORKTREE_SLUG == "workspace"`; project-repo issue matches iff
+   `WORKTREE_SLUG` equals the repo-name portion of `owner/repo`.
 3. **Find an existing worktree** with an anchored, repo-aware match —
    same pattern as `review-issue` step 8a.3:
    ```bash

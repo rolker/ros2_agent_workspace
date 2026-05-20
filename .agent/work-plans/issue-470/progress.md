@@ -201,9 +201,9 @@ issue: 470
 **Must-fix**: 1 | **Suggestions**: 2
 
 ### Findings
-- [ ] (must-fix) ADR-0013 line 110 still says "plan-file SHA" — verbatim cascade leak from the same series that R10 fix #1 (Decision table) and R9 fix #1 (Consume table) closed. One-word fix: "file" → "commit". — `docs/decisions/0013-progress-md-entry-type-vocabulary.md:110`
-- [ ] (suggestion) New `WORKTREE_SLUG` snippet doesn't document the comparison mechanism: how the derived slug maps to the `owner/repo` form returned by step 8a.1 (especially workspace-repo → literal `workspace`). — `.claude/skills/review-issue/SKILL.md:176-194`, `.claude/skills/review-plan/SKILL.md:282-298`
-- [ ] (suggestion) `case` has no fallthrough — if `$WORKTREE_ROOT` is unset, `WORKTREE_SLUG` is left unset and the 8a.2 / 6.2 equality check silently fails-closed (acceptable but undocumented). — same snippets
+- [x] (must-fix) ADR-0013 line 110 "plan-file SHA" → "plan-commit SHA". Closes the cascade-blast-radius leak the R10 narrative identified — exactly what pre-push review was added to catch.
+- [x] (suggestion) Documented the comparison mechanism in both snippets: workspace issue matches iff `WORKTREE_SLUG == "workspace"`; project-repo issue matches iff `WORKTREE_SLUG` equals the repo-name portion of step-1's `owner/repo`. — `.claude/skills/review-issue/SKILL.md` step 8a.2, `.claude/skills/review-plan/SKILL.md` step 6.2.
+- [x] (suggestion) Added explicit `if [ -z "${WORKTREE_ROOT:-}" ]` guard and `*)` fallthrough arm setting `WORKTREE_SLUG=""` — fail-closed is now explicit, not silent.
 
 ### Notes
 - Specialist coverage: governance + plan-drift + adversarial run in this thread. Static analysis skipped (markdown only, no profile). Copilot Adversarial unavailable on this runtime.

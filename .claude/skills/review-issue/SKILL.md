@@ -184,14 +184,27 @@ a colliding number).
 `$WORKTREE_ISSUE` — but not the repo slug. Derive it from
 `$WORKTREE_ROOT`'s basename:
 ```bash
-WT_BASENAME=$(basename "$WORKTREE_ROOT")
-# Workspace worktree: basename is `issue-workspace-<N>` → slug is "workspace"
-# Layer worktree:     basename is `issue-<repo-slug>-<N>` → slug is the middle field
-case "$WT_BASENAME" in
-    issue-workspace-*) WORKTREE_SLUG="workspace" ;;
-    issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
-esac
+if [ -z "${WORKTREE_ROOT:-}" ]; then
+    # Not in a worktree (or worktree_enter.sh never ran) — fall through to 8a.3
+    WORKTREE_SLUG=""
+else
+    WT_BASENAME=$(basename "$WORKTREE_ROOT")
+    case "$WT_BASENAME" in
+        issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+        issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+        *)                 WORKTREE_SLUG="" ;;
+    esac
+fi
 ```
+
+Compare `$WORKTREE_SLUG` against the owning repo. Step 8a.1 returned
+`owner/repo` form; the slug-relevant comparison depends on type:
+- **Workspace issue** — the `owner/repo` from step 8a.1 matches the
+  workspace repo's `nameWithOwner` (e.g., `rolker/ros2_agent_workspace`).
+  Match iff `WORKTREE_SLUG == "workspace"`.
+- **Project-repo issue** — the `owner/repo` from step 8a.1 matches a
+  project repo (e.g., `rolker/unh_marine_autonomy`). Match iff
+  `WORKTREE_SLUG` equals the repo-name portion (`unh_marine_autonomy`).
 
 **8a.3.** If not, check whether a worktree for the issue already
 exists. Use an anchored, repo-aware pattern so neighbouring issue

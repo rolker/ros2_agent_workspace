@@ -107,7 +107,7 @@ type**, not by re-classifying:
 A finding present in both a `## Local Review` at head `<sha>` and a
 GitHub-side Copilot review at the same head is a **cross-source
 confirmation** — keep both with a sources column, do not collapse.
-For entries keyed by issue or plan-file SHA, cross-source
+For entries keyed by issue or plan-commit SHA, cross-source
 confirmation is by entry type + issue number (e.g., a `## Plan Review`
 and a `## Plan Authored` for the same plan SHA agree on a finding).
 
