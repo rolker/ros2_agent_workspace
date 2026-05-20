@@ -269,3 +269,22 @@ issue: 470
 ### Notes
 - Finding #2 is the deepest yet — accumulated defensive edits across R5/R10/R11 introduced inconsistency that wasn't visible from any single edit. Bigger than R10's `$WORKTREE_REPO` bug (single var, single fix) because the right fix depends on a design decision (skill precondition vs self-resolution).
 - Severity trend continues: R5=2/R6=1/R7=3 must-fixes, then R8 onward 0 must-fixes. R13 adds 1 needs-discussion finding to the trend — first design question rather than implementation bug.
+
+## External Review
+**Status**: complete
+**When**: 2026-05-20 05:25
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `33322cb`
+**Reviews**: 14 total from `copilot-pull-request-reviewer[bot]` (5 fresh at HEAD), 5 valid (0 must-fix, 5 should-fix), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
+
+### Actions
+- [ ] (should-fix, #1) `principles_review_guide.md:36` — "recognised" → "recognized". R13 spelling-pass leak (I caught it in ADR-0013 but missed the matching instance in the principles guide).
+- [ ] (should-fix, #2) `principles_review_guide.md:36` — add `## External Review` (transitional) to the enumerated canonical entry types in the ADR-0013 row. Currently the guide lists the 7 canonical names but omits the recognized predecessor that the same sentence acknowledges `triage-reviews` continues to write — readers could read this as "External Review is forbidden".
+- [ ] (should-fix, #3+#4+#5) Three-skill cross-source pattern: empty-case prose sentences in `plan-task/SKILL.md:234` (`No open questions — plan is review-plan-ready.`), `review-issue/SKILL.md:307` (`No actions — issue is plan-task-ready.`), and `review-plan/SKILL.md:384` (`Plan looks solid. Ready for implementation.`) violate ADR-0013's "Findings/Actions/Open questions go in a checkbox list" requirement. Convert each to a single checkbox item (`- [ ] No open questions — plan is review-plan-ready.` etc.) so all entries are uniformly parseable.
+
+### Notes
+- All 5 findings are cleanup-level — no must-fix, no functional risk. #1 is a missed-replace from R13's sweep; #2 is a leftover propagation from #470's predecessor-recognition work that didn't reach the principles guide; #3/#4/#5 are a single pattern (empty-case prose instead of checkbox) across the three skills that gained progress.md persistence in this PR.
+- Cross-source pattern: #3+#4+#5 is the same defect class across three sibling skill files — exactly the symmetric-edit class of bug that R8 fix #4 / R11 finding #3 already demonstrated. The fix needs to propagate across all three.
+- Severity trend continues to flatten: R5=2 must-fixes → ... → R8=0 → R9=0 → R10=0 → R11=0 → R12=0 → R13=0 → R14=0. Bug velocity is now zero must-fixes and decreasing should-fix volume.
