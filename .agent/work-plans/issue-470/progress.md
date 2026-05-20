@@ -210,3 +210,23 @@ issue: 470
 - Plan adherence: no drift. R10 fixes are all within Phase A scope (Commit 1 ADR + Commit 2 SKILL.md persistence steps).
 - Cross-file consistency check: `$WORKTREE_REPO` grep confirms no remaining doc references outside historical progress.md notes. `worktree_enter.sh` exports the three env vars the snippet claims it exports (verified lines 221-230).
 - Cross-source pattern: the must-fix is exactly the cascade-blast-radius pattern the R10 narrative identifies. Catching it pre-push is the value the review was meant to add.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-19 23:10
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: approved-with-suggestions
+
+**Branch**: feature/issue-470 at `3b415a0`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching — ADR-0013 + 3 `.claude/skills/*/SKILL.md` files)
+**Must-fix**: 0 | **Suggestions**: 1
+
+### Findings
+- [ ] (suggestion) Copilot probe's `~/.nvm/versions/node/*/bin/copilot` glob fallback picks the first lexicographic match (e.g., `v18.12.1` before `v24.12.0`). All candidates symlink to the same `npm-loader.js` in practice, so risk is theoretical — but `sort -V` over the candidates or honouring `~/.nvm/alias/default` would harden it. — `.claude/skills/review-code/SKILL.md:473-478`
+
+### Notes
+- **Copilot Adversarial activated this run** via the PATH probe arm (`COPILOT_BIN=/home/roland/.nvm/versions/node/v24.12.0/bin/copilot`). The previous round's "copilot CLI not installed" diagnosis turns out to be environment-specific — this Claude Code Bash-tool subshell already inherits the parent shell's nvm-injected PATH, so the first probe arm wins without needing the `nvm.sh` source or glob fallback. The hardening still pays off for the harness configurations where PATH doesn't carry forward (which is what the previous sub-agent hit). Verified the probe order works in this environment.
+- Cross-model signal: Copilot also flagged the glob ordering issue (only finding worth keeping after silence filter). Its other two findings (`command -v` returning non-absolute paths; `WORKTREE_SLUG="workspace"` colliding with a project named `workspace`) dropped — first is moot for real binaries, second is prevented by the basename-discriminator pattern in worktree naming.
+- Plan adherence: no drift. Both commits remain within Phase A scope (cascade-fix + probe hardening).
+- This is the first pre-push review to actually exercise Copilot Adversarial end-to-end on #470. The previous Pre-Push entry's "Copilot Adversarial unavailable" note is what the `3b415a0` fix targets — recursion is intentional.
