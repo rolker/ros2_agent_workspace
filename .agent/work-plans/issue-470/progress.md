@@ -6,7 +6,7 @@ issue: 470
 
 ## Local Review (Pre-Push)
 **Status**: complete
-**When**: 2026-05-19 01:00
+**When**: 2026-05-19 01:00 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 **Verdict**: approved
 
@@ -27,7 +27,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-19 01:30
+**When**: 2026-05-19 01:30 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 — 3 review(s) from `copilot-pull-request-reviewer[bot]`, 12 valid (3 must-fix, 5 should-fix, 4 nice-to-fix), 5 false positives (addressed by pre-push fix commit `44343da`)
@@ -56,7 +56,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-19 02:00
+**When**: 2026-05-19 02:00 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 — 4 review(s) (2 fresh comments on HEAD `8a4687f`), 2 valid, 0 false positives
@@ -68,7 +68,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-19 17:30
+**When**: 2026-05-19 17:30 -04:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 — 5 review(s) from `copilot-pull-request-reviewer[bot]` (4 fresh comments on HEAD `5d57910`), 4 valid (2 must-fix, 2 should-fix), 0 false positives. Earlier-round comments addressed in the prior two `## External Review` entries.
@@ -82,7 +82,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-19 18:45
+**When**: 2026-05-19 18:45 -04:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 — 6 review(s) from `copilot-pull-request-reviewer[bot]` (3 fresh comments on HEAD `c2cd4a6`), 3 valid (1 must-fix, 2 should-fix), 0 false positives.
@@ -101,7 +101,7 @@ issue: 470
 
 ## Local Review
 **Status**: complete
-**When**: 2026-05-19 23:36
+**When**: 2026-05-19 23:36 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 **Verdict**: changes-requested
 
@@ -133,7 +133,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 00:30
+**When**: 2026-05-20 00:30 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 — 8 review(s) from `copilot-pull-request-reviewer[bot]` (5 fresh comments on HEAD `bd19a5a`), 5 valid (0 must-fix, 5 should-fix), 0 false positives.
@@ -153,7 +153,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 01:45
+**When**: 2026-05-20 01:45 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `6c8cfc5`
@@ -171,7 +171,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 02:20
+**When**: 2026-05-20 02:20 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `e3d4ba8`
@@ -191,7 +191,7 @@ issue: 470
 
 ## Local Review (Pre-Push)
 **Status**: complete
-**When**: 2026-05-20 02:40
+**When**: 2026-05-20 02:40 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 **Verdict**: changes-requested
 
@@ -213,7 +213,7 @@ issue: 470
 
 ## Local Review (Pre-Push)
 **Status**: complete
-**When**: 2026-05-20 03:10
+**When**: 2026-05-20 03:10 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 **Verdict**: approved-with-suggestions
 
@@ -233,7 +233,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 03:35
+**When**: 2026-05-20 03:35 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `ceab6b1`
@@ -254,7 +254,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 04:15
+**When**: 2026-05-20 04:15 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `3f18142`
@@ -272,7 +272,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 05:25
+**When**: 2026-05-20 05:25 +00:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `33322cb`
@@ -295,7 +295,7 @@ issue: 470
 
 ## Local Review (Pre-Push)
 **Status**: complete
-**When**: 2026-05-20 01:45
+**When**: 2026-05-20 01:45 -04:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 **Verdict**: changes-requested
 
@@ -317,7 +317,7 @@ issue: 470
 
 ## External Review
 **Status**: complete
-**When**: 2026-05-20 02:15
+**When**: 2026-05-20 09:25 -04:00
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **PR**: #473 at `3adeda2`
@@ -325,9 +325,9 @@ issue: 470
 **CI**: all-pass on Workspace Validation. Copilot code review pipeline all-pass.
 
 ### Actions
-- [ ] (cleanup, #1) `progress.md:298` `**When**` reads `2026-05-20 01:45` while the preceding entry at `progress.md:275` reads `2026-05-20 05:25` — naïve append-order readers see the timestamps go backward. Root cause is mixed TZ conventions across this file: line 275 is UTC (matches Copilot's `submitted_at`), line 298 is EDT (local). Recommended fix is to backfill line 275 to EDT (`01:25`) since 13 of 15 entries already follow the local-EDT convention. Surface to user before editing; the file has 15 `**When**` lines and only one of them needs to change to make the chronology read forward.
+- [x] (cleanup, #1) `progress.md:298` `**When**` reads `2026-05-20 01:45` while the preceding entry at `progress.md:275` reads `2026-05-20 05:25` — naïve append-order readers see the timestamps go backward. Root cause is mixed TZ conventions across this file: line 275 is UTC (matches Copilot's `submitted_at`), line 298 is EDT (local). Resolved via schema change rather than one-off fix — ADR-0013 `**When**` schema now requires an explicit numeric UTC offset (`<YYYY-MM-DD HH:MM ±HH:MM>`); the 5 SKILL.md templates were updated to match; all 16 `**When**` lines in this file were backfilled with the offset that was in use at write time (12× `+00:00`, 3× `-04:00`, plus my own R15 entry corrected to its real write time). Chronology now reads forward in UTC.
 
 ### Notes
 - R15 has a single low-severity finding; no must-fix, no functional risk. The "near-zero must-fix volume" trend continues — R8 onward each had 0 must-fix findings.
 - R1–R14 verified addressed by spot-checking: 8 prior `## External Review` entries in this file, 61 checked action items, every review's `commit_id` is reachable in linear history (no force-push complications). No reopened concerns at HEAD.
-- TZ inconsistency observed in this triage applies more broadly than R15's single line — lines 156 and 275 both used UTC while the other 13 entries used local EDT. Out of scope to backfill all 15 lines; phase B's `triage-reviews` → `Integrated Review` migration is the natural place to canonicalize the convention.
+- Fix decision recorded for future similar choices: when a Copilot finding surfaces a schema-shaped bug AND the load-bearing ADR is being landed in the same PR, prefer the schema fix in the ADR over the one-off cleanup. Costs ~30 lines of edit across ADR + templates + backfill; benefits ship with the ADR itself rather than as a follow-up. Out-of-PR backfill (other `progress.md` files at `.agent/work-plans/issue-{452,460,461,468}/`) deferred to phase B's `triage-reviews` → `Integrated Review` migration since those entries are historical and won't change.
