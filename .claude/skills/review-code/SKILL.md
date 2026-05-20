@@ -774,6 +774,12 @@ no owning worktree exists). Fetch the issue title via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
+For new files, create the parent directory first:
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
 Frontmatter for new files:
 
 ```yaml

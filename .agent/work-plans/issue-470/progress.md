@@ -363,7 +363,7 @@ issue: 470
 **CI**: all-pass on Workspace Validation. Copilot code review pipeline all-pass.
 
 ### Actions
-- [ ] (should-fix, #1+#2) Five-skill `mkdir -p` cascade: SKILL.md files that write a new `progress.md` need `mkdir -p .agent/work-plans/issue-<N>` before the frontmatter write. Copilot flagged review-issue:278 and review-plan:339 specifically; the same gap exists in plan-task, review-code, and triage-reviews (same "Frontmatter for new files" pattern). Real defect for review-issue (runs before plan-task creates the dir); defensive-best-practice for the other 4. Propagate identically — same shape as the R14 cascade fix and the R15 offset-schema cascade.
+- [x] (should-fix, #1+#2) Five-skill `mkdir -p` cascade: SKILL.md files that write a new `progress.md` need `mkdir -p .agent/work-plans/issue-<N>` before the frontmatter write. Copilot flagged review-issue:278 and review-plan:339 specifically; the same gap exists in plan-task, review-code, and triage-reviews (same "Frontmatter for new files" pattern). Real defect for review-issue (runs before plan-task creates the dir); defensive-best-practice for the other 4. Propagated identically across all 5 SKILL.md files in one atomic commit — review-issue:274-282, plan-task:203-211, review-plan:337-346, review-code:777-785, triage-reviews:233-241. Pattern matches the R14 + R15 cascade shape.
 
 ### Notes
 - Single-pattern finding across two files; promoting to 5-file cascade fix because the same template lives in all 5 SKILL.md and consistency beats per-file defensive-only patching.

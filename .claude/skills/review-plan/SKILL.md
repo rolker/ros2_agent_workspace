@@ -336,7 +336,11 @@ appending, resolve the right place to write:
    to commit progress.md on.
 5. **Initialize progress.md if absent** — if
    `<plan-worktree-path>/.agent/work-plans/issue-<N>/progress.md`
-   doesn't exist, create it with the standard frontmatter:
+   doesn't exist, create the parent directory if needed and write
+   the standard frontmatter:
+   ```bash
+   mkdir -p <plan-worktree-path>/.agent/work-plans/issue-<N>
+   ```
    ```yaml
    ---
    issue: <N>

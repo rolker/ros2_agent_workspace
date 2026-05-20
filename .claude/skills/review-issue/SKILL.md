@@ -271,7 +271,15 @@ issues — same logic as `plan-task` step 4). Create the worktree:
 `--plan-file`; only the worktree + branch are created. A draft PR
 will follow when `plan-task` runs.
 
-**8b. Append the entry.** Use frontmatter for a new file:
+**8b. Append the entry.** Create the parent directory if needed
+(`review-issue` typically runs *before* `plan-task`, so
+`.agent/work-plans/issue-<N>/` may not exist yet):
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
+Then use frontmatter for a new file:
 
 ```yaml
 ---

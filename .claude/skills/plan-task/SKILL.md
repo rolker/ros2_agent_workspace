@@ -202,8 +202,12 @@ This step runs **between** the PR creation (step 7) and the report
 
 If `review-issue` already ran for this issue, `progress.md` exists
 with a `## Issue Review` entry — just append after it. If
-`review-issue` didn't run, create `progress.md` with the standard
-frontmatter:
+`review-issue` didn't run, create the parent directory if needed
+and then `progress.md` with the standard frontmatter:
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
 
 ```yaml
 ---
