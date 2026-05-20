@@ -251,3 +251,21 @@ issue: 470
 - **Severity trend**: must-fixes per round are R5=2, R6=1, R7=3, R8=0, R9=0, R10=0, R11=0, R12=0. The cascade-bounding strategy (option-2 pre-push review) is paying off — bug velocity has fallen to small consistency / cosmetic issues. PR functionally complete; remaining work is tidiness.
 - Finding #1 is the **third** explicit reference to "plan-file SHA" / "issue number" semantics that needed updating after the R8 correlation-key-fields addition — same root issue, three locations. ADR-0013 has been the recurring source of cascades because the schema rules I added in R8 had implications I didn't trace through the whole document.
 - Finding #3 is a missed-symmetric-edit: R8 fix #4 added the layer/package derivation block to `review-plan` step 6 (project-repo "create on demand" branch); the parallel block in `review-issue` step 8a.5 was never updated. The skills' parallel structure is desirable but breaks when fixes don't traverse both files.
+
+## External Review
+**Status**: complete
+**When**: 2026-05-20 04:15
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `3f18142`
+**Reviews**: 13 total from `copilot-pull-request-reviewer[bot]` (3 fresh at HEAD), 3 valid (0 must-fix, 2 should-fix, 1 needs-discussion), 0 false positives.
+**CI**: all-pass on Workspace Validation. `Copilot code review / Cleanup artifacts` infra failure unchanged.
+
+### Actions
+- [ ] (should-fix, #1) ADR-0013 spelling pass: replace British spellings (`generalises`, `Canonicalise`, `recognised`, ...) with American (`generalizes`, `Canonicalize`, `recognized`, ...) to match the rest of `docs/decisions/`. Cross-doc style consistency.
+- [ ] (should-fix, #3) `review-code/SKILL.md:468` — harden Copilot probe PATH arm against alias/function returns from `command -v`. Either switch to `type -P copilot` (external-only) or wrap result in `[[ -x "$COPILOT_BIN" ]]` filter. Other probe arms already use absolute paths.
+- [ ] (needs-discussion, #2) `review-issue/SKILL.md` skill-coherence: step 8a.1's owning-repo probe makes the skill robust to cwd-vs-issue mismatch, but earlier steps 1+7 still use bare `gh issue view <N>` / `gh issue comment <N>` that resolve against cwd. Three resolution paths surfaced to user — doc-only precondition, minor cross-ref note, or substantive owning-repo-resolution refactor to step 1.
+
+### Notes
+- Finding #2 is the deepest yet — accumulated defensive edits across R5/R10/R11 introduced inconsistency that wasn't visible from any single edit. Bigger than R10's `$WORKTREE_REPO` bug (single var, single fix) because the right fix depends on a design decision (skill precondition vs self-resolution).
+- Severity trend continues: R5=2/R6=1/R7=3 must-fixes, then R8 onward 0 must-fixes. R13 adds 1 needs-discussion finding to the trend — first design question rather than implementation bug.
