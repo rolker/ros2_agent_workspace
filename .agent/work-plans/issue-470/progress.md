@@ -314,3 +314,20 @@ issue: 470
 - `triage-reviews/SKILL.md` `### Actions` template has no empty-case at all; pre-existing gap naturally subsumed by #470 phase B's `External Review` → `Integrated Review` migration. Out of scope here.
 - Copilot Adversarial activated cleanly (PATH-discovered via nvm-installed binary, no auth issue, no glob issue). Cross-model convergence on the same finding strengthens signal.
 - Minor regex observation (not a review finding, just a heads-up): the `sed -i '/^Changes$/,$d'` strip in review-code's step 5e didn't trim Copilot v1.0.49's trailing `Changes / Requests / Tokens` block in this run — block had leading blank lines + indented columns. The SKILL.md acknowledges this as a self-revealing no-op; flagging here for awareness.
+
+## External Review
+**Status**: complete
+**When**: 2026-05-20 02:15
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 at `3adeda2`
+**Reviews**: 15 total from `copilot-pull-request-reviewer[bot]` (1 fresh comment at HEAD), 1 valid (0 must-fix, 0 should-fix, 1 cleanup), 0 false positives. R1–R14 (77 comments) all addressed in prior cycles.
+**CI**: all-pass on Workspace Validation. Copilot code review pipeline all-pass.
+
+### Actions
+- [ ] (cleanup, #1) `progress.md:298` `**When**` reads `2026-05-20 01:45` while the preceding entry at `progress.md:275` reads `2026-05-20 05:25` — naïve append-order readers see the timestamps go backward. Root cause is mixed TZ conventions across this file: line 275 is UTC (matches Copilot's `submitted_at`), line 298 is EDT (local). Recommended fix is to backfill line 275 to EDT (`01:25`) since 13 of 15 entries already follow the local-EDT convention. Surface to user before editing; the file has 15 `**When**` lines and only one of them needs to change to make the chronology read forward.
+
+### Notes
+- R15 has a single low-severity finding; no must-fix, no functional risk. The "near-zero must-fix volume" trend continues — R8 onward each had 0 must-fix findings.
+- R1–R14 verified addressed by spot-checking: 8 prior `## External Review` entries in this file, 61 checked action items, every review's `commit_id` is reachable in linear history (no force-push complications). No reopened concerns at HEAD.
+- TZ inconsistency observed in this triage applies more broadly than R15's single line — lines 156 and 275 both used UTC while the other 13 entries used local EDT. Out of scope to backfill all 15 lines; phase B's `triage-reviews` → `Integrated Review` migration is the natural place to canonicalize the convention.
