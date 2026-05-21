@@ -137,7 +137,7 @@ for Mechanism C compliance.
 
 ## Estimated Scope
 
-**Phase A (this PR)**: landed as ~+1208/-16 across 10 files in
+**Phase A (this PR)**: landed as ~1.3k inserts across 10 files in
 multiple atomic commits (initial estimate of "~150–200 lines / 2
 atomic commits" was a substantial underestimate — ADR-0013 alone is
 ~190 lines; each skill SKILL.md persist step is ~50–90 lines; locate-
@@ -148,7 +148,12 @@ UTC offset and the corresponding 16-line `progress.md` backfill).
 Markdown-only. The original two-commit shape didn't survive review —
 implementation revisions (worktree-on-demand pivot, pre-push
 adversarial findings, Copilot triage fixes, offset-schema refinement)
-each became their own atomic commit on the branch.
+each became their own atomic commit on the branch. The precise
+line count drifts with each new `progress.md` review entry — refer to
+`git diff --shortstat origin/main..HEAD` for the current cumulative
+rather than tracking a stale point-in-time figure here (an earlier
+`+1208/-16` claim left this rubric behind by ~100 lines within four
+commits; R18 retired the point-in-time form to break the cascade).
 
 **Phase B + C**: separate stacked PRs per umbrella's "Sub-issues
 worth splitting" section. Sub-issues filed during phase A
