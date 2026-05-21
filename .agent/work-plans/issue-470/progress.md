@@ -375,3 +375,26 @@ issue: 470
 - Single-pattern finding across two files; promoting to 5-file cascade fix because the same template lives in all 5 SKILL.md and consistency beats per-file defensive-only patching.
 - Bug-velocity trend continues to flatten: must-fix volume zero across R8 → R16; should-fix volume now 2 (down from 5 last round).
 - Copilot is reviewing the implementation files directly now (not plan.md) — sign that the PR's last-mile review focus is converging on operational details rather than design.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-21 00:35 +00:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context) [sandbox])
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-470 at `2ef0d71` (pre-fix); fix landed at `5e6035d`
+**Mode**: pre-push
+**Depth**: Standard (reason: ADR-touching, governance-relevant, cascade-prone — 5 SKILL.md sibling files in diff)
+**Must-fix**: 1 | **Suggestions**: 0
+
+### Findings
+- [x] (must-fix) Cascade-pattern instance in progress.md itself: commit `5a69f27` (External Review for R16) spliced the new entry between the prior Pre-Push entry's `### Findings` and its `### Notes`, marooning the Pre-Push specialist remarks (Cross-source convergence, Plan Drift, Governance, Static analysis) under the wrong `## External Review` heading. Violates ADR-0013's "consume by entry-type filter" rule — a phase-B integrator filtering `## External Review` notes would pull misattributed Pre-Push specialist content, and the Pre-Push entry itself would surface as missing its Notes section. `progress.md:354-376` (pre-fix) — fixed in `5e6035d` by moving the orphan Notes block back inside the Pre-Push entry.
+
+### Notes
+- **Sandbox run** — first end-to-end test of the Docker-based agent sandbox infrastructure for #470. No SSH keys, no gh token, no `~/.claude/projects` memory mount; git push deferred to host-side `push_gateway.sh`. Cascade-pattern spot-check was the explicit task focus.
+- **Cascade-pattern verification across 5 SKILL.md files** — all symmetric: `mkdir -p` block (R16 fix, all 5), `**When**` schema with `±HH:MM` (R15 fix, all 5), empty-case checkbox templates (R14 fix, 4/5 — `triage-reviews` `### Actions` empty-case explicitly deferred to phase B per existing R14 notes), entry-type headers per ADR-0013 (all 5), `-c user.name="$AGENT_NAME"` commit override pattern (all 5), lifecycle-position cross-references (all 5).
+- **Must-fix is the same cascade-pattern this PR has been tracking** — symmetric edits across sibling structures (here, sibling sub-sections within a single file), missed one boundary. The bug crossed from SKILL.md sibling files to progress.md sibling entries; root cause unchanged. R8-onward zero-must-fix trend on SKILL.md cascade survives because that surface is now well-instrumented; the new surface (progress.md append placement) was not.
+- **Static analysis skipped** — markdown-only diff (10 files, all `.md`), no linter profile applies. Per step 4 table: markdown is "no linter — content review only".
+- **Claude Adversarial / Copilot Adversarial not dispatched** — sandbox has no `copilot` CLI binary and no GitHub credentials; Claude sub-agent dispatch deferred as a budget-conscious choice given the highly converged state of the PR (R16 zero must-fix, the explicit task framing as "spot-check the cascade pattern"). Cross-model signal unavailable; sole-source must-fix is the cascade-pattern finding above.
+- **Plan Drift** — no drift. The orphan-notes fix is a doc-only correction within Phase A; no new files, no new entry types, no schema change. plan.md's `+1208/-16 across 10 files` claim now reads `+1214/-22 across 10 files` after this fix (12 lines moved net = +6/-6 in the same file, treated as in-place edit by stat).
+- **Sandbox observations** (for the host operator): pre-commit hooks ran cleanly via the mounted `/home/roland/project11/.venv/bin/pre-commit`, but had to install hook envs on first commit (~30s extra wall time on `pre-commit-hooks`, `shellcheck-py`, `black`, `flake8`, `pylint`, `yamllint`). Cache lived only for the duration of this commit since the container's `~/.cache/pre-commit/` is not mounted from the host; second commit in this same session would re-pay the cost only if hooks change. No permission errors; no host-coupling leaks observed; the `.git`-as-file → main-tree-`.git/hooks` indirection worked correctly for the worktree.
