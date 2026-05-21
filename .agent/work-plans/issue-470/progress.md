@@ -353,6 +353,12 @@ issue: 470
 - [x] (suggestion, Claude Adv.) ADR schema silent on `Z` as UTC shorthand; one-line include/exclude clarification — `0013-progress-md-entry-type-vocabulary.md:65` — landed in `2dbd49e` (accepted `Z` as `+00:00` synonym per RFC 3339).
 - [x] (suggestion, Plan Drift) plan.md Estimated Scope says `+560/-15 across 7 files` but actual landed is `+1208/-16 across 10 files` after the offset refinement — `plan.md:140-149`
 
+### Notes
+- Cross-source convergence: Claude Adv. and Copilot Adv. — running with no shared context — both flagged the lines-9/30/59 backfill ambiguity. Per ADR-0013, cross-source confirmation is the strongest signal class; promoting from "suggestion" to "must-fix" on the strength of two independent reviewers reading the same diff cold.
+- Plan Drift specialist confirmed no architectural drift — the 4-commit batch fits within Phase A.1 + A.2 scope. Only stale claim is the Estimated Scope line counts.
+- Governance: ADR-0012 supersession rule does NOT apply — ADR-0013 is unmerged in this PR; in-PR refinement is the iteration loop until merge.
+- Static analysis skipped (markdown-only diff, no linter profile applies).
+
 ## External Review
 **Status**: complete
 **When**: 2026-05-20 10:25 -04:00
@@ -369,9 +375,3 @@ issue: 470
 - Single-pattern finding across two files; promoting to 5-file cascade fix because the same template lives in all 5 SKILL.md and consistency beats per-file defensive-only patching.
 - Bug-velocity trend continues to flatten: must-fix volume zero across R8 → R16; should-fix volume now 2 (down from 5 last round).
 - Copilot is reviewing the implementation files directly now (not plan.md) — sign that the PR's last-mile review focus is converging on operational details rather than design.
-
-### Notes
-- Cross-source convergence: Claude Adv. and Copilot Adv. — running with no shared context — both flagged the lines-9/30/59 backfill ambiguity. Per ADR-0013, cross-source confirmation is the strongest signal class; promoting from "suggestion" to "must-fix" on the strength of two independent reviewers reading the same diff cold.
-- Plan Drift specialist confirmed no architectural drift — the 4-commit batch fits within Phase A.1 + A.2 scope. Only stale claim is the Estimated Scope line counts.
-- Governance: ADR-0012 supersession rule does NOT apply — ADR-0013 is unmerged in this PR; in-PR refinement is the iteration loop until merge.
-- Static analysis skipped (markdown-only diff, no linter profile applies).
