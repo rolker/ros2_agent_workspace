@@ -423,3 +423,17 @@ issue: 470
 - **Plan Drift** — no structural drift. The fixes are doc-only corrections to existing prose within Phase A; no new files, no new entry types, no schema change. Cumulative-vs-`origin/main` at HEAD of this entry's writing is `+1313/-16 across 10 files` (will tick up slightly by this commit; refer to live `git diff --shortstat` rather than encoding the post-write number here, per the R18 cascade-break).
 - **Static analysis skipped** — markdown-only diff, no linter profile applies. Per `review-code` step 4 table.
 - **Sandbox observations** (round 2 update for the host operator): pre-commit hook envs from R17 commits did NOT survive into this round's container (separate `~/.cache/pre-commit/` since the host cache isn't bind-mounted — confirms R17's prediction). First commit in this round (`9399ca4`) re-paid the ~30s install cost. No SSH / gh failures because no operations attempted them — all GitHub queries were avoided in favor of local `git` commands.
+
+## External Review
+**Status**: complete
+**When**: 2026-05-25 12:38 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #473 — 18 review(s) (17 stale, 1 fresh against head `58c9822`), 1 valid, 0 false positives
+**CI**: all-pass
+
+### Actions
+- [ ] Fix (should-fix, Copilot @ `58c9822`): `review-code/SKILL.md:485` glob-fallback uses `sort -V` (GNU coreutils extension; absent on BSD/macOS `sort` and some BusyBox builds). If this arm runs on such a host, `sort` errors → empty `candidate` → `SKIP_COPILOT=1` with reason "copilot CLI not installed" even though the binary exists — a wrongful skip of Copilot Adversarial with a misleading diagnostic. Reaches only the narrow path where copilot is absent from PATH, nvm.sh sourcing failed, but a binary exists under `~/.nvm/versions/node/*/bin/` AND `sort` lacks `-V` (plausible: macOS dev running Claude Code with an nvm-managed copilot). Fix: drop `sort -V | tail -1` for a portable glob loop picking any executable match — the code's own comment notes version choice is "mostly theoretical" since all same-platform shims symlink to one npm-loader.js.
+
+### Notes
+- The 17 prior reviews (commits `a1d67cd2`…`2ef0d716`, 2026-05-19/20) are stale — superseded by today's (2026-05-25) full Copilot re-review against the current head. The R8→R18 must-fix chain documented above reached ~0 outstanding; the fresh re-review surfacing only this one shell-portability nit corroborates convergence.
