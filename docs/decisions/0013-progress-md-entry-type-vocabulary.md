@@ -184,3 +184,13 @@ name for new entries; no migration of historical files.
   `.agent/work-plans/issue-468/progress.md` — worked example of
   `## Integrated Review` output format.
 - [Principles review guide](../../.agent/knowledge/principles_review_guide.md) — references this ADR in the ADR-applicability table.
+
+### Addendum (cross-reference, per [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md))
+
+- Issue [#485](https://github.com/rolker/ros2_agent_workspace/issues/485) / PR
+  [#486](https://github.com/rolker/ros2_agent_workspace/pull/486) — #470 **phase
+  B** landed: `triage-reviews` is now the integrator and **writes
+  `## Integrated Review`**. The `## External Review` entry type is now a
+  read-only predecessor (recognized on consume; no longer written). This note is
+  navigational only — the Decision table and the "Predecessor recognition"
+  section are unchanged (a substantive change would require a superseding ADR).
