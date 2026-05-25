@@ -155,7 +155,7 @@ shopt -u nullglob
 # ---- Smoke test on workspace ------------------------------------------------
 echo ""
 if (cd "$ROOT_DIR" && git bug bug --format json 2>/dev/null | head -c 1 | grep -q '\['); then
-    _COUNT=$(cd "$ROOT_DIR" && git bug bug "status:open" 2>/dev/null | grep -c . || echo "0")
+    _COUNT=$(cd "$ROOT_DIR" && git bug bug "status:open" 2>/dev/null | grep -c . || true)
     echo "✅ git-bug smoke test passed in workspace ($_COUNT open issues cached)"
 else
     echo "⚠️  git-bug smoke test failed — 'git bug bug --format json' returned unexpected output"
