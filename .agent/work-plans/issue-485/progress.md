@@ -21,3 +21,16 @@ issue: 485
 - [ ] (test) Add parser/helper tests up front: malformed entries, missing correlation key, `Z` vs `+00:00` offset forms, predecessor recognition.
 - [ ] (open question) Decide whether ADR-0013 needs a status note once new writes are `## Integrated Review`; if touched, stay within ADR-0012's addendum carve-out — do not alter the Decision table.
 - [ ] (recommendation) Use `.agent/work-plans/issue-468/progress.md`'s `## Integrated Review` as the golden-output fixture; assert the redesigned skill reproduces its shape (sources column, cross-source flagging, separate false-positive justifications).
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-05-25 15:02 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**Plan**: `.agent/work-plans/issue-485/plan.md` at `239e9e2`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/486 (`[PLAN]` prefix)
+**Phases**: single
+
+### Open questions
+- [ ] ADR-0013 status note: leave as-is (ADR already anticipated "post phase B") vs. add an ADR-0012 cross-reference addendum noting the rename is live — must not alter the Decision table either way.
+- [ ] `progress_read.sh` output format: JSON (proposed, matches `fetch_pr_reviews.sh` + phase-C reuse) vs. line-oriented.
