@@ -15,15 +15,19 @@ Scope confirmed via [the review-issue comment](https://github.com/rolker/ros2_ag
 ## Approach
 
 1. **Extend the override block in `worktree_create.sh::generate_worktree_scripts()`** — inside the existing per-package `for _wt_pkg_build in …` loop, after the `AMENT_PREFIX_PATH` branch, add two `_wt_path_prepend LD_LIBRARY_PATH` calls:
-   - `<install>/<pkg>/lib` — covers post-install runtime resolution
-   - `<build>/<pkg>` (the loop variable's directory itself) — covers POST_BUILD generator binaries that dlopen sibling `.so` before install happens
+   - `<install>/<pkg>/lib` (prepended first) — covers post-install runtime resolution
+   - `<build>/<pkg>` (the loop variable's directory; prepended second so it ends up *first* on `LD_LIBRARY_PATH`) — covers POST_BUILD generator binaries that dlopen sibling `.so` before install happens
    Both go through the existing `_wt_path_prepend` helper so they inherit its idempotency guarantee.
+
+   **Ordering rationale (worth a one-line code comment in the heredoc):** `<build>/<pkg>` first is correct for POST_BUILD (the install step hasn't run yet, so `<install>/<pkg>/lib` may be empty or stale). Under `--symlink-install` (the workspace default) `<install>/<pkg>/lib` symlinks back to `<build>/<pkg>` anyway, so order doesn't matter at runtime. Without `--symlink-install`, the `<build>/<pkg>` priority means dev iterations always pick up the freshest build artifact — also the right choice during active development.
 
 2. **Extend test 21 (`test_layer_setup_bash_has_path_priority_block`)** in `test_worktree_create.sh` — add one `grep -Fq "_wt_path_prepend LD_LIBRARY_PATH"` assertion so the symmetry with `AMENT_PREFIX_PATH` / `PYTHONPATH` is enforced going forward.
 
-3. **Extend test 23 (`test_layer_setup_bash_idempotent_resourcing`)** — fabricate a `<build>/<pkg>` and `<install>/<pkg>/lib` pair, source the extracted block twice, and assert `LD_LIBRARY_PATH` contains each entry exactly once. Mirrors the existing `ament_count` / `py_sp_count` / `py_build_count` checks.
+3. **Extend test 23 (`test_layer_setup_bash_idempotent_resourcing`)** — test 23 already fabricates `<install>/<pkg>/lib/python3.99/site-packages`, so `<install>/<pkg>/lib` exists transitively and `<build>/<pkg>` is already created. No new directory fabrication needed — just add `LD_LIBRARY_PATH=''` to the sub-bash env (alongside the existing `AMENT_PREFIX_PATH=''` and `PYTHONPATH=''`), echo `LD_LIBRARY_PATH=$LD_LIBRARY_PATH` in the captured output, and add two assertions matching the existing pattern: `ld_lib_count` (occurrences of `install/$pkg/lib`) and `ld_build_count` (occurrences of `build/$pkg`), each expected to be 1.
 
-4. **Validate against the original repro** — recreate the unh_marine_navigation issue-26 worktree fresh, run `./core_ws/build.sh marine_nav_behavior_tree` without manual `LD_LIBRARY_PATH` munging, confirm POST_BUILD generator succeeds. This is the acceptance gate from the issue.
+4. **Validate against the original repro** — run `./core_ws/build.sh marine_nav_behavior_tree` in a fresh layer worktree on `unh_marine_navigation`, without manual `LD_LIBRARY_PATH` munging, and confirm the POST_BUILD generator succeeds. This is the acceptance gate from the issue.
+
+   **Timing constraint**: the existing `issue-unh_marine_navigation-26` worktree is **active** while PR #27 is in review (round-4 fixes pushed but not merged). Don't `worktree_remove` it to run this validation — that would lose mid-review state. Two options: (a) **defer** the validation to after PR #27 merges, then recreate that worktree from the merged `jazzy` and verify; (b) **use a separate test fixture** — create a throwaway layer worktree on a different C++ package whose main install has the shadow problem, or against a fresh `unh_marine_navigation` issue branch after merge. (a) is preferable — strongest signal, lowest setup cost — and PR #27 is the immediate next thing landing.
 
 5. **Sanity check `WORKTREE_GUIDE.md` and `AGENTS.md`** — both already omit any mention of the path-priority block (verified). No doc updates needed; consistent with how #428 landed.
 
@@ -62,10 +66,11 @@ Scope confirmed via [the review-issue comment](https://github.com/rolker/ros2_ag
 | `worktree_create.sh` | `AGENTS.md` worktree section | Not needed — same reason. |
 | `worktree_create.sh::generate_worktree_scripts()` | `test_worktree_create.sh` tests 21 + 23 | Yes — step 2 + step 3 |
 | Generated `setup.bash` format | Existing worktrees don't auto-update | Document in PR description; manual workaround (prepend `LD_LIBRARY_PATH` before `colcon build`) still works for the interim |
+| `worktree_create.sh` | `Makefile` if it has a target (per consequences map) | Verified: `grep -F worktree_create Makefile` returns nothing — `worktree_create.sh` is not a Make target. No update needed. |
 
 ## Open Questions
 
-- None. The scope, mechanism, and tests are all bounded by #428's precedent.
+- **Validation timing vs PR #27**: the cleanest acceptance test is recreating the `issue-unh_marine_navigation-26` worktree post-implementation and running `./core_ws/build.sh marine_nav_behavior_tree` clean. That worktree is currently active with PR #27's round-4 fixes; recreating it now would lose mid-review state. Resolution defaults to step 4(a) (sequence after PR #27 merges) unless a substitute fixture is preferred for faster turnaround.
 
 ## Estimated Scope
 
