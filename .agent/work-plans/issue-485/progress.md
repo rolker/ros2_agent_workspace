@@ -79,9 +79,9 @@ issue: 485
 **Cross-source confirmations**: 0
 
 ### Findings
-- [ ] (suggestion→fixing) Fenced code blocks parse as real entries: `_split_entries`/`_parse_findings` have no fence awareness, so a ` ```markdown ` block containing `## External Review` + checkboxes yields a phantom entry with a real-looking correlation SHA — a stale-data vector in the integrator's trusted path (progress.md files embed fenced markdown, incl. this PR's `## Integrated Review` template). — `progress_read.py:192-208`
-- [ ] (suggestion→fixing) Leading `---` horizontal rule mis-detected as frontmatter can swallow the body. Guard: require a `key:` line in the block. — `progress_read.py:179-189`
-- [ ] (suggestion→fixing) Test gaps: fenced-block heading (regression for #1), CRLF, no-frontmatter body, checkbox with no leading paren (`source_hint` None). — `test_progress_read.py`
+- [x] (fixed `eaa2c0d`) Fenced code blocks parse as real entries: `_split_entries` now tracks fence state and skips fenced lines, so a heading/checkbox quoted inside a ` ```markdown ` block can't become a phantom entry with a real-looking correlation SHA. — `progress_read.py`
+- [x] (fixed `eaa2c0d`) Leading `---` horizontal rule mis-detected as frontmatter: `_split_frontmatter` now requires a `key:` line before treating the block as YAML, so a horizontal rule no longer swallows the body. — `progress_read.py`
+- [x] (fixed `eaa2c0d`) Test gaps closed: added fenced-block, CRLF, no-frontmatter, leading-HR, and no-leading-paren cases (24 tests pass). — `test_progress_read.py`
 - [x] (observation, not a defect) `_corr_plan` greedy-split handles paths containing " at " correctly (`$`-anchored SHA + non-greedy); no action.
 
 ### Notes
