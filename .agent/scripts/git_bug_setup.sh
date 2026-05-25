@@ -22,6 +22,13 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# extract_gh_slug: anchored GitHub remote-URL validator + slug extractor.
+# Rejects lookalike hosts (mygithub.com, gist.github.com) and `github.com`
+# appearing inside a URL path, so a field/gitcloud origin can't be misread
+# as GitHub and wired to the wrong owner/repo.
+# shellcheck source=.agent/scripts/_worktree_helpers.sh
+source "$SCRIPT_DIR/_worktree_helpers.sh"
+
 if [ -n "${CI:-}" ]; then
     echo "CI environment — skipping git-bug setup."
     exit 0
@@ -85,7 +92,9 @@ setup_repo_gitbug() {
         return 0
     fi
 
-    if [[ "$remote_url" == *"github.com"* ]]; then
+    local repo_slug
+    repo_slug=$(extract_gh_slug "$remote_url")
+    if [ -n "$repo_slug" ]; then
         local bridge_count
         bridge_count=$(cd "$repo_dir" && git bug bridge 2>/dev/null | grep -c "github" || true)
         if [ "$bridge_count" -eq 0 ]; then
@@ -97,8 +106,7 @@ setup_repo_gitbug() {
                 if [ -z "$gh_token" ]; then
                     echo "⚠️  No GitHub token — skipping bridge."
                 else
-                    local repo_slug owner repo
-                    repo_slug=$(echo "$remote_url" | sed -E 's#.*github\.com[:/]##' | sed 's/\.git$//')
+                    local owner repo
                     owner="${repo_slug%%/*}"
                     repo="${repo_slug##*/}"
                     if [ -z "$owner" ] || [ -z "$repo" ]; then
