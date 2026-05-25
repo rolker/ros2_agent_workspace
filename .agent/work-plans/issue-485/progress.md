@@ -67,3 +67,22 @@ issue: 485
 - [x] Plan steps 1–8 implemented: `progress_read.py` helper + tests; `triage-reviews` steps 3/5/6/7 (read prior entries, sources column, cross-source confirmations, `## Integrated Review` rename + in-body fixes); `AGENTS.md` script table; ADR-0012 addendum to ADR-0013; review-guide ADR-0013 row refresh.
 - [x] Adapter check (step 7): no-op — no framework adapter names skill output entries.
 - [ ] Next: review-code (pre-push) before pushing, per local-first.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-25 17:29 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context)) — fresh-context sub-agent (dispatched by author; independent context)
+**Verdict**: approve-with-suggestions
+
+**Branch**: feature/issue-485 at `25869e7` (local, pre-push)
+**Sources**: 1 (fresh-context review-code sub-agent)
+**Cross-source confirmations**: 0
+
+### Findings
+- [ ] (suggestion→fixing) Fenced code blocks parse as real entries: `_split_entries`/`_parse_findings` have no fence awareness, so a ` ```markdown ` block containing `## External Review` + checkboxes yields a phantom entry with a real-looking correlation SHA — a stale-data vector in the integrator's trusted path (progress.md files embed fenced markdown, incl. this PR's `## Integrated Review` template). — `progress_read.py:192-208`
+- [ ] (suggestion→fixing) Leading `---` horizontal rule mis-detected as frontmatter can swallow the body. Guard: require a `key:` line in the block. — `progress_read.py:179-189`
+- [ ] (suggestion→fixing) Test gaps: fenced-block heading (regression for #1), CRLF, no-frontmatter body, checkbox with no leading paren (`source_hint` None). — `test_progress_read.py`
+- [x] (observation, not a defect) `_corr_plan` greedy-split handles paths containing " at " correctly (`$`-anchored SHA + non-greedy); no action.
+
+### Notes
+- Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 19 tests pass. Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
