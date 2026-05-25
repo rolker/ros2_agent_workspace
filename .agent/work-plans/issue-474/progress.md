@@ -25,5 +25,5 @@ issue: 474
 **CI**: all-pass
 
 ### Actions
-- [ ] Fix (valid, Copilot @ `69baebe`): `git_bug_setup.sh:158` smoke-test count `_COUNT=$(… | grep -c . || echo "0")` double-prints when there are zero open issues — `grep -c` prints `0` and exits 1, so `|| echo "0"` also runs and `_COUNT` becomes `"0\n0"`, garbling the success message. Common case (fresh setup). Fix: drop `|| echo "0"` (grep -c already prints the count); use `|| true` to neutralize the exit code.
+- [x] Fix (commit `9acc75a`): `git_bug_setup.sh:158` smoke-test count `_COUNT=$(… | grep -c . || echo "0")` double-printed when there are zero open issues — `grep -c` prints `0` and exits 1, so `|| echo "0"` also ran and `_COUNT` became `"0\n0"`, garbling the success message. Replaced `|| echo "0"` with `|| true` (grep -c already prints the count).
 - [x] (addressed) Stale review @ `63a6c6e`: `github.com` substring lookalike-host concern — already fixed by the `extract_gh_slug` change in `69baebe` (this round's head).
