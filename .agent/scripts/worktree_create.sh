@@ -201,6 +201,15 @@ for _wt_pkg_build in "\$WORKTREE_DIR/${target_layer}_ws/build"/*/; do
     if [ -d "\$_wt_pkg_prefix" ]; then
         _wt_path_prepend AMENT_PREFIX_PATH "\$_wt_pkg_prefix"
     fi
+    # LD_LIBRARY_PATH: same shadowing problem for C++ shared libs (#484).
+    # Prepend <install>/lib first, then <build>/<pkg>, so <build>/<pkg> ends
+    # up FIRST on the path — correct for POST_BUILD generators that dlopen
+    # sibling .so before install runs, and harmless under --symlink-install
+    # (the workspace default) where install/lib symlinks back to <build>/<pkg>.
+    if [ -d "\$_wt_pkg_prefix/lib" ]; then
+        _wt_path_prepend LD_LIBRARY_PATH "\$_wt_pkg_prefix/lib"
+    fi
+    _wt_path_prepend LD_LIBRARY_PATH "\${_wt_pkg_build%/}"
     # PYTHONPATH: prepend site-packages and build dir for Python packages
     for _wt_sp in "\$_wt_pkg_prefix"/lib/python3.*/site-packages; do
         [ -d "\$_wt_sp" ] || continue
