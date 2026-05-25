@@ -849,6 +849,8 @@ test_layer_setup_bash_has_path_priority_block() {
         || { echo "    missing core_ws/build reference"; fail=1; }
     grep -Fq "_wt_path_prepend AMENT_PREFIX_PATH" "$wt_setup" \
         || { echo "    AMENT_PREFIX_PATH not routed through idempotency helper"; fail=1; }
+    grep -Fq "_wt_path_prepend LD_LIBRARY_PATH" "$wt_setup" \
+        || { echo "    LD_LIBRARY_PATH not routed through idempotency helper"; fail=1; }
     grep -Fq "_wt_path_prepend PYTHONPATH" "$wt_setup" \
         || { echo "    PYTHONPATH not routed through idempotency helper"; fail=1; }
 
@@ -934,21 +936,35 @@ test_layer_setup_bash_idempotent_resourcing() {
         set -u
         WORKTREE_DIR='$wt_dir'
         AMENT_PREFIX_PATH=''
+        LD_LIBRARY_PATH=''
         PYTHONPATH=''
         source '$block_file'
         source '$block_file'
         echo \"AMENT_PREFIX_PATH=\$AMENT_PREFIX_PATH\"
+        echo \"LD_LIBRARY_PATH=\$LD_LIBRARY_PATH\"
         echo \"PYTHONPATH=\$PYTHONPATH\"
     " 2>&1)
 
     local fail=0
-    local ament_count py_sp_count py_build_count
-    ament_count=$(echo "$out" | grep '^AMENT_PREFIX_PATH=' | grep -o "install/$pkg" | wc -l)
-    py_sp_count=$(echo "$out"  | grep '^PYTHONPATH='       | grep -o "site-packages" | wc -l)
-    py_build_count=$(echo "$out" | grep '^PYTHONPATH='     | grep -o "build/$pkg" | wc -l)
+    local ament_count ld_lib_count ld_build_count py_sp_count py_build_count
+    ament_count=$(echo "$out"     | grep '^AMENT_PREFIX_PATH=' | grep -o "install/$pkg" | wc -l)
+    ld_lib_count=$(echo "$out"    | grep '^LD_LIBRARY_PATH='   | grep -o "install/$pkg/lib" | wc -l)
+    ld_build_count=$(echo "$out"  | grep '^LD_LIBRARY_PATH='   | grep -o "build/$pkg" | wc -l)
+    py_sp_count=$(echo "$out"     | grep '^PYTHONPATH='        | grep -o "site-packages" | wc -l)
+    py_build_count=$(echo "$out"  | grep '^PYTHONPATH='        | grep -o "build/$pkg" | wc -l)
 
     if [ "$ament_count" -ne 1 ]; then
         echo "    AMENT_PREFIX_PATH grew on re-source (count=$ament_count, expected 1)"
+        echo "    out: $out"
+        fail=1
+    fi
+    if [ "$ld_lib_count" -ne 1 ]; then
+        echo "    LD_LIBRARY_PATH install/lib grew on re-source (count=$ld_lib_count, expected 1)"
+        echo "    out: $out"
+        fail=1
+    fi
+    if [ "$ld_build_count" -ne 1 ]; then
+        echo "    LD_LIBRARY_PATH build dir grew on re-source (count=$ld_build_count, expected 1)"
         echo "    out: $out"
         fail=1
     fi
