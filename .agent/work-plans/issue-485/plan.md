@@ -28,28 +28,50 @@ output shape is the hand-written entry in
    pairs with `fetch_pr_reviews.sh` so the integrator and phase C (#481) consume
    both inputs in one idiom.
 2. **Add pytest tests for `progress_read.py`** (run via `.venv`, per ADR-0009) —
-   malformed entries, missing correlation key, `Z` vs `+00:00` offset,
-   `## External Review` predecessor recognition, multi-entry files. Use
-   `.agent/work-plans/issue-468/progress.md` as a golden-input fixture.
+   malformed entries; **each of the three correlation-key forms** (issue#,
+   plan-commit SHA, and PR/branch head SHA — including the `**Branch**: <name> at
+   <sha>` alternative to `**PR**:`); **skill-specific fields appearing before the
+   canonical correlation field** (ADR-0013 §Schema permits this — locate by field
+   name, not line offset; the golden fixture exercises it); `Z` vs `+00:00`
+   offset; `## External Review` predecessor recognition; multi-entry files. Two
+   fixtures: `.agent/work-plans/issue-468/progress.md` for the golden
+   `## Integrated Review` output shape (and the `**Branch**`/`**PR**` field mix),
+   and one with an actual `## External Review` heading (e.g. issue-452/460/461)
+   for predecessor recognition — issue-468 has no `## External Review` entry, so
+   one fixture can't cover both.
 3. **triage-reviews step 3** — after fetching PR reviews, also run
-   `progress_read.sh` on the issue's progress.md and select prior entries by
+   `progress_read.py` on the issue's progress.md and select prior entries by
    **entry type + correlation key** (head SHA for review entries).
-4. **triage-reviews steps 5/6** — add a `sources` column; flag a finding present
-   in both a local entry and a GitHub review at the same correlation key as a
-   **cross-source confirmation** (keep both, don't collapse). False positives
-   listed separately with justification (per the golden reference).
+4. **triage-reviews steps 5/6** — add a `sources` column; flag a finding raised
+   by **any two sources at the same entry-type correlation key** (per ADR-0013
+   §"Consume by entry-type filter", `0013:120-128` — not only local-entry vs
+   GitHub-review; e.g. a `## Plan Review` + `## Plan Authored` at one plan-commit
+   SHA also agree) as a **cross-source confirmation** — keep both, don't collapse.
+   False positives listed separately with justification (per the golden reference).
 5. **triage-reviews step 7** — rename the persisted entry `## External Review`
    → `## Integrated Review`; add `**Sources**:` and
    `**Cross-source confirmations**:` header fields. Retire the old name for new
-   writes; still *read* historical `## External Review` entries.
-6. **Update `AGENTS.md`** Script Reference table: add `progress_read.sh`.
-7. **Verify** no framework adapter describes triage-reviews' now-stale
-   `## External Review` output name.
-8. **Add an ADR-0012 cross-reference addendum to ADR-0013** — one line noting
-   phase B landed in #485 and new writes are `## Integrated Review`. Do **not**
-   alter ADR-0013's Decision table (that would require a superseding ADR). Also
-   refresh the predecessor wording in the review guide's ADR-0013 row if it
-   reads stale ("transitional, until phase B retires it").
+   writes; still *read* historical `## External Review` entries. Also fix the two
+   in-body spots the rename leaves stale: the forward-looking self-reference note
+   (`SKILL.md:~284` "ADR-0013 will rename this … in phase B") and the commit
+   string `"progress: external review for #<N>"` → `"progress: integrated review
+   for #<N>"`.
+6. **Update `AGENTS.md`** Script Reference table: add `progress_read.py`. (No
+   Makefile target — it's a library helper invoked by the skill, not a CLI
+   entry point; the consequences map's "Makefile if it has a target" half is N/A.)
+7. **Verify** no framework adapter describes triage-reviews' output entry name.
+   Expected no-op — a grep of `copilot-instructions.md`,
+   `gemini-cli.instructions.md`, and `AGENT_ONBOARDING.md` shows none name skill
+   output entries (they list the skill set, which is unchanged).
+8. **Add an ADR-0012 cross-reference addendum to ADR-0013** — a one-line note in
+   the **References/Status** section that phase B landed in #485 and new writes
+   are `## Integrated Review`. Do **not** edit the `## External Review` row's
+   Decision-table parenthetical (that's a substantive Decision-table change
+   requiring supersession, which ADR-0013's own Consequences forbid). The
+   live/retired status nuance goes in the **review guide** row, not the ADR table.
+   Refresh the review-guide ADR-0013 row: post-merge its "transitional, until
+   phase B retires it" wording is factually wrong — make it "`## External Review`
+   (retired predecessor of `## Integrated Review`; historical entries still read)".
 
 ## Files to Change
 
@@ -60,7 +82,7 @@ output shape is the hand-written entry in
 | `.claude/skills/triage-reviews/SKILL.md` | Steps 3, 5, 6, 7 (integrate prior entries; sources column; rename entry) |
 | `AGENTS.md` | Add `progress_read.py` to Script Reference table |
 | `docs/decisions/0013-*.md` | ADR-0012 cross-reference addendum (rename live, links #485); Decision table untouched |
-| `.agent/knowledge/principles_review_guide.md` | Refresh ADR-0013 row wording if the predecessor note reads stale |
+| `.agent/knowledge/principles_review_guide.md` | Refresh ADR-0013 row: replace the stale "transitional, until phase B retires it" wording (definite post-merge) |
 
 ## Principles Self-Check
 
