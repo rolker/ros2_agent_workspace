@@ -81,6 +81,8 @@ _SUBSECTION = re.compile(r"^### (.+)$")
 _CHECKBOX = re.compile(r"^- \[([ xX])\]\s+(.*)$")
 _LEADING_PAREN = re.compile(r"^\(([^)]*)\)")
 _OFFSET = re.compile(r"(?:[+-]\d{2}:\d{2}|Z)$")
+# Fenced code block delimiter (``` or ~~~, optionally indented / with info string).
+_FENCE = re.compile(r"^\s*(?:```|~~~)")
 
 
 def _field(header_lines, name):
@@ -182,19 +184,36 @@ def _split_frontmatter(text):
         end = text.find("\n---", 3)
         if end != -1:
             front = text[3:end]
-            body = text[end + 4 :]
-            match = re.search(r"^\s*issue:\s*(\d+)\s*$", front, re.MULTILINE)
-            issue = int(match.group(1)) if match else None
-            return issue, body.lstrip("\n")
+            # Only treat the block as YAML frontmatter if it actually contains a
+            # `key:` line; otherwise a leading `---` horizontal rule with a later
+            # `---` would swallow real body content.
+            if re.search(r"^\s*[\w-]+:\s", front, re.MULTILINE):
+                body = text[end + 4 :]
+                match = re.search(r"^\s*issue:\s*(\d+)\s*$", front, re.MULTILINE)
+                issue = int(match.group(1)) if match else None
+                return issue, body.lstrip("\n")
     return None, text
 
 
 def _split_entries(body):
-    """Yield (heading, [lines]) for each ``## `` entry block."""
+    """Yield (heading, [lines]) for each ``## `` entry block.
+
+    Fence-aware: lines inside fenced code blocks are skipped entirely, so a
+    ``## <Type>`` heading or checkbox quoted inside a ``` ```markdown ``` block
+    (e.g. an embedded template or a quoted prior entry) does not produce a
+    phantom entry. Downstream parsing (header fields, findings) therefore never
+    sees fenced content.
+    """
     entries = []
     current_heading = None
     current_lines = []
+    in_fence = False
     for line in body.splitlines():
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         heading = _ENTRY_HEADING.match(line)
         if heading:
             if current_heading is not None:

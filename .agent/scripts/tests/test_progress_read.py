@@ -209,6 +209,53 @@ class TestMalformedAndEdgeCases(unittest.TestCase):
         self.assertNotIn("Findings", types)
         self.assertNotIn("Actions", types)
 
+    def test_fenced_code_block_not_parsed_as_entry(self):
+        # Regression: a heading + checkboxes quoted inside a fenced block must
+        # NOT become a phantom entry (it would inject ghost findings at a
+        # real-looking correlation SHA into the integrator).
+        text = (
+            "## Local Review\n"
+            "**PR**: #5 at `abc1234`\n"
+            "### Findings\n"
+            "- [ ] (must-fix) real finding\n"
+            "\n"
+            "```markdown\n"
+            "## External Review\n"
+            "**PR**: #999 at `deadbeef`\n"
+            "- [x] (suggestion) fake finding inside fence\n"
+            "```\n"
+        )
+        result = parse_progress(text)
+        self.assertEqual([e["type"] for e in result["entries"]], ["Local Review"])
+        # The fenced checkbox must not be counted as a finding.
+        findings = result["entries"][0]["findings"]
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["text"], "(must-fix) real finding")
+
+    def test_crlf_line_endings(self):
+        text = "## Issue Review\r\n**When**: 2026-05-25 14:19 -04:00\r\n\r\n**Issue**: #7\r\n"
+        result = parse_progress(text)
+        self.assertEqual(result["entries"][0]["correlation"], {"kind": "issue", "issue": 7})
+        self.assertTrue(result["entries"][0]["when_has_offset"])
+
+    def test_no_frontmatter_body_preserved(self):
+        text = "# Issue #3 — title\n\n## Issue Review\n**Issue**: #3\n"
+        result = parse_progress(text)
+        self.assertIsNone(result["issue"])
+        self.assertEqual([e["type"] for e in result["entries"]], ["Issue Review"])
+
+    def test_leading_hr_not_treated_as_frontmatter(self):
+        # A `---` horizontal rule (no key: line) must not swallow the body.
+        text = "---\nintro prose\n---\n\n## Issue Review\n**Issue**: #4\n"
+        result = parse_progress(text)
+        self.assertIsNone(result["issue"])
+        self.assertEqual([e["type"] for e in result["entries"]], ["Issue Review"])
+
+    def test_checkbox_without_leading_paren_has_no_source_hint(self):
+        text = "## Issue Review\n**Issue**: #1\n### Actions\n- [ ] plain action, no source\n"
+        result = parse_progress(text)
+        self.assertIsNone(result["entries"][0]["findings"][0]["source_hint"])
+
 
 class TestCli(unittest.TestCase):
     def _run(self, text, *args):
