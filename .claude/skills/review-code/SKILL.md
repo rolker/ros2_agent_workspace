@@ -471,19 +471,22 @@ elif [ -s "$HOME/.nvm/nvm.sh" ] && \
     : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
 else
     # Glob fallback for nvm installs where nvm.sh sourcing didn't help
-    # (e.g., multiple node versions, default-alias misconfigured). Use
-    # `sort -V` to pick the newest node version — `v18.12.1` sorts
-    # before `v24.12.0` lexicographically (1<2), but a Copilot version
-    # installed under newer node is what the user almost certainly
-    # wants. All same-platform copilot shims symlink to the same
-    # npm-loader.js so the choice is mostly theoretical; it matters
-    # only when older nvm-managed node versions have different copilot
-    # versions installed under them.
-    # printf is used instead of ls so the no-match case is bash's
-    # literal unmatched-glob string (caught below by `[ -x ]` failing)
-    # rather than ls's stderr.
-    candidate=$(printf '%s\n' "$HOME"/.nvm/versions/node/*/bin/copilot | sort -V | tail -1)
-    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+    # (e.g., multiple node versions, default-alias misconfigured). Loop
+    # over the glob and keep the last executable match. We deliberately
+    # avoid `sort -V` here: it's a GNU coreutils extension absent on
+    # BSD/macOS `sort` and some BusyBox builds, where it would error to
+    # empty output and wrongly skip Copilot with a "not installed"
+    # reason even though the binary exists. Exact-version selection
+    # isn't needed anyway — all same-platform copilot shims symlink to
+    # the same npm-loader.js, so any executable match is equivalent;
+    # bash expands the glob in lexical order and we take the last.
+    # When the glob matches nothing, bash leaves the literal pattern and
+    # `[ -x ]` filters it out, leaving candidate empty (else branch).
+    candidate=""
+    for c in "$HOME"/.nvm/versions/node/*/bin/copilot; do
+        [ -x "$c" ] && candidate="$c"
+    done
+    if [ -n "$candidate" ]; then
         COPILOT_BIN="$candidate"
     else
         COPILOT_SKIP_REASON="copilot CLI not installed (probed PATH, nvm.sh, and ~/.nvm glob)"
