@@ -1,6 +1,6 @@
 ---
 name: triage-reviews
-description: Integrator — evaluate PR review comments (human and bot) together with the prior progress.md review timeline, against local code, principles, and ADRs. Includes CI check status. Classifies each finding as valid or false positive, flags cross-source confirmations, presents a fix plan, and persists a unified ## Integrated Review entry to progress.md.
+description: Integrator — evaluate PR review comments (human and bot) together with the prior progress.md review timeline, against local code, principles, and ADRs. Includes CI check status. Classifies each finding as valid or false positive, flags cross-source confirmations, presents a fix plan, and persists a unified Integrated Review entry to progress.md.
 ---
 
 # Triage Reviews

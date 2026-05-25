@@ -283,6 +283,21 @@ class TestMalformedAndEdgeCases(unittest.TestCase):
         result = parse_progress(text)
         self.assertIsNone(result["entries"][0]["findings"][0]["source_hint"])
 
+    def test_checkbox_before_subsection_ignored(self):
+        # ADR-0013 puts findings/actions under ### subsections; a stray checkbox
+        # in the header area (before any ###) is not a finding.
+        text = (
+            "## Issue Review\n"
+            "**Issue**: #1\n"
+            "- [ ] (stray) header-area checkbox\n"
+            "### Actions\n"
+            "- [ ] (real) under a subsection\n"
+        )
+        findings = parse_progress(text)["entries"][0]["findings"]
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["section"], "Actions")
+        self.assertEqual(findings[0]["source_hint"], "real")
+
 
 class TestCli(unittest.TestCase):
     def _run(self, text, *args):

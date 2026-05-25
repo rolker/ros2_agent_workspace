@@ -177,7 +177,12 @@ def _parse_correlation(entry_type, header_lines):
 
 
 def _parse_findings(body_lines):
-    """Collect checkbox items across all ``### `` sub-sections of an entry."""
+    """Collect checkbox items appearing under a ``### `` sub-section of an entry.
+
+    Checkboxes before the first sub-section header are ignored: ADR-0013 places
+    findings/actions checkbox lists under `### Findings` / `### Actions` /
+    `### Open questions`, so a stray checkbox in the header area is not a finding.
+    """
     findings = []
     section = None
     for line in body_lines:
@@ -186,7 +191,7 @@ def _parse_findings(body_lines):
             section = sub.group(1).strip()
             continue
         box = _CHECKBOX.match(line)
-        if box:
+        if box and section is not None:
             text = box.group(2).strip()
             hint = _LEADING_PAREN.match(text)
             findings.append(
