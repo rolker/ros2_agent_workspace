@@ -32,5 +32,5 @@ issue: 485
 **Phases**: single
 
 ### Open questions
-- [ ] ADR-0013 status note: leave as-is (ADR already anticipated "post phase B") vs. add an ADR-0012 cross-reference addendum noting the rename is live — must not alter the Decision table either way.
-- [ ] `progress_read.sh` output format: JSON (proposed, matches `fetch_pr_reviews.sh` + phase-C reuse) vs. line-oriented.
+- [x] ADR-0013 status note → **resolved (2026-05-25): add an ADR-0012 cross-reference addendum** noting the rename is live (links #485); Decision table untouched.
+- [x] `progress_read` output format → **resolved (2026-05-25): JSON, implemented in Python** (`progress_read.py`).
