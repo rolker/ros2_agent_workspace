@@ -86,3 +86,29 @@ issue: 485
 
 ### Notes
 - Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 19 tests pass. Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-25 18:35 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #486 at `01700f5`
+**Sources**: 2 (Copilot @ `01700f5`; prior `## Local Review (Pre-Push)` @ `25869e7`, findings already resolved in `eaa2c0d`)
+**Cross-source confirmations**: 0
+**CI**: all-pass (Lint, Validate Documentation, commit-identity Mechanism C)
+
+<!-- Dogfooding the phase-B rename: this PR introduces ## Integrated Review, so
+     the triage entry for the PR itself uses the new type. progress_read.py
+     recognizes the predecessor ## External Review on read either way. -->
+
+### Findings
+- [ ] (valid, Copilot @ `01700f5`) `## Implementation` entry says "19 unittest cases" but the suite is 24 after the fence fix (`eaa2c0d`); the same entry's findings say 24 — stale count. Update to 24. — `progress.md`
+- [ ] (valid, Copilot @ `01700f5`) `## Local Review (Pre-Push)` Notes say "19 tests pass" contradicting "24 tests pass" in its resolved finding. Update to 24. — `progress.md`
+- [ ] (valid, Copilot @ `01700f5`) review-guide ADR-0013 row drops `## External Review` from the canonical-types list, but ADR-0013's Decision table still lists it (read-only predecessor) — reads as contradicting the ADR. Reword to distinguish "types to write" vs "recognized on read". — `principles_review_guide.md:36`
+- [ ] (valid, substantive, Copilot @ `01700f5`) `--type "Integrated Review"` silently drops legacy suffixed headings like `## External Review (Round 5–6)` (`issue-452/progress.md:23`): `entry["type"]` is the full heading, so `predecessor_of` is null and `_matches_type` excludes it. Fix: normalize to a canonical base (strip a trailing ` (...)` when the base is canonical, but keep `Local Review (Pre-Push)` intact) for recognized/predecessor/correlation/filter; add a regression test. — `progress_read.py`
+
+### False positives
+- (none)
+
+### Notes
+- 5 older Copilot comments are against the plan-only commits (`3110a14`/`b3faa44`) and target `plan.md`/early `progress.md` — low priority per the plan-first guidance (plan is a pre-implementation artifact; reviews on plan-only commits go stale once implementation lands). Two are historical-record minutiae in `progress.md` (a `progress_read.sh` reference at line 19, adapter paths at line 20) — optional tidy, not blocking.
