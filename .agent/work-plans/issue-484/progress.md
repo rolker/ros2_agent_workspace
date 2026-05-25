@@ -45,3 +45,16 @@ issue: 484
 
 ### Findings
 - [ ] No issues found. LGTM. (Copilot Adversarial surfaced 2 candidate findings — both verified as false positives: asymmetric guarding matches the sibling AMENT/PYTHONPATH pattern; `$pkg` is defined at test_worktree_create.sh:924 within the same function scope.)
+
+## External Review
+**Status**: complete
+**When**: 2026-05-25 16:55 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #487 at `648da0c`
+**Reviews**: 8 inline comments across 3 Copilot rounds; 1 valid, 2 addressed, 5 false positives
+**CI**: all-pass (copilot-pull-request-reviewer, Validate Documentation, Validate commit identity, Lint)
+
+### Actions
+- [ ] Mark the addressed findings in this file's `## Plan Review` entry (lines 28-33) as `[x]` to resolve the verdict-vs-findings ambiguity Copilot flagged: verdict says "approve-with-suggestions" but the must-fix item is now resolved by plan inline edit `5e1b628`. Updates the checkbox status without rewriting the historical verdict (Copilot R2 #4).
+- [ ] (FP note) Copilot flagged "double-leading pipe `||`" in plan.md tables 5 times across R1+R2. Verified false positive — `grep '\|\|' plan.md` returns zero matches; every row uses single `|`. Render misread on Copilot's side, no edit needed.
