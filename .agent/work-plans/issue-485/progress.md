@@ -54,3 +54,16 @@ issue: 485
 - [ ] (suggestion) State the Makefile-half of the script consequence explicitly ("no make target — library helper"), per the consequences map. — `plan.md:85`
 - [ ] (suggestion) Phrase the adapter-verify step as expected no-op (grep confirmed adapters don't name skill outputs). — `plan.md:46-47`
 - [ ] (suggestion) ADR-0012 addendum must land in References/Status, NOT edit the `## External Review` Decision-table parenthetical (that'd need supersession). — `plan.md:48-49`
+
+## Implementation
+**Status**: complete
+**When**: 2026-05-25 16:53 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**Branch**: feature/issue-485 at `f468ac5` (local, pre-push; PR #486)
+**Commits**: `ab5ab44` (progress_read.py + 19 unittest cases), `f468ac5` (triage-reviews integrator + docs)
+
+### Findings
+- [x] Plan steps 1–8 implemented: `progress_read.py` helper + tests; `triage-reviews` steps 3/5/6/7 (read prior entries, sources column, cross-source confirmations, `## Integrated Review` rename + in-body fixes); `AGENTS.md` script table; ADR-0012 addendum to ADR-0013; review-guide ADR-0013 row refresh.
+- [x] Adapter check (step 7): no-op — no framework adapter names skill output entries.
+- [ ] Next: review-code (pre-push) before pushing, per local-first.
