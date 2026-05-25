@@ -230,6 +230,12 @@ title from the correct repo via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
+For new files, create the parent directory first:
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
 Frontmatter for new files:
 
 ```yaml
@@ -246,10 +252,11 @@ Append this step entry:
 
 ## External Review
 **Status**: complete
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
-**PR**: #<N> — <total> review(s), <valid-count> valid, <false-positive-count> false positives
+**PR**: #<N> at `<short-sha>`
+**Reviews**: <total> review(s), <valid-count> valid, <false-positive-count> false positives
 **CI**: <all-pass | failures-noted>
 
 ### Actions
@@ -262,8 +269,21 @@ from the current working directory):
 
 ```bash
 git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-git -C <worktree-path> commit -m "progress: external review for #<N>"
+git -C <worktree-path> \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: external review for #<N>"
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
+agents run each bash invocation in a fresh subshell where
+`set_git_identity_env.sh`'s env exports may not be in scope, and a
+plain `git commit` then trips `check_pr_authors.py` (CI mechanism C,
+[#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
+ADR-0013 will rename this entry from `## External Review` to
+`## Integrated Review` in phase B of [#470](https://github.com/rolker/ros2_agent_workspace/issues/470);
+the commit pattern carries forward.
 
 (The fail-loud rule above already covers the case where the branch
 name doesn't carry an issue number — the skill stops with an error

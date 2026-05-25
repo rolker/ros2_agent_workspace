@@ -148,10 +148,18 @@ The plan file path is relative to the current repo (workspace or project):
 mkdir -p .agent/work-plans/issue-<N>
 # (write plan to .agent/work-plans/issue-<N>/plan.md)
 git add .agent/work-plans/issue-<N>/
-git commit -m "Add work plan for #<N>
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "Add work plan for #<N>
 
 <one-line summary of the approach>"
 ```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity).
+Step 8 (progress.md) uses the same pattern; both commits land on
+`feature/issue-<N>` and would otherwise trip the `check_pr_authors.py`
+CI check (Mechanism C from [#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
 
 ### 7. Create or update a draft PR
 
@@ -184,13 +192,83 @@ fi
 rm -f "$BODY_FILE"
 ```
 
-### 8. Report to user
+### 8. Persist to progress.md
+
+Append a `## Plan Authored` entry to
+`.agent/work-plans/issue-<N>/progress.md` in the same worktree the
+plan lives in. Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+This step runs **between** the PR creation (step 7) and the report
+(step 9) so the report can cite the progress.md commit SHA.
+
+If `review-issue` already ran for this issue, `progress.md` exists
+with a `## Issue Review` entry — just append after it. If
+`review-issue` didn't run, create the parent directory if needed
+and then `progress.md` with the standard frontmatter:
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
+```yaml
+---
+issue: <N>
+---
+
+# Issue #<N> — <issue title>
+```
+
+Append:
+
+```markdown
+
+## Plan Authored
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
+**By**: <agent name> (<model>)
+
+**Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
+**PR**: <draft-PR-URL> (`[PLAN]` prefix)
+**Phases**: <count, if the plan describes a stacked-PR breakdown; else "single">
+
+### Open questions
+- [ ] <each Open Question from the plan, condensed to one line>
+```
+
+If the plan has no Open Questions, write a single checkbox item
+under that header so the section stays uniformly parseable per
+ADR-0013's checkbox-list schema:
+`- [ ] No open questions — plan is review-plan-ready.`
+
+Commit and push:
+
+```bash
+git add .agent/work-plans/issue-<N>/progress.md
+git -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: plan authored for #<N>"
+git push
+```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
+agents run each bash invocation in a fresh subshell, so the env
+exports from `set_git_identity_env.sh` aren't reliable here.
+
+The push is required — step 7 already pushed the branch (whether it
+created a new draft PR or updated an existing one), so the new commit
+needs its own push to appear on the PR alongside the plan. Without it
+the report (step 9) would cite a SHA that's only local.
+
+### 9. Report to user
 
 Summarize:
 - What the plan proposes
 - Which principles and ADRs were considered
 - Any open questions that need input
 - Link to the draft PR
+- **Cite the `progress.md` commit SHA from step 8** (`progress: plan
+  authored for #<N>`) so the report references the durable timeline
+  artifact, not just the PR
 - Pointer to the "During implementation" section below, so the
   implementer knows to keep the plan in sync with landed code
 - Reminder that `/review-code` (pre-push mode) is the next step after

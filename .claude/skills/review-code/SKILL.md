@@ -422,7 +422,7 @@ Deep-tier prompt adds:
 - Concurrency / lifecycle (lock ordering, init/destroy ordering, signal
   handling, shutdown paths)
 - Cross-cutting effects (does this change interact with caching,
-  retries, error propagation, or other system-wide behaviour?)
+  retries, error propagation, or other system-wide behavior?)
 
 Report findings in the same format as other specialists (file, line,
 severity, description). The silence filter (step 6) deduplicates overlap
@@ -450,13 +450,50 @@ when the CLI is missing, so field-mode hosts (gabby, salmon — no
 GitHub credentials) don't block the rest of the review:
 
 ```bash
+# Resolve copilot to an absolute path so invocation survives subshells
+# that didn't load the user's shell init. nvm-managed copilot binaries
+# (~/.nvm/versions/node/*/bin/copilot) are PATH-injected by ~/.bashrc,
+# but ~/.bashrc early-returns for non-interactive shells — so Agent-tool
+# sub-shells (and non-interactive `bash -l`) never load nvm even though
+# the binary is installed. Probe in order: current PATH, then explicit
+# nvm sourcing, then a glob for nvm-managed installs.
+COPILOT_BIN=""
 if [[ "$NO_COPILOT" == "1" ]]; then
     # User opted out for this invocation; no "skipped" notice needed.
     SKIP_COPILOT=1
-elif ! command -v copilot >/dev/null 2>&1; then
-    COPILOT_SKIP_REASON="copilot CLI not installed"
-    SKIP_COPILOT=1
-elif ! copilot --version >/dev/null 2>&1; then
+elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -x "$COPILOT_BIN" ]; then
+    : # Found on current PATH. `[ -x ]` filters out alias/function
+      # returns from `command -v` (e.g., "alias copilot='...'" or a
+      # shell function name) — only an actual executable path passes.
+elif [ -s "$HOME/.nvm/nvm.sh" ] && \
+     COPILOT_BIN=$(bash -c '. "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; command -v copilot' 2>/dev/null) && \
+     [ -x "$COPILOT_BIN" ]; then
+    : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
+else
+    # Glob fallback for nvm installs where nvm.sh sourcing didn't help
+    # (e.g., multiple node versions, default-alias misconfigured). Loop
+    # over the glob and keep the last executable match. We deliberately
+    # avoid `sort -V` here: it's a GNU coreutils extension absent on
+    # BSD/macOS `sort` and some BusyBox builds, where it would error to
+    # empty output and wrongly skip Copilot with a "not installed"
+    # reason even though the binary exists. Exact-version selection
+    # isn't needed anyway — all same-platform copilot shims symlink to
+    # the same npm-loader.js, so any executable match is equivalent;
+    # bash expands the glob in lexical order and we take the last.
+    # When the glob matches nothing, bash leaves the literal pattern and
+    # `[ -x ]` filters it out, leaving candidate empty (else branch).
+    candidate=""
+    for c in "$HOME"/.nvm/versions/node/*/bin/copilot; do
+        [ -x "$c" ] && candidate="$c"
+    done
+    if [ -n "$candidate" ]; then
+        COPILOT_BIN="$candidate"
+    else
+        COPILOT_SKIP_REASON="copilot CLI not installed (probed PATH, nvm.sh, and ~/.nvm glob)"
+        SKIP_COPILOT=1
+    fi
+fi
+if [[ "$SKIP_COPILOT" != "1" ]] && ! "$COPILOT_BIN" --version >/dev/null 2>&1; then
     # `copilot --version` is a presence check, not an auth check —
     # `--version` typically prints without contacting the API. We keep
     # it as a "binary at least runs" sanity guard. Real auth failures
@@ -520,7 +557,7 @@ trap 'rm -f "$PROMPT_FILE" "$FINDINGS_FILE"' EXIT  # tempfile cleanup
 # stuck stdin negotiation) doesn't block the entire review. 300 s is
 # generous for a single-diff prompt; tune if Deep-tier prompts on
 # large diffs need more.
-timeout 300 copilot -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
+timeout 300 "$COPILOT_BIN" -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
 COPILOT_EXIT=$?
 
 # Strip the trailing `Changes / Requests / Tokens` metadata block. The
@@ -740,6 +777,12 @@ no owning worktree exists). Fetch the issue title via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
+For new files, create the parent directory first:
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
 Frontmatter for new files:
 
 ```yaml
@@ -760,7 +803,7 @@ timeline without one overwriting the other. Append only one header line
 
 ## Local Review
 **Status**: complete
-**When**: <YYYY-MM-DD HH:MM>
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 **Verdict**: <approved|changes-requested>
 
@@ -776,8 +819,10 @@ timeline without one overwriting the other. Append only one header line
 ```
 
 If no findings survived the silence filter, set `**Verdict**: approved`,
-`**Must-fix**: 0 | **Suggestions**: 0`, and write `No issues found.
-LGTM.` under Findings.
+`**Must-fix**: 0 | **Suggestions**: 0`, and write a single checkbox
+item under `### Findings` so the section stays uniformly parseable
+per ADR-0013's checkbox-list schema:
+`- [ ] No issues found. LGTM.`
 
 Key points:
 - Use `- [ ]` checkboxes so findings can be checked off as addressed.
@@ -788,8 +833,14 @@ Key points:
   from the current working directory):
   ```bash
   git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-  git -C <worktree-path> commit -m "progress: local review for #<N>"
+  git -C <worktree-path> \
+      -c user.name="$AGENT_NAME" \
+      -c user.email="$AGENT_EMAIL" \
+      commit -m "progress: local review for #<N>"
   ```
+  The per-invocation `-c` overrides are required by
+  [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+  on agent-convention branches.
 - If no issue number was resolved in step 1, skip persistence and note
   this in the report Summary ("Progress persistence skipped (no linked
   issue)") — the same canonical wording used in the step-8 intro above.

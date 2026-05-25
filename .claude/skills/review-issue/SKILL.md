@@ -23,6 +23,23 @@ the issue — does not modify the issue body.
 repo? conflicting with ADRs?). For evaluating an implementation plan, use
 `plan-task`. For evaluating a completed PR, use `review-code`.
 
+**Precondition: invoke from the owning repo's cwd.** Issue numbers are
+scoped per-repo (`rolker/ros2_agent_workspace#42` and
+`rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 7
+(`gh issue view <N>` and `gh issue comment <N>`) resolve the repo via
+the current directory's origin — so `cd` into the repo that owns the
+issue before invoking `/review-issue <N>`. From the wrong cwd the
+skill will either fail loudly (`NotFound`) or silently query/comment
+on a colliding-number issue in the wrong repo. Step 8's
+owning-repo probe creates the right worktree for progress.md even if
+cwd is mismatched, but the comment-and-view steps will already have
+hit the wrong repo by then. If you don't know which repo owns `<N>`,
+use step 8a.1's probe pattern up front (probe workspace, then project
+repos under `layers/main/*/src/*`) and `cd` to the match before
+invoking. Cwd-independent owning-repo resolution is tracked as
+[#478](https://github.com/rolker/ros2_agent_workspace/issues/478) —
+until that lands, the precondition is load-bearing.
+
 ## Steps
 
 ### 1. Read the issue
@@ -138,6 +155,188 @@ COMMENT_EOF
 gh issue comment <N> --body-file "$BODY_FILE"
 rm "$BODY_FILE"
 ```
+
+### 8. Persist to progress.md
+
+After posting the comment, append a `## Issue Review` entry to
+`.agent/work-plans/issue-<N>/progress.md` so the timeline reflects
+that the issue has been governance-reviewed before plan-task starts.
+Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+
+**8a. Locate-or-create the owning worktree.** `review-issue` is
+typically the *first* skill in the lifecycle, so a worktree may not
+exist yet. Since progress.md commits cannot land on a protected
+default branch, this step creates a worktree on demand:
+
+**8a.1.** **Resolve the owning repo first.** Issue numbers can collide
+across the workspace repo and project repos (e.g., workspace `#42` is
+a different issue from `unh_echoboats_project11#42`), so the issue
+number alone is not enough to identify a worktree.
+
+`gh issue view <N>` without `--repo` resolves against the current
+directory's origin (don't pass `--repo <owner/repo>` — that's the
+value we're trying to determine). Probe in order:
+
+1. **Workspace first** — from the workspace root,
+   `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
+   succeeds if `<N>` is a workspace issue.
+2. **Project repos next** — if the workspace lookup returns
+   `NotFound`, try each project repo under `layers/main/*/src/*`:
+   `(cd <path> && gh issue view <N> --json repository --jq '.repository.nameWithOwner')`.
+   First success wins; record both the path and `owner/repo`.
+3. **No match** — stop with an error; the issue may live in a repo
+   not currently checked out, or `<N>` is wrong.
+
+This mirrors `plan-task` step 4's cwd-based `gh issue view <N>`
+pattern.
+
+**8a.2.** Check `$WORKTREE_ISSUE` and the worktree's repo slug. If
+`$WORKTREE_ISSUE` matches `<N>` *and* the worktree's repo slug
+matches the owning repo's short slug, you're already in the right
+worktree — skip to step 8b. If only the number matches, treat it as a
+miss and continue to step 8a.3 (you're in the wrong-repo worktree for
+a colliding number).
+
+`worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`, and
+`$WORKTREE_ISSUE` — but not the repo slug. Derive it from
+`$WORKTREE_ROOT`'s basename:
+```bash
+if [ -z "${WORKTREE_ROOT:-}" ]; then
+    # Not in a worktree (or worktree_enter.sh never ran) — fall through to 8a.3
+    WORKTREE_SLUG=""
+else
+    WT_BASENAME=$(basename "$WORKTREE_ROOT")
+    case "$WT_BASENAME" in
+        issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+        issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+        *)                 WORKTREE_SLUG="" ;;
+    esac
+fi
+```
+
+Compare `$WORKTREE_SLUG` against the owning repo. Step 8a.1 returned
+`owner/repo` form; the slug-relevant comparison depends on type:
+- **Workspace issue** — the `owner/repo` from step 8a.1 matches the
+  workspace repo's `nameWithOwner` (e.g., `rolker/ros2_agent_workspace`).
+  Match iff `WORKTREE_SLUG == "workspace"`.
+- **Project-repo issue** — the `owner/repo` from step 8a.1 matches a
+  project repo (e.g., `rolker/unh_marine_autonomy`). Match iff
+  `WORKTREE_SLUG` equals the repo-name portion (`unh_marine_autonomy`).
+
+**8a.3.** If not, check whether a worktree for the issue already
+exists. Use an anchored, repo-aware pattern so neighbouring issue
+numbers (e.g. `4700` for `<N>=470`) and unrelated repo worktrees don't
+match:
+```bash
+# Workspace worktree (path ends in `/issue-workspace-<N>` exactly)
+ls -d "/path/to/workspace/.workspace-worktrees/issue-workspace-<N>" 2>/dev/null
+# Layer worktree for a specific project repo
+ls -d "/path/to/workspace/layers/worktrees/issue-<repo-slug>-<N>" 2>/dev/null
+```
+Or grep `worktree_list.sh` output with a numeric boundary:
+```bash
+.agent/scripts/worktree_list.sh \
+  | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
+```
+
+**8a.4.** If a worktree exists, source it to enter:
+```bash
+source .agent/scripts/worktree_enter.sh --issue <N> [--repo-slug <slug>]
+```
+(Or `cd` to the path directly when sourcing isn't possible.) When the
+issue number collides across repos, pass `--repo-slug <slug>` to
+disambiguate (see `WORKTREE_GUIDE.md`).
+
+**8a.5.** If neither: determine worktree type from the owning repo
+(workspace for issues in the workspace repo, layer for project-repo
+issues — same logic as `plan-task` step 4). Create the worktree:
+
+- **Workspace issue** (`owner/repo` from step 8a.1 matches the
+  workspace repo's `nameWithOwner`):
+  ```bash
+  .agent/scripts/worktree_create.sh --issue <N> --type workspace
+  ```
+- **Project-repo issue**: derive `<layer>` and `<project_repo>` from
+  the local path the step 8a.1 probe matched (under
+  `layers/main/<layer>_ws/src/<project_repo>/`). Parse `<layer>` as
+  the directory name before `_ws/src/` and `<project_repo>` as the
+  leaf directory. This mirrors `plan-task` step 4 and `review-plan`
+  step 6.4. Then:
+  ```bash
+  .agent/scripts/worktree_create.sh --issue <N> --type layer \
+      --layer <layer> --packages <project_repo>
+  ```
+
+`worktree_create.sh` does NOT open a draft PR when invoked without
+`--plan-file`; only the worktree + branch are created. A draft PR
+will follow when `plan-task` runs.
+
+**8b. Append the entry.** Create the parent directory if needed
+(`review-issue` typically runs *before* `plan-task`, so
+`.agent/work-plans/issue-<N>/` may not exist yet):
+
+```bash
+mkdir -p .agent/work-plans/issue-<N>
+```
+
+Then use frontmatter for a new file:
+
+```yaml
+---
+issue: <N>
+---
+
+# Issue #<N> — <issue title>
+```
+
+Append:
+
+```markdown
+
+## Issue Review
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
+**By**: <agent name> (<model>)
+
+**Issue**: #<N>
+**Comment**: <URL of the posted issue comment from step 7>
+**Scope verdict**: <well-scoped | needs-splitting | needs-more-detail>
+
+### Actions
+- [ ] <each "Action needed" principle finding>
+- [ ] <each "Recommendation" worth following up on>
+```
+
+If the scope verdict is `well-scoped` and there were no Action-needed
+principle findings *and* no Recommendations, set `### Actions` to a
+single checkbox item (keeping ADR-0013's checkbox-list schema
+uniform for downstream consumers):
+`- [ ] No actions — issue is plan-task-ready.` If there are
+Recommendations but no Action-needed findings, list the Recommendations
+under `### Actions` so the timeline preserves them — they're follow-up
+candidates downstream consumers should be able to see.
+
+Commit:
+
+```bash
+git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
+git -C <worktree-path> \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: issue review for #<N>"
+```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+because the skill instructions run in fresh subshells where the
+`set_git_identity_env.sh` exports may not be in scope; without them
+`check_pr_authors.py` (CI mechanism C, [#468](https://github.com/rolker/ros2_agent_workspace/issues/468))
+will reject the commit.
+
+The branch (`feature/issue-<N>`) now exists with one commit. If the
+user decides not to proceed (and so plan-task never runs), they can
+remove the worktree + branch via
+`.agent/scripts/worktree_remove.sh --issue <N>`.
 
 ## Guidelines
 

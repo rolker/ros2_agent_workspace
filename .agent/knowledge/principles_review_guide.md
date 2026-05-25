@@ -33,6 +33,7 @@ humans use it as a checklist.
 | 0008 — Follow ROS 2 Official Conventions | Creating or modifying ROS 2 packages, launch files, `package.xml`, or license headers | Follow ROS 2 conventions (target Rolling); deviations require their own ADR; check `.agent/knowledge/ros2_development_patterns.md` |
 | 0009 — Python package management | Installing Python packages or modifying `.venv` | Use apt/rosdep for build/runtime; .venv for dev tools; never bare pip install |
 | 0010 — git-bug for local issue tracking | Adding or modifying issue lookup scripts, bootstrap, or sync | git-bug is optional; scripts try git-bug first, fall back to `gh`; graceful degradation required |
+| 0013 — `progress.md` entry-type vocabulary | Adding a new workflow skill that writes to `progress.md`, or consuming prior entries from a skill | Use the canonical entry types (`## Issue Review`, `## Plan Authored`, `## Plan Review`, `## Local Review`, `## Local Review (Pre-Push)`, `## Integrated Review`, `## External Review` (transitional, until #470 phase B retires it), `## Implementation`); `## External Review` is a recognized predecessor of `## Integrated Review` that `triage-reviews` continues to write until phase B. Consume prior entries by entry-type filter, not by re-classifying |
 
 ## Consequences Map
 
@@ -45,6 +46,7 @@ humans use it as a checklist.
 | A template in `.agent/templates/` | Docs that reference the template; skills that use it |
 | A framework skill (e.g., `.claude/skills/`) | That framework's adapter file; regenerate skills if needed |
 | Workflow skill list (add/remove a skill) | Skill list in non-Claude adapters (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`) |
+| Add a workflow skill that produces durable findings | Persist a typed entry to `progress.md` per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md); pick an existing entry type or introduce a new one via a **superseding ADR** (ADR-0012's cross-reference-addendum carve-out does not cover changes to ADR-0013's Decision table) |
 | Package interfaces (`.msg`/`.srv`) | Downstream packages, documentation, tests |
 | Worktree scripts | `.agent/WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
 

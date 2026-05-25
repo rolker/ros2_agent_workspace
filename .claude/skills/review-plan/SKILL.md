@@ -242,6 +242,175 @@ PR-less no-findings variant (`--issue` or file path):
 Plan looks solid. Ready for implementation.
 ```
 
+### 6. Persist to progress.md
+
+Append a `## Plan Review` entry to
+`.agent/work-plans/issue-<N>/progress.md` in the worktree that owns
+the plan. Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+The entry lets implementation skills and downstream consumers (notably
+`triage-reviews` as integrator) see what the plan review concluded
+without re-reading the entire PR conversation.
+
+**Locate-or-create the owning worktree.** `review-plan` supports
+PR-number, file-path, and `--issue` invocations, none of which
+guarantee the agent is already inside the owning worktree. Before
+appending, resolve the right place to write:
+
+1. **Resolve the owning repo and issue number** — `<N>` already came
+   from step 1 (the PR's `closingIssuesReferences`, the issue argument,
+   or extracted from the plan path). The owning-repo resolution
+   depends on the invocation mode:
+
+   - **PR-number mode**: take the owning repo from step 1's PR
+     metadata (`closingIssuesReferences[].repository.nameWithOwner`)
+     — already in hand, no extra lookup needed.
+   - **`--issue` or file-path mode**: no PR metadata available. Don't
+     pass `--repo <owner/repo>` — that's the value we're resolving.
+     Probe in order (matches `review-issue` step 8a.1):
+
+     1. **Workspace root first** — from the workspace root,
+        `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
+        succeeds if `<N>` is a workspace issue. (Don't rely on the
+        agent's `cwd` — it might be a project repo already, which
+        would skip the workspace.)
+     2. **Project repos next** — if the workspace lookup returns
+        `NotFound`, try each project repo under `layers/main/*/src/*`:
+        `(cd <path> && gh issue view <N> --json repository --jq '.repository.nameWithOwner')`.
+        First success wins; record both the path and `owner/repo`.
+     3. **No match** — stop with an error; the issue may live in a
+        repo not currently checked out, or `<N>` is wrong.
+2. **Check the current worktree** — if `$WORKTREE_ISSUE` matches `<N>`
+   *and* the worktree's repo slug matches the owning repo's short
+   slug, the current directory is the right worktree. Record
+   `<plan-worktree-path>` as `$PWD` (used in the commit commands
+   below) and skip to "Append".
+
+   `worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`,
+   and `$WORKTREE_ISSUE` — but not the repo slug. Derive it from
+   `$WORKTREE_ROOT`'s basename (same pattern as `review-issue` step
+   8a.2):
+   ```bash
+   if [ -z "${WORKTREE_ROOT:-}" ]; then
+       # Not in a worktree — fall through to sub-step 3 (find or create)
+       WORKTREE_SLUG=""
+   else
+       WT_BASENAME=$(basename "$WORKTREE_ROOT")
+       case "$WT_BASENAME" in
+           issue-workspace-*) WORKTREE_SLUG="workspace" ;;
+           issue-*)           WORKTREE_SLUG="${WT_BASENAME#issue-}"; WORKTREE_SLUG="${WORKTREE_SLUG%-*}" ;;
+           *)                 WORKTREE_SLUG="" ;;
+       esac
+   fi
+   ```
+
+   Comparison against step 1's `owner/repo`: workspace issue matches
+   iff `WORKTREE_SLUG == "workspace"`; project-repo issue matches iff
+   `WORKTREE_SLUG` equals the repo-name portion of `owner/repo`.
+3. **Find an existing worktree** with an anchored, repo-aware match —
+   same pattern as `review-issue` step 8a.3:
+   ```bash
+   .agent/scripts/worktree_list.sh \
+     | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
+   ```
+   If one exists, record its path as `<plan-worktree-path>` (used in
+   the commit commands below). When the issue number collides across
+   repos, pass `--repo-slug <slug>` if entering via
+   `worktree_enter.sh`.
+4. **Otherwise create one on demand**, mirroring `review-issue` step
+   8a.5:
+   - **Workspace issues**: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`.
+   - **Project-repo issues**: derive `<layer>` and `<project_repo>`
+     from the project repo's path. Step 1 returned the owning
+     `owner/repo` and (for the probe-success path in `--issue` /
+     file-path mode) the local path under `layers/main/<layer>_ws/src/<project_repo>/`
+     where the gh probe matched. Parse `<layer>` (the directory name
+     before `_ws/src/`) and `<project_repo>` (the leaf directory) from
+     that path. Then:
+     `.agent/scripts/worktree_create.sh --issue <N> --type layer --layer <layer> --packages <project_repo>`.
+     This mirrors `plan-task` step 4's layer/package inference. In
+     PR-number mode where step 1 didn't probe a local path, run the
+     workspace-root → project-repos probe from step 1 now (it's
+     idempotent) to discover the local path.
+
+   No `--plan-file` — the plan already exists, we just need a branch
+   to commit progress.md on.
+5. **Initialize progress.md if absent** — if
+   `<plan-worktree-path>/.agent/work-plans/issue-<N>/progress.md`
+   doesn't exist, create the parent directory if needed and write
+   the standard frontmatter:
+   ```bash
+   mkdir -p <plan-worktree-path>/.agent/work-plans/issue-<N>
+   ```
+   ```yaml
+   ---
+   issue: <N>
+   ---
+
+   # Issue #<N> — <issue title>
+   ```
+   (Fetch the issue title from the owning repo via `gh issue view <N>
+   --repo <owner/repo> --json title --jq '.title'`.)
+
+**Independence annotation.** If this review is the *plan author*
+re-reading their own work, annotate the entry's `**By**` field with
+`(in-context — author self-review)` so downstream consumers can weight
+the entry appropriately.
+
+To detect: find the most recent `## Plan Authored` entry in this
+`progress.md`. If one exists, compare `$AGENT_NAME` to the agent-name
+portion of its `**By**` field (the prefix before the first ` (`, since
+`**By**` is written as `<agent name> (<model>)` per ADR-0013). Match →
+annotate. No match → independent, no annotation.
+
+If no `## Plan Authored` entry exists (PR-less invocation, or an older
+plan that pre-dates `plan-task`'s persistence step), omit the
+annotation — the review is independent by default.
+
+Append:
+
+```markdown
+
+## Plan Review
+**Status**: complete
+**When**: <YYYY-MM-DD HH:MM ±HH:MM>
+**By**: <agent name> (<model>)  <!-- append ` (in-context — author self-review)` per the detection above when applicable -->
+
+**Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
+**PR**: <plan PR URL, or "PR-less" if --issue / file path mode>
+**Verdict**: <approve | approve-with-suggestions | changes-requested>
+
+### Findings
+- [ ] (must-fix) <one-line summary> — `plan.md:<line>`
+- [ ] (suggestion) <one-line summary> — `plan.md:<line>`
+```
+
+If the review surfaced no findings, set `**Verdict**: approve` and
+write a single checkbox item under `### Findings` so the section
+stays uniformly parseable per ADR-0013's checkbox-list schema:
+`- [ ] Plan looks solid. Ready for implementation.`
+
+Commit:
+
+```bash
+git -C <plan-worktree-path> add .agent/work-plans/issue-<N>/progress.md
+git -C <plan-worktree-path> \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    commit -m "progress: plan review for #<N>"
+```
+
+The per-invocation `-c` overrides are required by
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+to keep commits on agent-convention branches. Plain `git commit` in
+a fresh subshell can fall back to the human git config and trip the
+[`check_pr_authors.py`](../../../.agent/hooks/check_pr_authors.py)
+CI check.
+
+If the review found anything must-fix or substantive, the
+implementation step (or the plan author) should address them and amend
+the plan inline per `plan-task`'s "During implementation" rules before
+work continues. The `## Plan Review` entry stays as a historical record.
+
 ## Guidelines
 
 - **Evaluate, don't rewrite** — flag gaps and concerns. Don't generate an
