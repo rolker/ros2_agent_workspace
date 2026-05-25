@@ -27,7 +27,9 @@ output shape is the hand-written entry in
    `## External Review` as the predecessor of `## Integrated Review`. JSON shape
    pairs with `fetch_pr_reviews.sh` so the integrator and phase C (#481) consume
    both inputs in one idiom.
-2. **Add pytest tests for `progress_read.py`** (run via `.venv`, per ADR-0009) —
+2. **Add `unittest` tests for `progress_read.py`** (stdlib, `python3 -m unittest`
+   — the workspace convention per `test_build_report_generator.py`; pytest is
+   not installed) —
    malformed entries; **each of the three correlation-key forms** (issue#,
    plan-commit SHA, and PR/branch head SHA — including the `**Branch**: <name> at
    <sha>` alternative to `**PR**:`); **skill-specific fields appearing before the
@@ -78,7 +80,7 @@ output shape is the hand-written entry in
 | File | Change |
 |------|--------|
 | `.agent/scripts/progress_read.py` | New — Python entry extractor by type + correlation key, emits JSON |
-| `.agent/scripts/tests/test_progress_read.py` | New — pytest parser tests (run via `.venv`) |
+| `.agent/scripts/tests/test_progress_read.py` | New — `unittest` parser tests (`python3 -m unittest`) |
 | `.claude/skills/triage-reviews/SKILL.md` | Steps 3, 5, 6, 7 (integrate prior entries; sources column; rename entry) |
 | `AGENTS.md` | Add `progress_read.py` to Script Reference table |
 | `docs/decisions/0013-*.md` | ADR-0012 cross-reference addendum (rename live, links #485); Decision table untouched |
@@ -120,5 +122,13 @@ output shape is the hand-written entry in
 
 ## Estimated Scope
 
-Single PR. One new Python helper + pytest tests, a focused multi-step edit to one
-SKILL.md, a one-line AGENTS.md table addition, and an ADR-0013 addendum.
+Single PR. One new Python helper + `unittest` tests, a focused multi-step edit to
+one SKILL.md, a one-line AGENTS.md table addition, and an ADR-0013 addendum.
+
+## Implementation Notes
+
+- **Tests use stdlib `unittest`, not pytest.** pytest isn't installed in `.venv`,
+  and the existing `.agent/scripts/tests/test_build_report_generator.py` is
+  class-based `unittest` run via `python3 -m unittest`. Followed that convention
+  rather than introducing a pytest dependency. (Surfaced during implementation;
+  plan step 2 amended.)
