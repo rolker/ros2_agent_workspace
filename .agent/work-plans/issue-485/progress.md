@@ -124,8 +124,8 @@ issue: 485
 **CI**: all-pass
 
 ### Findings
-- [ ] (must-fix, Copilot @ `854733a`) Frontmatter `description:` is truncated by YAML: `...persists a unified ## Integrated Review entry...` — the space before `##` makes YAML treat `#` as a comment, so the value ends at "a unified" (verified with PyYAML). Introduced by this PR's rename. Fix: drop the `##` marker (or quote the value). — `triage-reviews/SKILL.md:3`
-- [ ] (suggestion, Copilot @ `854733a`) `_parse_findings` records checkbox lines that appear before any `### ` subsection (`section=None`), but ADR-0013 places findings/actions under `###` subsections. Scope collection to `section is not None` so a stray header-area checkbox isn't surfaced as a finding; + a regression test. — `progress_read.py`
+- [x] (fixed `7103dc0`, must-fix, Copilot @ `854733a`) Frontmatter `description:` was truncated by YAML: `...persists a unified ## Integrated Review entry...` — the space before `##` makes YAML treat `#` as a comment, so the value ends at "a unified" (verified with PyYAML). Introduced by this PR's rename. Fix: drop the `##` marker (or quote the value). — `triage-reviews/SKILL.md:3`
+- [x] (fixed `7103dc0`, suggestion, Copilot @ `854733a`) `_parse_findings` recorded checkbox lines that appear before any `### ` subsection (`section=None`), but ADR-0013 places findings/actions under `###` subsections. Scope collection to `section is not None` so a stray header-area checkbox isn't surfaced as a finding; + a regression test. — `progress_read.py`
 
 ### False positives
 - (none)
