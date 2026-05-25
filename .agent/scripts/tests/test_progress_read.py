@@ -173,6 +173,33 @@ class TestPredecessorRecognition(unittest.TestCase):
         self.assertTrue(_matches_type(entry, {"Integrated Review"}))
         self.assertFalse(_matches_type(entry, {"Plan Review"}))
 
+    def test_suffixed_external_review_normalizes_to_canonical_base(self):
+        # Legacy non-conformant heading: must still be recognized as External
+        # Review (and thus an Integrated Review predecessor), not silently
+        # dropped by type filters.
+        text = (
+            "## External Review (Round 5–6)\n"
+            "**PR**: #5 at `abc1234`\n"
+            "### Actions\n"
+            "- [ ] (suggestion) thing\n"
+        )
+        entry = parse_progress(text)["entries"][0]
+        self.assertEqual(entry["type"], "External Review (Round 5–6)")
+        self.assertEqual(entry["base_type"], "External Review")
+        self.assertTrue(entry["recognized"])
+        self.assertEqual(entry["predecessor_of"], "Integrated Review")
+        self.assertEqual(entry["correlation"], {"kind": "pr", "pr": 5, "sha": "abc1234"})
+        self.assertTrue(_matches_type(entry, {"Integrated Review"}))
+        self.assertTrue(_matches_type(entry, {"External Review"}))
+
+    def test_local_review_prepush_parenthetical_not_stripped(self):
+        # `Local Review (Pre-Push)` is canonical as-is; its parenthetical must
+        # NOT be stripped to `Local Review`.
+        text = "## Local Review (Pre-Push)\n**Branch**: feat at `abc1234`\n"
+        entry = parse_progress(text)["entries"][0]
+        self.assertEqual(entry["base_type"], "Local Review (Pre-Push)")
+        self.assertTrue(entry["recognized"])
+
 
 class TestMalformedAndEdgeCases(unittest.TestCase):
     def test_missing_correlation_field_does_not_crash(self):

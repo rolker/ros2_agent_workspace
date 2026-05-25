@@ -19,8 +19,9 @@ Output (stdout) is a JSON object::
 Each entry::
 
     {
-      "type": "Plan Review",
-      "recognized": true,            # canonical ADR-0013 type?
+      "type": "Plan Review",         # full heading text (may carry a suffix)
+      "base_type": "Plan Review",    # canonical type (suffix stripped if non-canonical)
+      "recognized": true,            # is base_type a canonical ADR-0013 type?
       "predecessor_of": null,        # "Integrated Review" for External Review
       "status": "complete",
       "when": "2026-05-25 15:27 -04:00",
@@ -38,9 +39,11 @@ Correlation by entry type (ADR-0013 "Consume by entry-type filter"):
   ``External Review`` / ``Implementation`` -> ``{"kind":"pr","pr":N,"sha":..}``
   or ``{"kind":"branch","branch":..,"sha":..}``
 
-``--type`` filters the emitted entries to the given type(s). Filtering on
-``Integrated Review`` also returns ``External Review`` entries, since
-ADR-0013 recognizes the latter as the predecessor of the former.
+``--type`` filters the emitted entries to the given type(s), matching on the
+full heading, the canonical ``base_type`` (so legacy suffixed headings like
+``External Review (Round 5-6)`` match ``External Review``), and predecessor
+recognition (filtering ``Integrated Review`` also returns ``External Review``
+entries, since ADR-0013 recognizes the latter as the predecessor of the former).
 """
 
 import argparse
@@ -83,6 +86,25 @@ _LEADING_PAREN = re.compile(r"^\(([^)]*)\)")
 _OFFSET = re.compile(r"(?:[+-]\d{2}:\d{2}|Z)$")
 # Fenced code block delimiter (``` or ~~~, optionally indented / with info string).
 _FENCE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def _canonical_base(heading):
+    """Map a heading to its canonical ADR-0013 entry type.
+
+    Returns the heading unchanged when it is already canonical (including
+    ``Local Review (Pre-Push)``, whose parenthetical is part of the canonical
+    name). Otherwise strips a trailing ``(...)`` suffix and returns the base if
+    that base is canonical — so legacy non-conformant headings like
+    ``External Review (Round 5-6)`` are still recognized as ``External Review``
+    (and thus consumed as ``Integrated Review`` predecessors) rather than
+    silently dropped by type filters. Falls back to the heading unchanged.
+    """
+    if heading in CANONICAL_TYPES:
+        return heading
+    match = re.match(r"^(.*?)\s*\([^)]*\)\s*$", heading)
+    if match and match.group(1) in CANONICAL_TYPES:
+        return match.group(1)
+    return heading
 
 
 def _field(header_lines, name):
@@ -242,15 +264,17 @@ def parse_progress(text, path=None):
             header_lines.append(line)
 
         when = _field(header_lines, "When")
+        base = _canonical_base(heading)
         entry = {
             "type": heading,
-            "recognized": heading in CANONICAL_TYPES,
-            "predecessor_of": PREDECESSOR_OF.get(heading),
+            "base_type": base,
+            "recognized": base in CANONICAL_TYPES,
+            "predecessor_of": PREDECESSOR_OF.get(base),
             "status": _field(header_lines, "Status"),
             "when": when,
             "when_has_offset": bool(when and _OFFSET.search(when.strip())),
             "by": _field(header_lines, "By"),
-            "correlation": _parse_correlation(heading, header_lines),
+            "correlation": _parse_correlation(base, header_lines),
             "findings": _parse_findings(lines),
         }
         result["entries"].append(entry)
@@ -261,10 +285,12 @@ def parse_progress(text, path=None):
 def _matches_type(entry, wanted):
     """True if ``entry`` should be emitted for the ``--type`` filter.
 
-    Exact type match, plus predecessor recognition: requesting
-    ``Integrated Review`` also matches ``External Review`` entries.
+    Matches on the full heading, on the canonical base type (so legacy
+    suffixed headings like ``External Review (Round 5-6)`` match
+    ``External Review``), and on predecessor recognition (requesting
+    ``Integrated Review`` also matches ``External Review`` entries).
     """
-    if entry["type"] in wanted:
+    if entry["type"] in wanted or entry.get("base_type") in wanted:
         return True
     return entry["predecessor_of"] in wanted
 
