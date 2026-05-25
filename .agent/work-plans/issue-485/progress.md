@@ -112,3 +112,20 @@ issue: 485
 
 ### Notes
 - 5 older Copilot comments are against the plan-only commits (`3110a14`/`b3faa44`) and target `plan.md`/early `progress.md` — low priority per the plan-first guidance (plan is a pre-implementation artifact; reviews on plan-only commits go stale once implementation lands). Two are historical-record minutiae in `progress.md` (a `progress_read.sh` reference at line 19, adapter paths at line 20) — optional tidy, not blocking.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-25 19:36 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #486 at `854733a`
+**Sources**: 1 (Copilot @ `854733a`; prior rounds' findings all resolved)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (must-fix, Copilot @ `854733a`) Frontmatter `description:` is truncated by YAML: `...persists a unified ## Integrated Review entry...` — the space before `##` makes YAML treat `#` as a comment, so the value ends at "a unified" (verified with PyYAML). Introduced by this PR's rename. Fix: drop the `##` marker (or quote the value). — `triage-reviews/SKILL.md:3`
+- [ ] (suggestion, Copilot @ `854733a`) `_parse_findings` records checkbox lines that appear before any `### ` subsection (`section=None`), but ADR-0013 places findings/actions under `###` subsections. Scope collection to `section is not None` so a stray header-area checkbox isn't surfaced as a finding; + a regression test. — `progress_read.py`
+
+### False positives
+- (none)
