@@ -31,3 +31,17 @@ issue: 484
 - [ ] (suggestion) Prepend ordering rationale (`<build>/<pkg>` first vs `<install>/<pkg>/lib`) should be noted in plan step 1 so the explanatory comment lands at implementation time — `plan.md:17-20`
 - [ ] (suggestion) "Open Questions: None" contradicts must-fix finding above — update to capture the acceptance-gate timing question — `plan.md:66-68`
 - [ ] (suggestion) Test 23 extension underspecified — note that python3.99/site-packages fabrication already exists; new step is just counting `lib` and `build/<pkg>` occurrences in `$LD_LIBRARY_PATH` — `plan.md:24, 35`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-25 16:30 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+**Verdict**: approved
+
+**Branch**: `feature/issue-484` at `10f7be2`
+**Mode**: pre-push
+**Depth**: Light (reason: <50 code lines, ≤3 code files, no override-trigger files)
+**Must-fix**: 0 | **Suggestions**: 0
+
+### Findings
+- [ ] No issues found. LGTM. (Copilot Adversarial surfaced 2 candidate findings — both verified as false positives: asymmetric guarding matches the sibling AMENT/PYTHONPATH pattern; `$pkg` is defined at test_worktree_create.sh:924 within the same function scope.)
