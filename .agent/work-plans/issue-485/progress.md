@@ -61,7 +61,7 @@ issue: 485
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **Branch**: feature/issue-485 at `f468ac5` (local, pre-push; PR #486)
-**Commits**: `ab5ab44` (progress_read.py + 19 unittest cases), `f468ac5` (triage-reviews integrator + docs)
+**Commits**: `ab5ab44` (progress_read.py + unittest suite), `f468ac5` (triage-reviews integrator + docs); suite is **24 cases** (19 at `ab5ab44`, +5 from the `eaa2c0d` pre-push fix)
 
 ### Findings
 - [x] Plan steps 1–8 implemented: `progress_read.py` helper + tests; `triage-reviews` steps 3/5/6/7 (read prior entries, sources column, cross-source confirmations, `## Integrated Review` rename + in-body fixes); `AGENTS.md` script table; ADR-0012 addendum to ADR-0013; review-guide ADR-0013 row refresh.
@@ -85,7 +85,7 @@ issue: 485
 - [x] (observation, not a defect) `_corr_plan` greedy-split handles paths containing " at " correctly (`$`-anchored SHA + non-greedy); no action.
 
 ### Notes
-- Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 19 tests pass. Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
+- Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 24 tests pass (19 at review; +5 from the `eaa2c0d` fix). Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
 
 ## Integrated Review
 **Status**: complete
@@ -102,10 +102,10 @@ issue: 485
      recognizes the predecessor ## External Review on read either way. -->
 
 ### Findings
-- [ ] (valid, Copilot @ `01700f5`) `## Implementation` entry says "19 unittest cases" but the suite is 24 after the fence fix (`eaa2c0d`); the same entry's findings say 24 — stale count. Update to 24. — `progress.md`
-- [ ] (valid, Copilot @ `01700f5`) `## Local Review (Pre-Push)` Notes say "19 tests pass" contradicting "24 tests pass" in its resolved finding. Update to 24. — `progress.md`
-- [ ] (valid, Copilot @ `01700f5`) review-guide ADR-0013 row drops `## External Review` from the canonical-types list, but ADR-0013's Decision table still lists it (read-only predecessor) — reads as contradicting the ADR. Reword to distinguish "types to write" vs "recognized on read". — `principles_review_guide.md:36`
-- [ ] (valid, substantive, Copilot @ `01700f5`) `--type "Integrated Review"` silently drops legacy suffixed headings like `## External Review (Round 5–6)` (`issue-452/progress.md:23`): `entry["type"]` is the full heading, so `predecessor_of` is null and `_matches_type` excludes it. Fix: normalize to a canonical base (strip a trailing ` (...)` when the base is canonical, but keep `Local Review (Pre-Push)` intact) for recognized/predecessor/correlation/filter; add a regression test. — `progress_read.py`
+- [x] (fixed) `## Implementation` entry stale "19 unittest cases" → now reflects the 24-case suite (19 at `ab5ab44`, +5 at `eaa2c0d`). — `progress.md`
+- [x] (fixed) `## Local Review (Pre-Push)` Notes "19 tests pass" → "24 tests pass (19 at review; +5 from `eaa2c0d`)". — `progress.md`
+- [x] (fixed) review-guide ADR-0013 row reworded to distinguish **Write** (the 7 types) vs **Recognize on read** (those + `## External Review`, read-only predecessor) — no longer reads as contradicting ADR-0013's Decision table. — `principles_review_guide.md:36`
+- [x] (fixed `e63df1b`, substantive) `--type` filters silently dropping legacy suffixed `## External Review (Round 5–6)` headings: added `_canonical_base()` + `base_type`; recognized/predecessor/correlation/`_matches_type` now key off the canonical base (`Local Review (Pre-Push)` kept intact). +2 regression tests (26 total); verified against `issue-452` (both External Review entries now match `--type "Integrated Review"`). — `progress_read.py`
 
 ### False positives
 - (none)
