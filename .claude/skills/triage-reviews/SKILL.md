@@ -1,6 +1,6 @@
 ---
 name: triage-reviews
-description: Evaluate PR review comments (human and bot) against local code, principles, and ADRs. Includes CI check status. Classifies each as valid or false positive, presents a fix plan, and persists the triage to progress.md.
+description: Integrator — evaluate PR review comments (human and bot) together with the prior progress.md review timeline, against local code, principles, and ADRs. Includes CI check status. Classifies each finding as valid or false positive, flags cross-source confirmations, presents a fix plan, and persists a unified Integrated Review entry to progress.md.
 ---
 
 # Triage Reviews
@@ -16,9 +16,14 @@ description: Evaluate PR review comments (human and bot) against local code, pri
 **Lifecycle position**: implement → push → review → **triage-reviews** → fix
 
 Evaluate all PR review comments — from human reviewers, Copilot, and other
-bots — against the local worktree code, workspace principles, and ADRs.
-Classifies each comment as a valid issue or false positive and presents a
-structured plan. Does not auto-fix or post comments.
+bots — **together with the prior `progress.md` review timeline** (e.g.
+`## Local Review`, `## Local Review (Pre-Push)`), against the local worktree
+code, workspace principles, and ADRs. As the **integrator**
+([#470](https://github.com/rolker/ros2_agent_workspace/issues/470) phase B),
+this skill merges those sources, flags findings raised by more than one as
+**cross-source confirmations** (the strongest signal), classifies each as a
+valid issue or false positive, presents a structured plan, and persists a
+unified `## Integrated Review` entry. Does not auto-fix or post comments.
 
 ## Steps
 
@@ -76,8 +81,38 @@ The script:
 - Fetches CI check-runs for the PR head SHA
 - Outputs structured JSON with `head_sha`, `reviews`, `conversation_comments`, and `ci_checks`
 
-If the result contains no reviews and no conversation comments, report
-"No reviews or comments on this PR" and stop.
+If the result contains no reviews and no conversation comments, **do not stop** —
+the local timeline (next paragraph) may still carry findings to integrate. Only
+report "No reviews, comments, or prior entries" and stop if *both* the GitHub
+side and the local timeline are empty.
+
+**Also read the prior local timeline** (integrator step). The GitHub-side
+reviews are one source; the other is the issue's own `progress.md`. Here
+`<issue-N>` is the **issue** number (resolved from the PR head branch, as in
+step 7) — *not* the PR number the skill was invoked with. Extract it (invoke via
+`python3`, matching the repo's `.agent/scripts/*.py` convention — don't rely on
+the executable bit):
+
+```bash
+# progress.md may not exist yet (a legacy PR with no lifecycle timeline);
+# progress_read.py exits non-zero on a missing file, so guard with -f and treat
+# an absent timeline as empty — the GitHub-side reviews are then the only source.
+PROGRESS=.agent/work-plans/issue-<issue-N>/progress.md
+[ -f "$PROGRESS" ] && python3 .agent/scripts/progress_read.py "$PROGRESS" \
+    --type "Local Review" --type "Local Review (Pre-Push)" --type "Integrated Review"
+```
+
+`progress_read.py` emits JSON with one record per entry, each carrying its entry
+type, correlation key (issue# / plan-commit SHA / PR-or-branch head SHA per
+ADR-0013), and findings. Select the review entries relevant to this PR:
+`## Local Review`, `## Local Review (Pre-Push)`, prior `## Integrated Review`
+entries (earlier rounds on this same PR — read them so multi-round triage builds
+on, rather than repeats, prior findings), and any historical `## External
+Review` (the recognized predecessor; `--type "Integrated Review"` matches those
+predecessors too). Match them to the GitHub-side reviews by **head SHA** (the
+correlation key for review entries): entries at the current `head_sha` describe
+the same code as the live
+reviews; older entries are prior rounds.
 
 ### 4. Load governance context
 
@@ -137,6 +172,14 @@ f. **Check governance context** — does the comment align with or contradict:
    - Workspace principles (`docs/PRINCIPLES.md`)
    - Relevant ADRs (`docs/decisions/`)
    - Project-level governance (`.agents/README.md` in the project repo, if applicable)
+g. **Detect cross-source confirmations** (integrator step) — a finding raised by
+   two or more sources at the **same entry-type correlation key** is a
+   cross-source confirmation: the strongest signal. Per ADR-0013's "consume by
+   entry-type filter," the key is that entry type's correlation key — for review
+   entries, the PR/branch **head SHA**. Example: a finding in a `## Local Review`
+   at head `<sha>` that a Copilot review at the same head also raises. **Keep
+   both; do not collapse** — record the finding once with its list of sources.
+   Cross-source confirmations are the highest-priority class in the report.
 
 ### 6. Classify and present plan
 
@@ -147,7 +190,17 @@ Output a structured report:
 
 **PR**: <url>
 **Head**: `<branch>` at `<short-sha>`
+**Sources**: <count> (e.g., Copilot R2, Local Review @ `<sha>`, CI rollup)
 **Reviews**: <total> review(s), <total> inline comment(s), <total> conversation comment(s)
+**Cross-source confirmations**: <count>
+
+### Cross-Source Confirmations
+
+Findings raised by two or more sources at the same head SHA — highest priority.
+
+| # | Sources | File | Line | Finding |
+|---|---------|------|------|---------|
+| 1 | Copilot R2 + Local Review @ `<sha>` | `path/to/file` | 42 | Description |
 
 ### Human Reviewer Comments
 
@@ -163,8 +216,8 @@ Output a structured report:
 
 ### Valid Issues (Bot)
 
-| # | Source | File | Line | Issue | Suggested Fix |
-|---|--------|------|------|-------|---------------|
+| # | Sources | File | Line | Issue | Suggested Fix |
+|---|---------|------|------|-------|---------------|
 | 1 | Copilot | `path/to/file` | 42 | Description of the valid issue | Brief fix description |
 
 ### False Positives (Bot)
@@ -250,18 +303,29 @@ Append this step entry:
 
 ```markdown
 
-## External Review
+## Integrated Review
 **Status**: complete
 **When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
-**PR**: #<N> at `<short-sha>`
-**Reviews**: <total> review(s), <valid-count> valid, <false-positive-count> false positives
+**PR**: #<N> at `<short-sha>`   <!-- or **Branch**: <name> at `<sha>` if no PR yet -->
+**Sources**: <count> (e.g., Copilot R2 @ `<sha>`, Local Review @ `<sha>`, CI rollup)
+**Cross-source confirmations**: <count>
 **CI**: <all-pass | failures-noted>
 
-### Actions
-- [ ] <each recommended action from the triage>
+### Findings
+- [ ] (cross-confirmed) <finding raised by 2+ sources> — `<file>`
+- [ ] (<severity>, <source>) <single-source finding> — `<file>`
+
+### False positives
+- (<source>) <what was claimed> — <specific reason the failure mode cannot occur>
 ```
+
+Findings carry their source(s) inline in the leading `(...)`; cross-source
+confirmations use `(cross-confirmed)` and are listed first. False positives are
+plain bullets (not checkboxes) with a justification — they are dismissals, not
+action items. This shape matches the worked example in
+`.agent/work-plans/issue-468/progress.md`.
 
 Commit `progress.md` after appending. Run `git add` and `git commit` in
 the worktree where progress.md was found or created (which may differ
@@ -272,7 +336,7 @@ git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
 git -C <worktree-path> \
     -c user.name="$AGENT_NAME" \
     -c user.email="$AGENT_EMAIL" \
-    commit -m "progress: external review for #<N>"
+    commit -m "progress: integrated review for #<N>"
 ```
 
 The per-invocation `-c` overrides are required by
@@ -281,9 +345,11 @@ agents run each bash invocation in a fresh subshell where
 `set_git_identity_env.sh`'s env exports may not be in scope, and a
 plain `git commit` then trips `check_pr_authors.py` (CI mechanism C,
 [#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
-ADR-0013 will rename this entry from `## External Review` to
-`## Integrated Review` in phase B of [#470](https://github.com/rolker/ros2_agent_workspace/issues/470);
-the commit pattern carries forward.
+`## Integrated Review` is the current entry type per
+[ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md)
+(this skill is [#470](https://github.com/rolker/ros2_agent_workspace/issues/470)
+phase B). The predecessor `## External Review` is still *read* (step 3) for
+historical entries but is no longer *written*.
 
 (The fail-loud rule above already covers the case where the branch
 name doesn't carry an issue number — the skill stops with an error
