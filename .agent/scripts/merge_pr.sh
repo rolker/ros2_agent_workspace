@@ -70,6 +70,9 @@ BRANCH=""        # feature/issue-<N>
 ISSUE_NUM=""
 REPO_SLUG=""     # "" for the workspace repo; project-repo dir name for a layer repo
 PR_NUM="$ARG_PR"
+HAVE_WORKTREE=false  # true when resolution found a real worktree (cwd/--issue);
+                     # false for the headless --pr escape hatch. Gates removal
+                     # without reconstructing the (sanitized) worktree dir name.
 
 issue_from_branch() {  # echo the issue number from a feature/issue-<N> branch
     echo "$1" | sed -nE 's#^feature/[iI][sS][sS][uU][eE]-([0-9]+).*#\1#p'
@@ -146,6 +149,7 @@ elif [[ -n "$ARG_ISSUE" ]]; then
     fi
     REPO_PATH=$(repo_path_in_worktree "$local_wt")
     REPO_SLUG=$(slug_for_repo_path "$REPO_PATH")
+    HAVE_WORKTREE=true
 else
     # --- cwd mode (dominant): the worktree you're standing in is the answer ---
     REPO_PATH=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)
@@ -157,6 +161,7 @@ else
         exit 1
     fi
     REPO_SLUG=$(slug_for_repo_path "$REPO_PATH")
+    HAVE_WORKTREE=true
 fi
 
 # BRANCH_REPO = the owning repo's MAIN checkout (NOT the worktree, which gets
@@ -237,18 +242,19 @@ echo "  ✅ merged"
 # branch-deletion/sync rather than leave a forced, partial-cleanup state — and
 # print the exact commands to finish cleanup once the worktree is resolved.
 cd "$ROOT_DIR"
-if [[ -n "$REPO_SLUG" ]]; then
-    WT_DIR="$ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
-else
-    WT_DIR="$ROOT_DIR/.workspace-worktrees/issue-workspace-${ISSUE_NUM}"
-fi
-if [[ -n "$ISSUE_NUM" && -d "$WT_DIR" ]]; then
+# Gate on whether resolution actually found a worktree (HAVE_WORKTREE) rather
+# than reconstructing the worktree dir name — worktree_create/worktree_remove
+# sanitize the slug (e.g. `my-pkg` → `issue-my_pkg-N`), so a reconstructed path
+# could miss a real worktree and skip removal while branches still get deleted.
+# worktree_remove does its own (sanitizing) resolution from --issue/--repo-slug.
+if [[ "$HAVE_WORKTREE" == true && -n "$ISSUE_NUM" ]]; then
     echo "  Removing worktree..."
     if ! "$SCRIPT_DIR/worktree_remove.sh" --issue "$ISSUE_NUM" ${REPO_SLUG:+--repo-slug "$REPO_SLUG"}; then
+        slug_hint=${REPO_SLUG:+--repo-slug $REPO_SLUG}
         {
             echo "ERROR: worktree removal failed (uncommitted changes in the worktree?)."
             echo "  PR #$PR_NUM is already MERGED. Resolve the worktree, then finish cleanup:"
-            echo "    $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM ${REPO_SLUG:+--repo-slug $REPO_SLUG}"
+            echo "    $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM $slug_hint"
             echo "    git -C $BRANCH_REPO branch -D $BRANCH && git -C $BRANCH_REPO push origin --delete $BRANCH"
             echo "    make -C $ROOT_DIR sync"
         } >&2
@@ -256,7 +262,8 @@ if [[ -n "$ISSUE_NUM" && -d "$WT_DIR" ]]; then
     fi
     echo "  ✅ worktree removed"
 else
-    echo "  (no worktree for issue #${ISSUE_NUM:-?} — skipping removal)"
+    echo "  (no worktree resolved for issue #${ISSUE_NUM:-?} — skipping removal;"
+    echo "   if one exists, remove it separately with worktree_remove.sh --issue $ISSUE_NUM)"
 fi
 
 # ---- delete local + remote branch on the owning repo ------------------------
