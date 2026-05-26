@@ -87,20 +87,27 @@ report "No reviews, comments, or prior entries" and stop if *both* the GitHub
 side and the local timeline are empty.
 
 **Also read the prior local timeline** (integrator step). The GitHub-side
-reviews are one source; the other is the issue's own `progress.md`. Extract it:
+reviews are one source; the other is the issue's own `progress.md`. Here
+`<issue-N>` is the **issue** number (resolved from the PR head branch, as in
+step 7) — *not* the PR number the skill was invoked with. Extract it (invoke via
+`python3`, matching the repo's `.agent/scripts/*.py` convention — don't rely on
+the executable bit):
 
 ```bash
-.agent/scripts/progress_read.py .agent/work-plans/issue-<N>/progress.md
+python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<issue-N>/progress.md \
+    --type "Local Review" --type "Local Review (Pre-Push)" --type "Integrated Review"
 ```
 
 `progress_read.py` emits JSON with one record per entry, each carrying its entry
 type, correlation key (issue# / plan-commit SHA / PR-or-branch head SHA per
-ADR-0013), and findings. Select the review entries relevant to this PR —
-`## Local Review`, `## Local Review (Pre-Push)`, and any historical
-`## External Review` (the recognized predecessor of `## Integrated Review`; a
-`--type "Integrated Review"` filter matches those predecessors too). Match them
-to the GitHub-side reviews by **head SHA** (the correlation key for review
-entries): entries at the current `head_sha` describe the same code as the live
+ADR-0013), and findings. Select the review entries relevant to this PR:
+`## Local Review`, `## Local Review (Pre-Push)`, prior `## Integrated Review`
+entries (earlier rounds on this same PR — read them so multi-round triage builds
+on, rather than repeats, prior findings), and any historical `## External
+Review` (the recognized predecessor; `--type "Integrated Review"` matches those
+predecessors too). Match them to the GitHub-side reviews by **head SHA** (the
+correlation key for review entries): entries at the current `head_sha` describe
+the same code as the live
 reviews; older entries are prior rounds.
 
 ### 4. Load governance context

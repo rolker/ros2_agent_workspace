@@ -27,9 +27,13 @@ output shape is the hand-written entry in
    `## External Review` as the predecessor of `## Integrated Review`. JSON shape
    pairs with `fetch_pr_reviews.sh` so the integrator and phase C (#481) consume
    both inputs in one idiom.
-2. **Add `unittest` tests for `progress_read.py`** (stdlib, `python3 -m unittest`
-   — the workspace convention per `test_build_report_generator.py`; pytest is
-   not installed) —
+2. **Add `unittest` tests for `progress_read.py`** (stdlib `unittest.TestCase`,
+   run via `python3 -m unittest`) — pytest is **not** installed in `.venv`, so a
+   `unittest.TestCase` suite is the choice that actually runs with no new
+   dependency. (Note: the existing `.agent/scripts/tests/test_build_report_generator.py`
+   is *pytest-style* — plain classes + `assert` — and currently collects 0 tests
+   under `-m unittest`; a latent test-infra gap, out of scope here, so we do NOT
+   follow it as a precedent.) —
    malformed entries; **each of the three correlation-key forms** (issue#,
    plan-commit SHA, and PR/branch head SHA — including the `**Branch**: <name> at
    <sha>` alternative to `**PR**:`); **skill-specific fields appearing before the
@@ -128,7 +132,9 @@ one SKILL.md, a one-line AGENTS.md table addition, and an ADR-0013 addendum.
 ## Implementation Notes
 
 - **Tests use stdlib `unittest`, not pytest.** pytest isn't installed in `.venv`,
-  and the existing `.agent/scripts/tests/test_build_report_generator.py` is
-  class-based `unittest` run via `python3 -m unittest`. Followed that convention
-  rather than introducing a pytest dependency. (Surfaced during implementation;
-  plan step 2 amended.)
+  so a `unittest.TestCase` suite (run via `python3 -m unittest`) is the choice
+  that runs with no new dependency. The existing
+  `.agent/scripts/tests/test_build_report_generator.py` is *pytest-style* (plain
+  classes + `assert`) and collects 0 tests under `-m unittest` — a latent
+  test-infra gap (out of scope here), so it was **not** used as a precedent.
+  (Surfaced during implementation + #486 round-3 review; plan step 2 amended.)

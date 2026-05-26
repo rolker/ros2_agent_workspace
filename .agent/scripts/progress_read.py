@@ -10,7 +10,7 @@ correlation key without re-parsing markdown.
 
 Usage::
 
-    progress_read.py <progress.md> [--type "Entry Type"] ...
+    python3 .agent/scripts/progress_read.py <progress.md> [--type "Entry Type"] ...
 
 Output (stdout) is a JSON object::
 
