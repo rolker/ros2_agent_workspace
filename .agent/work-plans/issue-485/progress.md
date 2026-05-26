@@ -61,7 +61,7 @@ issue: 485
 **By**: Claude Code Agent (Claude Opus 4.7 (1M context))
 
 **Branch**: feature/issue-485 at `f468ac5` (local, pre-push; PR #486)
-**Commits**: `ab5ab44` (progress_read.py + unittest suite), `f468ac5` (triage-reviews integrator + docs); suite is **24 cases** (19 at `ab5ab44`, +5 from the `eaa2c0d` pre-push fix)
+**Commits**: `ab5ab44` (progress_read.py + unittest suite), `f468ac5` (triage-reviews integrator + docs); suite grew per-commit — 19 (`ab5ab44`) → 24 (`eaa2c0d`) → 26 (`e63df1b`) → **27** (`7103dc0`) — across the #486 review rounds (anchored to commits so the count can't go stale; `test_progress_read.py` is the live source)
 
 ### Findings
 - [x] Plan steps 1–8 implemented: `progress_read.py` helper + tests; `triage-reviews` steps 3/5/6/7 (read prior entries, sources column, cross-source confirmations, `## Integrated Review` rename + in-body fixes); `AGENTS.md` script table; ADR-0012 addendum to ADR-0013; review-guide ADR-0013 row refresh.
@@ -85,7 +85,7 @@ issue: 485
 - [x] (observation, not a defect) `_corr_plan` greedy-split handles paths containing " at " correctly (`$`-anchored SHA + non-greedy); no action.
 
 ### Notes
-- Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 24 tests pass (19 at review; +5 from the `eaa2c0d` fix). Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
+- Lint/tests green under the real hook config (flake8 plugin-less max-line 100, black 100). 24 tests passed at review-time (`eaa2c0d`); the suite later grew to 27 across the round-2/3 fixes (`e63df1b`, `7103dc0`). Plan drift: none (steps 1–8 as planned). Rename complete write-side; read-side predecessor retained. Verdict approve-with-suggestions; fixing #1–#3 before push per the Quality Standard (stale data is not a nit) since phase C (#481) will rely on this helper.
 
 ## Integrated Review
 **Status**: complete
@@ -152,3 +152,22 @@ issue: 485
 ### Notes
 - 3 rounds of Copilot, 11 findings total, **zero false positives** — but the PR is NOT converging to nothing; each round surfaces real (now doc/consistency-level) issues. Round 3 is all documentation/rationale accuracy + one real skill gap (#481-style multi-round input). Functionally the PR is complete and CLEAN; these are polish.
 - Aside (out of #485 scope): `test_build_report_generator.py` is pytest-style but pytest isn't installed and it doesn't run under `-m unittest` — a latent gap worth its own issue.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-25 22:20 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context)) — fresh-context sub-agent (dispatched by author; independent context)
+**Verdict**: approve-with-suggestions
+
+**Branch**: feature/issue-485 at `5f7fd0f` (local, pre-push)
+**Sources**: 1 (fresh-context review-code sub-agent)
+**Cross-source confirmations**: 0
+**CI**: n/a (pre-push)
+
+### Findings
+- [x] (fixed, staleness-class) Standing present-tense test-count went stale: `## Implementation` ("suite is 24 cases") + `## Local Review (Pre-Push)` Notes ("24 tests pass") — suite is 27 after the round-2/3 fixes. This is the exact class prior Copilot rounds flagged and the likely round-4 trigger. Reworded both to commit-anchored / as-of phrasing (the #470 R18 cascade-break) so the count can't go stale again. — `progress.md:64,88`
+- [x] (trivia, no action) `_OFFSET` is `$`-anchored, so trailing text after the offset would false-negative `when_has_offset` — cannot occur (ADR-0013's offset is terminal).
+- [x] (trivia, no action) exec bit + `python3`-invocation are both correct/consistent (the shebang hook mandates the exec bit; the `python3` prefix is for portability).
+
+### Notes
+- Purpose: pre-push review-code to catch what a 4th Copilot round would flag and push once-clean, ending the review churn. The fresh-context sub-agent ran ~20 adversarial parser inputs (indented/`~~~` fences, trailing-whitespace headings, lowercase/spaced field keys, `Local Review (Pre-Push)` vs `Integrated Review (Round 2)` base-stripping, paths containing " at ") + the 27-test suite + lint (pylint 10.00, flake8 clean) + ADR/schema round-trip — all clean except the one staleness finding (now fixed). Ready to push.
