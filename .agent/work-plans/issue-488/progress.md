@@ -73,3 +73,25 @@ issue: 488
 
 ### Notes
 - Reviewer held a high bar (destructive tool): resolution across all 3 modes, destructive-sequence ordering, partial-failure recovery, gh usage, and the generator change all verified correct; both suites pass; shellcheck clean. The one must-fix was a latent set-e/find robustness gap, now closed.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-26 00:21 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #494 at `ea9b7dd`
+**Sources**: 2 (Copilot @ `ea9b7dd`; prior `## Local Review (Pre-Push)` @ `5fdb48e`, all findings resolved)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (must-fix/safety, Copilot @ `ea9b7dd`) Always passes `--force` to `worktree_remove.sh` — bypasses the uncommitted-changes guard and can destroy unpushed work. Drop `--force`; if removal fails (dirty worktree), **abort before branch-deletion/sync** (don't leave partial cleanup). worktree_remove without `--force` is non-interactive (refuses-on-dirty, no prompt) — verified. — `merge_pr.sh:213`
+- [ ] (must-fix/safety, Copilot @ `ea9b7dd`) `--pr` mode silently falls back to the workspace repo when the `--repo-slug` dir isn't found under `layers/main` — a misspelled slug could merge/delete in the WRONG repo. Treat unknown slug as a usage error; require explicit `--repo-slug workspace` for the workspace. — `merge_pr.sh:101`
+- [ ] (valid, Copilot @ `ea9b7dd`) `--issue <N>` without `--repo-slug` only checks `.workspace-worktrees/issue-workspace-<N>`; layer worktrees (`layers/worktrees/issue-<slug>-<N>`) aren't scanned, so the documented "optional --repo-slug" doesn't work for layer issues. Scan both, resolve when unambiguous, error on collision (mirror worktree_remove). — `merge_pr.sh:114`
+- [ ] (valid, Copilot @ `ea9b7dd`) Arg parsing assumes `$2` exists for `--issue`/`--repo-slug`/`--pr`; a trailing `--issue` makes `shift 2` error confusingly under set -e. Add `[[ $# -lt 2 ]]` missing-value validation (exit 2), like worktree_remove. — `merge_pr.sh:58`
+
+### False positives
+- (none)
+
+### Notes
+- First review of the implementation (the 2 earlier Copilot reviews were on plan-only commits). The pre-push fresh-context review-code (@ `5fdb48e`) caught a different must-fix (set-e/find) and missed ALL FOUR of these — confirming again that fresh-context review and Copilot have non-overlapping blind spots. **Lesson refinement: for a destructive tool (merges + branch/worktree deletion), the Copilot round genuinely earns its keep** — unlike the doc-grade churn on #486, two of these are data-safety/wrong-repo bugs. Fix all four before merge.
