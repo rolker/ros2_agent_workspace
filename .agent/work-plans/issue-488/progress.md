@@ -95,3 +95,21 @@ issue: 488
 
 ### Notes
 - First review of the implementation (the 2 earlier Copilot reviews were on plan-only commits). The pre-push fresh-context review-code (@ `5fdb48e`) caught a different must-fix (set-e/find) and missed ALL FOUR of these — confirming again that fresh-context review and Copilot have non-overlapping blind spots. **Lesson refinement: for a destructive tool (merges + branch/worktree deletion), the Copilot round genuinely earns its keep** — unlike the doc-grade churn on #486, two of these are data-safety/wrong-repo bugs. Fix all four before merge.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-26 00:49 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context)) — fresh-context sub-agent (dispatched by author; independent context)
+**Verdict**: approve-with-suggestions
+
+**Branch**: feature/issue-488 at `d210109` (local, pre-push)
+**Sources**: 1 (fresh-context review-code sub-agent, reviewing the round's 4 Copilot fixes)
+**Cross-source confirmations**: 0
+
+### Findings
+- [x] (fixed `af3997b`) The 4 Copilot Integrated-Review findings (no-force/abort, --pr unknown-slug error, --issue scan-both, arg-value validation) — verified correct by the sub-agent.
+- [x] (fixed `d210109`, latent) WT_DIR existence-gate reconstructed the worktree dir from the local slug, but worktree_create/remove **sanitize** it (`my-pkg → issue-my_pkg-N`); a hyphenated repo dir would skip removal while branches still got deleted. Replaced with a HAVE_WORKTREE flag (no reconstruction). Not triggerable today (no hyphenated project-repo dirs) but closed proactively for a destructive tool.
+- [x] (fixed `d210109`, cosmetic) Quoted the slug in the cleanup-guidance echo.
+
+### Notes
+- This round's review specifically guarded the *destructive* surface: removal-vs-skip gating, abort-before-branch-delete on dirty, no wrong-repo merge. worktree_remove confirmed non-interactive + exits non-zero on dirty (so the abort fires). Pushing now and **waiting for Copilot** — not merging; for a tool that merges + deletes, every review layer stays in the loop.
