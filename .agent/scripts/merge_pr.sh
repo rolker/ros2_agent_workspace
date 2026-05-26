@@ -75,7 +75,10 @@ repo_path_in_worktree() {
     local wt="$1"
     if [ -e "$wt/.git" ]; then echo "$wt"; return 0; fi
     local inner
-    inner=$(find "$wt" -maxdepth 4 -name .git -print 2>/dev/null | head -n1)
+    # `-print -quit` returns the first match and exits 0 (no SIGPIPE from a
+    # closed `head` pipe); `|| true` swallows find's non-zero on an unreadable
+    # subdir so `set -eo pipefail` can't abort here.
+    inner=$(find "$wt" -maxdepth 4 -name .git -print -quit 2>/dev/null || true)
     [ -n "$inner" ] && dirname "$inner"
 }
 
@@ -90,7 +93,7 @@ slug_for_repo_path() {
 if [[ -n "$ARG_PR" ]]; then
     # --- escape hatch: explicit PR (+ repo-slug to locate the local repo) ---
     if [[ -n "$ARG_REPO_SLUG" ]]; then
-        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$ARG_REPO_SLUG" 2>/dev/null | head -n1)
+        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$ARG_REPO_SLUG" -print -quit 2>/dev/null || true)
         [[ -z "$REPO_PATH" ]] && REPO_PATH="$ROOT_DIR"   # slug may name the workspace
     else
         REPO_PATH="$ROOT_DIR"
@@ -121,7 +124,9 @@ else
     REPO_PATH=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)
     if [[ -z "$REPO_PATH" || "$REPO_PATH" == "$ROOT_DIR" ]]; then
         echo "ERROR: not inside a feature worktree (cwd resolves to the main tree or no repo)." >&2
-        echo "  cd into the PR's worktree, or pass --issue <N> / --pr <N> --repo-slug <slug>." >&2
+        echo "  For a layer worktree, cd into the package dir (<layer>_ws/src/<repo>) — the" >&2
+        echo "  worktree root itself resolves to the main tree. Or pass --issue <N> /" >&2
+        echo "  --pr <N> --repo-slug <slug>." >&2
         exit 1
     fi
     REPO_SLUG=$(slug_for_repo_path "$REPO_PATH")
@@ -133,7 +138,7 @@ fi
 if [[ -z "$REPO_SLUG" ]]; then
     BRANCH_REPO="$ROOT_DIR"
 else
-    BRANCH_REPO=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$REPO_SLUG" 2>/dev/null | head -n1)
+    BRANCH_REPO=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$REPO_SLUG" -print -quit 2>/dev/null || true)
     [[ -z "$BRANCH_REPO" ]] && BRANCH_REPO="$REPO_PATH"
 fi
 

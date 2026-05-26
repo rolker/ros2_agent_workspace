@@ -51,6 +51,13 @@ assert_err "bogus --issue rejected" "$ROOT_DIR" "no worktree found for issue #99
 echo "Test: bogus --issue with --repo-slug → error names the slug"
 assert_err "bogus --issue+slug rejected" "$ROOT_DIR" "repo-slug nonesuch" --issue 99999 --repo-slug nonesuch
 
+echo "Test: cwd on a non-feature branch → can't-derive-issue error"
+tmp=$(mktemp -d)
+git -C "$tmp" init -q
+git -C "$tmp" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m init
+assert_err "non-feature branch rejected" "$tmp" "is not 'feature/issue-"
+rm -rf "$tmp"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"
