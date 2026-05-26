@@ -54,3 +54,22 @@ issue: 488
 - [x] `test_merge_pr.sh` (6 tests, resolution/guard dispatch) + `test_generate_make_skills.sh` pass; shellcheck clean; generated `/make_merge-pr` verified.
 - [x] Self-caught during review: branch deletion targeted the worktree (gone after removal) — fixed to use `BRANCH_REPO` (main checkout). shellcheck SC2066 single-item-for fixed.
 - [ ] Next: review-code (pre-push) before pushing, per local-first.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-26 00:09 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context)) — fresh-context sub-agent (dispatched by author; independent context)
+**Verdict**: approve-with-suggestions
+
+**Branch**: feature/issue-488 at `5fdb48e` (local, pre-push)
+**Sources**: 1 (fresh-context review-code sub-agent)
+**Cross-source confirmations**: 0
+**CI**: n/a (pre-push)
+
+### Findings
+- [x] (fixed `5fdb48e`, must-fix) `find … | head -n1` command-subs (escape-hatch REPO_PATH, BRANCH_REPO, repo_path_in_worktree) could abort under `set -eo pipefail` (unreadable subdir → find rc=1, or SIGPIPE) mid-resolution for layer PRs — a destructive tool aborting half-done. Switched to `find … -print -quit … || true`. — `merge_pr.sh`
+- [x] (fixed `5fdb48e`, suggestion) cwd-mode error from a layer-worktree *root* was misleading; added a hint to cd into `<layer>_ws/src/<repo>`. — `merge_pr.sh`
+- [x] (fixed `5fdb48e`, suggestion) added a test for the non-feature-branch cwd path (7 tests). — `test_merge_pr.sh`
+
+### Notes
+- Reviewer held a high bar (destructive tool): resolution across all 3 modes, destructive-sequence ordering, partial-failure recovery, gh usage, and the generator change all verified correct; both suites pass; shellcheck clean. The one must-fix was a latent set-e/find robustness gap, now closed.
