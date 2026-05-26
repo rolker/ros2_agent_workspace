@@ -39,3 +39,18 @@ issue: 488
 ### Notes
 - Reviewer's recommended resolution: answer Open Question 1 with "require `REPO=`/`--repo-slug` for non-workspace PRs" — dissolves the two must-fix resolution findings with less magic. Flow shape (resolve → field-guard → CI-wait → merge → remove worktree → delete branches → make sync) and the adapt-don't-port divergences are otherwise sound.
 - **Resolution (2026-05-25, with user)**: went further than "require `REPO=`" — reframed to **worktree/issue-keyed** resolution (cwd zero-arg → `ISSUE=`/`REPO=` → `PR=` escape hatch), since most PRs in a mature workspace are project PRs and the PR number is the ambiguous thing; PR# is now derived from (repo, branch). All 8 findings addressed in the plan amendment this round (field-guard reordered before `gh`; `generate_make_skills.sh` + test added with `ISSUE=$ARGUMENTS`/`disable-model-invocation` preserved; cd-to-root, layer-branch-deletion ownership, dropped upstream deps, human-control posture). OQ2: merge-pr stays mechanical.
+
+## Implementation
+**Status**: complete
+**When**: 2026-05-25 23:43 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**Branch**: feature/issue-488 at `9d84297` (local, pre-push; PR #494)
+**Commits**: `9d84297` (merge_pr.sh + tests + Makefile target + generator + AGENTS.md)
+
+### Findings
+- [x] Plan implemented: `merge_pr.sh` (worktree/issue-keyed: cwd → `--issue`/`--repo-slug` → `--pr`; field-mode guard before `gh`; CI-wait/`--no-wait`; `--merge`; `cd $ROOT` then `worktree_remove`; branch deletion on the **main checkout** via `BRANCH_REPO`, not the removed worktree; `make sync`).
+- [x] Makefile `merge-pr` target (+ `.PHONY` + help); `generate_make_skills.sh` parameterized case (`/make_merge-pr <N>` → `make merge-pr ISSUE=<N>`, `disable-model-invocation: true`); `test_generate_make_skills.sh` covers it; AGENTS.md script-table row.
+- [x] `test_merge_pr.sh` (6 tests, resolution/guard dispatch) + `test_generate_make_skills.sh` pass; shellcheck clean; generated `/make_merge-pr` verified.
+- [x] Self-caught during review: branch deletion targeted the worktree (gone after removal) — fixed to use `BRANCH_REPO` (main checkout). shellcheck SC2066 single-item-for fixed.
+- [ ] Next: review-code (pre-push) before pushing, per local-first.
