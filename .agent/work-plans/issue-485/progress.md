@@ -141,10 +141,10 @@ issue: 485
 **CI**: all-pass
 
 ### Findings
-- [ ] (suggestion, Copilot @ `fe0ca7c`) `triage-reviews/SKILL.md` step 3 reuses `<N>` for the progress.md path, but there `<N>` is the **issue** number (from the branch), while the skill is invoked with a **PR** number. Clarify (issue-number, as in step 7) + invoke as `python3 .agent/scripts/progress_read.py` (repo convention; don't rely on exec bit). — `SKILL.md:~94`
-- [ ] (suggestion, Copilot @ `fe0ca7c`) Step-3 input-type list omits `## Integrated Review` — multi-round triage (like this PR's own rounds) must read prior `## Integrated Review` entries too, not just `Local Review*`/`External Review`. Add it + a repeated-`--type` example. — `SKILL.md:~102`
-- [ ] (suggestion, Copilot @ `fe0ca7c`) `progress_read.py` docstring Usage shows bare `progress_read.py ...`; use `python3 .agent/scripts/progress_read.py ...` to match repo convention. — `progress_read.py:13`
-- [ ] (valid, Copilot @ `fe0ca7c` ×2) plan.md step-2 + Implementation Note mis-cite `test_build_report_generator.py` as class-based `unittest`; it's actually **pytest-style** (plain class + `assert`) and collects **0 tests** under `python3 -m unittest` (verified). The decision (use `unittest.TestCase`) stands and is the runnable choice; correct the rationale to stop citing that file as a unittest precedent. — `plan.md:32,134`
+- [x] (fixed `9021e1a`) (suggestion, Copilot @ `fe0ca7c`) `triage-reviews/SKILL.md` step 3 reuses `<N>` for the progress.md path, but there `<N>` is the **issue** number (from the branch), while the skill is invoked with a **PR** number. Clarify (issue-number, as in step 7) + invoke as `python3 .agent/scripts/progress_read.py` (repo convention; don't rely on exec bit). — `SKILL.md:~94`
+- [x] (fixed `9021e1a`) (suggestion, Copilot @ `fe0ca7c`) Step-3 input-type list omits `## Integrated Review` — multi-round triage (like this PR's own rounds) must read prior `## Integrated Review` entries too, not just `Local Review*`/`External Review`. Add it + a repeated-`--type` example. — `SKILL.md:~102`
+- [x] (fixed `9021e1a`) (suggestion, Copilot @ `fe0ca7c`) `progress_read.py` docstring Usage shows bare `progress_read.py ...`; use `python3 .agent/scripts/progress_read.py ...` to match repo convention. — `progress_read.py:13`
+- [x] (fixed `9021e1a`) (valid, Copilot @ `fe0ca7c` ×2) plan.md step-2 + Implementation Note mis-cite `test_build_report_generator.py` as class-based `unittest`; it's actually **pytest-style** (plain class + `assert`) and collects **0 tests** under `python3 -m unittest` (verified). The decision (use `unittest.TestCase`) stands and is the runnable choice; correct the rationale to stop citing that file as a unittest precedent. — `plan.md:32,134`
 
 ### False positives
 - (none)
