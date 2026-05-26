@@ -129,3 +129,26 @@ issue: 485
 
 ### False positives
 - (none)
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-25 20:12 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #486 at `fe0ca7c`
+**Sources**: 1 (Copilot @ `fe0ca7c`; prior rounds resolved)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (suggestion, Copilot @ `fe0ca7c`) `triage-reviews/SKILL.md` step 3 reuses `<N>` for the progress.md path, but there `<N>` is the **issue** number (from the branch), while the skill is invoked with a **PR** number. Clarify (issue-number, as in step 7) + invoke as `python3 .agent/scripts/progress_read.py` (repo convention; don't rely on exec bit). — `SKILL.md:~94`
+- [ ] (suggestion, Copilot @ `fe0ca7c`) Step-3 input-type list omits `## Integrated Review` — multi-round triage (like this PR's own rounds) must read prior `## Integrated Review` entries too, not just `Local Review*`/`External Review`. Add it + a repeated-`--type` example. — `SKILL.md:~102`
+- [ ] (suggestion, Copilot @ `fe0ca7c`) `progress_read.py` docstring Usage shows bare `progress_read.py ...`; use `python3 .agent/scripts/progress_read.py ...` to match repo convention. — `progress_read.py:13`
+- [ ] (valid, Copilot @ `fe0ca7c` ×2) plan.md step-2 + Implementation Note mis-cite `test_build_report_generator.py` as class-based `unittest`; it's actually **pytest-style** (plain class + `assert`) and collects **0 tests** under `python3 -m unittest` (verified). The decision (use `unittest.TestCase`) stands and is the runnable choice; correct the rationale to stop citing that file as a unittest precedent. — `plan.md:32,134`
+
+### False positives
+- (none)
+
+### Notes
+- 3 rounds of Copilot, 11 findings total, **zero false positives** — but the PR is NOT converging to nothing; each round surfaces real (now doc/consistency-level) issues. Round 3 is all documentation/rationale accuracy + one real skill gap (#481-style multi-round input). Functionally the PR is complete and CLEAN; these are polish.
+- Aside (out of #485 scope): `test_build_report_generator.py` is pytest-style but pytest isn't installed and it doesn't run under `-m unittest` — a latent gap worth its own issue.
