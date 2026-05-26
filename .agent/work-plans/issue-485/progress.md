@@ -183,8 +183,8 @@ issue: 485
 **CI**: all-pass
 
 ### Findings
-- [ ] (suggestion, Copilot @ `76e75d8`) SKILL.md step 3 runs `progress_read.py <path>` but the script exits 1 on a missing file; a legacy PR with no timeline yet would stop the skill. Guard with `[ -f <path> ]` (treat absent timeline as empty) — `triage-reviews/SKILL.md:~98`
-- [ ] (suggestion, Copilot @ `76e75d8`) ADR-0013 is self-contradictory post-merge: the addendum says phase B landed / writes `## Integrated Review`, but the "Predecessor recognition" prose still says triage-reviews "continues to write `## External Review` until phase B". Extend the addendum (NOT the Decision table, per ADR-0012) to mark that clause historical. — `docs/decisions/0013-...md:~194`
+- [x] (fixed) (suggestion, Copilot @ `76e75d8`) SKILL.md step 3 runs `progress_read.py <path>` but the script exits 1 on a missing file; a legacy PR with no timeline yet would stop the skill. Guard with `[ -f <path> ]` (treat absent timeline as empty) — `triage-reviews/SKILL.md:~98`
+- [x] (fixed) (suggestion, Copilot @ `76e75d8`) ADR-0013 is self-contradictory post-merge: the addendum says phase B landed / writes `## Integrated Review`, but the "Predecessor recognition" prose still says triage-reviews "continues to write `## External Review` until phase B". Extend the addendum (NOT the Decision table, per ADR-0012) to mark that clause historical. — `docs/decisions/0013-...md:~194`
 
 ### False positives
 - (none)

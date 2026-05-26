@@ -94,7 +94,11 @@ step 7) — *not* the PR number the skill was invoked with. Extract it (invoke v
 the executable bit):
 
 ```bash
-python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<issue-N>/progress.md \
+# progress.md may not exist yet (a legacy PR with no lifecycle timeline);
+# progress_read.py exits non-zero on a missing file, so guard with -f and treat
+# an absent timeline as empty — the GitHub-side reviews are then the only source.
+PROGRESS=.agent/work-plans/issue-<issue-N>/progress.md
+[ -f "$PROGRESS" ] && python3 .agent/scripts/progress_read.py "$PROGRESS" \
     --type "Local Review" --type "Local Review (Pre-Push)" --type "Integrated Review"
 ```
 

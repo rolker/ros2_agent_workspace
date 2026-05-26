@@ -194,3 +194,10 @@ name for new entries; no migration of historical files.
   read-only predecessor (recognized on consume; no longer written). This note is
   navigational only — the Decision table and the "Predecessor recognition"
   section are unchanged (a substantive change would require a superseding ADR).
+- **Historical-state marker**: the "Predecessor recognition" section above is
+  written in the pre-phase-B present tense ("`triage-reviews` continues to write
+  `## External Review` … until phase B retires it"). As of #485 that is
+  **historical** — phase B has landed and `triage-reviews` writes
+  `## Integrated Review`. Read that paragraph as describing the transitional
+  state, not current write behavior; this addendum is the current source of
+  truth for what gets written.
