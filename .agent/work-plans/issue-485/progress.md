@@ -171,3 +171,23 @@ issue: 485
 
 ### Notes
 - Purpose: pre-push review-code to catch what a 4th Copilot round would flag and push once-clean, ending the review churn. The fresh-context sub-agent ran ~20 adversarial parser inputs (indented/`~~~` fences, trailing-whitespace headings, lowercase/spaced field keys, `Local Review (Pre-Push)` vs `Integrated Review (Round 2)` base-stripping, paths containing " at ") + the 27-test suite + lint (pylint 10.00, flake8 clean) + ADR/schema round-trip — all clean except the one staleness finding (now fixed). Ready to push.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-25 22:41 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #486 at `76e75d8`
+**Sources**: 1 (Copilot @ `76e75d8`; the pre-push review-code @ `5f7fd0f` had different blind spots — it caught the staleness, not these two)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (suggestion, Copilot @ `76e75d8`) SKILL.md step 3 runs `progress_read.py <path>` but the script exits 1 on a missing file; a legacy PR with no timeline yet would stop the skill. Guard with `[ -f <path> ]` (treat absent timeline as empty) — `triage-reviews/SKILL.md:~98`
+- [ ] (suggestion, Copilot @ `76e75d8`) ADR-0013 is self-contradictory post-merge: the addendum says phase B landed / writes `## Integrated Review`, but the "Predecessor recognition" prose still says triage-reviews "continues to write `## External Review` until phase B". Extend the addendum (NOT the Decision table, per ADR-0012) to mark that clause historical. — `docs/decisions/0013-...md:~194`
+
+### False positives
+- (none)
+
+### Notes
+- Round 4. 13 findings across 4 rounds, **zero false positives** — the PR is functionally done, but each fix-push surfaces new (now doc/robustness) angles, and the progress.md triage commits themselves trigger the next Copilot round. The pre-push fresh-context review and Copilot demonstrably have different blind spots (neither is a superset). Loop-ending move: fix + **merge** (the merge closes the PR and stops the review trigger), accepting that a hypothetical round 5 would be follow-up-grade.
