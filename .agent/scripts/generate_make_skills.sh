@@ -64,7 +64,7 @@ for target in $PHONY_TARGETS; do
     # Build the SKILL.md content
     # Targets that require ISSUE=<number> get an argument-hint and $ARGUMENTS substitution
     case "$target" in
-        revert-feature|agent-run|agent-shell)
+        revert-feature|agent-run|agent-shell|merge-pr)
         content=$(cat <<HEREDOC
 ---
 name: ${skill_name}

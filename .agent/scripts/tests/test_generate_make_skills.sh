@@ -229,15 +229,16 @@ cleanup_workspace
 echo ""
 
 # Test 8: argument-hint generated for ISSUE-requiring targets
-echo "Test 8: argument-hint generated for revert-feature and agent-run"
+echo "Test 8: argument-hint generated for revert-feature, agent-run, and merge-pr"
 setup_workspace
 cat > "$TEST_DIR/Makefile" << 'MAKEFILE'
-.PHONY: help build revert-feature agent-run
+.PHONY: help build revert-feature agent-run merge-pr
 
 help:
 	@echo "  build            - Build all layers"
 	@echo "  revert-feature ISSUE=<number> - Revert all commits for a specific issue"
 	@echo "  agent-run ISSUE=<number> - Launch agent container for a worktree"
+	@echo "  merge-pr [ISSUE=<n>|PR=<n>] [REPO=<slug>] - Merge a PR, clean up, then sync"
 
 build:
 	@echo "building"
@@ -247,12 +248,29 @@ revert-feature:
 
 agent-run:
 	@echo "running"
+
+merge-pr:
+	@echo "merging"
 MAKEFILE
 run_generator > /dev/null
 revert_content=$(cat "$TEST_DIR/.claude/skills/make_revert-feature/SKILL.md")
 agent_run_content=$(cat "$TEST_DIR/.claude/skills/make_agent-run/SKILL.md")
+merge_pr_content=$(cat "$TEST_DIR/.claude/skills/make_merge-pr/SKILL.md")
 build_content=$(cat "$TEST_DIR/.claude/skills/make_build/SKILL.md")
 pass=true
+# merge-pr should have argument-hint, ISSUE=$ARGUMENTS, and disable-model-invocation
+if ! echo "$merge_pr_content" | grep -q 'argument-hint: "<issue-number>"'; then
+    echo "  ❌ FAIL: merge-pr missing argument-hint"
+    pass=false
+fi
+if ! echo "$merge_pr_content" | grep -q 'ISSUE=\$ARGUMENTS'; then
+    echo "  ❌ FAIL: merge-pr missing ISSUE=\$ARGUMENTS"
+    pass=false
+fi
+if ! echo "$merge_pr_content" | grep -q 'disable-model-invocation: true'; then
+    echo "  ❌ FAIL: merge-pr missing disable-model-invocation"
+    pass=false
+fi
 # revert-feature should have argument-hint and ISSUE=$ARGUMENTS
 if ! echo "$revert_content" | grep -q 'argument-hint: "<issue-number>"'; then
     echo "  ❌ FAIL: revert-feature missing argument-hint"

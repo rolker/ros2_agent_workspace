@@ -43,7 +43,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote
+.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote merge-pr
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -73,6 +73,7 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  sync          - Safely sync all workspace repositories"
+	@echo "  merge-pr [ISSUE=<n>|PR=<n>] [REPO=<slug>] - Merge a PR, clean up worktree/branches, then sync"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"
@@ -213,6 +214,13 @@ skip-git-bug:
 
 sync:
 	@python3 ./.agent/scripts/sync_repos.py
+
+# Merge a PR, remove its worktree, delete branches, and sync. Keyed on the
+# worktree/issue (PR# derived), not a global PR number. With no ISSUE=/PR=, the
+# script uses the current worktree (cwd) — so run it directly from a worktree
+# for the zero-arg path; via make, pass ISSUE= (or PR=) [+ REPO=<slug>].
+merge-pr:
+	@./.agent/scripts/merge_pr.sh $(if $(ISSUE),--issue $(ISSUE),) $(if $(PR),--pr $(PR),) $(if $(REPO),--repo-slug $(REPO),) $(if $(filter 1,$(NO_WAIT)),--no-wait,)
 
 add-remote:
 	@if [ -z "$(REMOTE)" ] || [ -z "$(URL_PREFIX)" ]; then \
