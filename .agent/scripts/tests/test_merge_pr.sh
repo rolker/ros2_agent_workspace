@@ -58,6 +58,14 @@ git -C "$tmp" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m in
 assert_err "non-feature branch rejected" "$tmp" "is not 'feature/issue-"
 rm -rf "$tmp"
 
+echo "Test: missing value for --issue → usage error (exit 2)"
+out=$("$MERGE_PR" --issue 2>&1); rc=$?
+{ [[ $rc -eq 2 ]] && grep -qF "missing value for --issue" <<<"$out"; } \
+    && ok "missing --issue value rejected" || bad "missing --issue value (rc=$rc)"
+
+echo "Test: --pr with unknown --repo-slug → error (no silent workspace fallback)"
+assert_err "unknown --repo-slug rejected" "$ROOT_DIR" "not found under layers/main" --pr 1 --repo-slug nonesuch_slug_xyz
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"

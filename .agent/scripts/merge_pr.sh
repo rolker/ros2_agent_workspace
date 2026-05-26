@@ -47,9 +47,15 @@ fi
 ARG_ISSUE=""; ARG_REPO_SLUG=""; ARG_PR=""; NO_WAIT=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --issue)     ARG_ISSUE="$2"; shift 2 ;;
-        --repo-slug) ARG_REPO_SLUG="$2"; shift 2 ;;
-        --pr)        ARG_PR="$2"; shift 2 ;;
+        --issue)
+            if [[ $# -lt 2 ]]; then echo "ERROR: missing value for --issue" >&2; exit 2; fi
+            ARG_ISSUE="$2"; shift 2 ;;
+        --repo-slug)
+            if [[ $# -lt 2 ]]; then echo "ERROR: missing value for --repo-slug" >&2; exit 2; fi
+            ARG_REPO_SLUG="$2"; shift 2 ;;
+        --pr)
+            if [[ $# -lt 2 ]]; then echo "ERROR: missing value for --pr" >&2; exit 2; fi
+            ARG_PR="$2"; shift 2 ;;
         --no-wait)   NO_WAIT=true; shift ;;
         *) echo "ERROR: unknown argument: $1" >&2
            echo "Usage: $0 [--issue <N> | --pr <N>] [--repo-slug <slug>] [--no-wait]" >&2
@@ -92,13 +98,21 @@ slug_for_repo_path() {
 
 if [[ -n "$ARG_PR" ]]; then
     # --- escape hatch: explicit PR (+ repo-slug to locate the local repo) ---
-    if [[ -n "$ARG_REPO_SLUG" ]]; then
-        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$ARG_REPO_SLUG" -print -quit 2>/dev/null || true)
-        [[ -z "$REPO_PATH" ]] && REPO_PATH="$ROOT_DIR"   # slug may name the workspace
-    else
+    # No silent fallback to the workspace on an unknown slug — a typo must NOT
+    # quietly target the workspace repo for a merge/branch-delete. Use the
+    # literal slug "workspace" for the workspace repo.
+    if [[ -z "$ARG_REPO_SLUG" || "$ARG_REPO_SLUG" == "workspace" ]]; then
         REPO_PATH="$ROOT_DIR"
+        REPO_SLUG=""
+    else
+        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$ARG_REPO_SLUG" -print -quit 2>/dev/null || true)
+        if [[ -z "$REPO_PATH" ]]; then
+            echo "ERROR: --repo-slug '$ARG_REPO_SLUG' not found under layers/main." >&2
+            echo "  Check the spelling, or pass --repo-slug workspace for the workspace repo." >&2
+            exit 1
+        fi
+        REPO_SLUG="$ARG_REPO_SLUG"
     fi
-    REPO_SLUG="$ARG_REPO_SLUG"
 elif [[ -n "$ARG_ISSUE" ]]; then
     # --- by issue number: find the worktree, derive the repo ---
     ISSUE_NUM="$ARG_ISSUE"
@@ -109,8 +123,21 @@ elif [[ -n "$ARG_ISSUE" ]]; then
             [ -d "$cand" ] && { local_wt="$cand"; break; }
         done
     else
-        cand="$ROOT_DIR/.workspace-worktrees/issue-workspace-${ISSUE_NUM}"
-        [ -d "$cand" ] && local_wt="$cand"
+        # Scan BOTH the workspace and layer worktree dirs; resolve when there's
+        # exactly one match, error on ambiguity (mirrors worktree_remove). So
+        # `--issue <N>` works for a layer issue too when it's unambiguous.
+        matches=()
+        [ -d "$ROOT_DIR/.workspace-worktrees/issue-workspace-${ISSUE_NUM}" ] && \
+            matches+=("$ROOT_DIR/.workspace-worktrees/issue-workspace-${ISSUE_NUM}")
+        for d in "$ROOT_DIR/layers/worktrees/issue-"*"-${ISSUE_NUM}"; do
+            [ -d "$d" ] && matches+=("$d")
+        done
+        if [[ "${#matches[@]}" -gt 1 ]]; then
+            echo "ERROR: issue #${ISSUE_NUM} matches multiple worktrees — pass --repo-slug:" >&2
+            for m in "${matches[@]}"; do echo "    $(basename "$m" | sed -E 's/^issue-(.+)-[0-9]+$/\1/')" >&2; done
+            exit 1
+        fi
+        [[ "${#matches[@]}" -eq 1 ]] && local_wt="${matches[0]}"
     fi
     if [[ -z "$local_wt" ]]; then
         echo "ERROR: no worktree found for issue #${ISSUE_NUM}${ARG_REPO_SLUG:+ (repo-slug ${ARG_REPO_SLUG})}." >&2
@@ -204,12 +231,32 @@ GIT_EDITOR=true gh pr merge "$PR_NUM" -R "$GH_REPO" --merge || {
 echo "  ✅ merged"
 
 # ---- remove worktree (from ROOT, never from inside the worktree) ------------
+# NO --force: worktree_remove must keep its uncommitted-changes guard, so we
+# don't destroy unpushed work. It's non-interactive (refuses-on-dirty). The PR
+# is already merged at this point, so if removal fails we ABORT before
+# branch-deletion/sync rather than leave a forced, partial-cleanup state — and
+# print the exact commands to finish cleanup once the worktree is resolved.
 cd "$ROOT_DIR"
-if [[ -n "$ISSUE_NUM" ]]; then
+if [[ -n "$REPO_SLUG" ]]; then
+    WT_DIR="$ROOT_DIR/layers/worktrees/issue-${REPO_SLUG}-${ISSUE_NUM}"
+else
+    WT_DIR="$ROOT_DIR/.workspace-worktrees/issue-workspace-${ISSUE_NUM}"
+fi
+if [[ -n "$ISSUE_NUM" && -d "$WT_DIR" ]]; then
     echo "  Removing worktree..."
-    "$SCRIPT_DIR/worktree_remove.sh" --issue "$ISSUE_NUM" ${REPO_SLUG:+--repo-slug "$REPO_SLUG"} --force \
-        && echo "  ✅ worktree removed" \
-        || echo "  ⚠️  worktree removal reported an issue — check manually"
+    if ! "$SCRIPT_DIR/worktree_remove.sh" --issue "$ISSUE_NUM" ${REPO_SLUG:+--repo-slug "$REPO_SLUG"}; then
+        {
+            echo "ERROR: worktree removal failed (uncommitted changes in the worktree?)."
+            echo "  PR #$PR_NUM is already MERGED. Resolve the worktree, then finish cleanup:"
+            echo "    $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM ${REPO_SLUG:+--repo-slug $REPO_SLUG}"
+            echo "    git -C $BRANCH_REPO branch -D $BRANCH && git -C $BRANCH_REPO push origin --delete $BRANCH"
+            echo "    make -C $ROOT_DIR sync"
+        } >&2
+        exit 1
+    fi
+    echo "  ✅ worktree removed"
+else
+    echo "  (no worktree for issue #${ISSUE_NUM:-?} — skipping removal)"
 fi
 
 # ---- delete local + remote branch on the owning repo ------------------------
