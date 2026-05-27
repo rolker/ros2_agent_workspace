@@ -1,7 +1,8 @@
 # Research Digest: Workspace
 
-<!-- Last updated: 2026-03-11 -->
+<!-- Last updated: 2026-05-27 -->
 <!-- If older than 30 days, consider running /research --refresh; entries older than 90 days should be flagged for review -->
+<!-- 2026-05-27 pass: added "Operational-Assistant Behavior Under Live Time Pressure" and refreshed "Claude Code Agent Teams". The Feb–Mar 2026 landscape entries below retain their original survey dates and are due a fuller re-survey. -->
 
 ## Command Runner Alternatives to Make
 
@@ -84,15 +85,16 @@ Key takeaways:
 
 ## Claude Code Agent Teams
 
-**Added**: 2026-02-27 | **Sources**: [Claude Code Agent Teams docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/agent-teams)
+**Added**: 2026-02-27 | **Updated**: 2026-05-27 | **Sources**: [Claude Code Agent Teams docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/agent-teams), [CloudZero: Agent View/Subagents/Teams](https://www.cloudzero.com/blog/claude-code-agents/), [Developers Digest 2026 playbook](https://www.developersdigest.tech/blog/claude-code-agent-teams-subagents-2026)
 
 Key takeaways:
-- Multiple Claude Code instances coordinate as a team — leader spawns teammates, each gets its own context window, communication via mailbox
-- Coordination patterns: leader/swarm/pipeline/watchdog
-- Enable with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (still experimental)
-- Best suited for parallel work on separate packages where agents don't modify the same files
+- Released 2026-02-05 alongside Opus 4.6; **still experimental, disabled by default** (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
+- One session is team lead; teammates are full independent Claude Code instances, each with its own context window and tool access, that **talk peer-to-peer** via a mailbox and **claim work off a shared task list** — unlike subagents, which only report to their parent and can't message each other
+- **Subagents vs. Teams**: subagents for cleanly decomposable, coordination-free work (search usages, write tests for one module); teams for dependent work spanning multiple parts (a feature across frontend/backend/db, investigating a bug from multiple angles)
+- **Agent View** dashboard manages background sessions; subagents are reusable prompt+tool configs
+- **Cost is linear in parallelism** — no separate agent pricing; N agents burn quota Nx
 
-**Relevance**: The workspace's worktree infrastructure already provides the isolation layer Agent Teams assumes. Each teammate could work in its own worktree. Worth evaluating on non-critical multi-package features once stable.
+**Relevance**: The workspace's worktree infrastructure already provides the isolation Teams assume — each teammate works in its own worktree. The shared-task-list + peer mailbox model is directly relevant to the multi-host, multi-agent deployment lifecycle ([#495](https://github.com/rolker/ros2_agent_workspace/issues/495), [#470](https://github.com/rolker/ros2_agent_workspace/issues/470)): a deployment could run as a team (per-host loggers + a lead) rather than uncoordinated parallel sessions. Subagent-vs-team distinction informs when deployment sub-tasks need coordination vs. fire-and-forget.
 
 ---
 
@@ -232,3 +234,19 @@ Key takeaways:
 - The bottleneck has shifted from "can AI write code?" to "how do I run multiple agents in parallel without chaos?" — orchestration is the 2026 scaling lever
 
 **Relevance**: This workspace already has the foundational primitives that all orchestrators build on: worktree isolation scripts, draft-PR visibility, workforce protocol, and multi-framework identity. The gaps relative to agent-orchestrator are: (1) **no reaction system** — CI failures and review comments require manual agent re-engagement; (2) **no dashboard** — `worktree_list.sh` shows status but lacks a unified view of agent progress, CI, and PRs; (3) **no automated task decomposition** — issues are manually assigned to agents; (4) **no inter-agent messaging** — agents can't coordinate or hand off work. Of these, a reaction system for CI failures and review feedback would deliver the most immediate value, since agents already create PRs but can't respond to CI/review events autonomously. See [#375](https://github.com/rolker/ros2_agent_workspace/issues/375).
+
+---
+
+## Operational-Assistant Behavior Under Live Time Pressure
+
+**Added**: 2026-05-27 | **Sources**: [Google SRE incident response](https://sre.google/workbook/incident-response/), [incident.io AI SRE guide 2026](https://incident.io/blog/what-is-ai-sre-complete-guide-2026), [Sterile flight deck rule](https://en.wikipedia.org/wiki/Sterile_flight_deck_rule), [Sheridan & Verplank, levels of automation](https://www.hfes.org/Portals/0/Documents/Sheridan.pdf), [froggychips/sre-ai-copilot](https://github.com/froggychips/sre-ai-copilot), [Azure SRE Agent](https://azure.microsoft.com/en-us/products/sre-agent)
+
+Key takeaways:
+- **Mitigate before diagnose** (SRE): during an active incident, restore service first (rollback, drain, scale) and explicitly *defer* root-cause analysis until after stabilization. Investigation is time-boxed — don't deep-dive while the system (or, for us, scarce operating time) is impacted.
+- **Sterile cockpit rule** (aviation, FAA 1981): during critical phases of flight, *only* activities essential to safe operation are permitted; all non-essential work is forbidden. Direct analog for a "live-ops" agent mode — no doc polish, refactors, or speculative deep dives while the boat is on the water.
+- **Confidence-threshold escalation** (AI SRE 2026): agents auto-execute only *pre-approved runbooks for known failure classes*; below a configurable confidence threshold they **stop and hand off to a human with a prepared context summary**. Deterministic checks (a typed "FactStore") run *before* any LLM call, and conflicting facts cap confidence. A concrete anti-rabbit-hole mechanism.
+- **Human-in-the-loop → human-on-the-loop as trust grows**: the 2026 industry default is approval-gated mitigation, relaxing to supervised autonomy as accuracy is validated — mirrors the workspace principle "tight by default, relaxable as confidence grows."
+- **Adjustable / discretionary autonomy** (Sheridan & Verplank 1978, originally for *undersea teleoperators*): a selectable level-of-automation; operators rate systems more positively when they can change the autonomy level. Frames "deployment mode" as a discretionary autonomy shift, not a fixed behavior set.
+- **Incident Commander + short runbooks** (ICS): one accountable human directs; runbooks stay short, version-controlled, alert-linked, and reviewed after each incident. The SRE lifecycle (Prepare → Detect → Respond → Recover → Learn) maps cleanly onto the deployment lifecycle ([0] start → [1] session / [2] recovery → [3] wrap-up / [4] next).
+
+**Relevance**: Grounds the "deployment mode" design ([#495](https://github.com/rolker/ros2_agent_workspace/issues/495), [#477](https://github.com/rolker/ros2_agent_workspace/issues/477)) — an urgency-aware agent mode for live field deployments where on-water operating time is the scarce resource and agents have rabbit-holed during setup/troubleshooting. Sterile-cockpit + mitigate-before-diagnose + confidence-threshold-escalation supply a concrete "urgency contract" vocabulary; adjustable-autonomy and human-on-the-loop frame it as a *scoped, relaxable mode* — a behavioral sibling to field mode (ADR-0011), which already established the precedent of a mechanically-scoped exception to default agent rules.
