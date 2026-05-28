@@ -68,7 +68,7 @@ The design comment on #501 is the authoritative spec; this plan is the structura
 
 - **Rename #501 title?** Drop "+ activation marker" since the marker is dropped from the design. (Cosmetic; the design comment supersedes. Plan file H1 renamed 2026-05-28.)
 - **~~AGENTS.md / CLAUDE.md pointer to `/start-deployment`~~** — **Resolved 2026-05-28**: add a small `### Deployment mode` subsection to AGENTS.md after Skill Worktree Exception (pointing at `/start-deployment` + ADR-0014 + the knowledge doc) in this PR. CLAUDE.md untouched (Claude auto-discovers skills). Non-Claude adapter skill lists also updated in this PR per the Consequences Map.
-- **ADR-0014 marker-language reconciliation** — ADR-0014 draft ([PR #500](https://github.com/rolker/ros2_agent_workspace/pull/500)) still describes an "operator-set marker" in Activation and lists it in the Modes table, but the locked design comment and this implementation drop the marker. Options: (a) amend ADR-0014 in *this* PR before/with the skill landing; (b) push an amendment as part of PR #500 (the ADR draft) so the two land coherently; (c) open a follow-up issue and call out the drift in the PR body. Surfaced 2026-05-28 — decision pending.
+- **~~ADR-0014 marker-language reconciliation~~** — **Resolved 2026-05-28**: amend ADR-0014 in [PR #500](https://github.com/rolker/ros2_agent_workspace/pull/500) (the ADR draft itself) to drop "operator-set marker" language in Activation, the Modes table, and the negatives; replace with per-session activation matching the locked design comment. This PR (#503) lands the skill against the (soon-to-be-updated) ADR; no ADR edits in #503. PR body for #503 will note PR #500 amendment is the coordinated step.
 
 ## Estimated Scope
 

@@ -27,7 +27,7 @@ issue: 501
 **Verdict**: changes-requested
 
 ### Findings
-- [ ] (must-fix) ADR-0014 marker-language drift — ADR-0014 draft (PR #500) still describes "operator-set marker" in Activation and the Modes table, but the locked design (issue #501 design comment) and this plan drop the marker. Plan should either amend ADR-0014 in this PR or open a follow-up + flag it in the PR body. — `plan.md:51` (Consequences / ADR-0014 row)
+- [x] ~~(must-fix) ADR-0014 marker-language drift~~ → **Resolved 2026-05-28**: amend ADR-0014 in PR #500 (the ADR draft) to match the locked markerless design (Activation, Modes table, negatives). PR #503 just lands the skill; no ADR edits in #503; PR body will note PR #500 amendment is the coordinated step.
 - [ ] (must-fix) Non-Claude adapter skill lists missing from Consequences — `principles_review_guide.md` Consequences Map requires updating `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, and `.agent/AGENT_ONBOARDING.md` skill inventories when a workflow skill is added. Add to Files to Change for this PR; don't defer. — `plan.md:23-28` (Files to Change), `plan.md:53-58` (Consequences)
 - [ ] (suggestion) ADR-0004 / "Enforcement over documentation" not in Principles Self-Check — v1 lands at instruction tier only (SKILL.md + knowledge doc), which is defensible but should be stated. Add a row noting hook-based auto-injection is tracked as fast-follow under #495. — `plan.md:30-39`
 - [ ] (suggestion) Plan file H1 still reads "+ activation marker" — rename to drop the stale phrase; the issue rename is the operator's call but the plan file's title is the author's. — `plan.md:1`
