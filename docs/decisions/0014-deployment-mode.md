@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed (Draft) — recorded ahead of full implementation so the design has a
-stable reference; lifecycle skills (`/start-deployment` first, [#501](https://github.com/rolker/ros2_agent_workspace/issues/501))
+Proposed — recorded ahead of full implementation so the design has a stable
+reference; lifecycle skills (`/start-deployment` first, [#501](https://github.com/rolker/ros2_agent_workspace/issues/501))
 may land before this ADR is marked Accepted.
 
 ## Context
