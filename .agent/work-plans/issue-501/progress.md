@@ -15,7 +15,7 @@ issue: 501
 
 ### Open questions
 - [ ] Rename #501 title to drop the stale "+ activation marker" phrase (marker dropped from design)
-- [ ] Add a one-line AGENTS.md / CLAUDE.md pointer to `/start-deployment` now, or defer until `/wrap-up-deployment` lands (modifying AGENTS.md is "ask first" per Boundaries)
+- [x] ~~Add a one-line AGENTS.md / CLAUDE.md pointer to `/start-deployment`~~ → **Resolved 2026-05-28**: add a small `### Deployment mode` subsection to AGENTS.md after Skill Worktree Exception (pointing at `/start-deployment` + ADR-0014 + the knowledge doc) in this PR. CLAUDE.md untouched. Non-Claude adapter skill lists also updated in this PR per the Consequences Map.
 
 ## Plan Review
 **Status**: complete

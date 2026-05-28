@@ -1,4 +1,4 @@
-# Plan: v1 /start-deployment skill + activation marker (deployment-mode gap 1)
+# Plan: v1 /start-deployment skill (deployment-mode gap 1)
 
 ## Issue
 
@@ -26,6 +26,11 @@ The design comment on #501 is the authoritative spec; this plan is the structura
 | `.agent/knowledge/deployment_mode.md` | **create** — canonical reference doc |
 | `.agent/templates/deployment_config.yaml` | **create** — commented sample project config |
 | `.claude/skills/start-deployment/SKILL.md` | **create** — the skill (urgency contract embedded, three-state procedure) |
+| `AGENTS.md` | **edit** — add small `### Deployment mode` subsection after Skill Worktree Exception, pointing at `/start-deployment` + ADR-0014 + knowledge doc (open-question 2 resolution, 2026-05-28) |
+| `.github/copilot-instructions.md` | **edit** — add `/start-deployment` to the skill inventory (per [`principles_review_guide.md`](.agent/knowledge/principles_review_guide.md) Consequences Map) |
+| `.agent/instructions/gemini-cli.instructions.md` | **edit** — add `/start-deployment` to the skill inventory (Consequences Map) |
+| `.agent/AGENT_ONBOARDING.md` | **edit** — add `/start-deployment` to the skill inventory (Consequences Map) |
+| `.agent/work-plans/issue-501/progress.md` | **edit** — `## Plan Authored`, `## Plan Review`, future `## Implementation` entries per [ADR-0013](https://github.com/rolker/ros2_agent_workspace/blob/main/docs/decisions/0013-progress-md-entry-type-vocabulary.md) |
 
 ## Principles Self-Check
 
@@ -37,7 +42,8 @@ The design comment on #501 is the authoritative spec; this plan is the structura
 | Improve incrementally | v1 ships `/start-deployment` only; `/wrap-up-deployment`, `/next-deployment`, hook-based auto-injection are separate sub-issues of #495. |
 | Human control / tight-by-default, relaxable | Activation is per-session and operator-driven (slash command). No global behavior change. |
 | Capture decisions | ADR-0014 already captures the *what*; this PR is the *implementation*. |
-| A change includes its consequences | Fast-follow PRs tracked as tasks #9 (`docs/logs/README.md` shrink) and #10 (echoboats `.agents/deployment.yaml`). |
+| A change includes its consequences | Fast-follow PRs tracked as tasks #9 (`docs/logs/README.md` shrink) and #10 (echoboats `.agents/deployment.yaml`). Non-Claude adapter skill lists + AGENTS.md pointer landed in this PR per the Consequences Map. |
+| Enforcement over documentation ([ADR-0004](https://github.com/rolker/ros2_agent_workspace/blob/main/docs/decisions/0004-enforcement-hierarchy-for-agent-compliance.md)) | v1 lands at the **instruction tier only** (SKILL.md urgency contract + knowledge doc). The behavioral half is operator-set and skill-invoked, not hook-enforced. Hook-based auto-injection was rejected in the locked design (would over-broadcast); tracked as a separate fast-follow under umbrella [#495](https://github.com/rolker/ros2_agent_workspace/issues/495). |
 
 ## ADR Compliance
 
@@ -55,13 +61,15 @@ The design comment on #501 is the authoritative spec; this plan is the structura
 | Add `/start-deployment` skill | `unh_echoboats_project11/.agents/deployment.yaml` so the skill has a BizzyBoat config to consume | **Follow-up** (task #10, separate project-repo PR) |
 | Embed lifecycle ownership in the skill | `unh_echoboats_project11/docs/logs/README.md` (shrink: point at skill + workspace doc, keep only boat-specific overrides) | **Follow-up** (task #9, separate project-repo PR) |
 | Ship ADR-0014's first implementation | ADR-0014 Status: Proposed → Accepted (after v1 lands + first deployment uses it) | **Future** (post-deployment) |
-| AGENTS.md / CLAUDE.md reference to the skill | One-line pointer to `/start-deployment` under Skill Worktree Exception or a new "Deployment skills" subsection | **Open Question** below — not in v1 |
+| AGENTS.md reference to the skill | Small `### Deployment mode` subsection after Skill Worktree Exception | **In this PR** (resolved 2026-05-28 — see Files to Change) |
+| Non-Claude adapter skill lists | Add `/start-deployment` to `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | **In this PR** (per Consequences Map) |
 
 ## Open Questions
 
-- **Rename #501 title?** Drop "+ activation marker" since the marker is dropped from the design. (Cosmetic; the design comment supersedes.)
-- **AGENTS.md / CLAUDE.md pointer to `/start-deployment`** — add a one-line reference now, or defer until `/wrap-up-deployment` lands so they're added together? Modifying AGENTS.md is "ask first" per the Boundaries section.
+- **Rename #501 title?** Drop "+ activation marker" since the marker is dropped from the design. (Cosmetic; the design comment supersedes. Plan file H1 renamed 2026-05-28.)
+- **~~AGENTS.md / CLAUDE.md pointer to `/start-deployment`~~** — **Resolved 2026-05-28**: add a small `### Deployment mode` subsection to AGENTS.md after Skill Worktree Exception (pointing at `/start-deployment` + ADR-0014 + the knowledge doc) in this PR. CLAUDE.md untouched (Claude auto-discovers skills). Non-Claude adapter skill lists also updated in this PR per the Consequences Map.
+- **ADR-0014 marker-language reconciliation** — ADR-0014 draft ([PR #500](https://github.com/rolker/ros2_agent_workspace/pull/500)) still describes an "operator-set marker" in Activation and lists it in the Modes table, but the locked design comment and this implementation drop the marker. Options: (a) amend ADR-0014 in *this* PR before/with the skill landing; (b) push an amendment as part of PR #500 (the ADR draft) so the two land coherently; (c) open a follow-up issue and call out the drift in the PR body. Surfaced 2026-05-28 — decision pending.
 
 ## Estimated Scope
 
-**Single workspace PR** (this issue, ~3 files, ~300-400 lines total — SKILL.md is the longest). Two fast-follow project-repo PRs on `unh_echoboats_project11` tracked separately.
+**Single workspace PR** (this issue, ~7 files: 3 new + 4 small edits to instruction / adapter files, ~350-450 lines total — SKILL.md is the longest). Two fast-follow project-repo PRs on `unh_echoboats_project11` tracked separately.
