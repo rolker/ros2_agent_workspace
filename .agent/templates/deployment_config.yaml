@@ -76,9 +76,16 @@ hosts:
 # string invoked by the skill at the appropriate point in the flow.
 # Use {id} as a placeholder for an issue identifier where needed.
 #
-# If this entire section is OMITTED, the skill skips the sync step and
-# notes "no issue_sync configured — ensure all hosts see the deployment
-# issue by other means." No git-bug-shaped default is baked in.
+# Dev side: issue_sync is fully optional. `gh` (run inside the project
+# repo) handles issue discovery, listing, viewing, and editing on its
+# own — omitting issue_sync just disables dev_push.
+#
+# Field side: field_pull, field_list_open, and field_show are
+# HARD-REQUIRED. Field hosts have no `gh` access, so without these
+# three commands the skill literally cannot list or read deployment
+# issues — it stops with an explicit error directing the operator to
+# configure them. Only omit issue_sync entirely for dev-only projects.
+# No git-bug-shaped default is baked in.
 
 issue_sync:
   # Field side, at deployment start: pull/refresh issues from the share.

@@ -12,8 +12,12 @@ description: Activate deployment mode for a live field deployment. Discovers the
 ```
 
 No arguments. The skill discovers everything it needs from the current
-working directory's project config plus `gh` / `field_mode.sh` / the
-project repo's filesystem.
+working directory's project config plus `field_mode.sh` and the project
+repo's filesystem. On **dev side**, it additionally uses `gh` (running
+inside the project repo, so origin auto-detection picks the right
+remote). On **field side**, there is no `gh` access — all issue
+discovery and reads go through the configured `issue_sync` commands
+instead.
 
 ## Overview
 
@@ -176,9 +180,12 @@ deployment issue.
 Probe for an open `deployment`-labeled issue in the project repo, then
 for local artifacts that indicate first-activation vs resume.
 
-**Issue lookup** depends on side:
+**Issue lookup** depends on side. **All dev-side `gh` calls in this and
+subsequent steps run from inside the project repo** (main tree before
+step 4b's worktree creation, worktree after); `gh` auto-detects the
+correct remote from `origin`, so no `-R <owner/repo>` flag is needed.
 
-- **Dev side**: `gh -R <owner/repo> issue list --label deployment --state open --json number,title,createdAt,body`. `issue_sync` is fully
+- **Dev side**: `gh issue list --label deployment --state open --json number,title,createdAt,body`. `issue_sync` is fully
   optional here — `gh` alone handles discovery, listing, and editing.
 - **Field side**: run the configured `issue_sync.field_pull` first
   (refreshes the local view), then `issue_sync.field_list_open` (lists
@@ -218,7 +225,8 @@ operator which one this session is joining.
 two sentences; this becomes the issue title's `<scope>` portion and the
 body's first paragraph). Confirm before creating.
 
-Open the deployment issue with `gh -R <owner/repo> issue create`:
+Open the deployment issue with `gh issue create` (run from inside the
+project repo's main tree — `gh` auto-detects the remote):
 
 - **Title**: `Deployment <YYYY-MM-DD>: <scope>` (today's date).
 - **Labels**: from `labels` in the project config.
@@ -239,7 +247,7 @@ propagates them), then on each field host as those come online.
 
 **On both sides — read the issue body** to drive the state checks below.
 
-- Dev: `gh -R <owner/repo> issue view <N> --json title,body,createdAt`
+- Dev: `gh issue view <N> --json title,body,createdAt`
 - Field: `issue_sync.field_show` with `{id}` substituted for `<N>`.
 
 **Create the worktree / prepare main-tree** — branch on side. This is
@@ -288,7 +296,7 @@ also appends here for parity.
 - **Dev side**: if not already in that form, ask the operator to
   confirm the deployment-start date (default: the issue's `createdAt`
   date in the operator's TZ), then update the title via
-  `gh -R <owner/repo> issue edit <N> --title "..."`.
+  `gh issue edit <N> --title "..."`.
 - **Field side**: if not already in that form, append a warning to the
   per-host log file (initialized above): *"Deployment issue title not
   in canonical form; run `/start-deployment` from dev first to rename
@@ -308,8 +316,8 @@ managed; everything else is operator-authored and untouched):
 **Stamp the log file link in the issue body's `## Logs` section** —
 branch on side:
 
-- **Dev side**: edit the issue body via `gh -R <owner/repo> issue edit
-  <N> --body-file <tmpfile>` to add a line under `## Logs`:
+- **Dev side**: edit the issue body via `gh issue edit <N> --body-file <tmpfile>`
+  to add a line under `## Logs`:
   `- [<label> log](<log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md)`.
 - **Field side**: do not edit. Log the new log file's path to the host
   log itself with a note: *"Stamp this link under the deployment
@@ -329,8 +337,8 @@ done.
 
 Re-attach this session to the existing deployment. No artifacts created.
 
-- Print the deployment issue's URL and title (dev: `gh -R issue view`;
-  field: `issue_sync.field_show {N}`).
+- Print the deployment issue's URL and title (dev: `gh issue view <N> --json title,url`;
+  field: `issue_sync.field_show` with `{id}` substituted for `<N>`).
 - Print the current host's log file path.
 - Read the last ~20 entries of the current host's log and summarize them
   in chat so the operator can confirm context.
