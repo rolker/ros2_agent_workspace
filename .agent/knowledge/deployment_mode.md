@@ -249,9 +249,13 @@ hosts:
   field: <list of field hostnames>  # informational; field_mode.sh is authoritative
 
 # Pluggable issue-sync mechanism (no git-bug-shaped default — see ADR-0003).
-# If issue_sync is absent, the skill skips the sync step and notes
-# "no issue_sync configured" so the operator can ensure all hosts see
-# the deployment issue by other means.
+# - Dev side: issue_sync is fully optional (gh handles discovery, listing,
+#   editing). If absent, the skill skips dev_push and continues.
+# - Field side: field_pull, field_list_open, and field_show are
+#   HARD-REQUIRED — without them the skill has no way to discover or
+#   read deployment issues on field hosts (no gh fallback). If any of
+#   the three is missing on field side, the skill stops with an explicit
+#   error directing the operator to configure them.
 issue_sync:
   field_pull: <command>           # field: refresh issues from share
   field_list_open: <command>      # field: list open deployment issues

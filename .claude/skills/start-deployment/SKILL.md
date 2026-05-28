@@ -178,14 +178,21 @@ for local artifacts that indicate first-activation vs resume.
 
 **Issue lookup** depends on side:
 
-- **Dev side**: `gh -R <owner/repo> issue list --label deployment --state open --json number,title,createdAt,body`
-- **Field side**: run the configured `issue_sync.field_pull` first,
-  then `issue_sync.field_list_open`. If `issue_sync` is absent, skip
-  the sync step and warn:
-  > No `issue_sync` configured in `.agents/deployment.yaml`. The skill
-  > can't refresh the field share's view of issues. If this host
-  > already has a recent copy, the local view will be used; otherwise,
-  > ensure all hosts see the deployment issue by other means.
+- **Dev side**: `gh -R <owner/repo> issue list --label deployment --state open --json number,title,createdAt,body`. `issue_sync` is fully
+  optional here — `gh` alone handles discovery, listing, and editing.
+- **Field side**: run the configured `issue_sync.field_pull` first
+  (refreshes the local view), then `issue_sync.field_list_open` (lists
+  open deployment issues), and `issue_sync.field_show` (used later in
+  step 4b to read each issue's body). These three commands are
+  **hard-required on field side** — without them the skill has no way
+  to discover or read deployment issues (there is no `gh` fallback).
+  If any of `issue_sync.field_pull` / `field_list_open` / `field_show`
+  is missing from `.agents/deployment.yaml`, stop with:
+  > Field-side `/start-deployment` requires `issue_sync.field_pull`,
+  > `field_list_open`, and `field_show` in `.agents/deployment.yaml`
+  > (no `gh` access on field hosts). Configure them — see
+  > `.agent/templates/deployment_config.yaml` for examples — then
+  > re-invoke.
 
 Then branch on state:
 
@@ -239,15 +246,17 @@ propagates them), then on each field host as those come online.
 done *before* the title/body checks so the per-host log (initialized
 next) exists by the time any warnings need to land in it.
 
-- **Dev side**: create the worktree:
+- **Dev side**: create the worktree, using the workspace-root prefix
+  discovered in step 2 (the skill may be running from inside the
+  project repo, where `.agent/scripts/` does not exist):
   ```bash
-  .agent/scripts/worktree_create.sh \
+  <workspace_root>/.agent/scripts/worktree_create.sh \
       --issue <N> \
       --type layer \
       --layer <layer> \
       --packages <packages,comma-separated>
   ```
-  Then `source .agent/scripts/worktree_enter.sh --issue <N>`.
+  Then `source <workspace_root>/.agent/scripts/worktree_enter.sh --issue <N>`.
 - **Field side**: ensure the project repo is on its default branch
   (`<default_branch>` from the config) and the tree is clean. Do NOT
   create a worktree (per [ADR-0011](../../../docs/decisions/0011-field-mode-for-non-github-origins.md),
