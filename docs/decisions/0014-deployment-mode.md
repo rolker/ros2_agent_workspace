@@ -3,8 +3,8 @@
 ## Status
 
 Proposed (Draft) — recorded ahead of full implementation so the design has a
-stable reference; some components (activation marker, lifecycle skills) may land
-before this ADR is marked Accepted.
+stable reference; lifecycle skills (`/start-deployment` first, [#501](https://github.com/rolker/ros2_agent_workspace/issues/501))
+may land before this ADR is marked Accepted.
 
 ## Context
 
@@ -42,11 +42,17 @@ adjustments) and (2) the **lifecycle tooling** that runs inside it.
 
 ### Activation
 
-An **operator-set marker**: a slash command / skill writes a state marker at
-deployment start and clears it at wrap-up. It works identically on dev and field
-hosts (no GitHub dependency — field hosts have no GitHub access). The operator may
-also dial the autonomy level (adjustable autonomy); deployment mode is a setting,
-not a fixed behavior.
+**Per-agent-session**: invoking the activation skill (`/start-deployment`,
+[#501](https://github.com/rolker/ros2_agent_workspace/issues/501)) puts the
+current agent session in deployment mode. Other agent sessions on the same host
+doing unrelated work are unaffected. No filesystem marker and no host-wide
+hook — on-disk evidence of an ongoing deployment is what already exists
+naturally: an open `deployment`-labeled issue, plus a worktree (dev side) or a
+host log file (field side). This works identically on dev and field hosts (no
+GitHub dependency — field hosts have no GitHub access, so the field
+`issue_sync` mechanism — e.g. git-bug + a shared field remote — surfaces the
+issue there). The operator may also dial the autonomy level (adjustable
+autonomy); deployment mode is a setting, not a fixed behavior.
 
 ### The urgency contract (phase-aware behavioral adjustments)
 
@@ -99,7 +105,7 @@ Deployment mode is one of an emerging family of agent operating modes:
 |---|---|---|
 | Development (default) | the normal case | full worktree/PR ceremony |
 | Field ([ADR-0011](0011-field-mode-for-non-github-origins.md)) | origin not on GitHub | where commits go |
-| Deployment (this ADR) | operator-set marker | behavior under live time pressure |
+| Deployment (this ADR) | per-session, operator-invoked via `/start-deployment` | behavior under live time pressure |
 | Device/tmux troubleshooting (informal, [#420](https://github.com/rolker/ros2_agent_workspace/issues/420)) | interactive hardware session | collaboration rules |
 
 They share a structure — **trigger / behavioral adjustments / invariants**. This ADR
@@ -119,15 +125,20 @@ operating modes" ADR may follow once ≥3 modes are formalized.
 **Negative / risks:**
 
 - A *behavioral* mode is harder to enforce mechanically than field mode (which is
-  origin-detected). It relies on the agent reading the marker and honoring the
-  contract — mitigated by making the marker explicit and surfaced in context, with
-  a possible future hook.
+  origin-detected). It relies on the operator invoking the activation skill and
+  the agent honoring the embedded urgency contract — mitigated by embedding the
+  contract verbatim in the skill (so invocation puts the rules in context) and
+  by leaving the door open for a future framework-level hook if the
+  skill-invocation channel proves insufficient.
 - "Defer to wrap-up" carries risk if wrap-up is skipped — mitigated by the recovery
   checklist ([#496](https://github.com/rolker/ros2_agent_workspace/issues/496)) and
   wrap-up orchestration.
 - Drawing and maintaining the three-tier boundary takes ongoing discipline.
-- The activation marker is one more thing to set/clear — owned by the start/wrap-up
-  skills so the operator isn't doing it by hand.
+- Per-session activation means a second agent session on the same host won't
+  inherit deployment mode automatically — the operator has to invoke
+  `/start-deployment` in each session that should run under the contract. This
+  is by design (other sessions doing unrelated work shouldn't be constrained),
+  but it does require operator awareness.
 
 ## References
 
