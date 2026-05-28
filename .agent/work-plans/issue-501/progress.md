@@ -110,9 +110,32 @@ None.
 **CI**: all-pass (Lint, Validate Documentation, commit identity)
 
 ### Findings
-- [ ] (must-fix, Copilot R4) Worktree scripts use CWD-relative `.agent/scripts/worktree_create.sh` paths, but step 2's workspace-root discovery means CWD may be inside a project repo where `.agent/scripts/` doesn't exist. Prefix consistently with `<workspace_root>/` — `SKILL.md:244-250`
-- [ ] (must-fix, Copilot R4) "Claude-Code-native" hyphenated — repo convention is "Claude Code" (with space, no hyphen). Regression from R3 C3 fix. — `AGENTS.md:241`
-- [ ] (must-fix, Copilot R4) Field-side three-state detection relies on `issue_sync.field_list_open`, but absent-`issue_sync` warning text only mentions skipping the *sync* step. Without `field_list_open` the skill literally cannot list issues on field side. Make `field_list_open` + `field_show` hard-required on field side; stop with explicit error if absent (dev side can still treat `issue_sync` as fully optional). — `SKILL.md:182-188`
+- [x] (must-fix, Copilot R4) Worktree scripts CWD-relative — `SKILL.md:244-250` **(resolved in `27b3cfd`)**
+- [x] (must-fix, Copilot R4) "Claude-Code-native" hyphenation regression — `AGENTS.md:241` **(resolved in `27b3cfd`)**
+- [x] (must-fix, Copilot R4) Field-side `issue_sync` silent break — `SKILL.md:182-188` **(resolved in `27b3cfd` — hard-required on field side; explicit stop)**
 
 ### False positives
 - (Copilot R4, `plan.md:30`) Claimed `../../knowledge/principles_review_guide.md` resolves under `.agent/work-plans/knowledge/`, suggested `../../../knowledge/...`. Verified by `ls` from `.agent/work-plans/issue-501/`: `../../knowledge/principles_review_guide.md` resolves to `.agent/knowledge/principles_review_guide.md` (file exists). Copilot's suggested `../../../knowledge/...` would resolve to `<repo-root>/knowledge/` (does not exist). The R3-round fix is correct; this is a directory-level miscalculation by the bot.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-28 10:25 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #503 at `27b3cfd`
+**Sources**: 2 (Copilot R5 @ `27b3cfd`, prior Integrated Reviews @ `7174388` + `b41adbd`)
+**Cross-source confirmations**: 0
+**CI**: all-pass (Lint, Validate Documentation, commit identity)
+
+### Findings
+- [ ] (must-fix, Copilot R5) Usage section claims discovery via `gh` / `field_mode.sh` / filesystem, but field side has no `gh`. Qualify `gh` as dev-side-only; mention `issue_sync` for field side — `SKILL.md:14-16`
+- [ ] (must-fix, Copilot R5) `gh -R <owner/repo>` placeholder used across multiple steps, but the skill never explains how to derive `<owner/repo>` (not in `.agents/deployment.yaml`). Drop `-R` and rely on running `gh` from the project-repo CWD (cleanest), or add a derivation step. — `SKILL.md:181` and other `gh -R` callsites
+- [ ] (must-fix, Copilot R5) Step 4c "Resume ongoing" command `gh -R issue view` is incomplete — missing repo arg AND issue number. Same root cause as the previous finding. Complete to `gh issue view <N> --json title,url` — `SKILL.md:333`
+- [ ] (must-fix, Copilot R5) AGENTS.md overview says "either creates a new deployment, first-activates …, or resumes" but field-side cannot create (no GitHub access; stops with "start from dev first" message). Qualify "creates" as dev-side-only — `AGENTS.md:244-247`
+- [ ] (must-fix, Copilot R5) Template comment says omitting `issue_sync` "skips the sync step", but post-R4 fix `field_pull`/`field_list_open`/`field_show` are hard-required on field side. Clarify: omitting is dev-only-valid; field hosts must configure — `deployment_config.yaml:79-81`
+
+### Notes
+- Cohesive pattern across all 5 findings: the *prose* (Usage, AGENTS.md overview, template comment, incomplete commands) still leaks dev-side assumptions, while the procedure body was tightened by R3/R4. Suggests one focused pass to align the prose with the now-strict field-side gating.
+
+### False positives
+None.
