@@ -1,0 +1,134 @@
+# Deployment Mode — Per-Project Config Template
+#
+# Usage: Copy to <project_repo>/.agents/deployment.yaml in the project
+#        repo (NOT the workspace repo). Fill in the values marked TODO.
+#        The /start-deployment skill reads this file at invocation time
+#        and uses it to drive issue creation, worktree setup, side
+#        detection, and pre-flight data fetching.
+#
+# Reference: .agent/knowledge/deployment_mode.md (operational how-to)
+#            ADR-0014 (decision record)
+#            .claude/skills/start-deployment/SKILL.md (the skill)
+#
+# Schema philosophy: per ADR-0003, the skill is project-agnostic. Every
+# project-specific value lives here. The skill hardcodes no repo, label,
+# branch, log path, or `issue_sync` mechanism.
+
+# ---------------------------------------------------------------------
+# Platform identity
+# ---------------------------------------------------------------------
+
+# Short human-readable name for the platform.
+# Used in skill prompts and log file labels.
+# Example: "BizzyBoat", "IzzyBoat", "dora"
+platform: TODO
+
+# The project repo's default branch (NOT the workspace's default).
+# Used by the field-mode commit path and worktree creation.
+# Example: "jazzy", "main"
+default_branch: TODO
+
+# Workspace layer the project repo lives in.
+# Used by the dev-mode worktree path: layers/main/<layer>_ws/src/<repo>/
+# Example: "platforms", "underlay"
+layer: TODO
+
+# Project repos to include in deployment worktrees.
+# The first entry is the primary; others are included for cross-cutting
+# work. Names must match directory names under layers/main/<layer>_ws/src/.
+# Example: ["unh_echoboats_project11"]
+packages:
+  - TODO
+
+# Labels applied to the deployment issue when created.
+# At minimum include "deployment" so the three-state detection works.
+# Example: ["deployment", "bizzyboat"]
+labels:
+  - deployment
+
+# Log directory, relative to the project repo root.
+# Per-host log files land at <log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md
+# Example: "docs/logs"
+log_dir: TODO
+
+# ---------------------------------------------------------------------
+# Host inventory (informational only)
+# ---------------------------------------------------------------------
+#
+# This lists known hosts for human reference. The skill does NOT trust
+# these lists for dev/field detection — `field_mode.sh` against the
+# project repo's origin URL is authoritative. A dev workstation working
+# in a gitcloud-origin clone is in field mode for that repo, regardless
+# of what `hostname -s` returns.
+
+hosts:
+  dev:
+    - TODO  # e.g. "salmon"
+  field:
+    - TODO  # e.g. "gabby"
+    - TODO  # e.g. "mercat"
+
+# ---------------------------------------------------------------------
+# Pluggable issue-sync mechanism
+# ---------------------------------------------------------------------
+#
+# The skill does NOT hard-code git-bug. Each command below is a shell
+# string invoked by the skill at the appropriate point in the flow.
+# Use {id} as a placeholder for an issue identifier where needed.
+#
+# If this entire section is OMITTED, the skill skips the sync step and
+# notes "no issue_sync configured — ensure all hosts see the deployment
+# issue by other means." No git-bug-shaped default is baked in.
+
+issue_sync:
+  # Field side, at deployment start: pull/refresh issues from the share.
+  # Example for git-bug + a shared field remote:
+  #   field_pull: "git bug pull gitcloud"
+  field_pull: TODO
+
+  # Field side: list open issues with the deployment label.
+  # Output should be parseable (one issue per line, id first).
+  # Example: "git bug ls --label deployment --status open"
+  field_list_open: TODO
+
+  # Field side: show the body of a specific issue.
+  # {id} is replaced with the issue identifier.
+  # Example: "git bug show {id}"
+  field_show: TODO
+
+  # Dev side, after creating / editing the deployment issue: propagate
+  # changes to the field-visible source so field hosts see them on their
+  # next pull.
+  # Example for git-bug + gitcloud:
+  #   dev_push: "git bug push gitcloud"
+  dev_push: TODO
+
+  # One-line actionable error printed when any of the above fails.
+  # Example: "Check gitcloud connectivity; see reference_gitbug_gitcloud_propagation.md"
+  failure_hint: TODO
+
+# ---------------------------------------------------------------------
+# Pre-flight data sources (dev-only)
+# ---------------------------------------------------------------------
+#
+# All optional. If omitted, the skill asks the operator each deployment.
+# Tide heights are ALWAYS in metres regardless of unit specified here
+# (matching local hydrographic convention).
+
+tides:
+  # NOAA / hydrographic-office station ID for tide heights.
+  # Example: "8423898" (Fort Point, NH)
+  station: TODO
+
+currents:
+  # NOAA station ID for currents (if relevant — many sites have none).
+  # Pick the station that matches the actual flow geometry, not just
+  # the nearest one. See reference_noaa_currents_portsmouth.md for an
+  # example of why this matters.
+  # Example: "ACT0731" (Clark Island main channel)
+  station: TODO
+
+weather:
+  # Weather data source identifier.
+  # Example: "GYX" (NWS Gray, ME office) or a specific buoy ID
+  source: TODO
