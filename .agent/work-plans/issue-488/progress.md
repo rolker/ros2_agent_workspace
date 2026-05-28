@@ -113,3 +113,22 @@ issue: 488
 
 ### Notes
 - This round's review specifically guarded the *destructive* surface: removal-vs-skip gating, abort-before-branch-delete on dirty, no wrong-repo merge. worktree_remove confirmed non-interactive + exits non-zero on dirty (so the abort fires). Pushing now and **waiting for Copilot** — not merging; for a tool that merges + deletes, every review layer stays in the loop.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-27 23:41 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #494 at `9acd658`
+**Sources**: 2 (Copilot R4 @ `9acd658`, prior local timeline @ `5fdb48e`/`ea9b7dd`/`d210109`)
+**Cross-source confirmations**: 0 (R3's 4 cross-confirmed findings already fixed in `af3997b`/`d210109`)
+**CI**: all-pass
+
+### Findings
+- [ ] (must-fix/safety, Copilot R4 @ `9acd658`) `worktree_remove.sh --issue $N` without `--repo-slug` searches `layers/worktrees` **first**; when a workspace worktree resolves with `REPO_SLUG=""`, the `${REPO_SLUG:+--repo-slug "$REPO_SLUG"}` expansion drops the slug, so a colliding layer worktree at the same issue number gets removed instead of the workspace one. Real risk — issue-number collisions across workspace/layer trees are routine in this workspace. Fix: replace with `--repo-slug "${REPO_SLUG:-workspace}"` (and mirror in the `slug_hint=` cleanup string). `worktree_remove.sh` already handles `--repo-slug workspace` correctly. — `merge_pr.sh:252`
+- [ ] (cosmetic, Copilot R2 @ `5a3da9a`) `### Open questions` checkboxes left `[ ]` even though both are resolved in the Plan Review > Notes immediately below; ADR-0013 treats this section as a pre-implementation decision gate, so unchecked boxes can mislead future readers/skills. Fix: tick both checkboxes (optionally inline the resolution). — `progress.md:17-18`
+
+### False positives
+- (Copilot R1 @ `4634f0b`, on `plan.md:30`) Branch-name regex too narrow — implementation's `issue_from_branch()` already uses case-insensitive `[iI][sS][sS][uU][eE]-([0-9]+).*` and matches `feature/ISSUE-<N>-<desc>` too.
+- (Copilot R1 @ `4634f0b`, on `plan.md:41`) Cleanup should use `gh pr view --json headRefName` — implementation uses the actual `BRANCH` from `git branch --show-current` or `gh pr view ... headRefName`, never reconstructs `feature/issue-<N>`.
+- (Copilot R3 @ `ea9b7dd`, 4 findings on `merge_pr.sh`) Arg-value validation / unknown-slug fallback / `--issue` scan-both / always `--force` — all fixed in `af3997b` and verified in the Pre-Push review at `d210109`.
