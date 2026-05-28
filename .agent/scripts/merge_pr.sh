@@ -248,13 +248,17 @@ cd "$ROOT_DIR"
 # could miss a real worktree and skip removal while branches still get deleted.
 # worktree_remove does its own (sanitizing) resolution from --issue/--repo-slug.
 if [[ "$HAVE_WORKTREE" == true && -n "$ISSUE_NUM" ]]; then
+    # Always pass --repo-slug. Empty REPO_SLUG means the workspace repo, so use
+    # the literal "workspace" slug — without it, worktree_remove searches
+    # layers/worktrees FIRST and could remove a colliding LAYER worktree at the
+    # same issue number instead of the workspace one (Copilot R4 on PR #494).
+    remove_slug="${REPO_SLUG:-workspace}"
     echo "  Removing worktree..."
-    if ! "$SCRIPT_DIR/worktree_remove.sh" --issue "$ISSUE_NUM" ${REPO_SLUG:+--repo-slug "$REPO_SLUG"}; then
-        slug_hint=${REPO_SLUG:+--repo-slug $REPO_SLUG}
+    if ! "$SCRIPT_DIR/worktree_remove.sh" --issue "$ISSUE_NUM" --repo-slug "$remove_slug"; then
         {
             echo "ERROR: worktree removal failed (uncommitted changes in the worktree?)."
             echo "  PR #$PR_NUM is already MERGED. Resolve the worktree, then finish cleanup:"
-            echo "    $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM $slug_hint"
+            echo "    $SCRIPT_DIR/worktree_remove.sh --issue $ISSUE_NUM --repo-slug $remove_slug"
             echo "    git -C $BRANCH_REPO branch -D $BRANCH && git -C $BRANCH_REPO push origin --delete $BRANCH"
             echo "    make -C $ROOT_DIR sync"
         } >&2
