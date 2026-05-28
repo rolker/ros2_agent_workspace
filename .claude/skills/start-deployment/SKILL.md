@@ -114,13 +114,36 @@ Read the config and extract: `platform`, `default_branch`, `layer`,
 `packages`, `labels`, `log_dir`, `issue_sync` (optional), `tides` /
 `currents` / `weather` (optional).
 
+**Validation**: if any required value is the literal string `TODO`
+(or empty / null where required), stop with:
+
+> `<key>` is unconfigured in `<project_repo>/.agents/deployment.yaml` —
+> fill in before running `/start-deployment`. See
+> `.agent/templates/deployment_config.yaml` for the schema.
+
+Required keys: `platform`, `default_branch`, `layer`, `packages[0]`,
+`log_dir`. (`issue_sync` and the pre-flight sections are optional;
+absent values disable their respective steps.) This is a hard stop —
+half-filled configs cause silent failures mid-procedure (the skill
+would otherwise build paths like `layers/main/TODO_ws/src/TODO/`).
+
 ### 2. Detect side (dev vs field)
 
-Run `field_mode.sh` against the project repo's path:
+Run `field_mode.sh` against the project repo's path. The script lives at
+the workspace root and is not on `PATH` — invoke by explicit path. Pick
+whichever form matches the current working directory:
 
 ```bash
+# Form A — when CWD is the workspace root, pass the repo path:
 .agent/scripts/field_mode.sh --describe layers/main/<layer>_ws/src/<packages[0]>
+
+# Form B — when CWD is already inside the project repo, reference the
+# script via the workspace root and pass no path (defaults to $PWD):
+<workspace_root>/.agent/scripts/field_mode.sh --describe
 ```
+
+The repo identity comes from the origin URL either way; only the
+relative path plumbing differs.
 
 - **Dev side**: origin on the GitHub allowlist → worktree + draft PR flow.
 - **Field side**: origin not on the GitHub allowlist → direct-commit to
@@ -168,9 +191,16 @@ operator which one this session is joining.
 
 #### 4a. Create new
 
-Ask the operator for the scope of this deployment (one or two sentences;
-this becomes the issue title's `<scope>` portion and the body's first
-paragraph). Confirm before creating.
+**Field side**: cannot create the issue (no GitHub access). Stop with:
+
+> No open deployment issue found via `issue_sync`. Start the deployment
+> from a dev host first (where `gh` can create the issue and configure
+> labels), then run `issue_sync.dev_push` so this field host sees it on
+> the next `issue_sync.field_pull`.
+
+**Dev side**: ask the operator for the scope of this deployment (one or
+two sentences; this becomes the issue title's `<scope>` portion and the
+body's first paragraph). Confirm before creating.
 
 Open the deployment issue with `gh -R <owner/repo> issue create`:
 
@@ -185,35 +215,53 @@ issue.
 
 #### 4b. Activate first time
 
-**Verify the issue title**: if it's not already in
-`Deployment <YYYY-MM-DD>: <scope>` format, ask the operator to confirm
-the deployment-start date (default: the issue's `createdAt` date in the
-operator's TZ), then update the title via `gh issue edit`.
+This step has two branches — dev-side edits the canonical issue,
+field-side reads it and warns on drift. The locked design's intended
+order is **dev-first-then-field**: the operator runs `/start-deployment`
+on dev first (where rename / body edits happen and `dev_push`
+propagates them), then on each field host as those come online.
 
-**Ensure essentials on the body** — only:
+**On both sides — read the issue body** to drive the state checks below.
 
-- Append a `## Logs` section if absent (the skill will stamp per-host
-  log file links into this section as they appear).
-- If the body is suspiciously empty (no operator-authored sections),
-  warn but do NOT impose structure. Operator-authored sections
-  (Purpose, Must-verify, Operators, Hosts in use, Notes) are left
-  untouched.
+- Dev: `gh -R <owner/repo> issue view <N> --json title,body,createdAt`
+- Field: `issue_sync.field_show` with `{id}` substituted for `<N>`.
 
-**Create the worktree (dev side only)**:
+**Verify the issue title** (form: `Deployment <YYYY-MM-DD>: <scope>`):
 
-```bash
-.agent/scripts/worktree_create.sh \
-    --issue <N> \
-    --type layer \
-    --layer <layer> \
-    --packages <packages,comma-separated>
-```
+- **Dev side**: if not already in that form, ask the operator to
+  confirm the deployment-start date (default: the issue's `createdAt`
+  date in the operator's TZ), then update the title via
+  `gh -R <owner/repo> issue edit <N> --title "..."`.
+- **Field side**: if not already in that form, log a warning to the
+  host log: *"Deployment issue title not in canonical form; run
+  `/start-deployment` from dev first to rename + push."* Do not edit
+  on field side — `issue_sync` has no edit verb, and edits would
+  diverge from dev's view.
 
-Then `source .agent/scripts/worktree_enter.sh --issue <N>`.
+**Ensure essentials on the body** (only the `## Logs` section is
+managed; everything else is operator-authored and untouched):
 
-Field side: ensure the project repo is on its default branch
-(`<default_branch>` from the config) and the tree is clean. Do NOT
-create a worktree.
+- **Dev side**: append a `## Logs` section if absent.
+- **Field side**: read-only — if `## Logs` is absent, log the same
+  "rename + push from dev" warning to the host log; do not edit.
+- If the body is suspiciously empty on either side (no operator-authored
+  sections), warn but do NOT impose structure.
+
+**Create the worktree / prepare main-tree** — branch on side:
+
+- **Dev side**: create the worktree:
+  ```bash
+  .agent/scripts/worktree_create.sh \
+      --issue <N> \
+      --type layer \
+      --layer <layer> \
+      --packages <packages,comma-separated>
+  ```
+  Then `source .agent/scripts/worktree_enter.sh --issue <N>`.
+- **Field side**: ensure the project repo is on its default branch
+  (`<default_branch>` from the config) and the tree is clean. Do NOT
+  create a worktree (per [ADR-0011](../../../docs/decisions/0011-field-mode-for-non-github-origins.md),
+  field-mode repos edit and commit on the default branch).
 
 **Initialize the per-host log file**:
 
@@ -232,13 +280,22 @@ Side: <dev|field>
 Started: <YYYY-MM-DD HH:MM ±HH:MM>
 ```
 
-Stamp a link to this log file in the issue body's `## Logs` section
-(`<log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md` relative to the project
-repo).
+**Stamp the log file link in the issue body's `## Logs` section** —
+branch on side:
 
-**Run `issue_sync.dev_push` (dev side, if configured)** to propagate
-the issue title / body / label changes to the field-visible source.
-On failure, print `issue_sync.failure_hint`.
+- **Dev side**: edit the issue body via `gh -R <owner/repo> issue edit
+  <N> --body-file <tmpfile>` to add a line under `## Logs`:
+  `- [<label> log](<log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md)`.
+- **Field side**: do not edit. Log the new log file's path to the host
+  log itself with a note: *"Stamp this link under the deployment
+  issue's `## Logs` section from dev next time `/start-deployment`
+  runs there."* Dev's next invocation reads the field log directory
+  and can add missing entries.
+
+**Run `issue_sync.dev_push` (dev side only, if configured)** to
+propagate the title / body changes to the field-visible source. Skip
+silently on field side (the field host is the consumer of the share,
+not a producer). On failure, print `issue_sync.failure_hint`.
 
 Proceed to step 5 (dev pre-flight) if dev side; otherwise the skill is
 done.
@@ -247,7 +304,8 @@ done.
 
 Re-attach this session to the existing deployment. No artifacts created.
 
-- Print the deployment issue's URL and title.
+- Print the deployment issue's URL and title (dev: `gh -R issue view`;
+  field: `issue_sync.field_show {N}`).
 - Print the current host's log file path.
 - Read the last ~20 entries of the current host's log and summarize them
   in chat so the operator can confirm context.

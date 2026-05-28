@@ -261,8 +261,7 @@ issue_sync:
 
 # Default data sources for pre-flight (all optional; dev-only).
 tides:
-  station: <NOAA station ID>
-  units: metres                   # always metres for tides
+  station: <NOAA station ID>      # heights always reported in metres
 currents:
   station: <NOAA station ID>      # e.g. "ACT0731" for Clark Island
 weather:
