@@ -14,8 +14,8 @@ issue: 488
 **Phases**: single
 
 ### Open questions
-- [ ] Project-repo PR resolution UX: default workspace + worktree-narrowed scan of layer repos with `--repo-slug`/`REPO=` override (proposed), vs. requiring `REPO=` explicitly for any non-workspace PR (simpler, less magic)?
-- [ ] Should `merge-pr` write a terminal `progress.md` entry, or stay mechanical (lifecycle entries owned by #481-C / the `## Implementation` marker)? Proposed: stay mechanical — confirm the boundary.
+- [x] Project-repo PR resolution UX: default workspace + worktree-narrowed scan of layer repos with `--repo-slug`/`REPO=` override (proposed), vs. requiring `REPO=` explicitly for any non-workspace PR (simpler, less magic)? — **resolved (2026-05-25, with user)**: went further — reframed to worktree/issue-keyed resolution (cwd → `--issue`/`--repo-slug` → `--pr` escape hatch); PR# is derived from (repo, branch). See Plan Review > Notes.
+- [x] Should `merge-pr` write a terminal `progress.md` entry, or stay mechanical (lifecycle entries owned by #481-C / the `## Implementation` marker)? — **resolved (2026-05-25)**: stay mechanical.
 
 ## Plan Review
 **Status**: complete
