@@ -73,13 +73,13 @@ All 7 files from the amended plan landed:
 **CI**: all-pass (Lint, Validate Documentation, commit identity)
 
 ### Findings
-- [ ] (must-fix, Copilot R2) Broken relative link to `principles_review_guide.md` — resolves under `.agent/work-plans/issue-501/` not `.agent/`; use `../../knowledge/principles_review_guide.md` — `plan.md:30`
-- [ ] (must-fix, Copilot R3) `progress.md` H1 still has "+ activation marker" (matches issue title, which is still pending rename — coordinates with the open-question #1) — `progress.md:5`
-- [ ] (must-fix, Copilot R3) Vestigial schema-comment in template — "regardless of unit specified here" references a `units` field that was dropped in `e9a7e72`; reword to "always logged in metres" — `deployment_config.yaml:115`
-- [ ] (must-fix, Copilot R3) "(Claude Code)" parenthetical implies framework-specificity, but the concept is framework-agnostic (other adapter skill lists include `start-deployment`); drop or clarify — `AGENTS.md:238`
-- [ ] (must-fix, Copilot R3) `<workspace_root>` placeholder undefined in step 2 — specify discovery (walk up to `.agent/scripts/setup.bash` parent, or hardcode 5-level relative) — `SKILL.md:143`
-- [ ] (must-fix, Copilot R3) Step 4b instructs "log a warning to the host log" before the host log is initialized later in the same step; warnings dropped. Reorder to init log first, or print warnings in chat and defer write — `SKILL.md:235-246`
-- [ ] (suggestion, Copilot R2) Plan Review entry's `plan.md:<line>` refs point at pre-amendment line numbers; findings already resolved so it's archival, but future Plan Review entries should use section/heading anchors — `progress.md:67`
+- [x] (must-fix, Copilot R2) Broken relative link to `principles_review_guide.md` — `plan.md:30` **(resolved in `b41adbd`)**
+- [x] (must-fix, Copilot R3) `progress.md` H1 still has "+ activation marker" — `progress.md:5` **(resolved in `b41adbd` — issue renamed + H1 synced)**
+- [x] (must-fix, Copilot R3) Vestigial schema-comment in template — `deployment_config.yaml:115` **(resolved in `b41adbd`)**
+- [x] (must-fix, Copilot R3) "(Claude Code)" parenthetical — `AGENTS.md:238` **(addressed in `b41adbd`; new R4 finding C3 introduced by the fix — see R4 entry below)**
+- [x] (must-fix, Copilot R3) `<workspace_root>` placeholder undefined — `SKILL.md:143` **(resolved in `b41adbd` — discovery defined)**
+- [x] (must-fix, Copilot R3) Step 4b log-init ordering — `SKILL.md:235-246` **(resolved in `b41adbd` — reordered)**
+- [ ] (suggestion, Copilot R2) Plan Review entry's `plan.md:<line>` refs stale — `progress.md:67` (intentional skip — archival)
 
 ### Addressed by subsequent commits (no action needed)
 - (Copilot R1, `plan.md:8`) Plan H1 stale phrase — renamed in `b909c6f`
@@ -98,3 +98,21 @@ None.
 - Scope sizing is right (3 files, ~300–400 lines, SKILL.md as load-bearing artifact).
 - Plan matches the locked design comment item-for-item on substance (no marker, three-state detection, side-detection via `field_mode.sh`, pluggable `issue_sync`, dev-only tides in metres + explicit TZ, urgency contract embedded, ensure-essentials limited to `## Logs`).
 - Independence caveat: the original plan author and this skill's invoking agent are the same identity (Claude Code Agent / Claude Opus 4.7 (1M context)). Evaluation was delegated to a fresh-context sub-agent to mitigate; downstream consumers should weight accordingly.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-28 10:00 -04:00
+**By**: Claude Code Agent (Claude Opus 4.7 (1M context))
+
+**PR**: #503 at `b41adbd`
+**Sources**: 2 (Copilot R4 @ `b41adbd`, prior Integrated Review @ `7174388`)
+**Cross-source confirmations**: 0
+**CI**: all-pass (Lint, Validate Documentation, commit identity)
+
+### Findings
+- [ ] (must-fix, Copilot R4) Worktree scripts use CWD-relative `.agent/scripts/worktree_create.sh` paths, but step 2's workspace-root discovery means CWD may be inside a project repo where `.agent/scripts/` doesn't exist. Prefix consistently with `<workspace_root>/` — `SKILL.md:244-250`
+- [ ] (must-fix, Copilot R4) "Claude-Code-native" hyphenated — repo convention is "Claude Code" (with space, no hyphen). Regression from R3 C3 fix. — `AGENTS.md:241`
+- [ ] (must-fix, Copilot R4) Field-side three-state detection relies on `issue_sync.field_list_open`, but absent-`issue_sync` warning text only mentions skipping the *sync* step. Without `field_list_open` the skill literally cannot list issues on field side. Make `field_list_open` + `field_show` hard-required on field side; stop with explicit error if absent (dev side can still treat `issue_sync` as fully optional). — `SKILL.md:182-188`
+
+### False positives
+- (Copilot R4, `plan.md:30`) Claimed `../../knowledge/principles_review_guide.md` resolves under `.agent/work-plans/knowledge/`, suggested `../../../knowledge/...`. Verified by `ls` from `.agent/work-plans/issue-501/`: `../../knowledge/principles_review_guide.md` resolves to `.agent/knowledge/principles_review_guide.md` (file exists). Copilot's suggested `../../../knowledge/...` would resolve to `<repo-root>/knowledge/` (does not exist). The R3-round fix is correct; this is a directory-level miscalculation by the bot.
