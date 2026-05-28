@@ -27,7 +27,7 @@ The design comment on #501 is the authoritative spec; this plan is the structura
 | `.agent/templates/deployment_config.yaml` | **create** — commented sample project config |
 | `.claude/skills/start-deployment/SKILL.md` | **create** — the skill (urgency contract embedded, three-state procedure) |
 | `AGENTS.md` | **edit** — add small `### Deployment mode` subsection after Skill Worktree Exception, pointing at `/start-deployment` + ADR-0014 + knowledge doc (open-question 2 resolution, 2026-05-28) |
-| `.github/copilot-instructions.md` | **edit** — add `/start-deployment` to the skill inventory (per [`principles_review_guide.md`](.agent/knowledge/principles_review_guide.md) Consequences Map) |
+| `.github/copilot-instructions.md` | **edit** — add `/start-deployment` to the skill inventory (per [`principles_review_guide.md`](../../knowledge/principles_review_guide.md) Consequences Map) |
 | `.agent/instructions/gemini-cli.instructions.md` | **edit** — add `/start-deployment` to the skill inventory (Consequences Map) |
 | `.agent/AGENT_ONBOARDING.md` | **edit** — add `/start-deployment` to the skill inventory (Consequences Map) |
 | `.agent/work-plans/issue-501/progress.md` | **edit** — `## Plan Authored`, `## Plan Review`, future `## Implementation` entries per [ADR-0013](https://github.com/rolker/ros2_agent_workspace/blob/main/docs/decisions/0013-progress-md-entry-type-vocabulary.md) |

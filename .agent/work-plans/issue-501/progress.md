@@ -2,7 +2,7 @@
 issue: 501
 ---
 
-# Issue #501 — v1 /start-deployment skill + activation marker (deployment-mode gap 1)
+# Issue #501 — v1 /start-deployment skill (deployment-mode gap 1)
 
 ## Plan Authored
 **Status**: complete

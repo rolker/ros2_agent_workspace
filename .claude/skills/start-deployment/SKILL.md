@@ -130,15 +130,24 @@ would otherwise build paths like `layers/main/TODO_ws/src/TODO/`).
 ### 2. Detect side (dev vs field)
 
 Run `field_mode.sh` against the project repo's path. The script lives at
-the workspace root and is not on `PATH` — invoke by explicit path. Pick
-whichever form matches the current working directory:
+the workspace root and is not on `PATH` — invoke by explicit path.
+
+**Discovering the workspace root**: walk up from `$PWD` until a directory
+is found that contains `.agent/scripts/setup.bash` (the canonical marker
+for the workspace root). For the standard layer structure, a project
+repo at `layers/main/<layer>_ws/src/<repo>/` is exactly 5 levels below
+the workspace root (`../../../../../`), but don't hardcode — projects
+may reorganize.
+
+Then pick whichever form matches the current working directory:
 
 ```bash
 # Form A — when CWD is the workspace root, pass the repo path:
 .agent/scripts/field_mode.sh --describe layers/main/<layer>_ws/src/<packages[0]>
 
 # Form B — when CWD is already inside the project repo, reference the
-# script via the workspace root and pass no path (defaults to $PWD):
+# script via the discovered workspace root and pass no path (defaults
+# to $PWD):
 <workspace_root>/.agent/scripts/field_mode.sh --describe
 ```
 
@@ -226,28 +235,9 @@ propagates them), then on each field host as those come online.
 - Dev: `gh -R <owner/repo> issue view <N> --json title,body,createdAt`
 - Field: `issue_sync.field_show` with `{id}` substituted for `<N>`.
 
-**Verify the issue title** (form: `Deployment <YYYY-MM-DD>: <scope>`):
-
-- **Dev side**: if not already in that form, ask the operator to
-  confirm the deployment-start date (default: the issue's `createdAt`
-  date in the operator's TZ), then update the title via
-  `gh -R <owner/repo> issue edit <N> --title "..."`.
-- **Field side**: if not already in that form, log a warning to the
-  host log: *"Deployment issue title not in canonical form; run
-  `/start-deployment` from dev first to rename + push."* Do not edit
-  on field side — `issue_sync` has no edit verb, and edits would
-  diverge from dev's view.
-
-**Ensure essentials on the body** (only the `## Logs` section is
-managed; everything else is operator-authored and untouched):
-
-- **Dev side**: append a `## Logs` section if absent.
-- **Field side**: read-only — if `## Logs` is absent, log the same
-  "rename + push from dev" warning to the host log; do not edit.
-- If the body is suspiciously empty on either side (no operator-authored
-  sections), warn but do NOT impose structure.
-
-**Create the worktree / prepare main-tree** — branch on side:
+**Create the worktree / prepare main-tree** — branch on side. This is
+done *before* the title/body checks so the per-host log (initialized
+next) exists by the time any warnings need to land in it.
 
 - **Dev side**: create the worktree:
   ```bash
@@ -279,6 +269,32 @@ Host: <hostname>
 Side: <dev|field>
 Started: <YYYY-MM-DD HH:MM ±HH:MM>
 ```
+
+Any title / body / log-stamp warnings emitted below append to this
+file. It is the canonical sink for field-side drift warnings; dev side
+also appends here for parity.
+
+**Verify the issue title** (form: `Deployment <YYYY-MM-DD>: <scope>`):
+
+- **Dev side**: if not already in that form, ask the operator to
+  confirm the deployment-start date (default: the issue's `createdAt`
+  date in the operator's TZ), then update the title via
+  `gh -R <owner/repo> issue edit <N> --title "..."`.
+- **Field side**: if not already in that form, append a warning to the
+  per-host log file (initialized above): *"Deployment issue title not
+  in canonical form; run `/start-deployment` from dev first to rename
+  + push."* Do not edit on field side — `issue_sync` has no edit verb,
+  and edits would diverge from dev's view.
+
+**Ensure essentials on the body** (only the `## Logs` section is
+managed; everything else is operator-authored and untouched):
+
+- **Dev side**: append a `## Logs` section if absent.
+- **Field side**: read-only — if `## Logs` is absent, append the same
+  "rename + push from dev" warning to the per-host log file; do not
+  edit the issue.
+- If the body is suspiciously empty on either side (no operator-authored
+  sections), warn but do NOT impose structure.
 
 **Stamp the log file link in the issue body's `## Logs` section** —
 branch on side:

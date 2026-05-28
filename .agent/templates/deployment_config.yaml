@@ -112,8 +112,8 @@ issue_sync:
 # ---------------------------------------------------------------------
 #
 # All optional. If omitted, the skill asks the operator each deployment.
-# Tide heights are ALWAYS in metres regardless of unit specified here
-# (matching local hydrographic convention).
+# Tide heights are always logged in metres (matching local hydrographic
+# convention).
 
 tides:
   # NOAA / hydrographic-office station ID for tide heights.
