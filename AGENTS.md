@@ -232,6 +232,28 @@ source .agent/scripts/worktree_enter.sh --skill research
 the only exception is that no GitHub issue is needed. All other rules (atomic commits,
 AI signature, pre-commit hooks) still apply.
 
+### Deployment mode
+
+For live field deployments of an autonomous robot boat, activate **deployment
+mode** in the current agent session with `/start-deployment`. The procedure
+is framework-agnostic markdown (see
+[`.claude/skills/start-deployment/SKILL.md`](.claude/skills/start-deployment/SKILL.md));
+slash-command invocation is Claude Code native, but other runtimes can
+adapt the same steps. The skill discovers the project's
+`.agents/deployment.yaml` config, branches
+on dev vs field side via `field_mode.sh`, and either creates a new deployment
+(dev side only — field side has no GitHub access and instructs the operator
+to start from a dev host first), first-activates an existing one
+(worktree on dev / main-tree on field + per-host log + issue sync), or
+resumes an ongoing one. Activation is per-agent-session; other sessions
+on the same host are unaffected.
+
+See [ADR-0014](docs/decisions/0014-deployment-mode.md) for the decision record
+and [`.agent/knowledge/deployment_mode.md`](.agent/knowledge/deployment_mode.md)
+for the operational reference (urgency contract, lifecycle phases, log-naming
+convention, project-config schema). The wrap-up half (`/wrap-up-deployment`)
+and recovery checklist are tracked under umbrella [#495](https://github.com/rolker/ros2_agent_workspace/issues/495).
+
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 
 ```markdown
