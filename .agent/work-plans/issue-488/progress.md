@@ -206,3 +206,39 @@ issue: 488
 
 ### Notes
 - Ran the adversarial pass again given the R5 round caught a real bug. This round the change was clean — the prior lesson (verify against the canonical pattern) held: I checked the sed regex against worktree_create/remove before writing it. Suite 10 → 11, shellcheck clean, `bash -n` clean.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-29 00:16 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**PR**: #494 at `6f36740`
+**Sources**: 1 (Copilot R7 @ `6f36740`)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [x] (valid/safety + UX, Copilot R7 @ `6f36740`, 3 comments = 1 finding + 2 doc consequences) `--pr` mode silently defaulted to the workspace repo when `--repo-slug` was omitted; since PR numbers are per-repo, a bare `--pr <N>` (or `make merge-pr PR=<N>`) for a project repo could merge/delete the wrong repo's PR #N. Surfaced to Roland as a UX/interface choice (per `feedback_surface_ux_decisions`); **decision: require `--repo-slug` in `--pr` mode** (use `workspace` literal). **Fixed `108d9bc`** — bare `--pr` exits 2; usage text (header + Usage line), `Makefile` help, and a regression test updated. Aligns with the script's stated design and `plan.md:36` (`PR=<N> REPO=<slug>`). — `merge_pr.sh:122`, `Makefile:76`
+
+### False positives
+- (none this round)
+
+### Notes
+- The 3 R7 comments (`merge_pr.sh:135`, `merge_pr.sh:62`, `Makefile:76`) collapse to one finding plus its two doc-consequences — fixed together. R7 reviewed a progress-only commit (`6f36740`), so it re-scanned the whole diff and surfaced a pre-existing `--pr` default rather than a new regression.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-29 00:16 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — fresh-context adversarial sub-agent (general-purpose), reviewing the R7 fix
+**Verdict**: approved
+
+**Branch**: feature/issue-488 at `108d9bc` (local, pre-push)
+**Mode**: pre-push
+**Depth**: Light (reason: scoped resolution-logic change + usage/help + one test)
+**Must-fix**: 0 | **Suggestions**: 0
+
+### Findings
+- [ ] No issues found. LGTM — all three `--pr` cases correct (missing→exit 2, workspace→ROOT_DIR, project→find); `make merge-pr PR=<n>` surfaces the error cleanly (no Make swallowing); cwd/`--issue` modes untouched; usage/help consistent across all four locations; new test non-spurious (would fail if the requirement were removed; exits before any `gh` call).
+
+### Notes
+- Suite 11 → 12, shellcheck clean, `bash -n` clean, `make help` line renders correctly.
