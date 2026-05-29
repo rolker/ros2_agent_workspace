@@ -132,3 +132,23 @@ issue: 488
 - (Copilot R1 @ `4634f0b`, on `plan.md:30`) Branch-name regex too narrow — implementation's `issue_from_branch()` already uses case-insensitive `[iI][sS][sS][uU][eE]-([0-9]+).*` and matches `feature/ISSUE-<N>-<desc>` too.
 - (Copilot R1 @ `4634f0b`, on `plan.md:41`) Cleanup should use `gh pr view --json headRefName` — implementation uses the actual `BRANCH` from `git branch --show-current` or `gh pr view ... headRefName`, never reconstructs `feature/issue-<N>`.
 - (Copilot R3 @ `ea9b7dd`, 4 findings on `merge_pr.sh`) Arg-value validation / unknown-slug fallback / `--issue` scan-both / always `--force` — all fixed in `af3997b` and verified in the Pre-Push review at `d210109`.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-28 22:44 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**PR**: #494 at `64d4b57`
+**Sources**: 2 (Copilot R5 @ `64d4b57`; prior local timeline @ `5fdb48e`/`ea9b7dd`/`d210109`/`9acd658`)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (valid/data-safety, Copilot R5 @ `64d4b57`) `repo_path_in_worktree()` picks the *first* `.git` via `find … -print -quit`; a multi-package layer worktree (`--packages repo1,repo2`) makes the inner-repo pick non-deterministic → could merge/delete a branch in the wrong project repo. Reachable in `--issue` mode (and even with `--repo-slug`, since line 150 re-derives the inner repo by first-`.git`, ignoring the slug). Does NOT affect this PR (workspace worktree returns at line 85). Fix: when `--repo-slug` is given, locate `<wt>/<layer>_ws/src/<slug>`; otherwise error on >1 `.git` (mirror the dir-level ambiguity handling). — `merge_pr.sh:92`
+- [ ] (valid/defensive, Copilot R5 @ `64d4b57`) `gh pr merge … --merge` lacks `--yes`; the documented headless `--pr` escape hatch could hang on a confirmation prompt with no TTY (can't prove impossible across gh versions). Fix: add `--yes`. — `merge_pr.sh:236`
+
+### False positives
+- (none this round)
+
+### Notes
+- Round 5. The two R4 findings are confirmed FIXED at head `64d4b57`: workspace-worktree slug-drop (`merge_pr.sh:250-257` now passes `--repo-slug "${REPO_SLUG:-workspace}"` always) and the `### Open questions` checkboxes (both now `[x]`). Of the 10 Copilot inline comments across R1–R5, 8 were on earlier commits and already triaged/fixed in prior rounds; only these 2 are live at head. Neither blocks merging *this* PR (it's a workspace worktree, so the first-`.git` pick can't misfire here), but both should be fixed before merge since the tool is destructive and meant for broad use — consistent with the "every review layer stays in the loop" posture from R3.
