@@ -138,8 +138,14 @@ elif [[ -n "$ARG_ISSUE" ]]; then
     ISSUE_NUM="$ARG_ISSUE"
     local_wt=""
     if [[ -n "$ARG_REPO_SLUG" ]]; then
-        for cand in "$ROOT_DIR/.workspace-worktrees/issue-${ARG_REPO_SLUG}-${ISSUE_NUM}" \
-                    "$ROOT_DIR/layers/worktrees/issue-${ARG_REPO_SLUG}-${ISSUE_NUM}"; do
+        # worktree_create/worktree_remove name the dir with the *sanitized* slug
+        # (non-[A-Za-z0-9_] → _), so sanitize the same way before lookup — else a
+        # hyphenated --repo-slug (my-pkg, dir issue-my_pkg-N) is never found. Only
+        # this --issue worktree-dir lookup needs it; the --pr branch above matches
+        # an actual src/<dir> name under layers/main and must stay raw.
+        wt_slug=$(echo "$ARG_REPO_SLUG" | sed 's/[^A-Za-z0-9_]/_/g')
+        for cand in "$ROOT_DIR/.workspace-worktrees/issue-${wt_slug}-${ISSUE_NUM}" \
+                    "$ROOT_DIR/layers/worktrees/issue-${wt_slug}-${ISSUE_NUM}"; do
             [ -d "$cand" ] && { local_wt="$cand"; break; }
         done
     else

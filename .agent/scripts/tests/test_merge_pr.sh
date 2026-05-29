@@ -77,6 +77,18 @@ mkdir -p "$fakewt/overlay_ws/src/repo_a/.git" "$fakewt/overlay_ws/src/repo_b/.gi
 assert_err "multi-repo worktree errors, not first-.git" "$ROOT_DIR" "holds multiple package repos" --issue 88888
 rm -rf "$fakewt"
 
+# worktree dirs are named with the SANITIZED slug (issue-my_pkg-N), so a hyphenated
+# --repo-slug must be sanitized before lookup or the dir is never found. Fabricate
+# the sanitized-name dir and pass the hyphenated slug; the lookup must MATCH it
+# (proven by NOT getting "no worktree found" — it then fails later, off-slug).
+echo "Test: --issue + hyphenated --repo-slug → sanitized before worktree lookup"
+fakewt="$ROOT_DIR/layers/worktrees/issue-my_pkg-88888"
+mkdir -p "$fakewt/overlay_ws/src/my_pkg/.git"
+out=$(cd "$ROOT_DIR" && "$MERGE_PR" --issue 88888 --repo-slug my-pkg 2>&1); rc=$?
+{ [[ $rc -ne 0 ]] && ! grep -qF "no worktree found for issue #88888" <<<"$out"; } \
+    && ok "hyphenated slug sanitized for lookup" || bad "hyphenated slug lookup (rc=$rc, out: $(head -1 <<<"$out"))"
+rm -rf "$fakewt"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"
