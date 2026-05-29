@@ -242,3 +242,40 @@ issue: 488
 
 ### Notes
 - Suite 11 → 12, shellcheck clean, `bash -n` clean, `make help` line renders correctly.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-29 06:53 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**PR**: #494 at `abfe13e`
+**Sources**: 1 (Copilot R8 @ `abfe13e`)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [x] (valid/safety, Copilot R8 @ `abfe13e`) Legacy bare `.workspace-worktrees/issue-<N>` worktrees can't be cleaned up — the R4 fix passes `--repo-slug workspace` and `worktree_remove` matches only the exact `issue-workspace-<N>` path; dropping the slug would reintroduce the R4 wrong-worktree deletion. Surfaced to Roland (R4↔R8 tension + scope). **Decision: legacy bare dirs out of scope; add a pre-merge guard.** **Fixed `e9815d3`** — cwd-mode detects a legacy bare dir and errors BEFORE the merge, pointing at manual `worktree_remove --issue <N>`; never leaves a merged-but-uncleaned state. (Only cwd-mode reaches a legacy dir; `--issue` resolution can't find the bare form.) — `merge_pr.sh:223`
+- [x] (valid/doc, Copilot R8 @ `abfe13e`) `make help` didn't document the `NO_WAIT=1` knob the `merge-pr` target forwards to `--no-wait`. **Fixed `e9815d3`** — added to the help line. — `Makefile:76`
+
+### False positives
+- (none this round)
+
+### Notes
+- Both R8 comments valid. Comment 1 had a genuine R4↔R8 design tension (can't just drop the slug); resolved by treating legacy naming as out of scope + a fail-before-merge guard rather than reintroducing the collision bug. R8 again re-scanned the whole diff (head was a progress-only commit) and surfaced a pre-existing limitation, not a regression.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-29 06:53 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — fresh-context adversarial sub-agent (general-purpose), reviewing the R8 fix
+**Verdict**: approved
+
+**Branch**: feature/issue-488 at `e9815d3` (local, pre-push)
+**Mode**: pre-push
+**Depth**: Light (reason: scoped guard + variable capture + one test + help-line doc)
+**Must-fix**: 0 | **Suggestions**: 0
+
+### Findings
+- [ ] No issues found. LGTM — guard is genuinely pre-merge/pre-network; `-z "$REPO_SLUG"` correctly excludes layer worktrees and `--pr` mode; no false-positive on `issue-workspace-<N>` or false-negative (only cwd reaches bare dirs); new test non-spurious (guard message distinct from the downstream no-PR error); no residue (gitignored + rm -rf + standalone init not registered as a worktree).
+
+### Notes
+- Suite 12 → 13, shellcheck clean, `bash -n` clean.
