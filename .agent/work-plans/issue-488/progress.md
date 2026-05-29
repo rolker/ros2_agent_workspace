@@ -170,3 +170,39 @@ issue: 488
 
 ### Notes
 - The fresh-context adversarial sub-agent caught both — neither would have been caught by re-reading my own diff (I'd written `--yes` believing the Copilot R5 finding; the sub-agent verified the flag doesn't exist). Reinforces `feedback_internal_review_before_copilot`. Net result: the data-safety fix (deterministic error on multi-repo) is sound and tested; the `--yes` finding was a false positive corrected above. Suite 9 → 10, shellcheck clean, `bash -n` clean.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-05-28 23:51 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**PR**: #494 at `08e24d6`
+**Sources**: 2 (Copilot R6 @ `08e24d6`; prior local timeline)
+**Cross-source confirmations**: 0
+**CI**: all-pass (lint, docs, commit-identity green on `08e24d6`)
+
+### Findings
+- [x] (valid, Copilot R6 @ `08e24d6`) `--issue` mode built the `issue-<slug>-<N>` worktree-dir lookup from the RAW `--repo-slug`, but `worktree_create`/`worktree_remove` name the dir with the sanitized slug (`sed 's/[^A-Za-z0-9_]/_/g'`), so `--repo-slug my-pkg` (dir `issue-my_pkg-N`) was never found. **Fixed `e23df7d`** — sanitize before lookup, mirroring `worktree_remove.sh:100-102`; scoped to the `--issue` path (the `--pr` branch matches a real `src/<dir>` name and stays raw). Latent today (no hyphenated project-repo dirs) but fixed for a destructive tool. — `merge_pr.sh:142`
+
+### False positives
+- (none this round)
+
+### Notes
+- R6 raised exactly one comment — the previous R5 data-safety fix held. Confirmed the regex is byte-identical across `merge_pr.sh`, `worktree_create.sh:613/637`, `worktree_remove.sh:102`. CI green on the head being reviewed.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-28 23:51 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — fresh-context adversarial sub-agent (general-purpose), reviewing the R6 fix
+**Verdict**: approved
+
+**Branch**: feature/issue-488 at `e23df7d` (local, pre-push)
+**Mode**: pre-push
+**Depth**: Light (reason: one-line sanitization mirroring an audited canonical pattern + one test)
+**Must-fix**: 0 | **Suggestions**: 0
+
+### Findings
+- [ ] No issues found. LGTM — verified regex identical to worktree_create/worktree_remove; `--pr` correctly stays raw; no raw-`$ARG_REPO_SLUG` reuse downstream (REPO_SLUG/remove_slug derive from the resolved repo basename); the new test is non-spurious (fails under raw lookup).
+
+### Notes
+- Ran the adversarial pass again given the R5 round caught a real bug. This round the change was clean — the prior lesson (verify against the canonical pattern) held: I checked the sed regex against worktree_create/remove before writing it. Suite 10 → 11, shellcheck clean, `bash -n` clean.
