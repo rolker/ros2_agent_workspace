@@ -151,7 +151,7 @@ Key takeaways:
 - **Consolidation is the new headline**: top three (Cursor, Copilot, Claude Code) hold **70%+ share** ("winner-take-most"); M&A wave — OpenAI 6 acquisitions in early 2026, Google's $2.4B Windsurf/Codeium acqui-hire, Anthropic acquired Vercept
 - **Anthropic 2026 Trends Report** stats: 78% of Q1 2026 Claude Code sessions are multi-file edits (up from 34% Q1 2025); avg session 4min→23min; well-maintained context files → 40% fewer errors / 55% faster
 - **Adoption-vs-production gap** reframed: ~79% adoption vs ~11% actually in production (the older "57% in prod" framing overstates it); Gartner's 1,445% multi-agent inquiry surge still valid
-- Quality concern persists: more code enters pipelines than reviewers can validate; **worktree isolation has converged as an industry standard**; mini-swe-agent validates radical simplicity
+- Quality concern persists: more code enters pipelines than reviewers can validate; **worktree isolation has converged as an industry standard**; mini-swe-agent validates extreme minimalism
 - **GitHub Copilot CLI reached GA (Apr 2026)**, but **GitHub Agentic Workflows remains in technical preview, not GA** — don't conflate the two
 
 **Relevance**: The convergence on worktree isolation validates our architecture. The quality-deficit numbers and adoption/production gap reinforce the importance of the harness (lints, CI, structural enforcement) over raw agent throughput. GitHub Agentic Workflows are still worth monitoring for issue triage and CI-failure-investigation automation.
