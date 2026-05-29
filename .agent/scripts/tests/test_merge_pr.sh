@@ -66,6 +66,17 @@ out=$("$MERGE_PR" --issue 2>&1); rc=$?
 echo "Test: --pr with unknown --repo-slug → error (no silent workspace fallback)"
 assert_err "unknown --repo-slug rejected" "$ROOT_DIR" "not found under layers/main" --pr 1 --repo-slug nonesuch_slug_xyz
 
+# A multi-repo layer worktree (`--packages a,b` spanning different repos) holds
+# >1 inner git repo. The inner-repo pick must NOT silently grab the first .git
+# (wrong-repo merge/branch-delete); it must error deterministically. Fabricate a
+# fake layer worktree (two inner .git dirs) under layers/worktrees so the no-slug
+# issue-glob (`issue-*-<N>`) matches exactly it and reaches repo_path_in_worktree.
+echo "Test: --issue on a multi-repo layer worktree → deterministic ambiguity error"
+fakewt="$ROOT_DIR/layers/worktrees/issue-faketest-88888"
+mkdir -p "$fakewt/overlay_ws/src/repo_a/.git" "$fakewt/overlay_ws/src/repo_b/.git"
+assert_err "multi-repo worktree errors, not first-.git" "$ROOT_DIR" "holds multiple package repos" --issue 88888
+rm -rf "$fakewt"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"

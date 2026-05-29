@@ -78,17 +78,34 @@ issue_from_branch() {  # echo the issue number from a feature/issue-<N> branch
     echo "$1" | sed -nE 's#^feature/[iI][sS][sS][uU][eE]-([0-9]+).*#\1#p'
 }
 
-# Given a worktree dir, echo the project-repo git toplevel inside it (workspace
-# worktrees ARE git repos; layer worktree dirs contain per-package worktrees).
+# Given a worktree dir, echo the project-repo git toplevel inside it. Workspace
+# worktrees ARE git repos. A layer worktree dir contains one or MORE per-package
+# repos under <layer>_ws/src/<repo>. Picking the *first* .git would be
+# non-deterministic for a multi-repo layer worktree (`--packages a,b` spanning
+# different repos) and could merge/delete a branch in the WRONG repo — so resolve
+# only when there's exactly ONE inner repo; on more than one, error and point at
+# the `--pr <N> --repo-slug <repo-dir>` escape hatch, which targets a repo by its
+# dir name in the main tree (its slug there is the actual src/<dir> name, not the
+# worktree-naming slug --issue/--repo-slug keys on). `|| true` keeps find's
+# non-zero (unreadable subdir) from aborting under `set -eo pipefail`; the explicit
+# count is the deterministic gate.
 repo_path_in_worktree() {
     local wt="$1"
     if [ -e "$wt/.git" ]; then echo "$wt"; return 0; fi
-    local inner
-    # `-print -quit` returns the first match and exits 0 (no SIGPIPE from a
-    # closed `head` pipe); `|| true` swallows find's non-zero on an unreadable
-    # subdir so `set -eo pipefail` can't abort here.
-    inner=$(find "$wt" -maxdepth 4 -name .git -print -quit 2>/dev/null || true)
-    [ -n "$inner" ] && dirname "$inner"
+    local gits=()
+    while IFS= read -r g; do gits+=("$g"); done \
+        < <(find "$wt" -maxdepth 4 -name .git 2>/dev/null || true)
+    if [ "${#gits[@]}" -eq 0 ]; then
+        echo "ERROR: no git repo found inside worktree $wt." >&2
+        return 1
+    fi
+    if [ "${#gits[@]}" -gt 1 ]; then
+        echo "ERROR: worktree $wt holds multiple package repos; merge-pr can't pick one safely." >&2
+        echo "  Use the escape hatch: merge_pr.sh --pr <N> --repo-slug <repo-dir> (repos found:)" >&2
+        for g in "${gits[@]}"; do echo "    $(basename "$(dirname "$g")")" >&2; done
+        return 1
+    fi
+    dirname "${gits[0]}"
 }
 
 # slug for worktree_remove: "" if under .workspace-worktrees, else the repo dir name.
@@ -231,6 +248,10 @@ fi
 
 # ---- merge ------------------------------------------------------------------
 echo "  Merging (--merge)..."
+# No --yes: `gh pr merge` is already non-interactive once a merge-method flag
+# (--merge) is given — it only prompts when the method is unspecified. (`gh pr
+# merge` has no --yes flag anyway; passing it errors as an unknown flag.) Safe
+# for the headless --pr escape hatch; the banner above is the human gate.
 GIT_EDITOR=true gh pr merge "$PR_NUM" -R "$GH_REPO" --merge || {
     echo "ERROR: merge failed for PR #$PR_NUM ($GH_REPO)." >&2; exit 1; }
 echo "  ✅ merged"
