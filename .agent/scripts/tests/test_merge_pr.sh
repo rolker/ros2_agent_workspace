@@ -94,6 +94,22 @@ out=$(cd "$ROOT_DIR" && "$MERGE_PR" --issue 88888 --repo-slug my-pkg 2>&1); rc=$
     && ok "hyphenated slug sanitized for lookup" || bad "hyphenated slug lookup (rc=$rc, out: $(head -1 <<<"$out"))"
 rm -rf "$fakewt"
 
+# Legacy bare workspace worktree (.workspace-worktrees/issue-<N>, no slug) predates
+# the issue-workspace-<N> convention. From cwd-mode, merge-pr must fail BEFORE the
+# merge (worktree_remove --repo-slug workspace can't target it; dropping the slug
+# risks the R4 collision). Fabricate a real bare worktree-shaped git repo on a
+# feature branch and assert the pre-merge guard fires.
+echo "Test: cwd in legacy bare workspace worktree → fail before merge"
+legacywt="$ROOT_DIR/.workspace-worktrees/issue-88888"
+mkdir -p "$legacywt"
+git -C "$legacywt" init -q
+git -C "$legacywt" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m init
+git -C "$legacywt" checkout -q -b feature/issue-88888 2>/dev/null
+out=$(cd "$legacywt" && "$MERGE_PR" 2>&1); rc=$?
+{ [[ $rc -ne 0 ]] && grep -qF "legacy worktree dir 'issue-88888'" <<<"$out"; } \
+    && ok "legacy bare worktree rejected pre-merge" || bad "legacy guard (rc=$rc, out: $(head -1 <<<"$out"))"
+rm -rf "$legacywt"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"

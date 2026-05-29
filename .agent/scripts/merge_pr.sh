@@ -76,6 +76,8 @@ PR_NUM="$ARG_PR"
 HAVE_WORKTREE=false  # true when resolution found a real worktree (cwd/--issue);
                      # false for the headless --pr escape hatch. Gates removal
                      # without reconstructing the (sanitized) worktree dir name.
+RESOLVED_WT=""       # the resolved worktree directory (cwd/--issue modes), used
+                     # only by the legacy-naming guard below.
 
 issue_from_branch() {  # echo the issue number from a feature/issue-<N> branch
     echo "$1" | sed -nE 's#^feature/[iI][sS][sS][uU][eE]-([0-9]+).*#\1#p'
@@ -184,6 +186,7 @@ elif [[ -n "$ARG_ISSUE" ]]; then
     REPO_PATH=$(repo_path_in_worktree "$local_wt")
     REPO_SLUG=$(slug_for_repo_path "$REPO_PATH")
     HAVE_WORKTREE=true
+    RESOLVED_WT="$local_wt"
 else
     # --- cwd mode (dominant): the worktree you're standing in is the answer ---
     REPO_PATH=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)
@@ -196,6 +199,7 @@ else
     fi
     REPO_SLUG=$(slug_for_repo_path "$REPO_PATH")
     HAVE_WORKTREE=true
+    RESOLVED_WT="$REPO_PATH"   # workspace worktree → REPO_PATH is the worktree dir
 fi
 
 # BRANCH_REPO = the owning repo's MAIN checkout (NOT the worktree, which gets
@@ -217,6 +221,22 @@ if [[ -z "$PR_NUM" ]]; then
         echo "  Skill worktrees and non-issue branches aren't supported — use --pr <N> --repo-slug <slug>." >&2
         exit 1
     fi
+fi
+
+# ---- legacy-worktree guard (BEFORE the irreversible merge) ------------------
+# Bare `.workspace-worktrees/issue-<N>` dirs predate the `issue-workspace-<N>`
+# convention. worktree_remove can't target them when given `--repo-slug workspace`
+# (exact-path match only), and dropping the slug would risk removing a colliding
+# LAYER worktree at the same issue number (the R4 bug we fixed). merge-pr supports
+# only the current naming — fail here, BEFORE merging, so we never leave a
+# merged-but-uncleaned worktree. (Only cwd-mode can reach a legacy dir; --issue
+# resolution looks up `issue-workspace-<N>` and never finds the bare form.)
+if [[ "$HAVE_WORKTREE" == true && -z "$REPO_SLUG" && -n "$RESOLVED_WT" \
+      && "$(basename "$RESOLVED_WT")" == "issue-${ISSUE_NUM}" ]]; then
+    echo "ERROR: legacy worktree dir 'issue-${ISSUE_NUM}' (no repo slug) isn't supported by merge-pr cleanup." >&2
+    echo "  Merge the PR, then remove the worktree manually:" >&2
+    echo "    $SCRIPT_DIR/worktree_remove.sh --issue ${ISSUE_NUM}" >&2
+    exit 1
 fi
 
 # ---- field-mode guard (BEFORE any gh call) ----------------------------------
