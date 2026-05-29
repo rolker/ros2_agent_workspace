@@ -144,11 +144,29 @@ issue: 488
 **CI**: all-pass
 
 ### Findings
-- [ ] (valid/data-safety, Copilot R5 @ `64d4b57`) `repo_path_in_worktree()` picks the *first* `.git` via `find … -print -quit`; a multi-package layer worktree (`--packages repo1,repo2`) makes the inner-repo pick non-deterministic → could merge/delete a branch in the wrong project repo. Reachable in `--issue` mode (and even with `--repo-slug`, since line 150 re-derives the inner repo by first-`.git`, ignoring the slug). Does NOT affect this PR (workspace worktree returns at line 85). Fix: when `--repo-slug` is given, locate `<wt>/<layer>_ws/src/<slug>`; otherwise error on >1 `.git` (mirror the dir-level ambiguity handling). — `merge_pr.sh:92`
-- [ ] (valid/defensive, Copilot R5 @ `64d4b57`) `gh pr merge … --merge` lacks `--yes`; the documented headless `--pr` escape hatch could hang on a confirmation prompt with no TTY (can't prove impossible across gh versions). Fix: add `--yes`. — `merge_pr.sh:236`
+- [x] (valid/data-safety, Copilot R5 @ `64d4b57`) `repo_path_in_worktree()` picks the *first* `.git` via `find … -print -quit`; a multi-repo layer worktree makes the inner-repo pick non-deterministic → could merge/delete a branch in the wrong project repo. Does NOT affect this PR (workspace worktree returns early). **Fixed `87d8e30`** — error deterministically on >1 inner repo and point at the `--pr <N> --repo-slug <repo-dir>` escape hatch. (Slug-based inner selection rejected: `--issue/--repo-slug` keys the worktree-dir slug, which differs from the inner `src/<dir>` name — see commit body / pre-push review below.) — `merge_pr.sh:83`
+- [x] (RECLASSIFIED → false positive, Copilot R5 @ `64d4b57`) `gh pr merge … --merge` lacks `--yes` → headless hang. **False positive, confirmed against gh 2.92.0**: `gh pr merge` has no `--yes` flag (errors as unknown), and `--merge` already makes it non-interactive (gh only prompts when no method flag is given). Initially mis-triaged as valid; caught at implementation by the pre-push review when the added `--yes` broke the merge. — `merge_pr.sh:236`
 
 ### False positives
-- (none this round)
+- (Copilot R5 @ `64d4b57`, on `merge_pr.sh:236`) Add `--yes` for the headless path — no such flag on `gh pr merge`; `--merge` is already non-interactive. (Mis-triaged as valid above; corrected after verifying `gh pr merge --help`.)
 
 ### Notes
-- Round 5. The two R4 findings are confirmed FIXED at head `64d4b57`: workspace-worktree slug-drop (`merge_pr.sh:250-257` now passes `--repo-slug "${REPO_SLUG:-workspace}"` always) and the `### Open questions` checkboxes (both now `[x]`). Of the 10 Copilot inline comments across R1–R5, 8 were on earlier commits and already triaged/fixed in prior rounds; only these 2 are live at head. Neither blocks merging *this* PR (it's a workspace worktree, so the first-`.git` pick can't misfire here), but both should be fixed before merge since the tool is destructive and meant for broad use — consistent with the "every review layer stays in the loop" posture from R3.
+- Round 5. The two R4 findings are confirmed FIXED at head `64d4b57`: workspace-worktree slug-drop (`merge_pr.sh:250-257` now passes `--repo-slug "${REPO_SLUG:-workspace}"` always) and the `### Open questions` checkboxes (both now `[x]`). Of the 10 Copilot inline comments across R1–R5, 8 were on earlier commits and already triaged/fixed in prior rounds; only these 2 are live at head. Neither blocks merging *this* PR (it's a workspace worktree, so the first-`.git` pick can't misfire here), but the data-safety one should be fixed before merge since the tool is destructive and meant for broad use — consistent with the "every review layer stays in the loop" posture from R3.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-05-28 23:08 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — fresh-context adversarial sub-agent (general-purpose), reviewing this round's R5 fix
+**Verdict**: changes-requested (both fixed before push)
+
+**Branch**: feature/issue-488 at `87d8e30` (local, pre-push)
+**Mode**: pre-push
+**Depth**: Light (reason: small, low-risk shell change; shellcheck-clean; tests pass)
+**Must-fix**: 2 | **Suggestions**: 0
+
+### Findings
+- [x] (must-fix, fixed `87d8e30`) The R5 fix had added `--yes` to `gh pr merge`; verified against gh 2.92.0 that `--yes` is an unknown flag → the `|| { exit 1; }` guard would fire and break **every** merge in all three modes. Dropped `--yes`; `--merge` is already non-interactive. — `merge_pr.sh:262`
+- [x] (must-fix, fixed `87d8e30`) The "slug disambiguates inner repo" regression test passed spuriously: `--issue 88888 --repo-slug repo_a` constructs worktree-dir name `issue-repo_a-88888`, which didn't match the fabricated `issue-faketest-88888`, so it died at "no worktree found" *before* reaching `repo_path_in_worktree` — the assert was satisfied by the wrong error. Removed it along with the slug branch (the inner-repo-selection-by-slug design was unsound: worktree-dir slug ≠ inner `src/<dir>` name). — `test_merge_pr.sh`
+
+### Notes
+- The fresh-context adversarial sub-agent caught both — neither would have been caught by re-reading my own diff (I'd written `--yes` believing the Copilot R5 finding; the sub-agent verified the flag doesn't exist). Reinforces `feedback_internal_review_before_copilot`. Net result: the data-safety fix (deterministic error on multi-repo) is sound and tested; the `--yes` finding was a false positive corrected above. Suite 9 → 10, shellcheck clean, `bash -n` clean.
