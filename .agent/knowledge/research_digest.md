@@ -1,8 +1,9 @@
 # Research Digest: Workspace
 
-<!-- Last updated: 2026-05-28 -->
+<!-- Last updated: 2026-05-29 -->
 <!-- If older than 30 days, consider running /research --refresh; entries older than 90 days should be flagged for review -->
 <!-- 2026-05-28 full re-survey: refreshed all Feb–Mar 2026 landscape entries (the prior 2026-05-27 pass had only touched two). Original "Added" dates preserved; "Updated" stamps mark this pass. "Operational-Assistant Behavior Under Live Time Pressure" (2026-05-27) was already fresh and left as-is. Workspace-wide note: Opus 4.6 is no longer the current model — Opus 4.7 (2026-04-16) and Opus 4.8 (2026-05-28) shipped in this window; treat any "Opus 4.6 is current" framing elsewhere as stale. -->
+<!-- 2026-05-29 addendum: added "Claude Opus 4.8 — Model, Fast Mode & Dynamic Workflows" entry covering the 2026-05-28 release and the agentic-tooling features announced with it (Dynamic Workflows / ultracode, cheaper fast mode, the Agent View / background-session scaffolding). -->
 
 ## Command Runner Alternatives to Make
 
@@ -93,6 +94,21 @@ Key takeaways:
 - **Cost is linear in parallelism** — no separate agent pricing; N agents burn quota Nx
 
 **Relevance**: The workspace's worktree infrastructure already provides the isolation Teams assume — each teammate works in its own worktree. The shared-task-list + peer-mailbox model (plus the new task-dependency + file-locking primitives) is directly relevant to the multi-host, multi-agent deployment lifecycle ([#495](https://github.com/rolker/ros2_agent_workspace/issues/495), [#470](https://github.com/rolker/ros2_agent_workspace/issues/470)): a deployment could run as a team (per-host loggers + a lead) rather than uncoordinated parallel sessions. Still experimental, so not yet a dependency to build on.
+
+---
+
+## Claude Opus 4.8 — Model, Fast Mode & Dynamic Workflows
+
+**Added**: 2026-05-29 | **Sources**: [Introducing Claude Opus 4.8](https://www.anthropic.com/news/claude-opus-4-8), [Claude Code: Workflows](https://code.claude.com/docs/en/workflows), [Claude Code changelog](https://code.claude.com/docs/en/changelog), [Fast mode docs](https://platform.claude.com/docs/en/build-with-claude/fast-mode), [What's new in Opus 4.8](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-8)
+
+Key takeaways:
+- **Opus 4.8** (`claude-opus-4-8`, released 2026-05-28): pricing unchanged from 4.7 ($5/$25 per MTok); **1M-token context default** on the Claude API / Bedrock / Vertex (the tier this workspace runs on — note 1M went GA back with 4.6, not new here). Anthropic claims it is **~4× less likely than its predecessor to let code flaws pass unremarked** and is their strongest computer-use model (84% Online-Mind2Web). Quantitative benchmark numbers circulating (e.g. SWE-bench Verified ~88.6%) are **third-party (LLM-Stats et al.), unofficial pending the system card.**
+- **Dynamic Workflows** (research preview, Claude Code v2.1.154+, all paid plans): Claude authors a **JS orchestration script** that spins up background subagents while the session stays responsive — for codebase-scale migrations, bug sweeps, cross-checked research. Caps: **1,000 agents/run, 16 concurrent**. The script itself can't touch the filesystem/shell — only the spawned agents can; `/workflows` views runs. The new **`ultracode` effort** (`/effort ultracode`) = xhigh reasoning + automatic workflow orchestration per task.
+- **Fast mode** for Opus 4.8: ~2.5× output tokens/sec at a **much cheaper tier** than before (API $10/$50; ~3× cheaper than the old 4.6/4.7 fast rate); research preview, draws on usage credits. This is the `/fast` toggle in Claude Code.
+- **Supporting multi-agent scaffolding** (landed slightly earlier in May, not strictly part of the 4.8 post but relevant): **Agent View** dashboard (`claude agents`, research preview), `/goal` (work-until-condition-met), pinned background sessions (`Ctrl+T`), `/code-review` + `--fix`, `/simplify` (now cleanup-only), and `MessageDisplay`/`SessionStart` hooks. Subagents use **isolated context windows**, returning only relevant info to the orchestrator (explicit context-engineering rationale).
+- **API/context features** (mostly pre-existing, re-confirmed at this release): mid-conversation system messages that preserve prompt-cache hits (new, GA), `effort` defaulting to `high`, adaptive thinking, plus the memory tool / context editing / compaction APIs. **Agent SDK** (TS + Python) gains 4.8 via the bundled CLI; recent SDK additions include a `SessionStore` (S3/Redis/Postgres mirroring), an `EffortLevel` type, and Task tools.
+
+**Relevance**: **Dynamic Workflows is the in-product orchestration primitive** the "Agent Orchestrators" entry below was tracking as a workspace gap ([#375](https://github.com/rolker/ros2_agent_workspace/issues/375)) — Claude-authored fan-out over background subagents, each in an isolated context, composes naturally with our worktree isolation (subagents that mutate files can run in their own worktrees). Combined with Agent View + `/goal` + pinned sessions, it's a credible substrate for the multi-host, multi-agent deployment lifecycle ([#495](https://github.com/rolker/ros2_agent_workspace/issues/495)) — a lighter, single-lead alternative to the still-experimental Agent Teams. The "4× fewer unflagged code flaws" claim and the `/code-review --fix` / `ultracode` tooling map onto our Quality Standard and the `review-code` skill. **Caveat**: Dynamic Workflows, fast mode, `ultracode`, and Agent View are all **research preview** — useful now, not yet stable enough to hard-wire into governed scripts. Workflows can also burn tokens fast (up to 1,000 agents), so scope them deliberately.
 
 ---
 
@@ -228,7 +244,7 @@ Key takeaways:
 - **Industry framing shifted to "orchestration is the competitive battleground"** (Deloitte 2026, Anthropic Trends Report's "orchestration era"); consolidation is happening at the model/platform layer, not (yet) among the standalone open-source orchestrators — no single one has emerged as outright winner
 - The bottleneck has shifted from "can AI write code?" to "how do I run multiple agents in parallel without chaos?"
 
-**Relevance**: This workspace already has the foundational primitives all orchestrators build on: worktree isolation scripts, draft-PR visibility, workforce protocol, multi-framework identity. The gaps relative to agent-orchestrator remain: (1) **no reaction system** — CI failures and review comments need manual agent re-engagement; (2) **no unified dashboard** of agent progress + CI + PRs; (3) **no automated task decomposition**; (4) **no inter-agent messaging** (Agent Teams, above, is the likeliest path to close this). A reaction system for CI/review events would deliver the most immediate value. See [#375](https://github.com/rolker/ros2_agent_workspace/issues/375).
+**Relevance**: This workspace already has the foundational primitives all orchestrators build on: worktree isolation scripts, draft-PR visibility, workforce protocol, multi-framework identity. The gaps relative to agent-orchestrator remain: (1) **no reaction system** — CI failures and review comments need manual agent re-engagement; (2) **no unified dashboard** of agent progress + CI + PRs; (3) **no automated task decomposition**; (4) **no inter-agent messaging** (Agent Teams, above, is the likeliest path to close this). A reaction system for CI/review events would deliver the most immediate value. See [#375](https://github.com/rolker/ros2_agent_workspace/issues/375). **Update (2026-05-29)**: Claude Code's **Dynamic Workflows** (see the "Claude Opus 4.8" entry above) now provides an in-product version of primitives (1)–(2) for the Claude Code runtime specifically — Claude-authored fan-out over isolated-context background subagents — narrowing the gap without a third-party orchestrator.
 
 ---
 
