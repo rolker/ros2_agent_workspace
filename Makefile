@@ -73,7 +73,7 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  sync          - Safely sync all workspace repositories"
-	@echo "  merge-pr [ISSUE=<n>|PR=<n>] [REPO=<slug>] - Merge a PR, clean up worktree/branches, then sync"
+	@echo "  merge-pr (ISSUE=<n> [REPO=<slug>] | PR=<n> REPO=<slug>) - Merge a PR, clean up worktree/branches, then sync (PR= needs REPO=, e.g. REPO=workspace)"
 	@echo "  lock          - Lock workspace for exclusive access"
 	@echo "  unlock        - Unlock workspace"
 	@echo "  pr-triage     - Cross-repo PR triage (all workspace repos)"

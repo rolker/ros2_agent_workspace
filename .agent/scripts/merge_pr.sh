@@ -10,7 +10,10 @@
 # Usage (resolution, most-natural first):
 #   merge_pr.sh                       # cwd is inside a worktree → merge that branch's PR
 #   merge_pr.sh --issue <N> [--repo-slug <slug>]
-#   merge_pr.sh --pr <N> --repo-slug <slug>   # escape hatch: headless / no worktree
+#   merge_pr.sh --pr <N> --repo-slug <slug>   # escape hatch: headless / no worktree.
+#                                             # --repo-slug REQUIRED here (PR #s are
+#                                             # per-repo); use "workspace" for the
+#                                             # workspace repo.
 # Options:
 #   --no-wait    skip the pre-merge CI wait (use when CI is known green)
 #
@@ -58,7 +61,7 @@ while [[ $# -gt 0 ]]; do
             ARG_PR="$2"; shift 2 ;;
         --no-wait)   NO_WAIT=true; shift ;;
         *) echo "ERROR: unknown argument: $1" >&2
-           echo "Usage: $0 [--issue <N> | --pr <N>] [--repo-slug <slug>] [--no-wait]" >&2
+           echo "Usage: $0 [--issue <N> [--repo-slug <slug>] | --pr <N> --repo-slug <slug>] [--no-wait]" >&2
            exit 2 ;;
     esac
 done
@@ -117,11 +120,19 @@ slug_for_repo_path() {
 }
 
 if [[ -n "$ARG_PR" ]]; then
-    # --- escape hatch: explicit PR (+ repo-slug to locate the local repo) ---
-    # No silent fallback to the workspace on an unknown slug — a typo must NOT
-    # quietly target the workspace repo for a merge/branch-delete. Use the
-    # literal slug "workspace" for the workspace repo.
-    if [[ -z "$ARG_REPO_SLUG" || "$ARG_REPO_SLUG" == "workspace" ]]; then
+    # --- escape hatch: explicit PR (+ REQUIRED repo-slug to locate the repo) ---
+    # PR numbers are per-repo, so a bare --pr <N> is ambiguous across the workspace
+    # repo and the many project repos. Require --repo-slug explicitly rather than
+    # silently assuming the workspace — a forgotten slug must NOT merge/delete the
+    # WRONG repo's PR #N. Use the literal "workspace" for the workspace repo; a
+    # project repo's slug is its src/<dir> name under layers/main. (An unknown slug
+    # is a hard error below — never a silent workspace fallback.)
+    if [[ -z "$ARG_REPO_SLUG" ]]; then
+        echo "ERROR: --pr mode requires --repo-slug (PR numbers are per-repo)." >&2
+        echo "  Use --repo-slug workspace for the workspace repo, or" >&2
+        echo "  --repo-slug <repo-dir> for a project repo under layers/main." >&2
+        exit 2
+    elif [[ "$ARG_REPO_SLUG" == "workspace" ]]; then
         REPO_PATH="$ROOT_DIR"
         REPO_SLUG=""
     else

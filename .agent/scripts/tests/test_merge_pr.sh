@@ -66,6 +66,11 @@ out=$("$MERGE_PR" --issue 2>&1); rc=$?
 echo "Test: --pr with unknown --repo-slug → error (no silent workspace fallback)"
 assert_err "unknown --repo-slug rejected" "$ROOT_DIR" "not found under layers/main" --pr 1 --repo-slug nonesuch_slug_xyz
 
+echo "Test: --pr without --repo-slug → usage error (PR #s are per-repo, exit 2)"
+out=$("$MERGE_PR" --pr 1 2>&1); rc=$?
+{ [[ $rc -eq 2 ]] && grep -qF "requires --repo-slug" <<<"$out"; } \
+    && ok "bare --pr requires --repo-slug" || bad "bare --pr (rc=$rc, out: $(head -1 <<<"$out"))"
+
 # A multi-repo layer worktree (`--packages a,b` spanning different repos) holds
 # >1 inner git repo. The inner-repo pick must NOT silently grab the first .git
 # (wrong-repo merge/branch-delete); it must error deterministically. Fabricate a
