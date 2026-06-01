@@ -51,7 +51,53 @@ If the result is empty, report "No field changes to import" and stop.
 
 ### 3. For each repo with changes
 
-Process repos sequentially:
+Process repos sequentially.
+
+**First, check for an in-flight deployment (bundling path).** Before the
+default import-issue/PR flow below, check whether *this repo* already has a
+deployment in flight:
+
+- an **open issue with the `deployment` label** in the repo, AND
+- a **local worktree on that issue's `feature/issue-<N>` branch** (the
+  deployment branch `/start-deployment` created).
+
+```bash
+gh issue list -R <owner/repo> --label deployment --state open --json number,title
+.agent/scripts/worktree_list.sh        # or: git -C <path> worktree list
+```
+
+If both hold, the field commits in this repo are typically just the per-host
+logs (gabby/salmon/mercat) plus a small field-verified config tweak, and the
+established preference is to **bundle them into the deployment PR** (one PR
+`Closes #<deployment>`) rather than open a second import issue/PR. Surface the
+option to the operator:
+
+> "`<repo>` has an in-flight deployment (#N, worktree present). Merge
+> `<field_remote>/<default_branch>` into `feature/issue-N` to bundle into the
+> deployment PR (preserves field SHAs), instead of a separate import PR?"
+
+On confirmation, **merge — never cherry-pick**:
+
+```bash
+git -C <worktree_path> merge --no-ff <field_remote>/<default_branch>
+git -C <worktree_path> push
+```
+
+Then **skip 3c–3d for this repo** — the deployment PR picks up the merge.
+Record it in the summary as bundled into #<deployment>.
+
+**Why merge, not cherry-pick:** cherry-pick creates new SHAs for the same
+content, so `origin/<branch>` diverges from `<field_remote>/<branch>` and the
+next `push_remote.py` reconcile needs a force-push (the re-divergence pain in
+[#495](https://github.com/rolker/ros2_agent_workspace/issues/495) gap 7).
+Merging `<field_remote>/<default_branch>` keeps the original field commits
+reachable in history, so origin and the field remote stay reconcilable without a
+force-push.
+
+**Scope:** only the deployment's *own* repo (logs + small field config) bundles
+this way. Substantive field **code** in *other* repos still gets its own import
+issue + PR via the steps below. If there is no in-flight deployment for the
+repo, proceed with the default flow.
 
 #### 3a. Summarize the diff
 
@@ -137,9 +183,15 @@ Output a table:
 
 - **Never edit in the main tree** — all fixes go through worktrees
 - **One issue per repo** — even if the repo has multiple unrelated field commits
+  (exception: the bundling path reuses the deployment issue for the deployment's
+  own repo instead of opening an import issue)
 - **Pre-review is advisory** — findings go in the issue, not auto-fixed unless
   the fix is trivial and unambiguous (e.g., missing shebang)
 - **Diverged repos need human judgment** — report them prominently, don't
   auto-merge
+- **Never cherry-pick field commits** — always branch *from* the remote ref
+  (default flow) or **merge** it (bundling path). Cherry-pick rewrites SHAs and
+  diverges origin from the field remote, forcing a force-push at the next
+  reconcile (#495 gap 7)
 - **This skill does not resync gitcloud** — after PRs merge, use
   `push_remote.py` manually to update gitcloud
