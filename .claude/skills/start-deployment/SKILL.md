@@ -66,7 +66,14 @@ explicitly invokes the wrap-up flow or activates a different mode).
 6. **Avoid permission prompts.** Use `git -C <path>`, absolute paths,
    `gh -R`, and the file tools over heredocs / find / cat. The
    allowlist defeats itself when commands are wrapped in `cd && …`.
-   Timestamps: `date '+%Y-%m-%d %H:%M %:z'`, never `date | sed`.
+   **Timestamps: invoke `date '+%Y-%m-%d %H:%M %:z'` for every
+   timestamped entry — never type a time that "looks right," even when
+   typing feels faster under pressure.** A typed time is a durable lie
+   the wrap-up integration and downstream analysis will trust. For an
+   event the operator reports after the fact, call `date` to record
+   *when you're logging it* and write the operator's time separately as
+   `~HH:MM (operator-reported)`. Use `date '+…'`, never `date | sed`;
+   reach for the `dlog` helper below so the timestamp is never optional.
 7. **Sterile cockpit.** During live on-water ops, do *only*
    operation-essential work — no doc polish, refactors, or "while we're
    here" cleanups. Write them down for wrap-up.
@@ -290,6 +297,23 @@ Started: <YYYY-MM-DD HH:MM ±HH:MM>
 Any title / body / log-stamp warnings emitted below append to this
 file. It is the canonical sink for field-side drift warnings; dev side
 also appends here for parity.
+
+**Append entries with a `date`-baked helper.** Define this once after
+creating the log file, then use it for every entry so a measured
+timestamp is the path of least resistance (rule 6 — never type times by
+hand):
+
+```bash
+LOGFILE="<project_repo>/<log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md"
+dlog() { printf '\n**%s** — %s\n' "$(date '+%Y-%m-%d %H:%M %:z')" "$1" >> "$LOGFILE"; }
+dlog "charger disconnected; controls check good; going to launch"
+```
+
+For an event the operator reports after the fact — whose time you did
+**not** measure — let `dlog` stamp when you're recording it and put the
+operator's time in the text, marked approximate:
+`dlog "in water (operator-reported ~12:35)"`. Never back-fill the
+header timestamp to the operator's time; the header is when *you* logged.
 
 **Verify the issue title** (form: `Deployment <YYYY-MM-DD>: <scope>`):
 
