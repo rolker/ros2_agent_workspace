@@ -471,6 +471,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/gitbug_helpers.sh` | Shared git-bug lookup helpers **(source)** |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
+| `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`) |
 | `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
 | `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
 | `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos (`--json` for structured output) |
