@@ -66,6 +66,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# --issue and --pr are alternative resolution modes; the dispatch below prefers
+# --pr if both are set, so accepting both would silently act on the --pr target
+# (a typo or a stale `make merge-pr ISSUE=… PR=…` carryover could merge/clean up
+# the WRONG PR). For a destructive tool, reject the conflict outright.
+if [[ -n "$ARG_ISSUE" && -n "$ARG_PR" ]]; then
+    echo "ERROR: --issue and --pr are mutually exclusive (pick one resolution mode)." >&2
+    echo "  Usage: $0 [--issue <N> [--repo-slug <slug>] | --pr <N> --repo-slug <slug>] [--no-wait]" >&2
+    exit 2
+fi
+
 # Resolution outputs:
 REPO_PATH=""     # local git working tree (for field-mode check + branch delete)
 GH_REPO=""       # owner/repo for `gh -R`

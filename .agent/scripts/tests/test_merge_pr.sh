@@ -2,12 +2,13 @@
 # .agent/scripts/tests/test_merge_pr.sh
 # Tests for merge_pr.sh resolution + guard logic.
 #
-# Scope: the deterministic, no-network paths — argument handling and the
+# Scope: the deterministic, no-network paths — argument handling, the
 # worktree/issue resolution dispatch (the bug-prone part flagged in the #488
-# plan review). The CI-wait, the actual `gh pr merge`, and the field-mode guard
-# (which needs a real field-origin repo) are integration-level and intentionally
-# NOT exercised here — mocking `gh pr checks --watch` / a live merge is
-# drift-prone for little value (same call the upstream merge_pr test made).
+# plan review), and the field-mode guard (exercised with a stubbed `gh` to prove
+# no GitHub call escapes on a non-GitHub origin). The CI-wait and the actual
+# `gh pr merge` are integration-level and intentionally NOT exercised here —
+# mocking `gh pr checks --watch` / a live merge is drift-prone for little value
+# (same call the upstream merge_pr test made).
 #
 # Run: bash .agent/scripts/tests/test_merge_pr.sh
 
@@ -109,6 +110,34 @@ out=$(cd "$legacywt" && "$MERGE_PR" 2>&1); rc=$?
 { [[ $rc -ne 0 ]] && grep -qF "legacy worktree dir 'issue-88888'" <<<"$out"; } \
     && ok "legacy bare worktree rejected pre-merge" || bad "legacy guard (rc=$rc, out: $(head -1 <<<"$out"))"
 rm -rf "$legacywt"
+
+# The field-mode guard is the key safety feature: on a non-GitHub origin (field
+# repo, no GitHub PR) merge-pr must refuse BEFORE making any `gh` call. Exercise
+# it without network — a temp git repo shaped like a cwd worktree (feature branch
+# + gitcloud origin), with `gh` stubbed to a loud failure on PATH. The guard must
+# fire (field-mode error, non-zero) and the stub's sentinel must NOT appear.
+echo "Test: field-mode origin (cwd) → refuses before any gh call"
+fieldwt=$(mktemp -d "/tmp/mergepr_fieldtest.XXXXXX")
+git -C "$fieldwt" init -q
+git -C "$fieldwt" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m init
+git -C "$fieldwt" checkout -q -b feature/issue-88888 2>/dev/null
+git -C "$fieldwt" remote add origin "git@gitcloud:field/mergepr_fieldtest.git"
+ghstub=$(mktemp -d)
+cat >"$ghstub/gh" <<'STUB'
+#!/bin/bash
+echo "GH_WAS_CALLED" >&2
+exit 99
+STUB
+chmod +x "$ghstub/gh"
+out=$(cd "$fieldwt" && PATH="$ghstub:$PATH" "$MERGE_PR" 2>&1); rc=$?
+{ [[ $rc -ne 0 ]] && grep -qF "is a field-mode repo" <<<"$out" && ! grep -qF "GH_WAS_CALLED" <<<"$out"; } \
+    && ok "field-mode refused before any gh call" || bad "field-mode guard (rc=$rc, out: $(head -1 <<<"$out"))"
+rm -rf "$fieldwt" "$ghstub"
+
+echo "Test: --issue and --pr together → mutually-exclusive usage error (exit 2)"
+out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
+{ [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
+    && ok "conflicting --issue/--pr rejected" || bad "conflicting flags (rc=$rc, out: $(head -1 <<<"$out"))"
 
 echo ""
 echo "========================================"
