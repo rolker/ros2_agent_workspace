@@ -70,8 +70,14 @@ the skill puts the contract in context. The fuller treatment below explains
    them out at wrap-up.
 6. **Avoid permission prompts.** Use `git -C <path>`, absolute paths, `gh -R`,
    and the file tools over heredocs / find / cat. The allowlist defeats
-   itself when commands are wrapped in `cd && …`. Generate timestamps with
-   `date '+%Y-%m-%d %H:%M %:z'`, not `date | sed`.
+   itself when commands are wrapped in `cd && …`. **Generate every timestamp
+   by invoking `date '+%Y-%m-%d %H:%M %:z'` — never type a plausible-looking
+   time, even when typing feels faster under pressure.** A typed time is a
+   durable lie the wrap-up integration and downstream analysis will trust;
+   for an operator-reported event, `date`-stamp when you log it and mark
+   their time `~HH:MM (operator-reported)`. (And `date '+…'`, not
+   `date | sed`.) The `start-deployment` skill provides a `dlog` helper that
+   bakes `date` into each entry so this is the easy path.
 7. **Sterile cockpit.** During live on-water ops, do *only* operation-essential
    work — no doc polish, refactors, or "while we're here" cleanups. Write
    them down for wrap-up.
