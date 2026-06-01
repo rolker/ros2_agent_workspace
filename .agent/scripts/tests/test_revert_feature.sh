@@ -73,7 +73,11 @@ test_invalid_issue_number() {
     (
         setup_test_repo
         local output result
-        output=$("$REVERT_SCRIPT" --issue "abc" 2>&1 || true)
+        # No `|| true` here: it would make the substitution exit 0, so `result`
+        # would never capture the script's real (non-zero) exit code and the
+        # `[[ $result -ne 0 ]]` check below could never pass. The suite runs
+        # without `set -e`, so a non-zero rc here doesn't abort the test.
+        output=$("$REVERT_SCRIPT" --issue "abc" 2>&1)
         result=$?
         cleanup_test_repo
         [[ $result -ne 0 ]] && [[ "$output" =~ "must be numeric" ]]
@@ -86,7 +90,9 @@ test_no_commits_found() {
     (
         setup_test_repo
         local output result
-        output=$("$REVERT_SCRIPT" --issue 999 2>&1 || true)
+        # See the note in test_invalid_issue_number: dropping `|| true` lets
+        # `result` capture the script's real exit code (the suite has no `set -e`).
+        output=$("$REVERT_SCRIPT" --issue 999 2>&1)
         result=$?
         cleanup_test_repo
         [[ $result -ne 0 ]] && [[ "$output" =~ "No commits found" ]]
