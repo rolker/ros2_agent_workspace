@@ -43,7 +43,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build _build-layers test lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote merge-pr
+.PHONY: help build _build-layers test test-scripts lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote merge-pr
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -64,6 +64,7 @@ help:
 	@echo "  dashboard QUICK=1 - Quick mode (skip sync and GitHub API)"
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
+	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
 	@echo "  validate      - Validate workspace config (CI-oriented, pass/fail)"
 	@echo ""
 	@echo "Remote sync:"
@@ -132,6 +133,10 @@ dashboard-ui:
 test-dashboard:
 	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \
 	$$PYTHON -m unittest discover .agent/tools/dashboard/tests -v
+
+test-scripts:
+	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \
+	PYTHON=$$PYTHON ./.agent/scripts/tests/run_script_tests.sh
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py

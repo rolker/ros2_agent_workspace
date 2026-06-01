@@ -49,6 +49,27 @@ jobs:
           config-file: '.github/markdown-link-check.json'
         continue-on-error: true
 
+  script-tests:
+    name: Script tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install pytest
+        run: python3 -m pip install --upgrade pip pytest
+
+      # Runs .agent/scripts/tests/ (shell via bash, python via pytest). These are
+      # hermetic (temp git sandboxes, stubbed gh, no network/ROS), so no build or
+      # workspace setup is needed — just git (preinstalled on the runner) + pytest.
+      - name: Run script tests
+        run: make test-scripts
+
   validate-commit-identity:
     name: Validate commit identity (Mechanism C)
     runs-on: ubuntu-latest
