@@ -28,7 +28,18 @@ set -e
 CALLER_PWD="$(pwd -P)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# Resolve ROOT to the MAIN worktree, not whichever tree this script copy lives in.
+# `git worktree list --porcelain` always lists the main checkout first, so this is
+# correct even when invoked through a worktree's own copy of .agent/scripts (e.g.
+# merge_pr.sh calling "$SCRIPT_DIR/worktree_remove.sh" from inside a worktree). The
+# old `dirname dirname SCRIPT_DIR` form pointed ROOT at the *worktree* there, and
+# the dirs we manage — .workspace-worktrees/ and layers/worktrees/ — exist only in
+# the main tree, so removal failed with "No worktree found" (issue #507). Fall back
+# to the location-based form when git can't answer (not a repo / git absent).
+ROOT_DIR="$({ git -C "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null | head -n1 | sed 's/^worktree //'; } || true)"
+if [[ -z "$ROOT_DIR" ]]; then
+    ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+fi
 
 source "$SCRIPT_DIR/_worktree_helpers.sh"
 
