@@ -279,3 +279,31 @@ issue: 488
 
 ### Notes
 - Suite 12 → 13, shellcheck clean, `bash -n` clean.
+
+## Local Review (Pre-Push) — review-response hardening
+**Status**: complete
+**When**: 2026-06-01
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+**Verdict**: approved
+
+**Branch**: feature/issue-488 at `fe402ef` (local, pre-push)
+**Mode**: pre-push
+**Depth**: Light (reason: one guard rejection + one no-network unit test)
+
+Closes two still-open Copilot items from the PR review (stale against earlier
+commits, surfaced on a fresh re-read while evaluating the PR for merge):
+
+### Findings
+- [x] (valid/test-gap) Field-mode guard — the key safety feature (refuses any
+  `gh` call on a non-GitHub origin) — was present but unit-untested. **Fixed
+  `fe402ef`** — added a no-network test (temp gitcloud-origin worktree + stubbed
+  `gh`; asserts the field-mode error fires and the stub sentinel never appears)
+  and corrected the suite header that claimed the guard was intentionally not
+  exercised. — `test_merge_pr.sh`
+- [x] (valid/validation) `--issue` + `--pr` were both accepted, dispatch silently
+  preferring `--pr` — a typo or stale `make merge-pr ISSUE=… PR=…` carryover
+  could act on the wrong PR. **Fixed `fe402ef`** — rejected as a usage error
+  (exit 2) before resolution. — `merge_pr.sh`
+
+### Notes
+- Suite 13 → 15, all pass; `bash -n` + pre-commit shellcheck clean.
