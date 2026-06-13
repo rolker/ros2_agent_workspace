@@ -97,17 +97,39 @@ if [ "$1" == "--agent" ]; then
     fi
 
 elif [ "$1" == "--detect" ]; then
-    DETECTED=$(detect_framework)
+    # Prefer an identity already present in the environment. This is the
+    # robust path for sandboxed/container runs: docker_run_agent.sh
+    # forwards AGENT_NAME/AGENT_EMAIL (exported on the host by
+    # set_git_identity_env.sh) into the container. In-container framework
+    # auto-detection may still resolve (CLAUDE_CODE_ENTRYPOINT is
+    # forwarded, so detect_cli_env.sh reports `claude-code`), but it would
+    # only yield the *generic* framework-table identity — not the actual
+    # launching agent's self-reported name/email. Honoring the forwarded
+    # env vars keeps attribution accurate; fall back to framework-table
+    # lookup only when they are absent.
+    if [ -n "${AGENT_NAME:-}" ] && [ -n "${AGENT_EMAIL:-}" ]; then
+        echo "Using identity from environment: $AGENT_NAME <$AGENT_EMAIL>"
+    else
+        # Guard against a half-set environment: if exactly one of the two
+        # is provided, we cannot trust a guessed counterpart for the
+        # other, so warn that the partial value is being discarded rather
+        # than silently mixing it with a framework-table default.
+        if [ -n "${AGENT_NAME:-}" ] || [ -n "${AGENT_EMAIL:-}" ]; then
+            echo "⚠️  Only one of AGENT_NAME / AGENT_EMAIL is set; ignoring the partial value and falling back to framework detection." >&2
+        fi
 
-    if [ "$DETECTED" == "unknown" ]; then
-        echo "Error: Could not auto-detect framework"
-        echo "Please use --agent <framework> or provide name/email manually"
-        exit 1
+        DETECTED=$(detect_framework)
+
+        if [ "$DETECTED" == "unknown" ]; then
+            echo "Error: Could not auto-detect framework, and AGENT_NAME/AGENT_EMAIL are not set in the environment."
+            echo "Use --agent <framework>, export AGENT_NAME + AGENT_EMAIL (e.g. via set_git_identity_env.sh), or provide name/email manually."
+            exit 1
+        fi
+
+        AGENT_NAME="${FRAMEWORK_NAMES[$DETECTED]}"
+        AGENT_EMAIL="${FRAMEWORK_EMAILS[$DETECTED]}"
+        echo "Detected framework: $DETECTED"
     fi
-
-    AGENT_NAME="${FRAMEWORK_NAMES[$DETECTED]}"
-    AGENT_EMAIL="${FRAMEWORK_EMAILS[$DETECTED]}"
-    echo "Detected framework: $DETECTED"
 
 elif [ $# -eq 2 ]; then
     # Manual name and email

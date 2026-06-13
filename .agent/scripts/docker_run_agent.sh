@@ -189,6 +189,26 @@ if [ -f "$CLAUDE_CREDS" ]; then
     MOUNT_ARGS+=(-v "$CLAUDE_CREDS:/tmp/claude-credentials.json:ro")
 fi
 
+# 7. Pre-commit hook-env cache — amortize the ~30s hook-environment
+#    install across container sessions via a NAMED VOLUME, deliberately
+#    NOT a bind of the host's ~/.cache/pre-commit. A read-write host bind
+#    would let a --dangerously-skip-permissions agent overwrite the
+#    host's hook-environment binaries (interpreters, console-script
+#    shims), which the human then executes at the next host-side commit —
+#    a sandbox-escape / persistence vector outside the PR review path.
+#    A named volume stays writable (pre-commit can install missing envs)
+#    and amortizes across container runs, with no route back to the
+#    host's own cache. First run pays the one-time install; the entrypoint
+#    chowns the root-owned mountpoint to the ros user.
+MOUNT_ARGS+=(-v "ros2-agent-precommit-cache:/home/ros/.cache/pre-commit")
+
+# 8. Persist the Claude Code plugin marketplace across runs via a named
+#    volume, so each container start doesn't re-clone claude-plugins-official.
+#    A named volume (not a host bind) keeps it isolated from the host's own
+#    ~/.claude/plugins. The entrypoint's recursive chown of ~/.claude fixes
+#    the root-owned mountpoint docker creates on first use.
+MOUNT_ARGS+=(-v "ros2-agent-claude-plugins:/home/ros/.claude/plugins")
+
 # ---------- Read-only GitHub token (optional) ----------
 # Provides container agents with read-only gh CLI access (view issues, PRs, code search).
 # Token sources (first match wins):
@@ -205,9 +225,27 @@ fi
 
 # ---------- Container environment ----------
 
+# Forward the agent git identity into the container. The entrypoint runs
+# `configure_git_identity.sh --detect`, which now prefers these env vars
+# over in-container framework auto-detection (detection still resolves to
+# the generic `claude-code` table entry via CLAUDE_CODE_ENTRYPOINT, but
+# that loses the launching agent's self-reported identity). These are
+# normally exported on the host by set_git_identity_env.sh; warn if they
+# are missing so commits inside the container don't land under a wrong or
+# unset identity.
+if [ "$SHELL_MODE" = false ] && { [ -z "${AGENT_NAME:-}" ] || [ -z "${AGENT_EMAIL:-}" ]; }; then
+    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container will fall back to" >&2
+    echo "    in-container framework detection, which may fail. Source" >&2
+    echo "    .agent/scripts/set_git_identity_env.sh before launching to set them." >&2
+fi
+
 ENV_ARGS=(
     ${ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY"}
     ${AGENT_GH_TOKEN:+-e "GH_TOKEN=$AGENT_GH_TOKEN"}
+    ${AGENT_NAME:+-e "AGENT_NAME=$AGENT_NAME"}
+    ${AGENT_EMAIL:+-e "AGENT_EMAIL=$AGENT_EMAIL"}
+    ${AGENT_MODEL:+-e "AGENT_MODEL=$AGENT_MODEL"}
+    ${AGENT_FRAMEWORK:+-e "AGENT_FRAMEWORK=$AGENT_FRAMEWORK"}
     -e "CLAUDE_CODE_ENTRYPOINT=1"
     -e "ROS2_AGENT_WORKSPACE_ROOT=$ROOT_DIR"
     -e "WORKTREE_ROOT=$WORKTREE_PATH"
@@ -222,7 +260,16 @@ CONTAINER_CMD=()
 if [ "$SHELL_MODE" = true ]; then
     CONTAINER_CMD=(/bin/bash)
 else
-    CONTAINER_CMD=(claude --dangerously-skip-permissions)
+    # --strict-mcp-config: use only MCP servers from --mcp-config (none
+    # passed) → all MCP servers disabled. Silences the claude.ai
+    # Gmail/Drive/Calendar servers (and any other user-scoped MCP servers
+    # inherited via the mounted ~/.claude.json) that fail-fast with auth
+    # errors on every start in the credential-less sandbox — they're
+    # host-only by design (see #481 non-goals). The workspace defines no
+    # project/.mcp.json servers, so nothing the sandbox legitimately needs
+    # is lost; local skills still resolve via /skill-name. Removes the
+    # startup-log noise and a round-trip per server.
+    CONTAINER_CMD=(claude --dangerously-skip-permissions --strict-mcp-config)
 fi
 
 # ---------- Launch container ----------

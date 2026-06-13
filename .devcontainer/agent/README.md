@@ -79,17 +79,27 @@ required because git worktree `.git` files contain absolute paths to the parent 
 object store — mounting at a different path would break git operations.
 
 ```
-Host Path                           Container Mount     Access
-────────────────────────────────    ──────────────────  ──────
-<workspace>/                        same path           rw (base)
-<workspace>/.agent/                 same path           ro (overlay)
-<workspace>/.agent/scratchpad/      same path           rw (override)
-<workspace>/layers/main/*_ws/build  anonymous volume    rw (isolated)
-<workspace>/layers/main/*_ws/install anonymous volume   rw (isolated)
-<workspace>/layers/main/*_ws/log   anonymous volume     rw (isolated)
-<workspace>/layers/worktrees/       same path           rw
-<workspace>/.workspace-worktrees/   same path           rw
+Host Path / Source                  Container Mount          Access
+────────────────────────────────    ───────────────────────  ──────
+<workspace>/                        same path                rw (base)
+<workspace>/.agent/                 same path                ro (overlay)
+<workspace>/.agent/scratchpad/      same path                rw (override)
+<workspace>/layers/main/*_ws/build  anonymous volume         rw (isolated)
+<workspace>/layers/main/*_ws/install anonymous volume        rw (isolated)
+<workspace>/layers/main/*_ws/log   anonymous volume          rw (isolated)
+<workspace>/layers/worktrees/       same path                rw
+<workspace>/.workspace-worktrees/   same path                rw
+~/.claude.json, settings, creds     /tmp staging (copied)    ro
+named: ros2-agent-precommit-cache   /home/ros/.cache/pre-commit  rw (isolated)
+named: ros2-agent-claude-plugins    /home/ros/.claude/plugins    rw (isolated)
 ```
+
+The last two are **named Docker volumes**, not host binds. They amortize
+the pre-commit hook-environment install and the Claude plugin-marketplace
+clone across container runs without touching the host's own
+`~/.cache/pre-commit` or `~/.claude/plugins` — see Security Model. Reset
+either with `docker volume rm ros2-agent-precommit-cache` /
+`docker volume rm ros2-agent-claude-plugins` to force a fresh rebuild.
 
 **Mount ordering matters**: Docker processes mounts in order. Later mounts overlay
 earlier ones at the same path. So `.agent/` (ro) overlays the base (rw), and
@@ -111,6 +121,22 @@ has full visibility and control.
 The `.agent/` directory is mounted read-only to prevent the agent from modifying
 workspace infrastructure scripts. The exception is `.agent/scratchpad/`, which is
 read-write for push request signal files and temporary work.
+
+**The host's `~/.cache/pre-commit` and `~/.claude/plugins` are deliberately
+NOT bind-mounted.** Both hold *executable* content (hook-environment
+interpreters/shims; plugin code). A read-write host bind would let a
+`--dangerously-skip-permissions` agent overwrite binaries the **host**
+later executes (pre-commit runs hook envs at every host-side commit) —
+a sandbox-escape path that bypasses PR review. Instead, named volumes
+(`ros2-agent-precommit-cache`, `ros2-agent-claude-plugins`) give the
+same cross-run amortization while staying isolated from the host.
+
+MCP servers are disabled in-container via `--strict-mcp-config`: the
+claude.ai Gmail/Drive/Calendar servers (and any user-scoped servers
+inherited from the mounted `~/.claude.json`) are host-only and
+credential-less here, so they would only fail-fast on startup. The
+workspace defines no project `.mcp.json` servers, so nothing the sandbox
+needs is lost; local skills still resolve via `/skill-name`.
 
 ## Push Gateway Workflow
 
