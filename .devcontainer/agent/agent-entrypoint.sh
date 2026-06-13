@@ -6,8 +6,9 @@
 #   1. Fix ownership of anonymous volumes (build/install/log dirs)
 #   2. Configure persistent git identity
 #   3. Source ROS 2 environment
-#   4. Install rosdep dependencies (best-effort)
-#   5. Hand off to CMD (claude --dangerously-skip-permissions)
+#   4. Check/install rosdep dependencies (skip when already satisfied)
+#   5. Initialize Claude Code config; chown the pre-commit cache volume
+#   6. Hand off to CMD (claude --dangerously-skip-permissions ...)
 
 set -euo pipefail
 
@@ -105,6 +106,13 @@ if [ -f /tmp/claude-credentials.json ]; then
     chmod 600 "$TARGET_HOME/.claude/.credentials.json"
 fi
 chown -R "$TARGET_UID:$TARGET_GID" "$TARGET_HOME/.claude" "$TARGET_HOME/.claude.json" 2>/dev/null || true
+
+# Pre-commit cache named volume (docker_run_agent.sh mount #7): docker
+# creates the mountpoint root-owned, so chown it to the target user — the
+# pre-commit hooks run as that user and must read/write hook environments.
+if [ -d "$TARGET_HOME/.cache" ]; then
+    chown -R "$TARGET_UID:$TARGET_GID" "$TARGET_HOME/.cache" 2>/dev/null || true
+fi
 
 # ---------- 6. Hand off to CMD ----------
 # Restore working directory to the worktree (entrypoint cd'd to WORKSPACE_ROOT above)
