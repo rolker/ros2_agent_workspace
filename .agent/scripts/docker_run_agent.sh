@@ -189,6 +189,21 @@ if [ -f "$CLAUDE_CREDS" ]; then
     MOUNT_ARGS+=(-v "$CLAUDE_CREDS:/tmp/claude-credentials.json:ro")
 fi
 
+# 7. Pre-commit hook-env cache — amortize the ~30s hook-environment
+#    install across short container sessions. Ownership is correct
+#    because the container's `ros` user shares the host UID/GID (the
+#    Dockerfile USER_UID/USER_GID build args are set from `id -u`/`id -g`).
+if [ -d "$HOME/.cache/pre-commit" ]; then
+    MOUNT_ARGS+=(-v "$HOME/.cache/pre-commit:/home/ros/.cache/pre-commit")
+fi
+
+# 8. Persist the Claude Code plugin marketplace across runs via a named
+#    volume, so each container start doesn't re-clone claude-plugins-official.
+#    A named volume (not a host bind) keeps it isolated from the host's own
+#    ~/.claude/plugins. The entrypoint's recursive chown of ~/.claude fixes
+#    the root-owned mountpoint docker creates on first use.
+MOUNT_ARGS+=(-v "ros2-agent-claude-plugins:/home/ros/.claude/plugins")
+
 # ---------- Read-only GitHub token (optional) ----------
 # Provides container agents with read-only gh CLI access (view issues, PRs, code search).
 # Token sources (first match wins):
@@ -239,7 +254,13 @@ CONTAINER_CMD=()
 if [ "$SHELL_MODE" = true ]; then
     CONTAINER_CMD=(/bin/bash)
 else
-    CONTAINER_CMD=(claude --dangerously-skip-permissions)
+    # --strict-mcp-config: use only MCP servers from --mcp-config (none
+    # passed) → all MCP servers disabled. Silences the claude.ai
+    # Gmail/Drive/Calendar servers that fail-fast with auth errors on
+    # every start in the credential-less sandbox (they're host-only by
+    # design — see #481 non-goals), removing the startup-log noise and a
+    # round-trip per server. Local skills still resolve via /skill-name.
+    CONTAINER_CMD=(claude --dangerously-skip-permissions --strict-mcp-config)
 fi
 
 # ---------- Launch container ----------
