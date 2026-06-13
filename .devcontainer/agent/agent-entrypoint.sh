@@ -57,13 +57,29 @@ cd "$WORKSPACE_ROOT"
 source "$WORKSPACE_ROOT/.agent/scripts/setup.bash"
 set -u
 
-# ---------- 4. Install rosdep dependencies (best-effort) ----------
-# Refresh apt index — the Dockerfile's apt-get update is stale by container start
-apt-get update -qq
-echo "Installing rosdep dependencies..."
+# ---------- 4. Install rosdep dependencies (best-effort, skip when satisfied) ----------
+# `rosdep check` is fast and offline. Only pay the apt-get update +
+# rosdep install cost for layers that actually report missing deps —
+# on a workspace whose deps are already in the base image this skips
+# the 30–60s+ refresh entirely. Set FORCE_DEPS_REFRESH=1 to always
+# refresh (e.g. after editing a package.xml that adds a dependency).
+echo "Checking rosdep dependencies..."
+APT_REFRESHED=0
 for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
     [ -d "$ws_dir/src" ] || continue
     ws_name="$(basename "$ws_dir")"
+    if [ "${FORCE_DEPS_REFRESH:-0}" != "1" ] && \
+       rosdep check --from-paths "$ws_dir/src" --ignore-src --rosdistro jazzy >/dev/null 2>&1; then
+        echo "  $ws_name: dependencies satisfied — skipping install"
+        continue
+    fi
+    # Missing deps (or forced refresh, or rosdep db not yet usable):
+    # refresh the apt index once, then install for this layer.
+    if [ "$APT_REFRESHED" = "0" ]; then
+        echo "  refreshing apt index (deps missing or refresh forced)..."
+        apt-get update -qq || echo "  (apt-get update failed — continuing)"
+        APT_REFRESHED=1
+    fi
     echo "  rosdep install for $ws_name..."
     rosdep install --from-paths "$ws_dir/src" --ignore-src -y --rosdistro jazzy 2>/dev/null || {
         echo "  (some dependencies unavailable for $ws_name — continuing)"
