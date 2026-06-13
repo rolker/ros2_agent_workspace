@@ -116,12 +116,17 @@ only — emit an error if passed in post-PR mode), `--issue <N>` (sets
 `USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
 mode, where `closingIssuesReferences` is authoritative), `--copilot`
 (sets `COPILOT=1`, opts in to the Copilot Adversarial Specialist in
-step 5e — off by default; `--no-copilot` is accepted as a deprecated
-no-op), `--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
+step 5e — off by default), `--no-copilot` (**recognized and
+discarded**: a deprecated no-op since Copilot is already off by
+default — consume the token here so it never falls through to the
+classification step below as a stray argument),
+`--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
 post-PR only — emit an error if passed in pre-push mode, where the
-gate doesn't apply), `--base <branch>` (sets `USER_BASE`), then the
-optional depth keyword (`light` / `standard` / `deep` — positional).
-Classify what remains:
+gate doesn't apply; with `COPILOT` unset it has no effect, so emit a
+one-line note "`--allow-untrusted-copilot` ignored: no effect without
+`--copilot`" rather than silently dropping it), `--base <branch>`
+(sets `USER_BASE`), then the optional depth keyword (`light` /
+`standard` / `deep` — positional). Classify what remains:
 
 - Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
@@ -312,7 +317,7 @@ sequentially.
 
 Run:
 - **5a. Static Analysis Specialist**
-- **5d. Claude Adversarial Specialist** — **one pass** (Standard prompt)
+- **5d. Claude Adversarial Specialist** — **one pass** (Lens A only)
 - **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
   (`--copilot`); skipped with notice if `copilot` unavailable
 
@@ -586,15 +591,18 @@ auth-error output also route to the skipped-notice path (see the
 post-invocation guard below) so an opted-in but unauthenticated host
 doesn't surface as a silent zero-finding review.
 
-**Prompt body**. Copilot reuses 5d's lens focus areas so its read is
-comparable to the in-house passes: Light + Standard use the combined
-Lens A + Lens B focus areas (missed edge cases, assumption violations,
-subtle bugs, logic errors, plus security / concurrency-lifecycle /
-cross-cutting). Deep uses the same areas at the broader Deep file
-horizon. Reusing the lens focus areas keeps the cross-model signal
-meaningful — "another vendor reading the same brief", not "a different
-prompt on
-the same diff".
+**Prompt body**. Copilot runs as a **single** invocation at every tier
+(unlike 5d, which splits into two passes), so it always receives the
+**combined Lens A + Lens B focus areas** (missed edge cases, assumption
+violations, subtle bugs, logic errors, plus security /
+concurrency-lifecycle / cross-cutting) — there is no per-lens split for
+the cross-model read. Deep uses the same combined brief at the broader
+Deep file horizon. Reusing the lens focus areas keeps the cross-model
+signal meaningful — "another vendor reading the same brief", not "a
+different prompt on the same diff". (Note: at **Light**, the in-house
+5d pass deliberately covers Lens A only, so an opted-in Copilot read at
+Light is intentionally *broader* than the single Claude pass — that is
+expected, and the dedup in step 6 reconciles any overlap.)
 
 **Invocation** (only when `SKIP_COPILOT` is unset after both probes
 above).
@@ -807,7 +815,7 @@ since Claude Adversarial is now unconditional at Light.)
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
-**Copilot Adversarial**: skipped (<reason>, --copilot)  <!-- include only when COPILOT=1 and SKIP_COPILOT=1 -->
+**Copilot Adversarial**: <run (--copilot) | skipped (<reason>, --copilot)>  <!-- include only when COPILOT=1; shows that an opted-in cross-model pass ran-clean vs. was skipped -->
 No issues found. LGTM.
 ```
 
