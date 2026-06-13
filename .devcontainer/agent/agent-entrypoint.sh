@@ -43,6 +43,13 @@ done
 # ---------- 2. Configure persistent git identity ----------
 # In a container, we use persistent config (writes to .git/config) rather than
 # ephemeral env vars, since the container is an isolated environment.
+#
+# This step runs as root (before the privilege drop), but the mounted repos
+# are owned by the host user (uid != 0). Git's dubious-ownership protection
+# would otherwise reject every repo with "fatal: not in a git directory",
+# leaving identity silently unset. The container is single-tenant and
+# ephemeral, so trust all repo paths for root's git invocations here.
+git config --global --add safe.directory '*'
 if [ -x "$WORKSPACE_ROOT/.agent/scripts/configure_git_identity.sh" ]; then
     echo "Configuring git identity..."
     cd "$WORKSPACE_ROOT"
