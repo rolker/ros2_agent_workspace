@@ -26,12 +26,16 @@ expects authors to run `/review-code` against their diff before opening a PR.
 This applies to Copilot too when used in **agent / coding-assistant mode** —
 prefer a pre-push pass to catch findings locally rather than in PR
 review rounds. The specialists that actually run depend on the
-auto-classified tier: Light tier dispatches Static Analysis + Copilot
-Adversarial only, while Standard and Deep also dispatch Governance and
-Plan Drift. (The Claude Adversarial Specialist is Claude-only — see
-caveat below — so a Copilot-only pre-push pass cannot catch Claude-side
-adversarial findings; the Copilot Adversarial Specialist runs natively
-and remains in scope.) See
+auto-classified tier: Light tier dispatches Static Analysis + one
+Claude Adversarial pass, while Standard and Deep also dispatch
+Governance, Plan Drift, and a second disjoint-lens Claude Adversarial
+pass. The Copilot Adversarial Specialist is **opt-in** at every tier
+via `--copilot` (off by default to conserve the Premium quota — see
+[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)). (The
+Claude Adversarial Specialist is Claude-only — see caveat below — so a
+Copilot-only pre-push pass cannot catch Claude-side adversarial
+findings; the Copilot Adversarial Specialist runs natively when opted
+in.) See
 [`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md).
 
 **Limitation**: when Copilot runs as a **PR reviewer** (the GitHub
@@ -44,9 +48,10 @@ fresh subagent via Claude Code's `Agent` tool, which Copilot doesn't
 expose. The other specialists (Static Analysis, Governance, Plan
 Drift, **Copilot Adversarial**) are framework-agnostic and run
 regardless of host runtime, provided the relevant CLI tools are
-installed and authenticated where applicable (Copilot Adversarial
-additionally requires `copilot` CLI authentication — unauthenticated
-hosts route to the skipped-with-notice path automatically).
+installed and authenticated where applicable (Copilot Adversarial is
+opt-in via `--copilot` and additionally requires `copilot` CLI
+authentication — opted-in but unauthenticated hosts route to the
+skipped-with-notice path automatically).
 
 ## Environment Setup
 

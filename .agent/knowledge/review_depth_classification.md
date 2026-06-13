@@ -67,13 +67,14 @@ source path differs:
 
 **Specialists dispatched**:
 - Static Analysis
-- Copilot Adversarial (synchronous Copilot CLI; skipped with notice if
-  unavailable; suppressed entirely by `--no-copilot`)
+- Claude Adversarial — one pass (Lens A: logic & correctness)
+- Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
+  skipped with notice if opted in but the CLI is unavailable
 
-**Report format**: Condensed — static analysis findings, Copilot
-Adversarial findings (or a one-line skip notice / omitted entirely
-when `--no-copilot` was used), plus a one-line governance note
-("No governance concerns for a change of this scope").
+**Report format**: Condensed — static analysis findings, Claude
+Adversarial findings, plus a one-line governance note ("No governance
+concerns for a change of this scope"). A Copilot Adversarial section
+appears only when `--copilot` was passed.
 
 #### Standard
 
@@ -86,9 +87,11 @@ when `--no-copilot` was used), plus a one-line governance note
 - Static Analysis
 - Governance
 - Plan Drift
-- Claude Adversarial (fresh context)
-- Copilot Adversarial (synchronous Copilot CLI; skipped with notice if
-  unavailable; suppressed entirely by `--no-copilot`)
+- Claude Adversarial — **two passes** with disjoint lenses (Lens A:
+  logic & correctness; Lens B: security / concurrency-lifecycle /
+  cross-cutting), each a separate fresh-context dispatch
+- Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
+  skipped with notice if opted in but the CLI is unavailable
 
 **Report format**: Full report with all sections.
 
@@ -102,17 +105,20 @@ when `--no-copilot` was used), plus a one-line governance note
 - Any Deep promotion trigger
 
 **Specialists dispatched**:
-- Same as Standard. Both adversarial specialists (Claude and Copilot)
-  are already running at Standard; Deep adds extra emphasis in the
-  prompt (longer file horizon, explicit security/concurrency/lifecycle
-  checklist) but uses the same fresh-context dispatch mechanism.
+- Same as Standard (two disjoint-lens Claude Adversarial passes;
+  Copilot opt-in via `--copilot`). Deep runs both Claude passes at a
+  longer file horizon with an explicit security/concurrency/lifecycle
+  checklist, using the same fresh-context dispatch mechanism. The
+  Standard→Deep difference is horizon and rigor, not which lenses run.
 
 **Report format**: Full report with all sections.
 
 > **Note on cross-model adversarial**: The Copilot-only slice of
 > upstream's Cross-Model Adversarial Specialist is wired in as
 > `review-code` step 5e (synchronous Copilot CLI, no tmux,
-> default-on at all tiers, `--no-copilot` opt-out) — see the
+> **opt-in via `--copilot`** — off by default to conserve the Premium
+> quota; see [#467](https://github.com/rolker/ros2_agent_workspace/issues/467))
+> — see the
 > "Partially adopted" entry in `inspiration_agent_workspace_digest.md`.
 > The Gemini/Codex tmux dispatch from upstream `cross_model_review.sh`
 > remains unadopted. When you want a third or fourth model's read on a
@@ -211,10 +217,13 @@ header additions).
 - **`review-code` requires a one-line classification block in its report
   header.** The tier and the primary signal that determined it are always
   shown so authors can sanity-check (and override on the next run).
-- **The Adversarial Specialist activates at Standard** — meaning every
-  governance-touching PR gets a fresh-context second pass even if it's
-  small. This is the intended behaviour: governance edits have
-  out-of-proportion blast radius and benefit from a re-read cold.
+- **Claude Adversarial runs at every tier** — one pass at Light, two
+  disjoint-lens passes at Standard and Deep. Every governance-touching
+  PR gets at least the two-pass fresh-context read even if it's small.
+  This is the intended behaviour: governance edits have
+  out-of-proportion blast radius and benefit from a re-read cold. The
+  two in-house passes are the default adversarial signal now that the
+  cross-model Copilot pass is opt-in (`--copilot`).
 - **Trigger lists are workspace-specific.** Adding a new file pattern
   (e.g., a new `.claude/` directory, a new ADR-equivalent doc) means
   updating the trigger lists here so the depth classifier sees it.

@@ -45,12 +45,16 @@ markdown at [`.claude/skills/review-code/SKILL.md`](../../.claude/skills/review-
 follow its steps as you would any other governance skill.
 
 **Claude Adversarial Specialist is Claude-only** — its dispatch
-relies on Claude Code's `Agent` tool to launch a fresh subagent with
-no shared context. Gemini doesn't expose an equivalent. Run the other
-specialists (Static Analysis, Governance, Plan Drift, **Copilot
-Adversarial** — provided the `copilot` CLI is installed and
-authenticated) and note in the report header that Claude Adversarial
-was skipped because the runtime is Gemini.
+relies on Claude Code's `Agent` tool to launch fresh subagents with
+no shared context, and it is now the **default** adversarial read (one
+pass at Light; two disjoint-lens passes at Standard + Deep). Gemini
+doesn't expose an equivalent, so run the other specialists (Static
+Analysis, Governance, Plan Drift) and note in the report header that
+**both** Claude Adversarial passes were skipped because the runtime is
+Gemini — the run has no in-house adversarial coverage. Copilot
+Adversarial is **opt-in** via `--copilot` (off by default to conserve
+the Premium quota); when opted in with the `copilot` CLI installed and
+authenticated, it gives a cross-model read that partly compensates.
 
 
 ## Workflow Skills

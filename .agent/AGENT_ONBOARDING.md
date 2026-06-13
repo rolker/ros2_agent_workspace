@@ -74,11 +74,16 @@ a PR. The skill body is plain markdown at
 follow its steps regardless of framework.
 
 **Claude Adversarial Specialist is Claude-only** — its dispatch
-relies on Claude Code's `Agent` tool. Other frameworks should run the
-remaining specialists (Static Analysis, Governance, Plan Drift,
-**Copilot Adversarial** — provided the `copilot` CLI is installed and
-authenticated) and note that Claude Adversarial was skipped due to
-the runtime.
+relies on Claude Code's `Agent` tool, and it is now the **default**
+adversarial read (one pass at Light; two disjoint-lens passes at
+Standard + Deep). Other frameworks can't dispatch it, so they should
+run the remaining specialists (Static Analysis, Governance, Plan
+Drift) and note that **both** Claude Adversarial passes were skipped
+due to the runtime — i.e. the run has no in-house adversarial coverage.
+Copilot Adversarial is **opt-in** via `--copilot` (off by default to
+conserve the Premium quota); when opted in and the `copilot` CLI is
+installed and authenticated, it provides a cross-model read that
+non-Claude runtimes can use to partly compensate.
 
 ## Workflow Skills
 

@@ -77,17 +77,19 @@ of the surrounding tooling.
 
 - **Copilot Adversarial Specialist** (`review-code` step 5e). Ported in
   PR #464 (issue #461). Synchronous Copilot CLI dispatch (`copilot -p ""
-  --allow-all-tools < prompt`), no tmux, default-on at Light + Standard
-  + Deep, opt-out via `--no-copilot`, graceful skip when the CLI is
-  missing or unauthenticated (covers field hosts gabby/salmon). The
-  v1 context choice is the Copilot CLI default (~25.5k token floor) —
-  scheduled for evaluation against real-PR cost data; see the
-  cost-evaluation follow-up issue
-  ([#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
-  Light-tier activation produces a deliberate resource inversion (a
-  trivial PR's Light review now consumes more external token budget
-  than yesterday's Standard) — accepted as a v1 tradeoff for the
-  cross-model second-read signal, revisited once cost data is in.
+  --allow-all-tools < prompt`), no tmux, graceful skip when the CLI is
+  missing or unauthenticated (covers field hosts gabby/salmon).
+  Originally default-on at Light + Standard + Deep (opt-out via
+  `--no-copilot`), but **now opt-in via `--copilot`, off by default**
+  ([#467](https://github.com/rolker/ros2_agent_workspace/issues/467)
+  resolved): a GitHub Copilot Premium-request billing change exhausted
+  the team's monthly quota, so the per-run cost (~25.5k token floor, one
+  Premium request) is no longer paid on every review. The cross-model
+  second-read signal it used to provide by default is now covered by two
+  in-house disjoint-lens Claude Adversarial passes (5d); `--copilot`
+  adds a true second-vendor read on top when a reviewer judges it worth
+  the Premium request. The old Light-tier "resource inversion" no longer
+  applies, since Light no longer auto-runs Copilot.
 - **What remains unadopted**: the tmux-orchestrated multi-CLI dispatch
   in `cross_model_review.sh` and the Gemini/Codex specialists. The
   tmux session machinery adds complexity beyond the highest-leverage
