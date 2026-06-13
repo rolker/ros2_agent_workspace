@@ -205,9 +205,26 @@ fi
 
 # ---------- Container environment ----------
 
+# Forward the agent git identity into the container. The entrypoint runs
+# `configure_git_identity.sh --detect`, which now prefers these env vars
+# over in-container framework auto-detection (which can't see the host
+# runtime and would otherwise return "unknown" and fail). These are
+# normally exported on the host by set_git_identity_env.sh; warn if they
+# are missing so commits inside the container don't land under a wrong or
+# unset identity.
+if [ "$SHELL_MODE" = false ] && { [ -z "${AGENT_NAME:-}" ] || [ -z "${AGENT_EMAIL:-}" ]; }; then
+    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container will fall back to" >&2
+    echo "    in-container framework detection, which may fail. Source" >&2
+    echo "    .agent/scripts/set_git_identity_env.sh before launching to set them." >&2
+fi
+
 ENV_ARGS=(
     ${ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY"}
     ${AGENT_GH_TOKEN:+-e "GH_TOKEN=$AGENT_GH_TOKEN"}
+    ${AGENT_NAME:+-e "AGENT_NAME=$AGENT_NAME"}
+    ${AGENT_EMAIL:+-e "AGENT_EMAIL=$AGENT_EMAIL"}
+    ${AGENT_MODEL:+-e "AGENT_MODEL=$AGENT_MODEL"}
+    ${AGENT_FRAMEWORK:+-e "AGENT_FRAMEWORK=$AGENT_FRAMEWORK"}
     -e "CLAUDE_CODE_ENTRYPOINT=1"
     -e "ROS2_AGENT_WORKSPACE_ROOT=$ROOT_DIR"
     -e "WORKTREE_ROOT=$WORKTREE_PATH"
