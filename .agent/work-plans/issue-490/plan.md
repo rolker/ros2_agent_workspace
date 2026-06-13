@@ -46,11 +46,25 @@ Two concrete gaps the dispatch must close:
    - **in-process**: emit the prompt to stdout for the host to paste into a
      fresh `Agent` call (same context root; fast; no isolation).
    - **container**: emit the prompt + launch `docker_run_agent.sh` headless
-     with it as kickoff; on exit, read the worktree-issue's last `progress.md`
-     entry and print outcome + next action.
-3. **Exit-contract read** — reuse `.agent/scripts/progress_read.py` to extract
-   the last typed entry. Document that the contract is **convention-only, no
-   enforcement** (per #490 / ADR-0004 honesty about enforcement tiers).
+     with it as kickoff; on exit, apply the exit-contract read (step 3) and
+     print outcome + next action. **Identity note**: container dispatch must
+     forward `AGENT_NAME`/`AGENT_EMAIL` — the entrypoint's
+     `configure_git_identity.sh --detect` reads them to set the container's git
+     config (distinct from the prompt's `git -c` literals, which only tell the
+     sub-agent what to use). Reuse #489's forwarding + missing-identity warning.
+3. **Exit-contract read (robust).** The host determines outcome from, in order:
+   (a) the container/claude **exit status** — non-zero → failure regardless of
+   `progress.md`; (b) a **newer** `progress.md` entry than existed pre-dispatch
+   — capture the pre-dispatch last-entry sha/count and require the post-exit
+   read to show a newer one, else treat as "sub-agent died before writing" =
+   failure (never misread a stale prior entry as this run's result); (c) the
+   entry must match the **expected entry type** for the dispatched skill (e.g.
+   `## Plan Review` for review-plan) so an earlier skill's trailing entry in the
+   same worktree isn't mistaken for this run's. Note `progress_read.py` has **no
+   tail selector** — it emits all (or `--type`-filtered) entries as a JSON array
+   in document order, so the host type-filters then takes `.entries[-1]`. The
+   contract itself is **convention-only, no enforcement** (per ADR-0004/0005
+   honesty about enforcement tiers).
 4. **Per-skill handoff boilerplate (Scope B)** — add a "Next step" block to the
    final step of `review-issue`, `plan-task`, `review-plan`, `review-code`,
    `triage-reviews` (+ address-findings when #491 lands): identity literals,
@@ -62,7 +76,11 @@ Two concrete gaps the dispatch must close:
    exit-contract read), following the `test_check_commit_identity.sh` pattern.
    **Layer-worktree container check**: verify container mode works for a
    project-repo (layer) worktree — the 2026-05-20 experiment only exercised a
-   *workspace* worktree, and #492 will rely on layer dispatch.
+   *workspace* worktree, and #492 will rely on layer dispatch. This is a
+   **documented manual verification step** (a real container run against a real
+   layer worktree), not an automated CI test — the shell regression test can't
+   spin up a layer worktree + docker in CI. Record the run in the PR so it isn't
+   silently dropped.
 
 ## Files to Change
 
@@ -77,7 +95,10 @@ Two concrete gaps the dispatch must close:
 | `.claude/skills/review-code/SKILL.md` | "Next step" handoff block |
 | `.claude/skills/triage-reviews/SKILL.md` | "Next step" handoff block |
 | `.agent/knowledge/skill_workflows.md` | Document handoff convention + Scope-E no-auto-chain |
-| `AGENTS.md` | Script Reference row for `dispatch_subagent.sh` (**ask-first** — instruction file) |
+| `.github/copilot-instructions.md` | One-line note: handoff/dispatch is Claude-`Agent`-specific; non-Claude runtimes paste the handoff prompt manually (**ask-first** — adapter) |
+| `.agent/instructions/gemini-cli.instructions.md` | Same Claude-specific handoff note (**ask-first** — adapter) |
+| `.agent/AGENT_ONBOARDING.md` | Same Claude-specific handoff note (**ask-first** — adapter) |
+| `AGENTS.md` | Script Reference row for `dispatch_subagent.sh`; **no** Makefile target added (**ask-first** — instruction file) |
 
 ## Principles Self-Check
 
@@ -100,8 +121,9 @@ Two concrete gaps the dispatch must close:
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
-| Add `dispatch_subagent.sh` | AGENTS.md Script Reference table | Yes (ask-first) |
-| Edit 6 skills' final step | Skill list / framework adapters (consequences map) | Yes — handoff is Claude-`Agent`-specific; note non-Claude limitation in adapters |
+| Add `.agent/scripts/dispatch_subagent.sh` | AGENTS.md Script Reference table | Yes (ask-first) — **no** Makefile target, so no `make generate-skills` run needed |
+| Edit the 5 skills' final step (handoff block) | The 3 framework adapters (copilot / gemini / AGENT_ONBOARDING) | Yes — now listed in Files-to-Change; each gets a one-line "handoff is Claude-`Agent`-specific" note |
+| Container-mode dispatch sets git identity | Forward `AGENT_NAME`/`AGENT_EMAIL` (entrypoint `--detect`) | Yes — reuse #489's forwarding + missing-identity warning (Approach step 2) |
 | `docker_run_agent.sh` exit flow | `push_gateway` lifecycle | Partial — guarded now; full removal is #493 (gated on #492) |
 
 ## Decisions (resolved with user, 2026-06-13)
