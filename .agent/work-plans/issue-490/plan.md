@@ -104,22 +104,30 @@ Two concrete gaps the dispatch must close:
 | Edit 6 skills' final step | Skill list / framework adapters (consequences map) | Yes — handoff is Claude-`Agent`-specific; note non-Claude limitation in adapters |
 | `docker_run_agent.sh` exit flow | `push_gateway` lifecycle | Partial — guarded now; full removal is #493 (gated on #492) |
 
+## Decisions (resolved with user, 2026-06-13)
+
+- **#493 sequencing — leave the gateway intact.** #490 introduces the
+  `progress.md` exit contract for the *dispatch path only*; the legacy
+  interactive `docker_run_agent.sh --issue N` keeps `push_gateway.sh`
+  unchanged. #492 provides the host-side replacement; #493 (gated on #492)
+  deletes the gateway. No deprecation warning added in #490 — the gateway
+  stays as-is until its replacement exists. Plan #493's deletions separately
+  after #492.
+- **Kickoff output format — `stream-json`** (paired with `--verbose`, which
+  Claude Code requires for streaming `--print`). Gives #492 structured,
+  parseable live progress + a final result object. The authoritative outcome
+  still comes from the `progress.md` exit contract; `--output-format` remains a
+  per-call override.
+- **One PR, closes #490** — Scope A (dispatch + headless docker + tests) and B
+  (6 skill handoff blocks + docs) land together. A is independently testable
+  via `--prompt-file`, but bundling keeps the keystone cohesive in one review.
+
 ## Open Questions
 
-- [ ] **#493 sequencing.** #493 (delete `push_gateway.sh` + scratchpad request
-  dirs + Makefile `push-gateway` target) declares it **depends on #492**, not
-  #490. Recommended approach: #490 introduces the `progress.md` exit contract
-  for the dispatch path but **leaves the gateway in place** for the legacy
-  interactive launch until #492 replaces it and #493 deletes it. Planning the
-  deletion in detail now is premature. Confirm this split.
-- [ ] **Kickoff output format** — `stream-json` (live progress), `json` (single
-  result), or `text` for the host to consume. Leaning `stream-json`.
-- [ ] **PR split** — A (dispatch + headless docker) and B (6 skill handoff
-  blocks) as one PR or two. Leaning one — B is needed to test A end-to-end and
-  both are small.
+- [ ] None remaining — all three resolved above; plan is review-plan-ready.
 
 ## Estimated Scope
 
-Single PR for #490 (Scope A + B + E). #493 is a separate, later PR gated on
-#492 — recommend a dedicated `plan-task 493` after #492 lands rather than
-folding its deletions in here.
+Single PR for #490 (Scope A + B + E), closing the issue. #493 is a separate,
+later PR gated on #492 — recommend a dedicated `plan-task 493` after #492 lands
+rather than folding its deletions in here.
