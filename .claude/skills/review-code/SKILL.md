@@ -8,9 +8,9 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--no-copilot] [light|standard|deep]
+/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--copilot] [light|standard|deep]
                                             # pre-push: diff vs default branch
-/review-code <pr-number-or-url> [--skip-static] [--no-copilot] [--allow-untrusted-copilot] [light|standard|deep]
+/review-code <pr-number-or-url> [--skip-static] [--copilot] [--allow-untrusted-copilot] [light|standard|deep]
                                             # post-PR: diff vs PR base
 ```
 
@@ -32,18 +32,26 @@ Flags:
   branches). When passed, the branch-name extraction at step 1 is
   skipped. Mutually compatible with `--no-progress` — `--no-progress`
   wins (no persistence regardless of issue number).
-- **`--no-copilot`** (both modes) suppresses the Copilot Adversarial
-  Specialist (5e) for this invocation. Useful when the Copilot CLI is
-  installed but you want to avoid the Premium-request cost on a
-  specific run.
+- **`--copilot`** (both modes) **opts in** to the Copilot Adversarial
+  Specialist (5e) for this invocation. Copilot is **off by default** —
+  each run consumes one Premium Copilot request (~25.5k-token floor),
+  and that cost is no longer carried on every review (see
+  [#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
+  Pass `--copilot` when a true second-vendor cross-model read is worth
+  the Premium request on a specific PR. Without it, two independent
+  in-house Claude adversarial passes (5d) provide the adversarial
+  coverage. (`--no-copilot` is accepted as a deprecated no-op, since
+  Copilot is already off by default.)
 - **`--allow-untrusted-copilot`** (post-PR only) overrides the
   external-PR safety gate that suppresses Copilot Adversarial when the
-  PR head is from a fork or a non-collaborator author. Without this
-  flag, the specialist routes to the skipped-with-notice path on such
-  PRs because `--allow-all-tools` grants Copilot file/shell access to
-  the local worktree; running it against an untrusted contributor's
-  diff exposes that capability to attacker-controlled prompt content.
-  Pass only when you have read the diff and accept the risk.
+  PR head is from a fork or a non-collaborator author. Only meaningful
+  alongside `--copilot` (the gate only matters when Copilot is opted
+  in). Without this flag, the specialist routes to the
+  skipped-with-notice path on such PRs because `--allow-all-tools`
+  grants Copilot file/shell access to the local worktree; running it
+  against an untrusted contributor's diff exposes that capability to
+  attacker-controlled prompt content. Pass only when you have read the
+  diff and accept the risk.
 
 ## Overview
 
@@ -67,14 +75,18 @@ post comments or modify the PR unless the user asks.
   issue, plan file referenced in PR body.
 
 **Depth tiers** (see `.agent/knowledge/review_depth_classification.md`):
-- **Light** — Static Analysis + Copilot Adversarial (small, low-risk
-  changes)
-- **Standard** — Static Analysis + Governance + Plan Drift + Claude
-  Adversarial + Copilot Adversarial (medium changes or
+- **Light** — Static Analysis + one Claude Adversarial pass (small,
+  low-risk changes)
+- **Standard** — Static Analysis + Governance + Plan Drift + two
+  disjoint-lens Claude Adversarial passes (medium changes or
   governance-touching files)
-- **Deep** — Same as Standard with both Adversarial specialists primed
-  for security / concurrency / lifecycle (large changes, security, or
-  cross-layer)
+- **Deep** — Same as Standard with the two Claude Adversarial passes
+  primed for security / concurrency / lifecycle (large changes,
+  security, or cross-layer)
+
+Copilot Adversarial is **opt-in at every tier** via `--copilot` — when
+passed, it runs as an additional cross-model read on top of the
+in-house Claude passes.
 
 **Specialists**:
 - **Static Analysis** — runs linters with ament-aligned configs on
@@ -83,12 +95,16 @@ post comments or modify the PR unless the user asks.
   consequences map
 - **Plan Drift** — compares implementation against the work plan (if one
   exists)
-- **Claude Adversarial** — fresh-context Claude subagent that re-reads
-  the diff cold (Standard + Deep)
-- **Copilot Adversarial** — synchronous Copilot CLI dispatch that re-reads
-  the diff cold (Light + Standard + Deep). Skipped with a one-line
-  notice when `copilot` is unavailable; suppress entirely with
-  `--no-copilot`.
+- **Claude Adversarial** — fresh-context Claude subagent(s) that re-read
+  the diff cold. One pass at Light; **two passes with disjoint lenses**
+  at Standard + Deep (Lens A: logic / edge cases / assumptions; Lens B:
+  security / concurrency / lifecycle / cross-cutting). Two independent
+  in-house reads are the default adversarial signal.
+- **Copilot Adversarial** — **opt-in** (`--copilot`) synchronous Copilot
+  CLI dispatch that re-reads the diff cold, adding a cross-model
+  second-vendor read. Off by default to avoid the per-run Premium
+  request; skipped with a one-line notice when `copilot` is unavailable
+  even if opted in.
 
 ## Steps
 
@@ -98,9 +114,10 @@ Parse the arguments in this order: extract `--skip-static` (sets
 `SKIP_STATIC=true`), `--no-progress` (sets `NO_PROGRESS=true`, pre-push
 only — emit an error if passed in post-PR mode), `--issue <N>` (sets
 `USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
-mode, where `closingIssuesReferences` is authoritative), `--no-copilot`
-(sets `NO_COPILOT=1`, suppresses the Copilot Adversarial Specialist in
-step 5e), `--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
+mode, where `closingIssuesReferences` is authoritative), `--copilot`
+(sets `COPILOT=1`, opts in to the Copilot Adversarial Specialist in
+step 5e — off by default; `--no-copilot` is accepted as a deprecated
+no-op), `--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
 post-PR only — emit an error if passed in pre-push mode, where the
 gate doesn't apply), `--base <branch>` (sets `USER_BASE`), then the
 optional depth keyword (`light` / `standard` / `deep` — positional).
@@ -109,7 +126,7 @@ Classify what remains:
 - Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
 
-The depth keyword, `--skip-static`, and `--no-copilot` may appear in
+The depth keyword, `--skip-static`, and `--copilot` may appear in
 any order around the PR number / URL or `--base <branch>`. The same
 syntax applies in both modes. Examples:
 
@@ -122,11 +139,11 @@ syntax applies in both modes. Examples:
 /review-code --skip-static light            # pre-push, light + skip static
 /review-code --no-progress                  # pre-push, don't write progress.md
 /review-code --issue 460                    # pre-push, override branch-name issue extraction
-/review-code --no-copilot                   # pre-push, skip Copilot Adversarial
+/review-code --copilot                      # pre-push, opt in to Copilot Adversarial
 /review-code 42                             # post-PR, auto-classify
 /review-code 42 standard                    # post-PR, force Standard
 /review-code 42 --skip-static               # post-PR, skip static analysis
-/review-code 42 --no-copilot                # post-PR, skip Copilot Adversarial
+/review-code 42 --copilot                   # post-PR, opt in to Copilot Adversarial
 ```
 
 #### Pre-push mode
@@ -295,8 +312,9 @@ sequentially.
 
 Run:
 - **5a. Static Analysis Specialist**
-- **5e. Copilot Adversarial Specialist** (Standard prompt; skipped with
-  notice if `copilot` unavailable; suppressed entirely by `--no-copilot`)
+- **5d. Claude Adversarial Specialist** — **one pass** (Standard prompt)
+- **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
+  (`--copilot`); skipped with notice if `copilot` unavailable
 
 #### Standard tier
 
@@ -304,16 +322,18 @@ Run all of:
 - **5a. Static Analysis Specialist**
 - **5b. Governance Specialist**
 - **5c. Plan Drift Specialist** (if a plan exists)
-- **5d. Claude Adversarial Specialist** (Standard prompt)
-- **5e. Copilot Adversarial Specialist** (Standard prompt; skipped with
-  notice if `copilot` unavailable; suppressed entirely by `--no-copilot`)
+- **5d. Claude Adversarial Specialist** — **two passes** with disjoint
+  lenses (Lens A + Lens B; Standard prompt)
+- **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
+  (`--copilot`); skipped with notice if `copilot` unavailable
 
 #### Deep tier
 
-Same as Standard, but both adversarial specialists (**5d. Claude
-Adversarial** and **5e. Copilot Adversarial**) run with the Deep prompt
-(broader file horizon plus an explicit security / concurrency /
-lifecycle checklist).
+Same as Standard, but the two **5d. Claude Adversarial** passes run with
+the Deep prompt (broader file horizon plus an explicit security /
+concurrency / lifecycle checklist). If opted in with `--copilot`,
+**5e. Copilot Adversarial** also runs with the Deep prompt as a third,
+cross-model read.
 
 ---
 
@@ -321,13 +341,13 @@ lifecycle checklist).
 
 **Skip if `SKIP_STATIC=true`** (`--skip-static` flag passed in step 1):
 emit no findings for this specialist and note "Static analysis skipped
-(--skip-static)" so the report header can surface it. At Light tier
-with `--skip-static` **and** Copilot Adversarial also suppressed
-(`--no-copilot` or the CLI unavailable), zero specialists run and the
-silence filter produces the "No findings" output — that's the
-documented behavior, not a bug. If only `--skip-static` is set on
-Light, the Copilot Adversarial Specialist (5e) still runs and may
-produce findings.
+(--skip-static)" so the report header can surface it. Light tier always
+runs the single Claude Adversarial pass (5d), so `--skip-static` on
+Light still produces an adversarial read — there is no longer a
+zero-specialist path at Light. (The only way to reach zero specialists
+is the unsupported combination of skipping static analysis on a tier
+where every other specialist is also inapplicable; the silence filter
+produces the "No findings" output if that ever occurs.)
 
 Otherwise, run linters on **changed files only**, using the config
 profile from step 4. See `.agent/knowledge/review_static_analysis.md`
@@ -395,55 +415,82 @@ If no work plan exists, skip this specialist.
 
 #### 5d. Claude Adversarial Specialist
 
-**Activates at**: Standard, Deep.
+**Activates at**: Light (one pass), Standard, Deep (two passes each).
 
-Launch as a **fresh Claude subagent** via the `Agent` tool with no
+Launch as **fresh Claude subagent(s)** via the `Agent` tool with no
 context from the other specialists. The adversarial reviewer reads the
 diff and full changed files independently — that fresh-context dispatch
 is the whole point. An independent reviewer that agrees with the
 governance specialist is a stronger signal than one told what to look
 for.
 
-**Cross-repo limitation**: the Adversarial Specialist only sees the diff
+**Two disjoint-lens passes at Standard + Deep.** With Copilot now
+opt-in (5e), the default cross-read signal — two *independent* readers,
+not one model agreeing with itself — comes from running **two separate
+fresh subagents with non-overlapping focus areas**. Each pass is its
+own `Agent` dispatch; they do not share context with each other or with
+the other specialists. Dispatch them in parallel.
+
+- **Lens A — logic & correctness**:
+  - Missed edge cases and boundary conditions
+  - Assumption violations (what does the code assume that might not hold?)
+  - Subtle bugs (off-by-one, race conditions, resource leaks)
+  - Logic errors (does the code actually do what the PR claims?)
+- **Lens B — systemic & safety**:
+  - Security implications (injection, auth bypass, data exposure)
+  - Concurrency / lifecycle (lock ordering, init/destroy ordering, signal
+    handling, shutdown paths)
+  - Cross-cutting effects (does this change interact with caching,
+    retries, error propagation, or other system-wide behavior?)
+
+**Per-tier dispatch**:
+- **Light** — a **single** pass using **Lens A** only (small, low-risk
+  changes rarely need the systemic lens; keeps Light fast).
+- **Standard** — **both** lenses, each at the standard file horizon
+  (diff + directly-touched files).
+- **Deep** — **both** lenses at a **broader file horizon** (callers,
+  callees, and cross-module consumers of changed symbols) with
+  heightened scrutiny. The Standard→Deep difference is horizon and
+  rigor, not which lenses run.
+
+Giving each pass a single lens keeps the two reads genuinely
+independent rather than one prompt restating another; the silence
+filter (step 6) folds any overlap between Lens A and Lens B into a
+single finding and flags it as cross-pass confirmed.
+
+**Cross-repo limitation**: each Adversarial pass only sees the diff
 and the files it explicitly opens. In a layered workspace, cross-repo
 consequences (a workspace ADR change that affects project repos, a shared
 message-package edit that breaks downstream nodes) won't surface from
 fresh-context reading alone. The Governance Specialist carries that load
 via the consequences map; Adversarial is not a substitute for it.
 
-Standard-tier prompt focus areas:
-- Missed edge cases and boundary conditions
-- Assumption violations (what does the code assume that might not hold?)
-- Subtle bugs (off-by-one, race conditions, resource leaks)
-- Logic errors (does the code actually do what the PR claims?)
-
-Deep-tier prompt adds:
-- Security implications (injection, auth bypass, data exposure)
-- Concurrency / lifecycle (lock ordering, init/destroy ordering, signal
-  handling, shutdown paths)
-- Cross-cutting effects (does this change interact with caching,
-  retries, error propagation, or other system-wide behavior?)
-
 Report findings in the same format as other specialists (file, line,
-severity, description). The silence filter (step 6) deduplicates overlap
-with other specialists' findings.
+severity, description). Label each finding's source with its lens
+(`Claude Adversarial / Lens A`, `Claude Adversarial / Lens B`) so the
+report shows which read caught it.
 
-> **Cross-model adversarial** is wired in as the Copilot Adversarial
-> Specialist (step 5e below). The tmux-orchestrated Gemini/Codex
-> dispatch from upstream `cross_model_review.sh` remains unadopted —
-> see `inspiration_agent_workspace_digest.md` "Partially adopted".
+> **Cross-model adversarial** is available as the opt-in Copilot
+> Adversarial Specialist (step 5e below), adding a true second-vendor
+> read on top of the two in-house Claude lenses. The tmux-orchestrated
+> Gemini/Codex dispatch from upstream `cross_model_review.sh` remains
+> unadopted — see `inspiration_agent_workspace_digest.md`
+> "Partially adopted".
 
 #### 5e. Copilot Adversarial Specialist
 
-**Activates at**: Light, Standard, Deep.
+**Activates only when opted in** with `--copilot` (`COPILOT=1`), at any
+tier. **Off by default** — skip this entire specialist when `COPILOT`
+is unset (no "skipped" notice needed; it's the default state).
 
-A second adversarial pass that uses the GitHub Copilot CLI
-(`@github/copilot` ≥ v1.0.48) as a synchronous, cross-model reader of
-the same diff. Same fresh-context principle as 5d — Copilot sees only
-the diff prompt, no other specialists' findings. The cross-model
-signal value (a second vendor flagging an issue independently is a
-stronger signal than the same model agreeing with itself) is the
-reason this runs at every tier, not just Deep.
+An opt-in cross-model pass that uses the GitHub Copilot CLI
+(`@github/copilot` ≥ v1.0.48) as a synchronous reader of the same diff.
+Same fresh-context principle as 5d — Copilot sees only the diff prompt,
+no other specialists' findings. The cross-model signal value (a second
+*vendor* flagging an issue independently, beyond the two in-house Claude
+lenses) is what `--copilot` buys; it costs one Premium Copilot request
+per run, which is why it is opt-in rather than default-on (see
+[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
 
 **Availability probe**. Skip with a one-line notice (not a failure)
 when the CLI is missing, so field-mode hosts (gabby, salmon — no
@@ -458,8 +505,9 @@ GitHub credentials) don't block the rest of the review:
 # the binary is installed. Probe in order: current PATH, then explicit
 # nvm sourcing, then a glob for nvm-managed installs.
 COPILOT_BIN=""
-if [[ "$NO_COPILOT" == "1" ]]; then
-    # User opted out for this invocation; no "skipped" notice needed.
+if [[ "$COPILOT" != "1" ]]; then
+    # Not opted in (Copilot is off by default); skip the whole specialist.
+    # No "skipped" notice needed — absence is the default state.
     SKIP_COPILOT=1
 elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -x "$COPILOT_BIN" ]; then
     : # Found on current PATH. `[ -x ]` filters out alias/function
@@ -528,20 +576,24 @@ if [[ "$MODE" == "post-PR" && "$SKIP_COPILOT" != "1" ]]; then
 fi
 ```
 
-When `SKIP_COPILOT=1` and `NO_COPILOT` is unset, the report includes:
-`Copilot Adversarial skipped: <COPILOT_SKIP_REASON>`. When
-`NO_COPILOT=1`, the specialist is omitted from the report entirely.
-Post-call empty findings or auth-error output also route to the
-skipped-notice path (see the post-invocation guard below) so
-unauthenticated hosts don't surface as silent zero-finding reviews.
+When the specialist was opted in (`COPILOT=1`) but `SKIP_COPILOT=1`
+was set by the probes above, the report includes:
+`Copilot Adversarial skipped: <COPILOT_SKIP_REASON>` (e.g. opted in on
+a field-mode host where the CLI is unavailable). When `COPILOT` is
+unset — the default — the specialist is omitted from the report
+entirely (it was never requested). Post-call empty findings or
+auth-error output also route to the skipped-notice path (see the
+post-invocation guard below) so an opted-in but unauthenticated host
+doesn't surface as a silent zero-finding review.
 
-**Prompt body**. Light + Standard reuse the same prompt as the Standard
-Claude Adversarial prompt (the four focus areas under 5d: missed edge
-cases, assumption violations, subtle bugs, logic errors). Deep adds
-the same three Deep-tier focus areas as 5d (security, concurrency /
-lifecycle, cross-cutting effects). Reusing one prompt body per tier
-pair keeps the two adversarial specialists comparable — the cross-model
-signal is "two vendors reading the same brief", not "two prompts on
+**Prompt body**. Copilot reuses 5d's lens focus areas so its read is
+comparable to the in-house passes: Light + Standard use the combined
+Lens A + Lens B focus areas (missed edge cases, assumption violations,
+subtle bugs, logic errors, plus security / concurrency-lifecycle /
+cross-cutting). Deep uses the same areas at the broader Deep file
+horizon. Reusing the lens focus areas keeps the cross-model signal
+meaningful — "another vendor reading the same brief", not "a different
+prompt on
 the same diff".
 
 **Invocation** (only when `SKIP_COPILOT` is unset after both probes
@@ -618,13 +670,15 @@ the same trusted-input precondition or supply its own gate.
 
 **Context cost**. Copilot autoloads workspace context on launch — a
 trivial prompt floors at ~25.5k tokens and consumes one Premium
-request. v1 accepts that cost as the tradeoff for default-on
-all-tier activation. If the cost proves unacceptable in practice,
-tighten via `--add-dir <worktree>` (scope context to the worktree) or
-isolated `-C /tmp/scratch` invocation (diff + governance docs only).
-See the cost-evaluation follow-up issue
-([#467](https://github.com/rolker/ros2_agent_workspace/issues/467))
-for the data-collection plan.
+request. Default-on all-tier activation proved unsustainable against
+the team's Premium quota (the trigger that moved this specialist to
+opt-in — see
+[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)), so
+the per-run cost is now paid only when a reviewer explicitly passes
+`--copilot`. To further reduce the per-invocation floor on opted-in
+runs, scope Copilot's context via `--add-dir <worktree>` (worktree
+only) or an isolated `-C /tmp/scratch` invocation (diff + governance
+docs only).
 
 Report findings in the same format as other specialists. The silence
 filter (step 6) deduplicates overlap with 5d and with the other
@@ -661,7 +715,8 @@ Collect all findings from all dispatched specialists and filter:
 **Files changed**: <count> (+<additions> -<deletions>)
 **Review depth**: <Light|Standard|Deep> (reason: <primary signal>)
 **Static analysis**: <run | skipped (--skip-static)>
-**Copilot Adversarial**: <run | skipped (<reason>) | suppressed (--no-copilot)>
+**Claude Adversarial**: <1 pass (Lens A) | 2 passes (Lens A + Lens B)>
+**Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
@@ -716,7 +771,8 @@ Existing Review Comments sections. Use:
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
-**Copilot Adversarial**: <run | skipped (<reason>) | suppressed (--no-copilot)>
+**Claude Adversarial**: 1 pass (Lens A)
+**Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
 
 ### Static Analysis
 
@@ -724,20 +780,24 @@ Existing Review Comments sections. Use:
 |---|------|------|---------|
 | 1 | `path` | 42 | Description |
 
-### Copilot Adversarial
+### Claude Adversarial
 
 | # | File | Line | Finding |
 |---|------|------|---------|
 | 1 | `path` | 17 | Description |
 
-<!-- Or, if the specialist was skipped or suppressed: -->
-<!-- Copilot Adversarial skipped: <reason>     (when copilot unavailable) -->
-<!-- (Section omitted entirely when invoked with --no-copilot) -->
+<!-- Copilot Adversarial section: include only when opted in with --copilot. -->
+<!-- ### Copilot Adversarial  (its findings table, when COPILOT=1 and it ran) -->
+<!-- Copilot Adversarial skipped: <reason>   (when opted in but copilot unavailable) -->
+<!-- Omitted entirely by default, when --copilot was not passed. -->
 
 No governance concerns for a change of this scope.
 ```
 
-When `SKIP_STATIC=true` and **both** `SKIP_COPILOT=1` (from `--no-copilot` or the availability/gate probes in 5e) — i.e., Light + `--skip-static` with Copilot also suppressed = zero specialists — drop the `### Static Analysis` and `### Copilot Adversarial` tables entirely and use the No-findings format below. The two `<header>: skipped` lines carry the only signals that need to surface.
+Light always runs at least Static Analysis + the single Claude
+Adversarial pass, so the report always has an adversarial section. (The
+former Light + `--skip-static` "zero specialists" case no longer exists,
+since Claude Adversarial is now unconditional at Light.)
 
 **No findings format** — if no findings exist across all sections:
 
@@ -747,7 +807,7 @@ When `SKIP_STATIC=true` and **both** `SKIP_COPILOT=1` (from `--no-copilot` or th
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
-**Copilot Adversarial**: <skipped (<reason>) | suppressed (--no-copilot)>  <!-- include only when SKIP_COPILOT=1 -->
+**Copilot Adversarial**: skipped (<reason>, --copilot)  <!-- include only when COPILOT=1 and SKIP_COPILOT=1 -->
 No issues found. LGTM.
 ```
 
