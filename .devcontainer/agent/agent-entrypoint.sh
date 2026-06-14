@@ -55,6 +55,22 @@ done
 # `configure_git_identity.sh --detect` that tripped git's dubious-ownership
 # protection — running as root over host-uid-owned mounts.)
 
+# ---------- 2b. Env-fallback git identity (matches the forwarded one) ----------
+# setup.bash (sourced below) runs `set_git_identity_env.sh --detect` when
+# GIT_AUTHOR_NAME is unset, which re-derives a generic `claude-code` identity
+# that can diverge from the launching agent's self-reported AGENT_NAME/EMAIL.
+# If the host forwarded both, pre-export the GIT_AUTHOR_*/GIT_COMMITTER_* vars
+# from them so that detect branch is skipped — the env-fallback identity then
+# matches the handoff prompt's `git -c` literals instead of a re-detected one.
+# (The `-c` literals remain the load-bearing path; this just keeps the fallback
+# consistent for any commit that omits them.)
+if [ -n "${AGENT_NAME:-}" ] && [ -n "${AGENT_EMAIL:-}" ]; then
+    export GIT_AUTHOR_NAME="$AGENT_NAME"
+    export GIT_AUTHOR_EMAIL="$AGENT_EMAIL"
+    export GIT_COMMITTER_NAME="$AGENT_NAME"
+    export GIT_COMMITTER_EMAIL="$AGENT_EMAIL"
+fi
+
 # ---------- 3. Source ROS 2 environment ----------
 # Temporarily relax strict mode — ROS 2 setup scripts reference unbound variables
 set +u
