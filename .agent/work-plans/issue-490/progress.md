@@ -171,3 +171,71 @@ clean (shellcheck unavailable). Copilot: off.
 - [ ] (suggestion/ask-first) AGENTS.md Script Reference adds `dispatch_subagent.sh` row but omits `docker_run_agent.sh` (extended into the dispatch backend) — `AGENTS.md:466`
 - [ ] (suggestion/ask-first) `configure_git_identity.sh` still documented as "ideal for containerized agents" (README.md 216-255, AI_IDENTITY_STRATEGY.md) but the entrypoint no longer runs it (new model: `git -c` literals + env-fallback) — stale/contradictory
 - [ ] (governance) Confirm human approval for the 4 ask-first instruction-file edits now in the diff (AGENTS.md, copilot-instructions.md, gemini-cli.instructions.md, AGENT_ONBOARDING.md) before pushing
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-14 12:59 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8) — fresh-context sub-agent dispatch
+
+**Scope**: address the round-2 `Local Review (Pre-Push)` findings — 1 must-fix
++ 1 must-fix (exit-contract) + 2 in-scope suggestions + 2 human-approved
+ask-first doc edits. Do-NOT-touch list honored (`framework_config.sh`,
+`set_git_identity_env.sh`, and the 4 earlier framework-adapter/AGENTS handoff
+edits left untouched).
+
+**Branch**: feature/issue-490
+
+**Commits**:
+- `3d98375` — `docker_run_agent.sh` (#1, #3, #4)
+- `da0b52b` — `dispatch_subagent.sh` (#2)
+- `f702f4b` — `AGENTS.md` Script Reference row (#5)
+- `05a553c` — `README.md` + `AI_IDENTITY_STRATEGY.md` doc sync (#6)
+
+### Findings fixed
+- **#1 (must-fix)** `--prompt ""` dispatch gate — `--prompt` arm now rejects
+  an empty value at parse time, and `DISPATCH_MODE` is gated on `PROMPT_SET`
+  (intent) instead of `[ -n "$PROMPT" ]` (value), so an empty prompt can no
+  longer fall through to an interactive `-it` container —
+  `docker_run_agent.sh`.
+- **#2 (must-fix)** exit-contract missed review-code's pre-push variant.
+  **Note on the task's `base_type` premise:** verified via `progress_read.py`
+  JSON that `Local Review (Pre-Push)` is *itself* a canonical ADR-0013 type,
+  so its `base_type` is the full `Local Review (Pre-Push)` — it does **not**
+  strip to `Local Review`. The documented fallback was therefore required:
+  `entry_count` and the OK-branch last-entry display now match over the
+  unfiltered `progress_read.py` JSON with the predicate
+  `type == ENTRY_TYPE OR base_type == ENTRY_TYPE OR type.startswith(ENTRY_TYPE)`
+  (the `startswith` arm catches the parenthetical variant). `progress_read.py`
+  left unchanged (changing `_canonical_base` would broadly re-scope a distinct
+  canonical type and risk other consumers). Failure message softened to
+  acknowledge the unexpected-type case — `dispatch_subagent.sh`.
+- **#3 (suggestion)** `GH_TOKEN` now forwarded via bare `-e GH_TOKEN`
+  (value-in-env, exported when set) instead of `-e "GH_TOKEN=$AGENT_GH_TOKEN"`
+  (value-in-argv, visible in host `ps`) — matches the OAuth pattern —
+  `docker_run_agent.sh`.
+- **#4 (suggestion)** both secret-file reads use `IFS= read -r` to avoid
+  whitespace stripping — `docker_run_agent.sh`.
+- **#5 (ask-first, approved)** `docker_run_agent.sh` row added to the AGENTS.md
+  Script Reference (verbatim per the task) — `AGENTS.md`.
+- **#6 (ask-first, approved)** `configure_git_identity.sh` containerized-identity
+  docs synced to the current model (handoff `git -c` literals + entrypoint
+  `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env); the script is reframed as the
+  dedicated-checkout method, not the container method — `README.md`,
+  `AI_IDENTITY_STRATEGY.md`. Claims cross-checked against
+  `agent-entrypoint.sh` (lines 67–80).
+
+### Tests
+- `bash -n` clean on both edited scripts (`docker_run_agent.sh`,
+  `dispatch_subagent.sh`).
+- `test_dispatch_subagent.sh`: **29/29 pass**.
+- shellcheck (via pre-commit) passed on both scripts.
+- The #2 matching predicate runs only in the container-mode exit-contract path
+  (not reachable without docker, consistent with the existing test file's
+  documented scope), so no new unit test was added; it was verified manually
+  with the live `progress.md` — `ENTRY_TYPE="Local Review"` now matches both
+  `Local Review` and `Local Review (Pre-Push)` (count 1 → 2).
+
+### Out of scope (untouched)
+`framework_config.sh` stale-model follow-up, `set_git_identity_env.sh`, and the
+4 already-committed framework-adapter/AGENTS handoff edits — per the
+Do-NOT-touch list. No `git push` (host performs pushes).
