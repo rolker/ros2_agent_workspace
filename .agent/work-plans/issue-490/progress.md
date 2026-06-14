@@ -145,3 +145,29 @@ touched, per the Do-NOT-touch list.
 handoff rule, and the ambiguous-worktree warning). Container-mode behavior
 (fixes #1/#4/#6 runtime path) remains covered by the manual layer-worktree
 verification noted in the plan — not unit-testable without docker.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-14 12:25 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-490 at `65d3408`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant scripts — container dispatch, --dangerously-skip-permissions, OAuth-token handling, in-container git identity)
+**Must-fix**: 1 | **Suggestions**: 5
+
+Re-review of the current tree after the prior post-PR fixes (`e6770db`,
+`a2d898d`, `cc26ead`). All earlier must-fix items verify as applied;
+`test_dispatch_subagent.sh` 29/29; both adversarial lenses confirmed the
+exit-contract + privilege-drop logic correct. Static analysis: `bash -n`
+clean (shellcheck unavailable). Copilot: off.
+
+### Findings
+- [ ] (must-fix) `--prompt ""` sets `PROMPT_SET=true` but `DISPATCH_MODE` stays false (gated on `[ -n "$PROMPT" ]`) → silently launches interactive `-it` container; same class as prior must-fix #2 for `--prompt-file`. Gate on `PROMPT_SET` + reject empty `--prompt` — `docker_run_agent.sh:156`
+- [ ] (suggestion) GH read-only token forwarded inline `-e "GH_TOKEN=$AGENT_GH_TOKEN"` → visible in host `ps`/cmdline; PR's new adjacent OAuth forwarding (line 369) uses the safe bare-`-e` form. Pre-existing line, 1-line fix while here — `docker_run_agent.sh:371`
+- [ ] (suggestion) "died before reporting" headline is a false-negative when the sub-agent writes a real entry of a different type than the gated `--entry-type`; add a caveat to the message — `dispatch_subagent.sh:265`
+- [ ] (suggestion) secrets read via `read -r VAR < file`; use `IFS= read -r` to avoid whitespace stripping — `docker_run_agent.sh:181,345`
+- [ ] (suggestion/ask-first) AGENTS.md Script Reference adds `dispatch_subagent.sh` row but omits `docker_run_agent.sh` (extended into the dispatch backend) — `AGENTS.md:466`
+- [ ] (suggestion/ask-first) `configure_git_identity.sh` still documented as "ideal for containerized agents" (README.md 216-255, AI_IDENTITY_STRATEGY.md) but the entrypoint no longer runs it (new model: `git -c` literals + env-fallback) — stale/contradictory
+- [ ] (governance) Confirm human approval for the 4 ask-first instruction-file edits now in the diff (AGENTS.md, copilot-instructions.md, gemini-cli.instructions.md, AGENT_ONBOARDING.md) before pushing
