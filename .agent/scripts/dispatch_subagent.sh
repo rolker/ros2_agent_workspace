@@ -11,7 +11,11 @@
 # Usage:
 #   dispatch_subagent.sh --mode in-process|container --issue <N> \
 #       (--skill <name> | --prompt-file <path>) \
-#       [--entry-type <type>] [--output-format <fmt>]
+#       [--entry-type <type>] [--output-format <fmt>] [--model <id>]
+#
+#   --model defaults per-skill (Opus for review/implement, Sonnet otherwise);
+#   pass an alias ('opus'/'sonnet') to override. Container mode forwards it;
+#   in-process mode only recommends it (the host picks the Agent's model).
 #
 # Examples:
 #   dispatch_subagent.sh --mode in-process --issue 490 --skill review-code
@@ -36,6 +40,7 @@ SKILL=""
 PROMPT_FILE=""
 ENTRY_TYPE=""
 OUTPUT_FORMAT="stream-json"
+MODEL=""   # --model override; empty => derive from the skill (see skill_model)
 
 # Identity literals embedded in the handoff (AGENTS.md § Agent Commit Identity).
 # Prefer the session's exported identity; fall back to the Claude default.
@@ -56,6 +61,20 @@ skill_entry_type() {
     esac
 }
 
+# Skill -> model (per-phase, #490). Reasoning-heavy phases get Opus; lighter
+# ones (and the default) get Sonnet for quota headroom. Aliases, not pinned
+# ids, so they survive model version bumps; an unavailable model hard-fails
+# loudly (claude exits non-zero -> exit-contract reports FAILED). `--model`
+# overrides any cell. Adjust the mapping here as needs change.
+skill_model() {
+    case "$1" in
+        review-code|review-plan|triage-reviews)  echo "opus" ;;
+        implement|address-findings)              echo "opus" ;;
+        review-issue|plan-task)                  echo "sonnet" ;;
+        *)                                       echo "sonnet" ;;
+    esac
+}
+
 usage() {
     sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
@@ -69,6 +88,7 @@ while [[ $# -gt 0 ]]; do
         --skill)         SKILL="${2:-}"; shift 2 ;;
         --prompt-file)   PROMPT_FILE="${2:-}"; shift 2 ;;
         --entry-type)    ENTRY_TYPE="${2:-}"; shift 2 ;;
+        --model)         MODEL="${2:-}"; shift 2 ;;
         --output-format) OUTPUT_FORMAT="${2:-}"; shift 2 ;;
         -h|--help)       usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -98,6 +118,12 @@ fi
 # the skill. May be empty for a raw prompt with no declared type.
 if [ -z "$ENTRY_TYPE" ] && [ -n "$SKILL" ]; then
     ENTRY_TYPE="$(skill_entry_type "$SKILL")"
+fi
+
+# Resolve the model: explicit --model wins, else derive from the skill, else the
+# default ('sonnet'). For a raw prompt with no --model, the default applies.
+if [ -z "$MODEL" ]; then
+    if [ -n "$SKILL" ]; then MODEL="$(skill_model "$SKILL")"; else MODEL="sonnet"; fi
 fi
 
 # ---------- Resolve the worktree + its progress.md ----------
@@ -161,6 +187,8 @@ if [ "$MODE" = "in-process" ]; then
     echo "=== DISPATCH (in-process) — issue #$ISSUE${SKILL:+, skill /$SKILL} ==="
     echo "Paste the block between the markers into a fresh Agent tool call (no"
     echo "inherited context). Expected entry type: ${ENTRY_TYPE:-<any>}."
+    echo "Recommended model: $MODEL (in-process can't set it — pick it when you"
+    echo "spawn the Agent; container mode passes it automatically)."
     echo "---------------8<--------------- BEGIN HANDOFF ---------------8<---------------"
     printf '%s\n' "$HANDOFF"
     echo "---------------8<---------------- END HANDOFF ----------------8<---------------"
@@ -190,11 +218,12 @@ PROMPT_TMP="$(mktemp /tmp/dispatch_handoff.XXXXXX.md)"
 trap 'rm -f "$PROMPT_TMP"' EXIT
 printf '%s\n' "$HANDOFF" > "$PROMPT_TMP"
 
-echo "Dispatching issue #$ISSUE into a container (headless)…" >&2
+echo "Dispatching issue #$ISSUE into a container (headless, model=$MODEL)…" >&2
 RC=0
 "$SCRIPT_DIR/docker_run_agent.sh" \
     --issue "$ISSUE" \
     --output-format "$OUTPUT_FORMAT" \
+    --model "$MODEL" \
     --prompt-file "$PROMPT_TMP" || RC=$?
 
 # --- Exit-contract read ---

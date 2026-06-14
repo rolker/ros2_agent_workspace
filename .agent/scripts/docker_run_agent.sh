@@ -36,6 +36,7 @@ BUILD_IMAGE=false
 SHELL_MODE=false
 PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
 OUTPUT_FORMAT="stream-json"  # claude -p --output-format in dispatch mode
+MODEL=""               # claude --model (alias like 'opus'/'sonnet', or full id); empty → claude default
 
 show_usage() {
     cat <<'EOF'
@@ -57,6 +58,9 @@ Options:
                         with --prompt and --shell.
   --output-format <fmt> Dispatch-mode claude output format: stream-json
                         (default), json, or text. Ignored without a prompt.
+  --model <id>          claude --model (prefer an alias like 'opus'/'sonnet'
+                        over a pinned id). Empty => claude's default. An
+                        unavailable model makes claude exit non-zero.
   -h, --help            Show this help
 
 Prerequisites:
@@ -111,6 +115,13 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             OUTPUT_FORMAT="$2"; shift 2 ;;
+        --model)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --model requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            MODEL="$2"; shift 2 ;;
         -h|--help)
             show_usage; exit 0 ;;
         *)
@@ -359,6 +370,13 @@ ENV_ARGS=(
 # project/.mcp.json servers, so nothing the sandbox legitimately needs
 # is lost; local skills still resolve via /skill-name. Removes the
 # startup-log noise and a round-trip per server.
+# --model is optional. Prefer an alias ('opus'/'sonnet') over a pinned id so
+# it survives model version bumps; an unavailable model makes claude exit
+# non-zero (hard-fail, surfaced by the caller's exit-contract — no silent
+# downgrade). Empty MODEL => claude's built-in default.
+MODEL_FLAGS=()
+[ -n "$MODEL" ] && MODEL_FLAGS=(--model "$MODEL")
+
 CONTAINER_CMD=()
 if [ "$SHELL_MODE" = true ]; then
     CONTAINER_CMD=(/bin/bash)
@@ -369,9 +387,10 @@ elif [ "$DISPATCH_MODE" = true ]; then
     # --verbose; for other formats --verbose is harmless.
     CONTAINER_CMD=(claude -p "$PROMPT"
         --output-format "$OUTPUT_FORMAT" --verbose
+        "${MODEL_FLAGS[@]}"
         --dangerously-skip-permissions --strict-mcp-config)
 else
-    CONTAINER_CMD=(claude --dangerously-skip-permissions --strict-mcp-config)
+    CONTAINER_CMD=(claude "${MODEL_FLAGS[@]}" --dangerously-skip-permissions --strict-mcp-config)
 fi
 
 # TTY allocation: interactive/shell modes want a TTY; headless dispatch
@@ -399,6 +418,7 @@ else
     RUN_MODE="Claude Code (YOLO)"
 fi
 echo "  Mode:      $RUN_MODE"
+echo "  Model:     ${MODEL:-(claude default)}"
 echo "  GitHub:    $([ -n "$AGENT_GH_TOKEN" ] && echo 'read-only token' || echo 'no token')"
 echo "========================================="
 echo ""

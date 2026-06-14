@@ -94,6 +94,22 @@ assert_emits "prompt-file content becomes the task body" "UNIQUE_TASK_MARKER_42"
     --mode in-process --issue "$TEST_ISSUE" --prompt-file "$PF"
 rm -f "$PF"
 
+# --- per-phase model mapping (in-process reports the recommended model) ---
+assert_emits "review-code -> opus model" "Recommended model: opus" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-code
+assert_emits "triage-reviews -> opus model" "Recommended model: opus" \
+    --mode in-process --issue "$TEST_ISSUE" --skill triage-reviews
+assert_emits "review-issue -> sonnet model" "Recommended model: sonnet" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue
+assert_emits "plan-task -> sonnet model" "Recommended model: sonnet" \
+    --mode in-process --issue "$TEST_ISSUE" --skill plan-task
+assert_emits "unknown skill -> sonnet default" "Recommended model: sonnet" \
+    --mode in-process --issue "$TEST_ISSUE" --skill frobnicate
+assert_emits "raw prompt -> sonnet default" "Recommended model: sonnet" \
+    --mode in-process --issue "$TEST_ISSUE" --prompt-file /etc/hostname
+assert_emits "--model overrides skill mapping" "Recommended model: haiku" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-code --model haiku
+
 # --- identity override via env ---
 out="$(AGENT_NAME="Tester Bot" AGENT_EMAIL="roland+tester@ccom.unh.edu" \
     "$DISPATCH" --mode in-process --issue "$TEST_ISSUE" --skill review-code 2>/dev/null)"
