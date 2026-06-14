@@ -17,18 +17,25 @@ delta installs at launch.
 The wrinkle: the build context is `.devcontainer/agent/`, which has **no layer
 source** (`layers/` is gitignored and mounted at runtime, never copied). So the
 Dockerfile has no `package.xml` to `rosdep install` against. Solution is the ROS
-"copy only the manifests" idiom — stage the 102 `package.xml` files into the
-build context host-side (where `layers/` exists), `COPY` just those, `rosdep
-install`, then discard. Source stays mounted, not baked.
+"copy only the manifests" idiom — stage the **108** `package.xml` files
+(recursive count across the checked-out layers) into the build context host-side
+(where `layers/` exists), `COPY` just those, `rosdep install`, then discard.
+Source stays mounted, not baked.
 
 ## Approach
 
 1. **Stage manifests host-side in `docker_run_agent.sh`** — in the build block
-   (around line 260, before `docker build`), gather every
-   `layers/main/*_ws/src/*/package.xml` into
-   `.devcontainer/agent/.rosdep-manifests/`, preserving the
-   `layers/main/<ws>/src/<pkg>/` structure. Wipe and regenerate the dir on every
-   `--build` so a stale manifest set can never bake outdated deps.
+   (around line 260, before `docker build`), gather every `package.xml` under
+   the layer sources **recursively** (`find "$ROOT_DIR"/layers/main/*_ws/src
+   -name package.xml`) into `.devcontainer/agent/.rosdep-manifests/`, preserving
+   each file's path relative to `$ROOT_DIR` (so each manifest lands in its **own
+   directory** — `rosdep install --from-paths` reads one `package.xml` per dir).
+   A non-recursive `src/*/package.xml` glob would catch only 21 of 108 manifests
+   — most project repos are multi-package and nest manifests in subdirs
+   (`marine_control/marine_control_interfaces/package.xml`, etc.), so a shallow
+   glob would leave ~80% of layer deps un-baked and the launch-time apt storm
+   would persist. Wipe and regenerate the dir on every `--build` so a stale
+   manifest set can never bake outdated deps.
 2. **Add `.devcontainer/agent/.dockerignore`** — keep the build context lean and
    explicit: include the staging dir + the two tracked files (`Dockerfile`,
    `agent-entrypoint.sh`), exclude `README.md` and anything else.
@@ -36,13 +43,16 @@ install`, then discard. Source stays mounted, not baked.
    generated build artifact; add it to `.gitignore` (workspace-cleanliness rule).
 4. **Bake deps in the Dockerfile** — after the dev-tools apt block and the
    existing `rosdep init`, while still **root** (apt needs root, and the image
-   has no sudo): `rosdep update` (root cache) → `COPY .rosdep-manifests/ ...` →
-   `rosdep install --from-paths <staged src dirs> --ignore-src -y --rosdistro
-   jazzy` → remove the staged copy. Keep the existing user-side `rosdep update`
-   (line 80) so the runtime check still works under the `ros` user. Use
-   best-effort (`|| true`) on the install so one transiently-unavailable dep
-   doesn't break the whole image build, matching the entrypoint's posture — but
-   echo what failed.
+   has no sudo): `apt-get update` (the dev-tools blocks each end with `rm -rf
+   /var/lib/apt/lists/*`, so the apt index is empty at the bake point and the
+   install would fail without a fresh index) → `rosdep update` (root cache) →
+   `COPY .rosdep-manifests/ ...` → `rosdep install --from-paths <staged src dirs>
+   --ignore-src -y --rosdistro jazzy` → `rm -rf /var/lib/apt/lists/*` + remove
+   the staged copy (keep the image layer lean). Keep the existing user-side
+   `rosdep update` (line 80) so the runtime check still works under the `ros`
+   user. Use best-effort (`|| true`) on the install so one transiently-unavailable
+   dep doesn't break the whole image build, matching the entrypoint's posture —
+   but echo what failed.
 5. **Docs** — update `.devcontainer/agent/README.md` (image now bakes layer deps;
    when to rebuild: dep drift / `package.xml` changes) and re-check the
    `docker_run_agent.sh` row in AGENTS.md's Script Reference.
@@ -51,8 +61,8 @@ install`, then discard. Source stays mounted, not baked.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/docker_run_agent.sh` | Add manifest-staging step before `docker build`; regenerate fresh each build |
-| `.devcontainer/agent/Dockerfile` | `COPY` staged manifests + root-side `rosdep update`/`install`/cleanup |
+| `.agent/scripts/docker_run_agent.sh` | Add **recursive** manifest-staging step before `docker build`; regenerate fresh each build |
+| `.devcontainer/agent/Dockerfile` | `COPY` staged manifests + root-side `apt-get update`/`rosdep update`/`install`/cleanup |
 | `.devcontainer/agent/.dockerignore` | New — constrain build context to intended files |
 | `.gitignore` | Ignore `.devcontainer/agent/.rosdep-manifests/` |
 | `.devcontainer/agent/README.md` | Document dep-baking + rebuild triggers |
@@ -65,7 +75,7 @@ install`, then discard. Source stays mounted, not baked.
 | Only what's needed | Solves a measured pain (apt storm in dispatch logs); manifest-staging is the minimum mechanism to do it |
 | A change includes its consequences | README + `.dockerignore` + `.gitignore` + AGENTS.md row updated in the same PR, not deferred |
 | Human control and transparency | Build logs show the bake; launch logs show "satisfied — skipping"; `FORCE_DEPS_REFRESH=1` escape hatch unchanged |
-| Test what breaks | Manifest-gather logic (structure-preserving copy, empty/missing `src/`) is the testable, silently-breakable part |
+| Test what breaks | Manifest-gather logic is the testable, silently-breakable part: assert the recursive gather copies all 108 manifests (not the 21 a shallow glob catches), each into its own dir, and handles empty/missing `src/`. A regression here silently re-creates the apt storm |
 | Improve incrementally | Small, layered on #489's already-merged entrypoint check |
 
 ## ADR Compliance

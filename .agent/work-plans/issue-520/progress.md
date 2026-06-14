@@ -45,7 +45,11 @@ issue: 520
 **Verdict**: changes-requested
 
 ### Findings
-- [ ] (must-fix) Manifest-gather glob `layers/main/*_ws/src/*/package.xml` is non-recursive — it catches only 21 of 108 actual `package.xml` files; multi-package repos (marine_control, unh_marine_autonomy, udp_bridge, vrx, etc.) keep their manifests in subdirs, so most layer deps would NOT bake and the launch-time apt storm would persist for them, defeating the goal. Gather recursively (`find <src> -name package.xml`) preserving structure. — `plan.md:28`
-- [ ] (suggestion) "102 package.xml files" is inaccurate (shallow glob=21, recursive=108); correct the count and tie it to the recursive gather. — `plan.md:20`
-- [ ] (suggestion) Bake step should `apt-get update` before `rosdep install` — the dev-tools blocks end with `rm -rf /var/lib/apt/lists/*` (Dockerfile L33/41/49), so the apt index is empty at the bake point; otherwise installs fail. Make explicit alongside the root-side `rosdep update`. — `plan.md:39`
-- [ ] (suggestion) Note that `rosdep install --from-paths` over the staging dir requires each `package.xml` in its own directory (rosdep reads package.xml per-dir); the structure-preserving copy already does this but worth stating as the test invariant. — `plan.md:31`
+- [x] (must-fix) Manifest-gather glob `layers/main/*_ws/src/*/package.xml` is non-recursive — it catches only 21 of 108 actual `package.xml` files; multi-package repos (marine_control, unh_marine_autonomy, udp_bridge, vrx, etc.) keep their manifests in subdirs, so most layer deps would NOT bake and the launch-time apt storm would persist for them, defeating the goal. Gather recursively (`find <src> -name package.xml`) preserving structure. — `plan.md:28` → **FIXED**: Approach step 1 now specifies a recursive `find`, per-dir staging, and the 21-vs-108 rationale (verified live: shallow=21, recursive=108).
+- [x] (suggestion) "102 package.xml files" is inaccurate (shallow glob=21, recursive=108); correct the count and tie it to the recursive gather. — `plan.md:20` → **FIXED**: Context now reads 108 (recursive).
+- [x] (suggestion) Bake step should `apt-get update` before `rosdep install` — the dev-tools blocks end with `rm -rf /var/lib/apt/lists/*` (Dockerfile L33/41/49), so the apt index is empty at the bake point; otherwise installs fail. Make explicit alongside the root-side `rosdep update`. — `plan.md:39` → **FIXED**: Approach step 4 now opens with `apt-get update` and closes with `rm -rf /var/lib/apt/lists/*`.
+- [x] (suggestion) Note that `rosdep install --from-paths` over the staging dir requires each `package.xml` in its own directory (rosdep reads package.xml per-dir); the structure-preserving copy already does this but worth stating as the test invariant. — `plan.md:31` → **FIXED**: per-dir invariant stated in Approach step 1 and the Test-what-breaks row.
+
+### Resolution
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-14
+All four findings addressed in plan revision; plan is now implementation-ready.
