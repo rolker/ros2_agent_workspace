@@ -213,9 +213,18 @@ source .agent/scripts/set_git_identity_env.sh "Gemini CLI Agent" "roland+gemini-
 
 ---
 
-### `configure_git_identity.sh` (Persistent - For Containerized Agents)
+### `configure_git_identity.sh` (Persistent - For Dedicated Agent-Only Checkouts)
 
 Configure git identity persistently across all repositories by modifying `.git/config`.
+
+> **Note:** This is **not** how the workspace's sandboxed agent container
+> (`docker_run_agent.sh`) sets its commit identity. The container entrypoint no
+> longer runs `configure_git_identity.sh --detect`; container commit identity now
+> comes from (a) the dispatch handoff prompt's per-invocation
+> `git -c user.name=… -c user.email=…` literals and (b) the
+> `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env that `agent-entrypoint.sh` exports from the
+> forwarded `AGENT_NAME`/`AGENT_EMAIL` before sourcing `setup.bash`. Use this
+> script for **non-container** dedicated agent-only checkouts (e.g. Antigravity).
 
 **Usage:**
 ```bash
@@ -234,7 +243,7 @@ Configure git identity persistently across all repositories by modifying `.git/c
 
 **Why use this:**
 - ✅ Persists across all shell sessions
-- ✅ Ideal for containerized agents (Antigravity) or dedicated agent-only checkouts
+- ✅ Ideal for dedicated agent-only checkouts (e.g. Antigravity host clones)
 - ✅ Automatically configures all repositories in one command
 
 **Trade-offs:**
@@ -247,11 +256,12 @@ Configure git identity persistently across all repositories by modifying `.git/c
 
 **Decision Tree:**
 ```
-Are you in a container or isolated environment?
-├─ YES → Use this script (configure_git_identity.sh)
+Are you in the sandboxed agent container (docker_run_agent.sh)?
+├─ YES → Don't use this script. Identity comes from the dispatch handoff's
+│        `git -c` literals + the entrypoint's GIT_AUTHOR_*/GIT_COMMITTER_* env.
 └─ NO → Do you share this checkout with the user?
          ├─ YES → Use set_git_identity_env.sh instead
-         └─ NO → Use this script (configure_git_identity.sh)
+         └─ NO → Use this script (configure_git_identity.sh) — dedicated checkout
 ```
 
 **Dependencies:**

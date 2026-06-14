@@ -96,9 +96,16 @@ so pre-commit hooks see the agent identity even when the bash subshell
 running the commit didn't inherit the sourced exports. See AGENTS.md
 "Agent Commit Identity" for the full pattern + rationale.
 
-#### When to Use Persistent Identity (Containerized Agents)
+#### When to Use Persistent Identity (Dedicated Agent-Only Checkouts)
 
-**Use for**: Antigravity, containerized agents, or dedicated agent-only checkouts.
+**Use for**: Antigravity host clones or other dedicated agent-only checkouts.
+
+> **Not the sandboxed agent container.** The workspace's `docker_run_agent.sh`
+> container no longer runs `configure_git_identity.sh --detect` at entry. In the
+> container, commit identity comes from (a) the dispatch handoff prompt's
+> per-invocation `git -c user.name=… -c user.email=…` literals and (b) the
+> `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env that `agent-entrypoint.sh` exports from the
+> forwarded `AGENT_NAME`/`AGENT_EMAIL` before sourcing `setup.bash`.
 
 **Method**: Run the configuration script:
 ```bash
@@ -117,17 +124,18 @@ running the commit didn't inherit the sourced exports. See AGENTS.md
 ### Decision Tree
 
 ```
-Are you running in a container or isolated environment?
+Are you in the sandboxed agent container (docker_run_agent.sh)?
 │
-├─ YES → Use Persistent Identity
-│         (./.agent/scripts/configure_git_identity.sh)
+├─ YES → Don't configure identity here. It comes from the dispatch
+│         handoff's `git -c` literals + the entrypoint's
+│         GIT_AUTHOR_*/GIT_COMMITTER_* env (from forwarded AGENT_NAME/EMAIL).
 │
 └─ NO → Do you share this working copy with a human user?
          │
          ├─ YES → Use Ephemeral Identity
          │         (source .agent/scripts/set_git_identity_env.sh)
          │
-         └─ NO → Use Persistent Identity
+         └─ NO → Use Persistent Identity — dedicated checkout
                   (./.agent/scripts/configure_git_identity.sh)
 ```
 
@@ -143,7 +151,7 @@ We configure each agent to use a distinct name and email for git commits.
     *   Determine appropriate identity for your agent (ask user if needed)
     *   Choose appropriate configuration method (ephemeral vs. persistent - see "Agent Identity Configuration" section above)
     *   **Ephemeral**: `source .agent/scripts/set_git_identity_env.sh` (for host-based agents in shared workspaces)
-    *   **Persistent**: `./.agent/scripts/configure_git_identity.sh` (for containerized agents or dedicated checkouts)
+    *   **Persistent**: `./.agent/scripts/configure_git_identity.sh` (for dedicated agent-only checkouts; **not** the sandboxed container — see "When to Use Persistent Identity" above)
 *   **Benefits**:
     *   Git history clearly distinguishes agent commits from human commits.
     *   Blame view shows the agent name instead of the user.
@@ -232,7 +240,8 @@ We distinguish the **content** author from the **setup** author.
     - **Ask the user** if self-reporting and auto-detection both fail
 2.  **Choose the appropriate configuration method**:
     - **Host-based agents (Copilot CLI, Gemini CLI)**: Use ephemeral identity (environment variables)
-    - **Containerized agents (Antigravity)**: Use persistent identity (.git/config)
+    - **Sandboxed agent container (`docker_run_agent.sh`)**: Don't configure here — identity comes from the dispatch handoff's `git -c` literals + the entrypoint's `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env (forwarded `AGENT_NAME`/`AGENT_EMAIL`)
+    - **Dedicated agent-only checkouts (Antigravity host clones)**: Use persistent identity (.git/config)
     - See "Configuration Methods: Ephemeral vs. Persistent" section above for details
 3.  **Configure git identity** before making any commits:
     - **Ephemeral (preferred)**: `source .agent/scripts/set_git_identity_env.sh "<Name>" "<email>" "<your model>"` (self-report)
