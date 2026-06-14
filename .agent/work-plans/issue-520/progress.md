@@ -99,3 +99,11 @@ All four findings addressed in plan revision; plan is now implementation-ready.
 - Claude Adversarial Lens A (logic): no correctness bugs; goal achieved (recursive `--from-paths`, best-effort RUN exits 0, empty-COPY safe).
 - Claude Adversarial Lens B (systemic/safety): isolation sound (only text manifests enter context; bake root is build-time only), caching sound (content-hash COPY), two suggestions above.
 - Copilot Adversarial: off (default; not opted in).
+
+## Local Review (Pre-Push) — follow-up fix
+**Status**: complete
+**When**: 2026-06-14 12:30 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Additional must-fix found while sequencing the push/build** (the pre-push adversarial passes didn't inspect the Makefile):
+- [x] (must-fix) `make agent-build` (Makefile:276) does a **bare** `docker build` that bypasses manifest staging, so the new `COPY .rosdep-manifests/` would fail (dir is gitignored, only `docker_run_agent.sh` created it). The README even listed `make agent-build` as a valid build path. FIXED: extracted `.agent/scripts/stage_rosdep_manifests.sh` (shared gather, single source of truth); `docker_run_agent.sh` now calls it; `make agent-build` stages via it (trap-cleaned) before building. Helper verified to stage 108 manifests; both scripts `bash -n` clean. README caveat + AGENTS.md Script Reference + plan consequences table updated.

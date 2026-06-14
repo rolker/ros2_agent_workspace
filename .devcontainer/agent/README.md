@@ -67,10 +67,11 @@ slower and the image larger; launches are much faster. The bake is best-effort:
 a dep that can't resolve at build time is logged and falls through to the
 launch-time install path rather than failing the build.
 
-> The image must be built through `docker_run_agent.sh --build` (or
-> `make agent-build`), which stages the manifests. A bare
-> `docker build .devcontainer/agent/` has no `.rosdep-manifests/` and the
-> `COPY` step will fail.
+> Build through `docker_run_agent.sh --build` or `make agent-build` — both
+> stage the manifests first (via `.agent/scripts/stage_rosdep_manifests.sh`).
+> A **manual** `docker build .devcontainer/agent/` that bypasses those wrappers
+> has no `.rosdep-manifests/` and the `COPY` step will fail; stage first with
+> `./.agent/scripts/stage_rosdep_manifests.sh "$PWD"` if you must build by hand.
 >
 > The baked deps are a snapshot of whatever layers are checked out at build
 > time, so the image is **not** project-agnostic at runtime — it's a local,

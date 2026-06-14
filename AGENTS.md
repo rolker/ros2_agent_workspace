@@ -465,6 +465,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dispatch_subagent.sh` | Dispatch a workflow skill into a fresh-context sub-agent (in-process or container); reads the progress.md exit contract |
 | `.agent/scripts/docker_run_agent.sh` | Launch the sandboxed agent container for a worktree; interactive or headless dispatch (`--prompt`/`--prompt-file`, `--model`), reads `CLAUDE_CODE_OAUTH_TOKEN`. `--build` also stages layer `package.xml` manifests into the image build context to bake their rosdep deps (#520) |
+| `.agent/scripts/stage_rosdep_manifests.sh` | Gather layer `package.xml` manifests (recursive) into the agent-image build context for the rosdep bake (#520); shared by `docker_run_agent.sh --build` and `make agent-build` |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |

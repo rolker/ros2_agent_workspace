@@ -264,32 +264,14 @@ if [ "$BUILD_IMAGE" = true ]; then
     # agent/) has no layer source — layers/ is gitignored and mounted at
     # runtime, never copied — so gather just the package.xml manifests here,
     # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
-    # Recursive: most project repos are multi-package and nest manifests in
-    # subdirs (marine_control/marine_control_interfaces/package.xml, …), so a
-    # shallow src/*/package.xml glob would miss ~80% of them. Regenerated fresh
-    # each build so a stale manifest set can never bake outdated deps. Each
-    # manifest keeps its path relative to ROOT_DIR so it lands in its own dir
-    # (rosdep install --from-paths reads one package.xml per directory).
+    # The gather logic lives in stage_rosdep_manifests.sh (shared with
+    # `make agent-build`) so both build entry points stage identically.
     STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
     # Clean the staging dir on any exit from here through the build — including
     # a `set -e` abort on a failed `docker build` — so it never lingers in the
     # working tree (workspace-cleanliness rule). Cleared after the build below.
     trap 'rm -rf "$STAGE_DIR"' EXIT
-    echo "Staging layer package.xml manifests for the rosdep bake..."
-    rm -rf "$STAGE_DIR"
-    mkdir -p "$STAGE_DIR"
-    manifest_count=0
-    for src_dir in "$ROOT_DIR"/layers/main/*_ws/src; do
-        [ -d "$src_dir" ] || continue
-        while IFS= read -r -d '' pkgxml; do
-            rel="${pkgxml#"$ROOT_DIR"/}"
-            dest="$STAGE_DIR/$rel"
-            mkdir -p "$(dirname "$dest")"
-            cp "$pkgxml" "$dest"
-            manifest_count=$((manifest_count + 1))
-        done < <(find "$src_dir" -name package.xml -type f -print0)
-    done
-    echo "  staged $manifest_count manifest(s)"
+    "$SCRIPT_DIR/stage_rosdep_manifests.sh" "$ROOT_DIR" "$STAGE_DIR"
 
     echo "Building agent image..."
     docker build \

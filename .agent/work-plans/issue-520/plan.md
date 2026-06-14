@@ -61,7 +61,9 @@ Source stays mounted, not baked.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/docker_run_agent.sh` | Add **recursive** manifest-staging step before `docker build`; regenerate fresh each build |
+| `.agent/scripts/stage_rosdep_manifests.sh` | **New** — shared recursive manifest-gather helper; single source of truth called by both build entry points |
+| `.agent/scripts/docker_run_agent.sh` | Call the staging helper before `docker build`; EXIT-trap cleanup of the staging dir |
+| `Makefile` | `agent-build` stages via the helper (trap-cleaned) before the bare `docker build` — otherwise its `COPY .rosdep-manifests/` fails |
 | `.devcontainer/agent/Dockerfile` | `COPY` staged manifests + root-side `apt-get update`/`rosdep update`/`install`/cleanup |
 | `.devcontainer/agent/.dockerignore` | New — constrain build context to intended files |
 | `.gitignore` | Ignore `.devcontainer/agent/.rosdep-manifests/` |
@@ -92,7 +94,8 @@ Source stays mounted, not baked.
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
-| `docker_run_agent.sh` (a `.agent/scripts/` script) | AGENTS.md Script Reference row | Yes |
+| `docker_run_agent.sh` / add `stage_rosdep_manifests.sh` | AGENTS.md Script Reference rows | Yes |
+| The Dockerfile to require a staged `COPY` | **Every** build path that stages: `docker_run_agent.sh --build` **and** `make agent-build` (Makefile) | Yes (found in pre-push review) |
 | The image build / Dockerfile | `.devcontainer/agent/README.md` | Yes |
 | Add a generated dir under a tracked path | `.gitignore` + `.dockerignore` | Yes |
 
