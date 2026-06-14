@@ -53,3 +53,28 @@ issue: 520
 ### Resolution
 **By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-14
 All four findings addressed in plan revision; plan is now implementation-ready.
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-14 11:40 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Plan**: `.agent/work-plans/issue-520/plan.md` at `0365c1b` (implemented as written; no material drift)
+
+### Changes
+- `.agent/scripts/docker_run_agent.sh` — recursive manifest-staging block in the `--build` path; gathers every layer `package.xml` (`find`, per-dir, structure preserved) into `.devcontainer/agent/.rosdep-manifests/`, regenerated fresh each build.
+- `.devcontainer/agent/Dockerfile` — root-side bake before `USER $USERNAME`: `COPY .rosdep-manifests/` → `apt-get update` → `rosdep update` → `rosdep install --from-paths /tmp/rosdep-manifests` → cleanup. Best-effort + log on each step. Kept the user-side `rosdep update`.
+- `.devcontainer/agent/.dockerignore` — new; constrains build context (excludes README.md / cruft).
+- `.gitignore` — ignore `.devcontainer/agent/.rosdep-manifests/`.
+- `.devcontainer/agent/README.md` — new "Dependency Baking" section + rosdep-failures troubleshooting update.
+- `AGENTS.md` — `docker_run_agent.sh` Script Reference row notes `--build` stages manifests.
+
+### Verification
+- `bash -n docker_run_agent.sh` passes.
+- Staging loop run standalone against the live workspace: **108/108** manifests staged, structure preserved, one `package.xml` per dir (rosdep `--from-paths` invariant holds) — confirms the review-plan must-fix (recursive gather) is satisfied; a shallow glob would have staged 21.
+- `.rosdep-manifests/` confirmed gitignored; no staging artifact in the worktree.
+- Not yet exercised: a full `docker build` (slow; needs Docker + network). Recommend the host run `make agent-build` once to confirm the bake resolves and a subsequent launch reports "dependencies satisfied — skipping".
+
+### Next
+- [ ] `/review-code` (pre-push) before pushing.
+- [ ] Host smoke test: `make agent-build` then a dispatch launch, confirm the launch-time rosdep check skips.

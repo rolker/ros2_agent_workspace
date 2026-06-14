@@ -40,6 +40,10 @@ COLCON_IGNORE
 .agent/scratchpad/*
 !.agent/scratchpad/README.md
 
+# Staged layer manifests for the agent-image rosdep bake (#520)
+# Generated fresh by docker_run_agent.sh --build; never committed
+.devcontainer/agent/.rosdep-manifests/
+
 # Agent Identity (Runtime-generated, not template)
 # The .agent/.identity.template is the checked-in template
 # The .agent/.identity file is generated at runtime and should not be committed

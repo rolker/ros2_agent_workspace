@@ -258,6 +258,39 @@ if ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
 fi
 
 if [ "$BUILD_IMAGE" = true ]; then
+    # ---------- Stage layer manifests for the rosdep bake (#520) ----------
+    # The agent image bakes the workspace's layer system-deps at build time so
+    # each launch installs only the delta. The build context (.devcontainer/
+    # agent/) has no layer source — layers/ is gitignored and mounted at
+    # runtime, never copied — so gather just the package.xml manifests here,
+    # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
+    # Recursive: most project repos are multi-package and nest manifests in
+    # subdirs (marine_control/marine_control_interfaces/package.xml, …), so a
+    # shallow src/*/package.xml glob would miss ~80% of them. Regenerated fresh
+    # each build so a stale manifest set can never bake outdated deps. Each
+    # manifest keeps its path relative to ROOT_DIR so it lands in its own dir
+    # (rosdep install --from-paths reads one package.xml per directory).
+    STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
+    # Clean the staging dir on any exit from here through the build — including
+    # a `set -e` abort on a failed `docker build` — so it never lingers in the
+    # working tree (workspace-cleanliness rule). Cleared after the build below.
+    trap 'rm -rf "$STAGE_DIR"' EXIT
+    echo "Staging layer package.xml manifests for the rosdep bake..."
+    rm -rf "$STAGE_DIR"
+    mkdir -p "$STAGE_DIR"
+    manifest_count=0
+    for src_dir in "$ROOT_DIR"/layers/main/*_ws/src; do
+        [ -d "$src_dir" ] || continue
+        while IFS= read -r -d '' pkgxml; do
+            rel="${pkgxml#"$ROOT_DIR"/}"
+            dest="$STAGE_DIR/$rel"
+            mkdir -p "$(dirname "$dest")"
+            cp "$pkgxml" "$dest"
+            manifest_count=$((manifest_count + 1))
+        done < <(find "$src_dir" -name package.xml -type f -print0)
+    done
+    echo "  staged $manifest_count manifest(s)"
+
     echo "Building agent image..."
     docker build \
         --build-arg USER_UID="$(id -u)" \
@@ -266,6 +299,9 @@ if [ "$BUILD_IMAGE" = true ]; then
         -f "$DOCKERFILE_DIR/Dockerfile" \
         "$DOCKERFILE_DIR"
     echo "Image built: $IMAGE_NAME:$IMAGE_TAG"
+    # Build succeeded — remove the staged manifests and clear the cleanup trap.
+    rm -rf "$STAGE_DIR"
+    trap - EXIT
 fi
 
 # ---------- Generate mount arguments ----------

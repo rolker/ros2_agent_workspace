@@ -74,9 +74,30 @@ RUN npm install -g @anthropic-ai/claude-code
 # Initialize rosdep (as root, then update as user)
 RUN rosdep init 2>/dev/null || true
 
+# Bake workspace layer dependencies into the image (#520).
+# docker_run_agent.sh stages the layer package.xml manifests into
+# .rosdep-manifests/ (build context); rosdep install them here so the system
+# deps live in a read-only image layer. Each container FS is ephemeral (--rm),
+# so this is what lets the launch-time `rosdep check` in agent-entrypoint.sh
+# actually skip — only deps added since the last image build install at launch.
+# Runs as root (apt needs root; the image has no sudo) and needs its own rosdep
+# cache, hence the root-side `rosdep update`. The dev-tools blocks above each
+# end with `rm -rf /var/lib/apt/lists/*`, so refresh the apt index first.
+# Best-effort: a dep that won't resolve at bake time is logged and falls through
+# to the launch-time install path rather than breaking the build (matches the
+# entrypoint posture). The image must be built via docker_run_agent.sh --build,
+# which creates .rosdep-manifests/; a bare `docker build` won't have it.
+COPY .rosdep-manifests/ /tmp/rosdep-manifests/
+RUN apt-get update || echo "WARNING: apt-get update failed — skipping dep bake"; \
+    rosdep update || echo "WARNING: rosdep update failed — skipping dep bake"; \
+    rosdep install --from-paths /tmp/rosdep-manifests --ignore-src -y --rosdistro jazzy \
+        || echo "WARNING: some layer deps did not resolve at bake time — they will install at launch"; \
+    rm -rf /tmp/rosdep-manifests /var/lib/apt/lists/*
+
 USER $USERNAME
 
-# Update rosdep as non-root user
+# Update rosdep as non-root user (the launch-time `rosdep check` in the
+# entrypoint runs under this user and needs its own populated cache)
 RUN rosdep update
 
 # Entrypoint runs as root to fix volume ownership, then drops to $USERNAME
