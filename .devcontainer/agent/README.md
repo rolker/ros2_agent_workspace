@@ -46,6 +46,37 @@ The image is based on `ros:jazzy-perception` and includes:
 
 The build passes your host UID/GID to match file ownership.
 
+### Dependency Baking
+
+The build **bakes the workspace's layer system-dependencies into the image**
+(#520). Before `docker build`, `docker_run_agent.sh` gathers every layer
+`package.xml` (recursively — multi-package repos nest manifests in subdirs)
+into a staging dir (`.rosdep-manifests/`, gitignored) under the build context;
+the Dockerfile `COPY`s those manifests and runs `rosdep install` so the deps
+land in a read-only image layer. The source itself stays mounted at runtime,
+never copied into the image.
+
+This is what makes the launch-time `rosdep check` in `agent-entrypoint.sh`
+actually skip: with deps already baked, each launch installs only the *delta*
+(deps added to a `package.xml` since the last image build) instead of
+re-running the full apt install on every ephemeral (`--rm`) container start.
+
+**Rebuild the image when layer deps drift** — i.e. after adding a dependency to
+a `package.xml`, or pulling layer repos that introduce new packages. Builds are
+slower and the image larger; launches are much faster. The bake is best-effort:
+a dep that can't resolve at build time is logged and falls through to the
+launch-time install path rather than failing the build.
+
+> Build through `docker_run_agent.sh --build` or `make agent-build` — both
+> stage the manifests first (via `.agent/scripts/stage_rosdep_manifests.sh`).
+> A **manual** `docker build .devcontainer/agent/` that bypasses those wrappers
+> has no `.rosdep-manifests/` and the `COPY` step will fail; stage first with
+> `./.agent/scripts/stage_rosdep_manifests.sh "$PWD"` if you must build by hand.
+>
+> The baked deps are a snapshot of whatever layers are checked out at build
+> time, so the image is **not** project-agnostic at runtime — it's a local,
+> per-workspace artifact, rebuilt when deps drift (cf. ADR-0003).
+
 **Architecture**: the image builds for the host's architecture (no
 `--platform` is set in `make agent-build`). Supported: `amd64` and
 `armhf` (32-bit ARM). Unsupported: `arm64` — git-bug v0.10.1 has no
@@ -250,10 +281,18 @@ ls -la $(cat .git | awk '{print $2}')  # Should be accessible
 
 ### rosdep failures
 
-Some rosdep dependencies may not be available in the container. The entrypoint runs
-rosdep install with best-effort (`-y` flag) and continues on failures. If a specific
-package fails to build due to missing dependencies, report them via `issue_request.sh`
-or note them for the host user. The container runs as a non-root user without sudo.
+Most layer deps are baked into the image at build time (see [Dependency
+Baking](#dependency-baking)), so the launch-time check normally skips. If a
+launch still installs many deps via apt, the image is stale relative to the
+current layer `package.xml` set — rebuild it (`make agent-build`). Force a
+launch-time refresh with `FORCE_DEPS_REFRESH=1`.
+
+Some rosdep dependencies may not be available at all. Both the bake and the
+entrypoint run `rosdep install` best-effort and continue on failures. If a
+specific package fails to build due to missing dependencies, report them via
+`issue_request.sh` or note them for the host user. The container runs as a
+non-root user without sudo (the bake runs as root at build time, where apt is
+available).
 
 ### Container won't start
 

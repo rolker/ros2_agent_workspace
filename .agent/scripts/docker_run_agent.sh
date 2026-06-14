@@ -258,6 +258,21 @@ if ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
 fi
 
 if [ "$BUILD_IMAGE" = true ]; then
+    # ---------- Stage layer manifests for the rosdep bake (#520) ----------
+    # The agent image bakes the workspace's layer system-deps at build time so
+    # each launch installs only the delta. The build context (.devcontainer/
+    # agent/) has no layer source — layers/ is gitignored and mounted at
+    # runtime, never copied — so gather just the package.xml manifests here,
+    # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
+    # The gather logic lives in stage_rosdep_manifests.sh (shared with
+    # `make agent-build`) so both build entry points stage identically.
+    STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
+    # Clean the staging dir on any exit from here through the build — including
+    # a `set -e` abort on a failed `docker build` — so it never lingers in the
+    # working tree (workspace-cleanliness rule). Cleared after the build below.
+    trap 'rm -rf "$STAGE_DIR"' EXIT
+    "$SCRIPT_DIR/stage_rosdep_manifests.sh" "$ROOT_DIR" "$STAGE_DIR"
+
     echo "Building agent image..."
     docker build \
         --build-arg USER_UID="$(id -u)" \
@@ -266,6 +281,9 @@ if [ "$BUILD_IMAGE" = true ]; then
         -f "$DOCKERFILE_DIR/Dockerfile" \
         "$DOCKERFILE_DIR"
     echo "Image built: $IMAGE_NAME:$IMAGE_TAG"
+    # Build succeeded — remove the staged manifests and clear the cleanup trap.
+    rm -rf "$STAGE_DIR"
+    trap - EXIT
 fi
 
 # ---------- Generate mount arguments ----------
