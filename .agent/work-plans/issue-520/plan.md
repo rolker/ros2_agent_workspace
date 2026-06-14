@@ -88,16 +88,16 @@ install`, then discard. Source stays mounted, not baked.
 
 ## Open Questions
 
-- **rosdep cache ownership at build time**: the bake must run as root (apt, no
-  sudo in image), so it needs a **root-side** `rosdep update` before `rosdep
-  install`. The current Dockerfile only runs `rosdep update` as the `ros` user
-  (line 80). Plan adds a root-side `rosdep update` before the install. Confirm
-  this is acceptable (small extra build time + a second rosdep cache) vs. an
-  alternative ordering.
-- **Build failure posture**: best-effort (`|| true`) so a transiently-missing
-  dep doesn't break the image, matching the entrypoint — or hard-fail to catch
-  real dep errors at build time? Plan proposes best-effort-with-logging; flag for
-  the reviewer.
+_Both resolved with the user (2026-06-14) — recorded here, no longer open:_
+
+- **rosdep cache ownership at build time** → **Add a root-side `rosdep update`**
+  before the bake's `rosdep install`, keeping the existing user-side `rosdep
+  update` (line 80) so the runtime check stays warm for the `ros` user. Accepts a
+  second cache + small extra build time.
+- **Build-failure posture** → **Best-effort + log** (`rosdep install ... || true`,
+  echo which layer/deps failed). The image build always succeeds; a missing dep
+  falls through to the existing launch-time install path. Matches the #489
+  entrypoint posture.
 
 ## Estimated Scope
 

@@ -32,5 +32,5 @@ issue: 520
 **Phases**: single
 
 ### Open questions
-- [ ] rosdep cache ownership: bake runs as root (apt, no sudo) → needs a root-side `rosdep update` before install; confirm acceptable vs. alternative ordering.
-- [ ] Build-failure posture: best-effort (`|| true`, matches entrypoint) vs. hard-fail to catch real dep errors at build time.
+- [x] rosdep cache ownership → **add a root-side `rosdep update`** before the bake install, keep the user-side update (resolved with user 2026-06-14).
+- [x] Build-failure posture → **best-effort + log** (`|| true`), matches the #489 entrypoint (resolved with user 2026-06-14).
