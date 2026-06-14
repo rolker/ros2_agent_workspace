@@ -35,6 +35,7 @@ ISSUE=""
 BUILD_IMAGE=false
 SHELL_MODE=false
 PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
+PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
 OUTPUT_FORMAT="stream-json"  # claude -p --output-format in dispatch mode
 MODEL=""               # claude --model (alias like 'opus'/'sonnet', or full id); empty → claude default
 
@@ -96,24 +97,37 @@ while [[ $# -gt 0 ]]; do
                 show_usage >&2
                 exit 1
             fi
-            PROMPT="$2"; shift 2 ;;
+            if [ "$PROMPT_SET" = true ]; then
+                echo "ERROR: --prompt and --prompt-file are mutually exclusive." >&2
+                exit 1
+            fi
+            PROMPT="$2"; PROMPT_SET=true; shift 2 ;;
         --prompt-file)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: --prompt-file requires a path." >&2
                 show_usage >&2
                 exit 1
             fi
+            if [ "$PROMPT_SET" = true ]; then
+                echo "ERROR: --prompt and --prompt-file are mutually exclusive." >&2
+                exit 1
+            fi
             if [ ! -f "$2" ]; then
                 echo "ERROR: --prompt-file not found: $2" >&2
                 exit 1
             fi
-            PROMPT="$(cat "$2")"; shift 2 ;;
+            [ -s "$2" ] || { echo "ERROR: --prompt-file is empty: $2" >&2; exit 1; }
+            PROMPT="$(cat "$2")"; PROMPT_SET=true; shift 2 ;;
         --output-format)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: --output-format requires a value." >&2
                 show_usage >&2
                 exit 1
             fi
+            case "$2" in
+                stream-json|json|text) : ;;
+                *) echo "ERROR: --output-format must be one of stream-json|json|text (got '$2')." >&2; exit 1 ;;
+            esac
             OUTPUT_FORMAT="$2"; shift 2 ;;
         --model)
             if [[ $# -lt 2 ]]; then
@@ -207,12 +221,13 @@ fi
 
 # Find worktree for this issue
 WORKTREE_PATH=""
+WORKTREE_MATCHES=0
 for candidate in \
     "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
     "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
     if [ -d "$candidate" ]; then
-        WORKTREE_PATH="$candidate"
-        break
+        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
     fi
 done
 
@@ -221,6 +236,9 @@ if [ -z "$WORKTREE_PATH" ]; then
     echo "Create one first:" >&2
     echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
     exit 1
+fi
+if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
 fi
 
 WORKTREE_ID="$(basename "$WORKTREE_PATH")"
@@ -329,18 +347,22 @@ fi
 
 # ---------- Container environment ----------
 
-# Forward the agent git identity into the container. The entrypoint runs
-# `configure_git_identity.sh --detect`, which now prefers these env vars
-# over in-container framework auto-detection (detection still resolves to
-# the generic `claude-code` table entry via CLAUDE_CODE_ENTRYPOINT, but
-# that loses the launching agent's self-reported identity). These are
-# normally exported on the host by set_git_identity_env.sh; warn if they
-# are missing so commits inside the container don't land under a wrong or
-# unset identity.
+# Forward the agent git identity into the container. No
+# `configure_git_identity.sh --detect` runs in the container anymore (that
+# entrypoint step was removed). Container commit identity now flows two ways:
+#   (a) the dispatch handoff prompt's per-invocation `git -c user.name=… -c
+#       user.email=… commit` literals (the load-bearing path); and
+#   (b) agent-entrypoint.sh exports GIT_AUTHOR_*/GIT_COMMITTER_* from
+#       AGENT_NAME/AGENT_EMAIL before sourcing setup.bash, so setup.bash's
+#       detect-and-set fallback is skipped and any `git commit` that omits the
+#       `-c` literals still uses the *forwarded* identity, not a re-detected one.
+# AGENT_NAME/AGENT_EMAIL are forwarded so (b) and `gh` signatures have them.
+# Warn if they're missing so the env-fallback identity doesn't go unset.
 if [ "$SHELL_MODE" = false ] && { [ -z "${AGENT_NAME:-}" ] || [ -z "${AGENT_EMAIL:-}" ]; }; then
-    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container will fall back to" >&2
-    echo "    in-container framework detection, which may fail. Source" >&2
-    echo "    .agent/scripts/set_git_identity_env.sh before launching to set them." >&2
+    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container's env-fallback git" >&2
+    echo "    identity will be unset (commits then rely solely on the handoff's" >&2
+    echo "    'git -c' literals). Source .agent/scripts/set_git_identity_env.sh" >&2
+    echo "    before launching to set them." >&2
 fi
 
 ENV_ARGS=(
