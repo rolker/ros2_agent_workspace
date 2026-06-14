@@ -47,11 +47,12 @@ Two concrete gaps the dispatch must close:
      fresh `Agent` call (same context root; fast; no isolation).
    - **container**: emit the prompt + launch `docker_run_agent.sh` headless
      with it as kickoff; on exit, apply the exit-contract read (step 3) and
-     print outcome + next action. **Identity note**: container dispatch must
-     forward `AGENT_NAME`/`AGENT_EMAIL` — the entrypoint's
-     `configure_git_identity.sh --detect` reads them to set the container's git
-     config (distinct from the prompt's `git -c` literals, which only tell the
-     sub-agent what to use). Reuse #489's forwarding + missing-identity warning.
+     print outcome + next action. **Identity**: pure per-commit `git -c`
+     literals embedded in the handoff prompt — no persistent container git
+     config (see Implementation Notes for why and the dogfood that settled it).
+     **Auth**: the headless container needs a `CLAUDE_CODE_OAUTH_TOKEN`
+     (subscription `setup-token`), which `docker_run_agent.sh` reads from
+     `~/.config/ros2-agent/claude-oauth-token` (600).
 3. **Exit-contract read (robust).** The host determines outcome from, in order:
    (a) the container/claude **exit status** — non-zero → failure regardless of
    `progress.md`; (b) a **newer** `progress.md` entry than existed pre-dispatch
@@ -87,7 +88,8 @@ Two concrete gaps the dispatch must close:
 | File | Change |
 |------|--------|
 | `.agent/scripts/dispatch_subagent.sh` | NEW — dual-mode dispatch + handoff-prompt builder + exit-contract read |
-| `.agent/scripts/docker_run_agent.sh` | Headless `--prompt`/`--prompt-file` kickoff; guard the push_gateway post-exit block off in dispatch mode |
+| `.agent/scripts/docker_run_agent.sh` | Headless `--prompt`/`--prompt-file` kickoff (drops `-it`, skips push_gateway post-exit); `CLAUDE_CODE_OAUTH_TOKEN` accept/forward + 600-file read |
+| `.devcontainer/agent/agent-entrypoint.sh` | Drop the root-run git-identity step (pure `-c`); set `HOME`/`USER`/`LOGNAME` for the dropped `ros` user |
 | `.agent/scripts/test_dispatch_subagent.sh` | NEW — unit tests |
 | `.claude/skills/review-issue/SKILL.md` | "Next step" handoff block |
 | `.claude/skills/plan-task/SKILL.md` | "Next step" handoff block |
@@ -123,7 +125,8 @@ Two concrete gaps the dispatch must close:
 |---|---|---|
 | Add `.agent/scripts/dispatch_subagent.sh` | AGENTS.md Script Reference table | Yes (ask-first) — **no** Makefile target, so no `make generate-skills` run needed |
 | Edit the 5 skills' final step (handoff block) | The 3 framework adapters (copilot / gemini / AGENT_ONBOARDING) | Yes — now listed in Files-to-Change; each gets a one-line "handoff is Claude-`Agent`-specific" note |
-| Container-mode dispatch sets git identity | Forward `AGENT_NAME`/`AGENT_EMAIL` (entrypoint `--detect`) | Yes — reuse #489's forwarding + missing-identity warning (Approach step 2) |
+| Container commits need identity | Handoff prompt embeds `git -c` literals (pure `-c`); no entrypoint config | Yes — settled via dogfood (Implementation Notes); `agent-entrypoint.sh` drops the identity step |
+| Headless container needs auth | `CLAUDE_CODE_OAUTH_TOKEN` via `setup-token`, read from a 600 file | Yes — `docker_run_agent.sh` accept/forward/file-read |
 | `docker_run_agent.sh` exit flow | `push_gateway` lifecycle | Partial — guarded now; full removal is #493 (gated on #492) |
 
 ## Decisions (resolved with user, 2026-06-13)
@@ -153,3 +156,45 @@ Two concrete gaps the dispatch must close:
 Single PR for #490 (Scope A + B + E), closing the issue. #493 is a separate,
 later PR gated on #492 — recommend a dedicated `plan-task 493` after #492 lands
 rather than folding its deletions in here.
+
+## Implementation Notes
+
+The headless container path was **dogfooded end-to-end** (2026-06-13): a
+sandboxed `claude -p` run authenticated, executed, made a correctly-attributed
+`git -c` commit, and pre-commit hooks ran — all validated. Three blockers were
+found and fixed during that dogfood (each would have shipped broken from a
+host-only build):
+
+- **Auth — `CLAUDE_CODE_OAUTH_TOKEN`, not transplanted OAuth.** A mounted
+  `~/.claude/.credentials.json` subscription-OAuth access token is short-lived
+  and can't refresh in the credential-less sandbox (`Not logged in`). Anthropic's
+  sanctioned headless/subscription method is `claude setup-token` → a 1-year
+  token (subscription billing, not API). Because each agent Bash invocation is a
+  fresh subshell, an exported env var never reaches the launcher, so
+  `docker_run_agent.sh` reads the token from a **600-perm file**
+  (`~/.config/ros2-agent/claude-oauth-token`, mirroring the gh-token pattern) —
+  secret stays out of argv and the transcript. We do **not** use `--bare` (it
+  disables OAuth/token entirely).
+- **Identity — pure `git -c`, not entrypoint config.** A root-run
+  `configure_git_identity.sh --detect` tripped git's dubious-ownership guard over
+  host-uid-owned mounts (`fatal: not in a git directory`). Removed it: the agent
+  runs as the repo-owning `ros` user and commits with per-invocation `-c`
+  literals. (Bonus: `setup.bash` sources `set_git_identity_env.sh`, so
+  `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env identity is also present and — uniquely in
+  the container's single process tree — propagates to the agent's git ops, so a
+  forgotten `-c` still attributes correctly. Started with pure `-c` to watch the
+  failure rate; the env identity makes hard-fail unlikely.)
+- **`HOME` for the dropped user.** `setpriv` inherited `HOME=/root`, so the `ros`
+  agent hit `EACCES` writing `/root/.claude/...` and every Bash call failed. Set
+  `HOME`/`USER`/`LOGNAME` to the target user on the exec.
+
+Also confirmed: **pre-commit hooks run in-container via the mounted host
+`.venv`** (the hook's `INSTALL_PYTHON` absolute path is mounted at the same path),
+so the "hooks must run" rule is honored without baking pre-commit into the image.
+Build-time dep-baking (to cut the rosdep-install storm on every launch) is tracked
+separately as #520.
+
+**Deferred:** the sandbox-vs-host provenance marker (distinct identity vs. commit
+trailer) is settled when wiring the Scope-B handoff literals — start with no
+marker / same identity unless we want sandbox commits visibly distinct while
+building trust.
