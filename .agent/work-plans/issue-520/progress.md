@@ -21,3 +21,16 @@ issue: 520
 - [ ] State the ADR-0003 nuance in the PR: image is a per-workspace dep snapshot, not project-agnostic at runtime.
 - [ ] Manually verify both paths: clean rebuild → all layers skip; added dep → only delta installs.
 - [ ] Confirm the entrypoint loop still falls through to launch-time install for a layer added after the last image build.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-14 10:32 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Plan**: `.agent/work-plans/issue-520/plan.md` at `1b4d985`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/521 (`[PLAN]` prefix)
+**Phases**: single
+
+### Open questions
+- [ ] rosdep cache ownership: bake runs as root (apt, no sudo) → needs a root-side `rosdep update` before install; confirm acceptable vs. alternative ordering.
+- [ ] Build-failure posture: best-effort (`|| true`, matches entrypoint) vs. hard-fail to catch real dep errors at build time.
