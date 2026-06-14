@@ -215,13 +215,13 @@ if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
 fi
 
 echo "  Result: OK — sub-agent wrote a new entry. Last entry:"
-python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null | python3 -c 'import sys,json
-d=json.load(sys.stdin); e=d.get("entries", [])
+python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+e = d.get("entries", [])
 if e:
-    x=e[-1]
-    print(f"    type:   {x.get(\"type\")}")
-    print(f"    status: {x.get(\"status\")}")
-    print(f"    by:     {x.get(\"by\")}")
-    print(f"    when:   {x.get(\"when\")}")
+    x = e[-1]
+    for k in ("type", "status", "by", "when"):
+        print("    %-7s %s" % (k + ":", x.get(k)))
 ' || echo "    (could not parse progress.md)"
 echo "  Next: the host reviews the entry and runs the next phase / does the push."
