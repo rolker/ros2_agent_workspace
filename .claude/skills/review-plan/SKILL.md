@@ -411,6 +411,32 @@ implementation step (or the plan author) should address them and amend
 the plan inline per `plan-task`'s "During implementation" rules before
 work continues. The `## Plan Review` entry stays as a historical record.
 
+### Next step
+
+Lifecycle: **Plan Review** → **implement** → **review-code**
+
+Two phases follow this review:
+
+1. **Implementation** (no skill yet) — the implementer reads the last `## Plan
+   Review` entry in `.agent/work-plans/issue-<N>/progress.md` and the linked
+   plan. If the verdict is `changes-requested`, address must-fix findings before
+   starting. Use `--mode container` for isolation-worthy implementation work:
+
+       .agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
+
+2. **Pre-push code review** — once implementation is complete and before pushing,
+   hand off to `review-code` in a fresh-context sub-agent:
+
+       .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill review-code
+
+   The sub-agent writes a `## Local Review` entry when done.
+
+**No auto-chaining (Scope E):** this skill never dispatches the next phase itself —
+the host orchestrator (`/run-issue`,
+[#492](https://github.com/rolker/ros2_agent_workspace/issues/492)) drives,
+pausing at user checkpoints. This step only emits this prompt and its
+`progress.md` entry.
+
 ## Guidelines
 
 - **Evaluate, don't rewrite** — flag gaps and concerns. Don't generate an

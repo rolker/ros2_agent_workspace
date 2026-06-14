@@ -463,6 +463,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
+| `.agent/scripts/dispatch_subagent.sh` | Dispatch a workflow skill into a fresh-context sub-agent (in-process or container); reads the progress.md exit contract |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |

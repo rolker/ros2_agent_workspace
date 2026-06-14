@@ -63,3 +63,46 @@ accepts a PR number / URL for post-PR review of someone else's work.
 `make_*` skills are auto-generated wrappers around Makefile targets (e.g.,
 `/make_build`, `/make_test`). Run `make generate-skills` after adding or
 removing `.PHONY` targets to keep them current.
+
+## Lifecycle Handoff Convention (#490)
+
+Each lifecycle skill's final step includes a `### Next step` block that
+describes how to hand off to the subsequent phase. The full lifecycle map:
+
+| Skill | Entry type written | Next skill | Next entry type |
+|-------|--------------------|------------|-----------------|
+| `review-issue` | `## Issue Review` | `plan-task` | `## Plan Authored` |
+| `plan-task` | `## Plan Authored` | `review-plan` | `## Plan Review` |
+| `review-plan` | `## Plan Review` | implement (no skill yet) → `review-code` | `## Local Review` |
+| `review-code` | `## Local Review` | `triage-reviews` | `## Integrated Review` |
+| `triage-reviews` | `## Integrated Review` | address findings / done | — |
+
+### How to hand off
+
+Use `dispatch_subagent.sh` to build a kickoff prompt that embeds the identity
+contract and `progress.md` exit contract, then pass it to a fresh sub-agent:
+
+```bash
+# In-process (fast; no filesystem isolation):
+.agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill <next-skill>
+# → emits a handoff block; paste into a fresh Agent tool call
+
+# Container (isolation; use for implementation-heavy phases):
+.agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
+```
+
+The sub-agent reads the last `## <prev-entry-type>` entry in
+`.agent/work-plans/issue-<N>/progress.md` for context, and appends its own
+typed entry when done. The host reads the last entry (filtered by expected
+entry type) to determine the outcome and whether a new entry was written at all
+(a missing new entry = the sub-agent died before reporting).
+
+### Scope-E no-auto-chaining rule
+
+**Skills never dispatch the next phase themselves.** The host orchestrator
+(`/run-issue`, [#492](https://github.com/rolker/ros2_agent_workspace/issues/492))
+drives the lifecycle, invoking each phase in sequence and pausing at user
+checkpoints between them. A skill's `### Next step` block is a prompt for
+the operator or orchestrator to act on — not an instruction for the skill to
+execute autonomously. This keeps each step's entry independently attributed and
+prevents a single runaway sub-agent from racing through the whole lifecycle.
