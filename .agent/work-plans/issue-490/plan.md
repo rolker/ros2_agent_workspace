@@ -88,7 +88,7 @@ Two concrete gaps the dispatch must close:
 | File | Change |
 |------|--------|
 | `.agent/scripts/dispatch_subagent.sh` | NEW — dual-mode dispatch + handoff-prompt builder + exit-contract read |
-| `.agent/scripts/docker_run_agent.sh` | Headless `--prompt`/`--prompt-file` kickoff (drops `-it`, skips push_gateway post-exit); `CLAUDE_CODE_OAUTH_TOKEN` accept/forward + 600-file read |
+| `.agent/scripts/docker_run_agent.sh` | Headless `--prompt`/`--prompt-file` kickoff (drops `-it`, skips push_gateway post-exit); `CLAUDE_CODE_OAUTH_TOKEN` accept/forward + 600-file read; `--model` pass-through |
 | `.devcontainer/agent/agent-entrypoint.sh` | Drop the root-run git-identity step (pure `-c`); set `HOME`/`USER`/`LOGNAME` for the dropped `ros` user |
 | `.agent/scripts/test_dispatch_subagent.sh` | NEW — unit tests |
 | `.claude/skills/review-issue/SKILL.md` | "Next step" handoff block |
@@ -193,6 +193,18 @@ Also confirmed: **pre-commit hooks run in-container via the mounted host
 so the "hooks must run" rule is honored without baking pre-commit into the image.
 Build-time dep-baking (to cut the rosdep-install storm on every launch) is tracked
 separately as #520.
+
+- **Per-phase model selection (dogfood finding).** The first container dispatch
+  ran on **Sonnet 4.6** (the headless `claude` default), not Opus —
+  `AGENT_MODEL` is cosmetic; the lever is `claude --model`. Added `--model` to
+  `docker_run_agent.sh` and a skill→model map to `dispatch_subagent.sh`: Opus
+  for review-code / review-plan / triage-reviews / implement / address-findings;
+  Sonnet for review-issue / plan-task and the default (quota headroom). Uses
+  **aliases** (`opus`/`sonnet`), not pinned ids, so it survives version bumps;
+  an unavailable model **hard-fails loudly** (verified `claude --model <bad>`
+  exits 1 → the exit-contract reports FAILED, no silent downgrade) — fix is one
+  mapping line. In-process mode only *recommends* the model (the host picks the
+  Agent's). `--model` overrides any cell.
 
 **Deferred:** the sandbox-vs-host provenance marker (distinct identity vs. commit
 trailer) is settled when wiring the Scope-B handoff literals — start with no
