@@ -137,6 +137,26 @@ if [ "$SHELL_MODE" = true ] && [ "$DISPATCH_MODE" = true ]; then
     exit 1
 fi
 
+# ---------- Subscription token (file fallback) ----------
+# CLAUDE_CODE_OAUTH_TOKEN is the long-lived subscription token from
+# `claude setup-token`. Prefer an already-exported env var; otherwise read it
+# from a 600-perm file. The file path mirrors the gh-readonly-token pattern
+# and keeps the secret out of the launching agent's environment dumps. We
+# export it (rather than passing -e VAR=value) so it forwards via the bare
+# `-e CLAUDE_CODE_OAUTH_TOKEN` below without ever appearing in `ps`/argv.
+CLAUDE_OAUTH_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
+    # Warn (don't fail) if the secret file is group/world-readable.
+    PERM=$(stat -c '%a' "$CLAUDE_OAUTH_TOKEN_FILE" 2>/dev/null || echo "")
+    case "$PERM" in
+        600|400) : ;;
+        "") : ;;  # stat unavailable; skip the check
+        *) echo "⚠️  $CLAUDE_OAUTH_TOKEN_FILE is mode $PERM — recommend 'chmod 600'." >&2 ;;
+    esac
+    read -r CLAUDE_CODE_OAUTH_TOKEN < "$CLAUDE_OAUTH_TOKEN_FILE" || true
+    export CLAUDE_CODE_OAUTH_TOKEN
+fi
+
 # ---------- Validation ----------
 
 # Check for authentication. Three sources, in order of robustness for a
@@ -155,7 +175,9 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
    && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
     echo "ERROR: No authentication found." >&2
     echo "Pick one:" >&2
-    echo "  - CLAUDE_CODE_OAUTH_TOKEN  (recommended; run 'claude setup-token' on a dev host)" >&2
+    echo "  - CLAUDE_CODE_OAUTH_TOKEN  (recommended; 'claude setup-token' in a real" >&2
+    echo "                              terminal, then save to $CLAUDE_OAUTH_TOKEN_FILE" >&2
+    echo "                              [chmod 600], or export the env var)" >&2
     echo "  - ANTHROPIC_API_KEY        (API billing, not subscription)" >&2
     echo "  - 'claude' + /login on the host for interactive subscription auth" >&2
     exit 1
@@ -168,8 +190,8 @@ if [ "$DISPATCH_MODE" = true ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z 
     echo "⚠️  Dispatch (headless) mode with no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY." >&2
     echo "    Mounted ~/.claude/.credentials.json OAuth tokens expire and cannot refresh in" >&2
     echo "    the sandbox — the run will likely fail with 'Not logged in'. Generate a" >&2
-    echo "    long-lived subscription token on a dev host with 'claude setup-token' and" >&2
-    echo "    export CLAUDE_CODE_OAUTH_TOKEN before dispatching." >&2
+    echo "    long-lived subscription token with 'claude setup-token' and save it to" >&2
+    echo "    $CLAUDE_OAUTH_TOKEN_FILE (chmod 600) before dispatching." >&2
 fi
 
 # Find worktree for this issue
