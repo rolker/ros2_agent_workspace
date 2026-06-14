@@ -4,7 +4,7 @@
 #
 # Responsibilities:
 #   1. Fix ownership of anonymous volumes (build/install/log dirs)
-#   2. Configure persistent git identity
+#   2. (git identity is intentionally NOT configured here — see step 2)
 #   3. Source ROS 2 environment
 #   4. Check/install rosdep dependencies (skip when already satisfied)
 #   5. Initialize Claude Code config; chown the pre-commit cache volume
@@ -40,21 +40,20 @@ for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
     done
 done
 
-# ---------- 2. Configure persistent git identity ----------
-# In a container, we use persistent config (writes to .git/config) rather than
-# ephemeral env vars, since the container is an isolated environment.
+# ---------- 2. Git identity: intentionally NOT configured here ----------
+# Dispatched agents commit with per-invocation identity literals
+# (`git -c user.name=… -c user.email=… commit`, per AGENTS.md § Agent Commit
+# Identity), which the dispatch handoff prompt embeds. The agent runs as the
+# repo-owning `ros` user (UID matches the host owner), so there is no
+# dubious-ownership issue and no persistent `.git/config` identity is needed.
 #
-# This step runs as root (before the privilege drop), but the mounted repos
-# are owned by the host user (uid != 0). Git's dubious-ownership protection
-# would otherwise reject every repo with "fatal: not in a git directory",
-# leaving identity silently unset. The container is single-tenant and
-# ephemeral, so trust all repo paths for root's git invocations here.
-git config --global --add safe.directory '*'
-if [ -x "$WORKSPACE_ROOT/.agent/scripts/configure_git_identity.sh" ]; then
-    echo "Configuring git identity..."
-    cd "$WORKSPACE_ROOT"
-    "$WORKSPACE_ROOT/.agent/scripts/configure_git_identity.sh" --detect
-fi
+# Deliberately NOT setting a default identity: a `git commit` that omits the
+# `-c` literals then fails loudly (and leaves the work staged in the
+# bind-mounted worktree for the host to recover) rather than committing under
+# a silent/generic identity. That loud failure is the guard against
+# misattribution, not a bug. (This replaces an earlier root-run
+# `configure_git_identity.sh --detect` that tripped git's dubious-ownership
+# protection — running as root over host-uid-owned mounts.)
 
 # ---------- 3. Source ROS 2 environment ----------
 # Temporarily relax strict mode — ROS 2 setup scripts reference unbound variables
@@ -132,7 +131,7 @@ echo "========================================="
 echo "  Sandboxed Agent Container Ready"
 echo "========================================="
 echo "  Workspace: $WORKSPACE_ROOT"
-echo "  Identity:  $(git config user.name 2>/dev/null || echo 'not set') <$(git config user.email 2>/dev/null || echo 'not set')>"
+echo "  Identity:  per-commit via 'git -c' literals (no persistent config — by design)"
 echo "  ROS 2:     ${ROS_DISTRO:-not sourced}"
 echo "========================================="
 echo ""
