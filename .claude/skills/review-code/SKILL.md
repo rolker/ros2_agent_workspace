@@ -913,6 +913,26 @@ Key points:
   this in the report Summary ("Progress persistence skipped (no linked
   issue)") — the same canonical wording used in the step-8 intro above.
 
+### Next step
+
+Lifecycle: **Local Review** → push / open PR → **triage-reviews**
+
+Once findings are addressed and the branch is pushed (or a PR opened), hand off
+to the next phase in a **fresh-context sub-agent** — independence between
+lifecycle steps is what makes the timeline trustworthy. Use the dispatcher:
+
+    .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill triage-reviews
+
+The sub-agent reads the last `## Local Review` entry in
+`.agent/work-plans/issue-<N>/progress.md` for your output (plus live PR review
+comments), and writes its own `## Integrated Review` entry when done.
+
+**No auto-chaining (Scope E):** this skill never dispatches the next phase itself —
+the host orchestrator (`/run-issue`,
+[#492](https://github.com/rolker/ros2_agent_workspace/issues/492)) drives,
+pausing at user checkpoints. This step only emits this prompt and its
+`progress.md` entry.
+
 ## Guidelines
 
 - **Report first, then persist** — output the review in the conversation,
