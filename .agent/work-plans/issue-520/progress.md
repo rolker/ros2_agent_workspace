@@ -34,3 +34,18 @@ issue: 520
 ### Open questions
 - [x] rosdep cache ownership → **add a root-side `rosdep update`** before the bake install, keep the user-side update (resolved with user 2026-06-14).
 - [x] Build-failure posture → **best-effort + log** (`|| true`), matches the #489 entrypoint (resolved with user 2026-06-14).
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-14 11:16 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) (in-context — author self-review)
+
+**Plan**: `.agent/work-plans/issue-520/plan.md` at `815fd42`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/521
+**Verdict**: changes-requested
+
+### Findings
+- [ ] (must-fix) Manifest-gather glob `layers/main/*_ws/src/*/package.xml` is non-recursive — it catches only 21 of 108 actual `package.xml` files; multi-package repos (marine_control, unh_marine_autonomy, udp_bridge, vrx, etc.) keep their manifests in subdirs, so most layer deps would NOT bake and the launch-time apt storm would persist for them, defeating the goal. Gather recursively (`find <src> -name package.xml`) preserving structure. — `plan.md:28`
+- [ ] (suggestion) "102 package.xml files" is inaccurate (shallow glob=21, recursive=108); correct the count and tie it to the recursive gather. — `plan.md:20`
+- [ ] (suggestion) Bake step should `apt-get update` before `rosdep install` — the dev-tools blocks end with `rm -rf /var/lib/apt/lists/*` (Dockerfile L33/41/49), so the apt index is empty at the bake point; otherwise installs fail. Make explicit alongside the root-side `rosdep update`. — `plan.md:39`
+- [ ] (suggestion) Note that `rosdep install --from-paths` over the staging dir requires each `package.xml` in its own directory (rosdep reads package.xml per-dir); the structure-preserving copy already does this but worth stating as the test invariant. — `plan.md:31`
