@@ -53,6 +53,13 @@ opt-in via `--copilot` and additionally requires `copilot` CLI
 authentication — opted-in but unauthenticated hosts route to the
 skipped-with-notice path automatically).
 
+**Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
+step` blocks dispatch the next phase via
+`.agent/scripts/dispatch_subagent.sh` / Claude Code's `Agent` tool. On a
+Copilot runtime there's no auto-dispatch: read the handoff block and drive
+the next skill yourself; the issue's `progress.md` entry is the cross-phase
+handoff vessel.
+
 ## Environment Setup
 
 ```bash

@@ -85,6 +85,13 @@ conserve the Premium quota); when opted in and the `copilot` CLI is
 installed and authenticated, it provides a cross-model read that
 non-Claude runtimes can use to partly compensate.
 
+**Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
+step` blocks dispatch the next phase via
+`.agent/scripts/dispatch_subagent.sh` / Claude Code's `Agent` tool. On a
+non-Claude runtime there's no auto-dispatch: read the handoff block and
+drive the next skill yourself; the issue's `progress.md` entry is the
+cross-phase handoff vessel.
+
 ## Workflow Skills
 
 Reusable workflow procedures are documented at the repo root in `.claude/skills/*/SKILL.md`.

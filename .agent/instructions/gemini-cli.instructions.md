@@ -56,6 +56,13 @@ Adversarial is **opt-in** via `--copilot` (off by default to conserve
 the Premium quota); when opted in with the `copilot` CLI installed and
 authenticated, it gives a cross-model read that partly compensates.
 
+**Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
+step` blocks dispatch the next phase via
+`.agent/scripts/dispatch_subagent.sh` / Claude Code's `Agent` tool. On a
+Gemini runtime there's no auto-dispatch: read the handoff block and drive
+the next skill yourself; the issue's `progress.md` entry is the cross-phase
+handoff vessel.
+
 
 ## Workflow Skills
 
