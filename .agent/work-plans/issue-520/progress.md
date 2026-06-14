@@ -78,3 +78,24 @@ All four findings addressed in plan revision; plan is now implementation-ready.
 ### Next
 - [ ] `/review-code` (pre-push) before pushing.
 - [ ] Host smoke test: `make agent-build` then a dispatch launch, confirm the launch-time rosdep check skips.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-14 12:12 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+**Verdict**: approved
+
+**Branch**: feature/issue-520 at `7c0a47b`
+**Mode**: pre-push
+**Depth**: Standard (reason: ~105 LoC across 6 infra files; touches AGENTS.md governance file; plan exists)
+**Must-fix**: 0 | **Suggestions**: 2 (1 fixed, 1 declined)
+
+### Findings
+- [x] (suggestion) Host-side staging dir `.devcontainer/agent/.rosdep-manifests/` left in working tree (and on build failure) — `docker_run_agent.sh`. FIXED: scoped EXIT trap + post-build `rm`; verified cleaned on success and failure paths.
+- [ ] (suggestion, declined) Hard-fail the build on `apt-get update` failure instead of best-effort — `Dockerfile:91`. DECLINED: contradicts the user's settled "best-effort + log" decision (2026-06-14); a transient mirror blip degrades to launch-time install rather than blocking every rebuild.
+
+### Specialists
+- Static analysis: shellcheck passed (pre-commit hook at commit time).
+- Claude Adversarial Lens A (logic): no correctness bugs; goal achieved (recursive `--from-paths`, best-effort RUN exits 0, empty-COPY safe).
+- Claude Adversarial Lens B (systemic/safety): isolation sound (only text manifests enter context; bake root is build-time only), caching sound (content-hash COPY), two suggestions above.
+- Copilot Adversarial: off (default; not opted in).
