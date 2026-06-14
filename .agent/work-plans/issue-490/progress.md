@@ -92,3 +92,56 @@ the plan's Files-to-Change "ask-first" annotation and the task prompt's Do-NOT-t
 - [ ] (ask-first) add `docker_run_agent.sh` row to AGENTS.md Script Reference (sibling of the dispatch row; still missing).
 - [ ] (ask-first) sync `configure_git_identity.sh` containerized-identity docs (`.agent/scripts/README.md`, `.agent/AI_IDENTITY_STRATEGY.md`) — now stale after the entrypoint step was removed.
 - [ ] (follow-up) `framework_config.sh` model entry stale (`Claude Opus 4.6`) — pre-existing, cosmetic; separate from this PR.
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-14 08:10 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8) — fresh-context sub-agent dispatch
+
+**Scope**: address the Local Review findings (4 must-fix + 6 in-scope
+suggestions); ask-first files left untouched.
+
+**Commits**:
+- `e6770db` — `dispatch_subagent.sh` + `test_dispatch_subagent.sh`
+- `a2d898d` — `docker_run_agent.sh`
+- `cc26ead` — `agent-entrypoint.sh`
+
+### Findings fixed
+- **#1 (must-fix)** exit-contract fail-closed: `PRE_COUNT`/`POST_COUNT`
+  coerced (`-1`/`0`) when non-numeric so `[ -le ]` can't error into the
+  success branch — `dispatch_subagent.sh`.
+- **#2 (must-fix)** empty `--prompt-file` rejected via `[ -s ]` —
+  `docker_run_agent.sh`.
+- **#3 (must-fix)** stale `configure_git_identity.sh --detect` comment
+  rewritten to the `git -c` literals + entrypoint env-export reality —
+  `docker_run_agent.sh`.
+- **#4 (must-fix)** status-aware exit contract: reads the gated entry's
+  `**Status**`, emits `Result: FAILED`/`PARTIAL` and exits non-zero for
+  failed/partial; `complete` → OK, unknown/missing → OK-but-says-so —
+  `dispatch_subagent.sh`.
+- **#5 (suggestion)** entrypoint pre-exports `GIT_AUTHOR_*`/`GIT_COMMITTER_*`
+  from forwarded `AGENT_NAME`/`AGENT_EMAIL` before sourcing `setup.bash`,
+  so the env-fallback matches the handoff literals — `agent-entrypoint.sh`.
+- **#6 (suggestion)** last-entry printer now `--type`-filtered to match the
+  gate (folded into #4) — `dispatch_subagent.sh`.
+- **#7 (suggestion)** `--prompt`/`--prompt-file` mutual exclusion enforced
+  via a `PROMPT_SET` tracker — `docker_run_agent.sh`.
+- **#8 (suggestion)** credential-handling line added to the handoff
+  contract — `dispatch_subagent.sh`.
+- **#9 (suggestion)** ambiguous worktree match warns on stderr (both
+  scripts).
+- **#10 (suggestion)** `--output-format` validated against
+  `stream-json|json|text` up front in both scripts.
+
+### Out of scope (left for human / follow-up)
+The 3 ask-first follow-ups (AGENTS.md Script Reference row,
+`configure_git_identity.sh` doc sync in `README.md`/`AI_IDENTITY_STRATEGY.md`)
+and the cosmetic `framework_config.sh` model-entry follow-up were **not**
+touched, per the Do-NOT-touch list.
+
+### Tests
+`bash -n` clean on all 4 edited scripts. `test_dispatch_subagent.sh`:
+**29/29 pass** (added: `--output-format` validation, the no-credentials
+handoff rule, and the ambiguous-worktree warning). Container-mode behavior
+(fixes #1/#4/#6 runtime path) remains covered by the manual layer-worktree
+verification noted in the plan — not unit-testable without docker.
