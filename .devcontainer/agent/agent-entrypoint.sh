@@ -4,7 +4,7 @@
 #
 # Responsibilities:
 #   1. Fix ownership of anonymous volumes (build/install/log dirs)
-#   2. Configure persistent git identity
+#   2. (git identity is intentionally NOT configured here — see step 2)
 #   3. Source ROS 2 environment
 #   4. Check/install rosdep dependencies (skip when already satisfied)
 #   5. Initialize Claude Code config; chown the pre-commit cache volume
@@ -40,13 +40,35 @@ for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
     done
 done
 
-# ---------- 2. Configure persistent git identity ----------
-# In a container, we use persistent config (writes to .git/config) rather than
-# ephemeral env vars, since the container is an isolated environment.
-if [ -x "$WORKSPACE_ROOT/.agent/scripts/configure_git_identity.sh" ]; then
-    echo "Configuring git identity..."
-    cd "$WORKSPACE_ROOT"
-    "$WORKSPACE_ROOT/.agent/scripts/configure_git_identity.sh" --detect
+# ---------- 2. Git identity: intentionally NOT configured here ----------
+# Dispatched agents commit with per-invocation identity literals
+# (`git -c user.name=… -c user.email=… commit`, per AGENTS.md § Agent Commit
+# Identity), which the dispatch handoff prompt embeds. The agent runs as the
+# repo-owning `ros` user (UID matches the host owner), so there is no
+# dubious-ownership issue and no persistent `.git/config` identity is needed.
+#
+# Deliberately NOT setting a default identity: a `git commit` that omits the
+# `-c` literals then fails loudly (and leaves the work staged in the
+# bind-mounted worktree for the host to recover) rather than committing under
+# a silent/generic identity. That loud failure is the guard against
+# misattribution, not a bug. (This replaces an earlier root-run
+# `configure_git_identity.sh --detect` that tripped git's dubious-ownership
+# protection — running as root over host-uid-owned mounts.)
+
+# ---------- 2b. Env-fallback git identity (matches the forwarded one) ----------
+# setup.bash (sourced below) runs `set_git_identity_env.sh --detect` when
+# GIT_AUTHOR_NAME is unset, which re-derives a generic `claude-code` identity
+# that can diverge from the launching agent's self-reported AGENT_NAME/EMAIL.
+# If the host forwarded both, pre-export the GIT_AUTHOR_*/GIT_COMMITTER_* vars
+# from them so that detect branch is skipped — the env-fallback identity then
+# matches the handoff prompt's `git -c` literals instead of a re-detected one.
+# (The `-c` literals remain the load-bearing path; this just keeps the fallback
+# consistent for any commit that omits them.)
+if [ -n "${AGENT_NAME:-}" ] && [ -n "${AGENT_EMAIL:-}" ]; then
+    export GIT_AUTHOR_NAME="$AGENT_NAME"
+    export GIT_AUTHOR_EMAIL="$AGENT_EMAIL"
+    export GIT_COMMITTER_NAME="$AGENT_NAME"
+    export GIT_COMMITTER_EMAIL="$AGENT_EMAIL"
 fi
 
 # ---------- 3. Source ROS 2 environment ----------
@@ -125,7 +147,7 @@ echo "========================================="
 echo "  Sandboxed Agent Container Ready"
 echo "========================================="
 echo "  Workspace: $WORKSPACE_ROOT"
-echo "  Identity:  $(git config user.name 2>/dev/null || echo 'not set') <$(git config user.email 2>/dev/null || echo 'not set')>"
+echo "  Identity:  per-commit via 'git -c' literals (no persistent config — by design)"
 echo "  ROS 2:     ${ROS_DISTRO:-not sourced}"
 echo "========================================="
 echo ""
@@ -133,4 +155,12 @@ echo ""
 # Drop privileges: run CMD as the non-root target user.
 # setpriv uses setuid(2) directly (no setuid bits) so it works with
 # --security-opt no-new-privileges:true.
-exec setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- "$@"
+#
+# setpriv inherits the entrypoint's environment, where HOME is still /root
+# (the entrypoint runs as root). Without resetting it, the dropped `ros`
+# process would resolve HOME=/root and fail with EACCES trying to write
+# under /root/.claude (e.g. Claude Code's per-session env dir). Set HOME
+# (and USER/LOGNAME) to the target user so $HOME-relative paths land in
+# the user-owned /home/ros.
+exec setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- \
+    env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"

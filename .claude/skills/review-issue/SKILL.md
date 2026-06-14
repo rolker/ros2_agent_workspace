@@ -338,6 +338,26 @@ user decides not to proceed (and so plan-task never runs), they can
 remove the worktree + branch via
 `.agent/scripts/worktree_remove.sh --issue <N>`.
 
+### Next step
+
+Lifecycle: **Issue Review** → **plan-task**
+
+Hand off to the next phase in a **fresh-context sub-agent** — independence
+between lifecycle steps is what makes the timeline trustworthy (a reviewer who
+shares the author's context inherits their blind spots). Use the dispatcher:
+
+    .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill plan-task
+
+The sub-agent reads the last `## Issue Review` entry in
+`.agent/work-plans/issue-<N>/progress.md` for your output, and writes its own
+`## Plan Authored` entry when done.
+
+**No auto-chaining (Scope E):** this skill never dispatches the next phase itself —
+the host orchestrator (`/run-issue`,
+[#492](https://github.com/rolker/ros2_agent_workspace/issues/492)) drives,
+pausing at user checkpoints. This step only emits this prompt and its
+`progress.md` entry.
+
 ## Guidelines
 
 - **Comment, don't edit** — the issue body is the authoritative spec. Review

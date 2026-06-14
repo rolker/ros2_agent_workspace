@@ -1,0 +1,322 @@
+#!/bin/bash
+# .agent/scripts/dispatch_subagent.sh
+# Dispatch a workflow skill (or a raw kickoff prompt) into a fresh-context
+# sub-agent — either in-process (Agent tool, via a stdout handoff block the
+# host pastes) or in a container (headless docker via docker_run_agent.sh).
+#
+# Part of #481 phase C / #490. The sub-agent's exit contract is convention-only
+# (no enforcement, per ADR-0004/0005): it writes a final progress.md entry; the
+# host reads the last entry for the outcome + next action.
+#
+# Usage:
+#   dispatch_subagent.sh --mode in-process|container --issue <N> \
+#       (--skill <name> | --prompt-file <path>) \
+#       [--entry-type <type>] [--output-format <fmt>] [--model <id>]
+#
+#   --model defaults per-skill (Opus for review/implement, Sonnet otherwise);
+#   pass an alias ('opus'/'sonnet') to override. Container mode forwards it;
+#   in-process mode only recommends it (the host picks the Agent's model).
+#
+# Examples:
+#   dispatch_subagent.sh --mode in-process --issue 490 --skill review-code
+#   dispatch_subagent.sh --mode container  --issue 490 --prompt-file /tmp/task.md --entry-type 'Local Review'
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# Resolve to the main workspace root if invoked from inside a worktree.
+if [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
+    ROOT_DIR="${ROOT_DIR%%/.workspace-worktrees/*}"
+elif [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
+    ROOT_DIR="${ROOT_DIR%%/layers/worktrees/*}"
+fi
+
+# ---------- Defaults ----------
+
+MODE=""
+ISSUE=""
+SKILL=""
+PROMPT_FILE=""
+ENTRY_TYPE=""
+OUTPUT_FORMAT="stream-json"
+MODEL=""   # --model override; empty => derive from the skill (see skill_model)
+
+# Identity literals embedded in the handoff (AGENTS.md § Agent Commit Identity).
+# Prefer the session's exported identity; fall back to the Claude default.
+DISPATCH_AGENT_NAME="${AGENT_NAME:-Claude Code Agent}"
+DISPATCH_AGENT_EMAIL="${AGENT_EMAIL:-roland+claude-code@ccom.unh.edu}"
+
+# Skill -> expected progress.md entry type (ADR-0013 vocabulary). Used for the
+# exit-contract "a newer entry of the expected type" check when --entry-type is
+# not given explicitly.
+skill_entry_type() {
+    case "$1" in
+        review-issue)    echo "Issue Review" ;;
+        plan-task)       echo "Plan Authored" ;;
+        review-plan)     echo "Plan Review" ;;
+        review-code)     echo "Local Review" ;;
+        triage-reviews)  echo "Integrated Review" ;;
+        *)               echo "" ;;
+    esac
+}
+
+# Skill -> model (per-phase, #490). Reasoning-heavy phases get Opus; lighter
+# ones (and the default) get Sonnet for quota headroom. Aliases, not pinned
+# ids, so they survive model version bumps; an unavailable model hard-fails
+# loudly (claude exits non-zero -> exit-contract reports FAILED). `--model`
+# overrides any cell. Adjust the mapping here as needs change.
+skill_model() {
+    case "$1" in
+        review-code|review-plan|triage-reviews)  echo "opus" ;;
+        implement|address-findings)              echo "opus" ;;
+        review-issue|plan-task)                  echo "sonnet" ;;
+        *)                                       echo "sonnet" ;;
+    esac
+}
+
+usage() {
+    sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+# ---------- Argument parsing ----------
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --mode)          MODE="${2:-}"; shift 2 ;;
+        --issue)         ISSUE="${2:-}"; shift 2 ;;
+        --skill)         SKILL="${2:-}"; shift 2 ;;
+        --prompt-file)   PROMPT_FILE="${2:-}"; shift 2 ;;
+        --entry-type)    ENTRY_TYPE="${2:-}"; shift 2 ;;
+        --model)         MODEL="${2:-}"; shift 2 ;;
+        --output-format) OUTPUT_FORMAT="${2:-}"; shift 2 ;;
+        -h|--help)       usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+    esac
+done
+
+# ---------- Validation ----------
+
+case "$MODE" in
+    in-process|container) : ;;
+    *) echo "ERROR: --mode must be 'in-process' or 'container'." >&2; usage >&2; exit 1 ;;
+esac
+if [ -z "$ISSUE" ]; then
+    echo "ERROR: --issue <N> is required." >&2; exit 1
+fi
+if [ -n "$SKILL" ] && [ -n "$PROMPT_FILE" ]; then
+    echo "ERROR: pass exactly one of --skill or --prompt-file, not both." >&2; exit 1
+fi
+if [ -z "$SKILL" ] && [ -z "$PROMPT_FILE" ]; then
+    echo "ERROR: pass one of --skill <name> or --prompt-file <path>." >&2; exit 1
+fi
+if [ -n "$PROMPT_FILE" ] && [ ! -f "$PROMPT_FILE" ]; then
+    echo "ERROR: --prompt-file not found: $PROMPT_FILE" >&2; exit 1
+fi
+case "$OUTPUT_FORMAT" in
+    stream-json|json|text) : ;;
+    *) echo "ERROR: --output-format must be one of stream-json|json|text (got '$OUTPUT_FORMAT')." >&2; exit 1 ;;
+esac
+
+# Resolve the expected entry type: explicit --entry-type wins, else derive from
+# the skill. May be empty for a raw prompt with no declared type.
+if [ -z "$ENTRY_TYPE" ] && [ -n "$SKILL" ]; then
+    ENTRY_TYPE="$(skill_entry_type "$SKILL")"
+fi
+
+# Resolve the model: explicit --model wins, else derive from the skill, else the
+# default ('sonnet'). For a raw prompt with no --model, the default applies.
+if [ -z "$MODEL" ]; then
+    if [ -n "$SKILL" ]; then MODEL="$(skill_model "$SKILL")"; else MODEL="sonnet"; fi
+fi
+
+# ---------- Resolve the worktree + its progress.md ----------
+
+WORKTREE_PATH=""
+WORKTREE_MATCHES=0
+for candidate in \
+    "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
+    "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
+    if [ -d "$candidate" ]; then
+        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+    fi
+done
+if [ -z "$WORKTREE_PATH" ]; then
+    echo "ERROR: no worktree found for issue #$ISSUE (create it first)." >&2; exit 1
+fi
+if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
+fi
+PROGRESS_FILE="$WORKTREE_PATH/.agent/work-plans/issue-$ISSUE/progress.md"
+
+# ---------- Build the handoff prompt ----------
+
+if [ -n "$PROMPT_FILE" ]; then
+    TASK_BODY="$(cat "$PROMPT_FILE")"
+else
+    TASK_BODY="Run the \`/$SKILL\` workflow skill for issue #$ISSUE: read \`.claude/skills/$SKILL/SKILL.md\` and follow its procedure to completion."
+fi
+
+if [ -n "$ENTRY_TYPE" ]; then
+    ENTRY_CLAUSE="append your final \`## $ENTRY_TYPE\` entry to"
+else
+    ENTRY_CLAUSE="append your final typed entry (per ADR-0013) to"
+fi
+
+HANDOFF="$(cat <<EOF
+$TASK_BODY
+
+---
+## Sub-agent handoff contract (#490)
+
+You are a fresh-context sub-agent dispatched for **issue #$ISSUE**. Work only
+within this issue's worktree; do not touch other issues.
+
+**Commit identity** — every \`git commit\` MUST carry per-invocation identity
+literals (AGENTS.md § Agent Commit Identity):
+
+    git -c user.name="$DISPATCH_AGENT_NAME" -c user.email="$DISPATCH_AGENT_EMAIL" commit -m "..."
+
+Never use \`--no-verify\`. Do **not** \`git push\` — the host performs pushes
+with its own credentials. Never write credentials/tokens (e.g.
+\`\$CLAUDE_CODE_OAUTH_TOKEN\`) into files, commits, or output.
+
+**Exit contract** — before you finish, $ENTRY_CLAUSE:
+
+    .agent/work-plans/issue-$ISSUE/progress.md
+
+The host reads the **last** entry to learn the outcome and the next step. If you
+cannot finish, still write an entry with \`**Status**: partial\` (or \`failed\`)
+recording what was done and what remains — a missing entry reads as "died
+before reporting".
+EOF
+)"
+
+# ---------- in-process mode: emit the handoff for a fresh Agent call ----------
+
+if [ "$MODE" = "in-process" ]; then
+    echo "=== DISPATCH (in-process) — issue #$ISSUE${SKILL:+, skill /$SKILL} ==="
+    echo "Paste the block between the markers into a fresh Agent tool call (no"
+    echo "inherited context). Expected entry type: ${ENTRY_TYPE:-<any>}."
+    echo "Recommended model: $MODEL (in-process can't set it — pick it when you"
+    echo "spawn the Agent; container mode passes it automatically)."
+    echo "---------------8<--------------- BEGIN HANDOFF ---------------8<---------------"
+    printf '%s\n' "$HANDOFF"
+    echo "---------------8<---------------- END HANDOFF ----------------8<---------------"
+    exit 0
+fi
+
+# ---------- container mode: launch headless docker, then read the contract ----------
+
+# Count progress.md entries (optionally of a given type) — used to require a
+# *newer* entry after dispatch. Missing file => 0.
+#
+# Type matching is done here, NOT via progress_read.py's `--type` filter,
+# because that filter matches `type`/`base_type` exactly and `Local Review
+# (Pre-Push)` is itself a canonical type (its `base_type` is the full
+# `Local Review (Pre-Push)`, not the stripped `Local Review`). review-code in
+# pre-push mode resolves ENTRY_TYPE="Local Review" but writes a
+# `## Local Review (Pre-Push)` heading, so an exact filter misses it and the
+# count stays flat → a false "died before reporting". We therefore count an
+# entry when its full type equals ENTRY_TYPE, its base_type equals ENTRY_TYPE,
+# OR its type begins with ENTRY_TYPE (catching the parenthetical variant).
+entry_count() {
+    [ -f "$PROGRESS_FILE" ] || { echo 0; return 0; }
+    python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
+        | ENTRY_TYPE="$ENTRY_TYPE" python3 -c 'import os,sys,json
+want = os.environ.get("ENTRY_TYPE", "")
+try: entries = json.load(sys.stdin).get("entries", [])
+except Exception: print(0); sys.exit(0)
+def match(e):
+    t = e.get("type") or ""
+    return (not want) or t == want or e.get("base_type") == want or t.startswith(want)
+print(sum(1 for e in entries if match(e)))' 2>/dev/null || echo 0
+}
+
+PRE_COUNT="$(entry_count)"
+# Fail closed: a non-numeric PRE_COUNT becomes -1 so any valid POST_COUNT
+# (>= 0) still requires a real new entry rather than spuriously passing.
+[[ "$PRE_COUNT" =~ ^[0-9]+$ ]] || PRE_COUNT=-1
+
+PROMPT_TMP="$(mktemp /tmp/dispatch_handoff.XXXXXX.md)"
+trap 'rm -f "$PROMPT_TMP"' EXIT
+printf '%s\n' "$HANDOFF" > "$PROMPT_TMP"
+
+echo "Dispatching issue #$ISSUE into a container (headless, model=$MODEL)…" >&2
+RC=0
+"$SCRIPT_DIR/docker_run_agent.sh" \
+    --issue "$ISSUE" \
+    --output-format "$OUTPUT_FORMAT" \
+    --model "$MODEL" \
+    --prompt-file "$PROMPT_TMP" || RC=$?
+
+# --- Exit-contract read ---
+echo ""
+echo "===== Dispatch outcome (issue #$ISSUE) ====="
+if [ "$RC" -ne 0 ]; then
+    echo "  Result: FAILED — container exited $RC (claude error / killed)."
+    echo "  Any partial work is in the worktree: $WORKTREE_PATH"
+    exit "$RC"
+fi
+
+POST_COUNT="$(entry_count)"
+# Fail closed: a non-numeric POST_COUNT becomes 0 so the `-le "$PRE_COUNT"`
+# comparison below can't error (status 2) into the success branch and print a
+# false "Result: OK".
+[[ "$POST_COUNT" =~ ^[0-9]+$ ]] || POST_COUNT=0
+if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
+    echo "  Result: FAILED — no new \`## ${ENTRY_TYPE:-<typed>}\` entry"
+    echo "          (count ${PRE_COUNT} -> ${POST_COUNT}); sub-agent died before"
+    echo "          reporting, or wrote an entry of an unexpected type."
+    echo "  Inspect the worktree: $WORKTREE_PATH"
+    exit 1
+fi
+
+# A new entry exists. Read its status (last entry matching the gate, same
+# type/base_type/prefix predicate as entry_count, so the displayed entry is the
+# one the count gate keyed on) and make the headline track it — #492 greps
+# "Result: …". Emits STATUS on the first line and the display fields after.
+LAST_ENTRY="$(
+    python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
+    | ENTRY_TYPE="$ENTRY_TYPE" python3 -c '
+import os, sys, json
+want = os.environ.get("ENTRY_TYPE", "")
+try:
+    entries = json.load(sys.stdin).get("entries", [])
+except Exception:
+    entries = []
+def match(e):
+    t = e.get("type") or ""
+    return (not want) or t == want or e.get("base_type") == want or t.startswith(want)
+e = [x for x in entries if match(x)]
+if e:
+    x = e[-1]
+    print((x.get("status") or "").strip().lower())
+    for k in ("type", "status", "by", "when"):
+        print("    %-7s %s" % (k + ":", x.get(k)))
+'
+)"
+LAST_STATUS="$(printf '%s\n' "$LAST_ENTRY" | head -n1)"
+ENTRY_DISPLAY="$(printf '%s\n' "$LAST_ENTRY" | tail -n +2)"
+
+case "$LAST_STATUS" in
+    failed)
+        echo "  Result: FAILED — sub-agent reported \`**Status**: failed\`. Last entry:" ;;
+    partial)
+        echo "  Result: PARTIAL — sub-agent reported \`**Status**: partial\`. Last entry:" ;;
+    complete)
+        echo "  Result: OK — sub-agent wrote a \`complete\` entry. Last entry:" ;;
+    *)
+        echo "  Result: OK — sub-agent wrote a new entry (status '${LAST_STATUS:-unknown}'). Last entry:" ;;
+esac
+if [ -n "$ENTRY_DISPLAY" ]; then
+    printf '%s\n' "$ENTRY_DISPLAY"
+else
+    echo "    (could not parse progress.md)"
+fi
+case "$LAST_STATUS" in
+    failed)  echo "  Next: the host inspects the failure in $WORKTREE_PATH."; exit 1 ;;
+    partial) echo "  Next: the host inspects the partial work in $WORKTREE_PATH."; exit 1 ;;
+    *)       echo "  Next: the host reviews the entry and runs the next phase / does the push." ;;
+esac

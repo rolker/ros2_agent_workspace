@@ -34,6 +34,10 @@ CONTAINER_PREFIX="ros2-agent"
 ISSUE=""
 BUILD_IMAGE=false
 SHELL_MODE=false
+PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
+PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
+OUTPUT_FORMAT="stream-json"  # claude -p --output-format in dispatch mode
+MODEL=""               # claude --model (alias like 'opus'/'sonnet', or full id); empty → claude default
 
 show_usage() {
     cat <<'EOF'
@@ -45,20 +49,32 @@ Required:
   --issue <N>       Issue number (worktree must exist on host)
 
 Options:
-  --build           Build/rebuild the Docker image before launch
-  --shell           Drop into bash instead of Claude Code (debugging)
-  -h, --help        Show this help
+  --build               Build/rebuild the Docker image before launch
+  --shell               Drop into bash instead of Claude Code (debugging)
+  --prompt <text>       Dispatch mode: run a headless `claude -p` with this
+                        kickoff prompt and exit (non-interactive). Mutually
+                        exclusive with --shell.
+  --prompt-file <path>  Dispatch mode: read the kickoff prompt from a file
+                        (preferred for multi-line prompts). Mutually exclusive
+                        with --prompt and --shell.
+  --output-format <fmt> Dispatch-mode claude output format: stream-json
+                        (default), json, or text. Ignored without a prompt.
+  --model <id>          claude --model (prefer an alias like 'opus'/'sonnet'
+                        over a pinned id). Empty => claude's default. An
+                        unavailable model makes claude exit non-zero.
+  -h, --help            Show this help
 
 Prerequisites:
   - Worktree must be created on host first:
       .agent/scripts/worktree_create.sh --issue <N> --type workspace
-  - ANTHROPIC_API_KEY must be set
+  - ANTHROPIC_API_KEY or subscription credentials must be available
 
-Workflow:
-  1. Create worktree on host
-  2. Run this script to launch container
-  3. Interact with Claude Code inside container
-  4. On exit, script checks for push requests and prompts to push
+Modes:
+  - Interactive (default): a TTY Claude Code session you drive.
+  - Dispatch (--prompt / --prompt-file): a headless `claude -p` run that
+    executes the kickoff and exits. The push-gateway post-exit step is
+    skipped; the caller (e.g. dispatch_subagent.sh) reads the worktree's
+    progress.md for the outcome.
 EOF
 }
 
@@ -75,6 +91,52 @@ while [[ $# -gt 0 ]]; do
             BUILD_IMAGE=true; shift ;;
         --shell)
             SHELL_MODE=true; shift ;;
+        --prompt)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --prompt requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            if [ "$PROMPT_SET" = true ]; then
+                echo "ERROR: --prompt and --prompt-file are mutually exclusive." >&2
+                exit 1
+            fi
+            [ -n "$2" ] || { echo "ERROR: --prompt is empty." >&2; exit 1; }
+            PROMPT="$2"; PROMPT_SET=true; shift 2 ;;
+        --prompt-file)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --prompt-file requires a path." >&2
+                show_usage >&2
+                exit 1
+            fi
+            if [ "$PROMPT_SET" = true ]; then
+                echo "ERROR: --prompt and --prompt-file are mutually exclusive." >&2
+                exit 1
+            fi
+            if [ ! -f "$2" ]; then
+                echo "ERROR: --prompt-file not found: $2" >&2
+                exit 1
+            fi
+            [ -s "$2" ] || { echo "ERROR: --prompt-file is empty: $2" >&2; exit 1; }
+            PROMPT="$(cat "$2")"; PROMPT_SET=true; shift 2 ;;
+        --output-format)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --output-format requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            case "$2" in
+                stream-json|json|text) : ;;
+                *) echo "ERROR: --output-format must be one of stream-json|json|text (got '$2')." >&2; exit 1 ;;
+            esac
+            OUTPUT_FORMAT="$2"; shift 2 ;;
+        --model)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --model requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            MODEL="$2"; shift 2 ;;
         -h|--help)
             show_usage; exit 0 ;;
         *)
@@ -90,25 +152,86 @@ if [ -z "$ISSUE" ]; then
     exit 1
 fi
 
+# Dispatch mode is active when a prompt source was explicitly provided. Gate on
+# PROMPT_SET (the intent), not [ -n "$PROMPT" ] (the value): an empty prompt is
+# already rejected at parse time, but keying on intent keeps a future empty
+# prompt from silently falling back to an interactive `-it` container.
+DISPATCH_MODE=false
+[ "$PROMPT_SET" = true ] && DISPATCH_MODE=true
+
+# --shell and dispatch mode are mutually exclusive (one wants a TTY, the
+# other is headless).
+if [ "$SHELL_MODE" = true ] && [ "$DISPATCH_MODE" = true ]; then
+    echo "ERROR: --shell and --prompt/--prompt-file are mutually exclusive." >&2
+    exit 1
+fi
+
+# ---------- Subscription token (file fallback) ----------
+# CLAUDE_CODE_OAUTH_TOKEN is the long-lived subscription token from
+# `claude setup-token`. Prefer an already-exported env var; otherwise read it
+# from a 600-perm file. The file path mirrors the gh-readonly-token pattern
+# and keeps the secret out of the launching agent's environment dumps. We
+# export it (rather than passing -e VAR=value) so it forwards via the bare
+# `-e CLAUDE_CODE_OAUTH_TOKEN` below without ever appearing in `ps`/argv.
+CLAUDE_OAUTH_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
+    # Warn (don't fail) if the secret file is group/world-readable.
+    PERM=$(stat -c '%a' "$CLAUDE_OAUTH_TOKEN_FILE" 2>/dev/null || echo "")
+    case "$PERM" in
+        600|400) : ;;
+        "") : ;;  # stat unavailable; skip the check
+        *) echo "⚠️  $CLAUDE_OAUTH_TOKEN_FILE is mode $PERM — recommend 'chmod 600'." >&2 ;;
+    esac
+    IFS= read -r CLAUDE_CODE_OAUTH_TOKEN < "$CLAUDE_OAUTH_TOKEN_FILE" || true
+    export CLAUDE_CODE_OAUTH_TOKEN
+fi
+
 # ---------- Validation ----------
 
-# Check for authentication (API key or subscription credentials)
-if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
+# Check for authentication. Three sources, in order of robustness for a
+# headless/sandboxed run:
+#   1. CLAUDE_CODE_OAUTH_TOKEN — long-lived (1yr) subscription token from
+#      `claude setup-token`. Subscription-native (counts against Max/Pro
+#      limits, not API billing), purpose-built for CI/headless. Best for
+#      dispatch mode.
+#   2. ANTHROPIC_API_KEY — pay-as-you-go API billing.
+#   3. ~/.claude/.credentials.json — interactive subscription OAuth. The
+#      access token is short-lived and a transplanted stale token can't
+#      reliably refresh inside the sandbox, so it's unreliable for headless
+#      dispatch (works for interactive sessions where a fresh login is at
+#      hand).
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
+   && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
     echo "ERROR: No authentication found." >&2
-    echo "Either:" >&2
-    echo "  - Export ANTHROPIC_API_KEY for API key auth" >&2
-    echo "  - Run 'claude' on the host and /login for subscription auth" >&2
+    echo "Pick one:" >&2
+    echo "  - CLAUDE_CODE_OAUTH_TOKEN  (recommended; 'claude setup-token' in a real" >&2
+    echo "                              terminal, then save to $CLAUDE_OAUTH_TOKEN_FILE" >&2
+    echo "                              [chmod 600], or export the env var)" >&2
+    echo "  - ANTHROPIC_API_KEY        (API billing, not subscription)" >&2
+    echo "  - 'claude' + /login on the host for interactive subscription auth" >&2
     exit 1
+fi
+
+# Dispatch mode is headless, so transplanted OAuth credentials.json can't
+# refresh — steer the user to the long-lived token unless they've set one
+# (or an API key).
+if [ "$DISPATCH_MODE" = true ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "⚠️  Dispatch (headless) mode with no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY." >&2
+    echo "    Mounted ~/.claude/.credentials.json OAuth tokens expire and cannot refresh in" >&2
+    echo "    the sandbox — the run will likely fail with 'Not logged in'. Generate a" >&2
+    echo "    long-lived subscription token with 'claude setup-token' and save it to" >&2
+    echo "    $CLAUDE_OAUTH_TOKEN_FILE (chmod 600) before dispatching." >&2
 fi
 
 # Find worktree for this issue
 WORKTREE_PATH=""
+WORKTREE_MATCHES=0
 for candidate in \
     "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
     "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
     if [ -d "$candidate" ]; then
-        WORKTREE_PATH="$candidate"
-        break
+        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
     fi
 done
 
@@ -117,6 +240,9 @@ if [ -z "$WORKTREE_PATH" ]; then
     echo "Create one first:" >&2
     echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
     exit 1
+fi
+if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
 fi
 
 WORKTREE_ID="$(basename "$WORKTREE_PATH")"
@@ -220,28 +346,38 @@ AGENT_GH_TOKEN="${AGENT_GH_TOKEN:-}"
 GH_TOKEN_FILE="$HOME/.config/ros2-agent/gh-readonly-token"
 
 if [ -z "$AGENT_GH_TOKEN" ] && [ -f "$GH_TOKEN_FILE" ]; then
-    read -r AGENT_GH_TOKEN < "$GH_TOKEN_FILE" || true
+    IFS= read -r AGENT_GH_TOKEN < "$GH_TOKEN_FILE" || true
 fi
+
+# Export the read-only GH token so it forwards via the bare `-e GH_TOKEN` below
+# (value-in-env, not value-in-argv) — keeping it out of the host's `ps`/cmdline,
+# matching the CLAUDE_CODE_OAUTH_TOKEN handling above.
+[ -n "$AGENT_GH_TOKEN" ] && export GH_TOKEN="$AGENT_GH_TOKEN"
 
 # ---------- Container environment ----------
 
-# Forward the agent git identity into the container. The entrypoint runs
-# `configure_git_identity.sh --detect`, which now prefers these env vars
-# over in-container framework auto-detection (detection still resolves to
-# the generic `claude-code` table entry via CLAUDE_CODE_ENTRYPOINT, but
-# that loses the launching agent's self-reported identity). These are
-# normally exported on the host by set_git_identity_env.sh; warn if they
-# are missing so commits inside the container don't land under a wrong or
-# unset identity.
+# Forward the agent git identity into the container. No
+# `configure_git_identity.sh --detect` runs in the container anymore (that
+# entrypoint step was removed). Container commit identity now flows two ways:
+#   (a) the dispatch handoff prompt's per-invocation `git -c user.name=… -c
+#       user.email=… commit` literals (the load-bearing path); and
+#   (b) agent-entrypoint.sh exports GIT_AUTHOR_*/GIT_COMMITTER_* from
+#       AGENT_NAME/AGENT_EMAIL before sourcing setup.bash, so setup.bash's
+#       detect-and-set fallback is skipped and any `git commit` that omits the
+#       `-c` literals still uses the *forwarded* identity, not a re-detected one.
+# AGENT_NAME/AGENT_EMAIL are forwarded so (b) and `gh` signatures have them.
+# Warn if they're missing so the env-fallback identity doesn't go unset.
 if [ "$SHELL_MODE" = false ] && { [ -z "${AGENT_NAME:-}" ] || [ -z "${AGENT_EMAIL:-}" ]; }; then
-    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container will fall back to" >&2
-    echo "    in-container framework detection, which may fail. Source" >&2
-    echo "    .agent/scripts/set_git_identity_env.sh before launching to set them." >&2
+    echo "⚠️  AGENT_NAME / AGENT_EMAIL not set — the container's env-fallback git" >&2
+    echo "    identity will be unset (commits then rely solely on the handoff's" >&2
+    echo "    'git -c' literals). Source .agent/scripts/set_git_identity_env.sh" >&2
+    echo "    before launching to set them." >&2
 fi
 
 ENV_ARGS=(
+    ${CLAUDE_CODE_OAUTH_TOKEN:+-e "CLAUDE_CODE_OAUTH_TOKEN"}
     ${ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY"}
-    ${AGENT_GH_TOKEN:+-e "GH_TOKEN=$AGENT_GH_TOKEN"}
+    ${AGENT_GH_TOKEN:+-e GH_TOKEN}
     ${AGENT_NAME:+-e "AGENT_NAME=$AGENT_NAME"}
     ${AGENT_EMAIL:+-e "AGENT_EMAIL=$AGENT_EMAIL"}
     ${AGENT_MODEL:+-e "AGENT_MODEL=$AGENT_MODEL"}
@@ -256,21 +392,43 @@ ENV_ARGS=(
 
 # ---------- Determine CMD ----------
 
+# --strict-mcp-config: use only MCP servers from --mcp-config (none
+# passed) → all MCP servers disabled. Silences the claude.ai
+# Gmail/Drive/Calendar servers (and any other user-scoped MCP servers
+# inherited via the mounted ~/.claude.json) that fail-fast with auth
+# errors on every start in the credential-less sandbox — they're
+# host-only by design (see #481 non-goals). The workspace defines no
+# project/.mcp.json servers, so nothing the sandbox legitimately needs
+# is lost; local skills still resolve via /skill-name. Removes the
+# startup-log noise and a round-trip per server.
+# --model is optional. Prefer an alias ('opus'/'sonnet') over a pinned id so
+# it survives model version bumps; an unavailable model makes claude exit
+# non-zero (hard-fail, surfaced by the caller's exit-contract — no silent
+# downgrade). Empty MODEL => claude's built-in default.
+MODEL_FLAGS=()
+[ -n "$MODEL" ] && MODEL_FLAGS=(--model "$MODEL")
+
 CONTAINER_CMD=()
 if [ "$SHELL_MODE" = true ]; then
     CONTAINER_CMD=(/bin/bash)
+elif [ "$DISPATCH_MODE" = true ]; then
+    # Headless kickoff. `-p` takes the prompt as a single argv element
+    # (passed through the entrypoint's `exec ... -- "$@"` unchanged, so no
+    # shell re-splitting/quoting issue). stream-json output requires
+    # --verbose; for other formats --verbose is harmless.
+    CONTAINER_CMD=(claude -p "$PROMPT"
+        --output-format "$OUTPUT_FORMAT" --verbose
+        "${MODEL_FLAGS[@]}"
+        --dangerously-skip-permissions --strict-mcp-config)
 else
-    # --strict-mcp-config: use only MCP servers from --mcp-config (none
-    # passed) → all MCP servers disabled. Silences the claude.ai
-    # Gmail/Drive/Calendar servers (and any other user-scoped MCP servers
-    # inherited via the mounted ~/.claude.json) that fail-fast with auth
-    # errors on every start in the credential-less sandbox — they're
-    # host-only by design (see #481 non-goals). The workspace defines no
-    # project/.mcp.json servers, so nothing the sandbox legitimately needs
-    # is lost; local skills still resolve via /skill-name. Removes the
-    # startup-log noise and a round-trip per server.
-    CONTAINER_CMD=(claude --dangerously-skip-permissions --strict-mcp-config)
+    CONTAINER_CMD=(claude "${MODEL_FLAGS[@]}" --dangerously-skip-permissions --strict-mcp-config)
 fi
+
+# TTY allocation: interactive/shell modes want a TTY; headless dispatch
+# must NOT allocate one (no stdin TTY in an orchestrated/CI context, and
+# stream-json is meant to be piped).
+TTY_FLAGS=(-it)
+[ "$DISPATCH_MODE" = true ] && TTY_FLAGS=()
 
 # ---------- Launch container ----------
 
@@ -283,14 +441,22 @@ echo "========================================="
 echo "  Issue:     #$ISSUE"
 echo "  Worktree:  $WORKTREE_PATH"
 echo "  Container: $CONTAINER_NAME"
-echo "  Mode:      $([ "$SHELL_MODE" = true ] && echo 'shell (debug)' || echo 'Claude Code (YOLO)')"
+if [ "$SHELL_MODE" = true ]; then
+    RUN_MODE="shell (debug)"
+elif [ "$DISPATCH_MODE" = true ]; then
+    RUN_MODE="dispatch (headless claude -p, $OUTPUT_FORMAT)"
+else
+    RUN_MODE="Claude Code (YOLO)"
+fi
+echo "  Mode:      $RUN_MODE"
+echo "  Model:     ${MODEL:-(claude default)}"
 echo "  GitHub:    $([ -n "$AGENT_GH_TOKEN" ] && echo 'read-only token' || echo 'no token')"
 echo "========================================="
 echo ""
 
 # Allow non-zero exit (user Ctrl+C, Claude exit, etc.) — we still check push requests
 EXIT_CODE=0
-docker run -it --rm \
+docker run "${TTY_FLAGS[@]}" --rm \
     --name "$CONTAINER_NAME" \
     --hostname "agent-$ISSUE" \
     --security-opt no-new-privileges:true \
@@ -301,7 +467,18 @@ docker run -it --rm \
     "${CONTAINER_CMD[@]}" \
     || EXIT_CODE=$?
 
-# ---------- Post-exit: check for outbox items ----------
+# ---------- Post-exit ----------
+# Dispatch mode uses progress.md as the outcome channel (the caller reads
+# the worktree's last entry), so skip the interactive push-gateway flow
+# entirely and just surface the container exit code.
+if [ "$DISPATCH_MODE" = true ]; then
+    echo ""
+    echo "Dispatch run exited with code $EXIT_CODE."
+    echo "Outcome is in the worktree's progress.md (read the last entry)."
+    exit "$EXIT_CODE"
+fi
+
+# ---------- Post-exit: check for outbox items (interactive mode) ----------
 
 echo ""
 HAS_PENDING=false
