@@ -66,3 +66,29 @@ the plan's Files-to-Change "ask-first" annotation and the task prompt's Do-NOT-t
 ### Actions
 - [ ] Host: push branch and open/update PR for review
 - [ ] Ask-first: add one-line "handoff is Claude-Agent-specific" note to the 3 framework adapters + AGENTS.md Script Reference row (human approval needed)
+
+## Local Review
+**Status**: complete
+**When**: 2026-06-14 07:22 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+**Verdict**: changes-requested
+
+**PR**: #519 at `0139dda`
+**Mode**: post-PR
+**Depth**: Deep (reason: +1032/-39, 16 files, container-isolation/auth/identity scripts)
+**Must-fix**: 4 | **Suggestions**: 6 | **Ask-first follow-ups**: 3
+
+### Findings
+- [ ] (must-fix) exit-contract fails OPEN: non-numeric `entry_count` makes `[ -le ]` error → success branch → false "OK" — `dispatch_subagent.sh` (PRE/POST_COUNT). Fix: validate numeric, fail closed.
+- [ ] (must-fix) empty `--prompt-file` → `DISPATCH_MODE` stays false → launches interactive `-it` container — `docker_run_agent.sh`. Fix: reject empty file (`[ -s ]`).
+- [ ] (must-fix) stale comment describes the now-deleted entrypoint `configure_git_identity.sh --detect` step — `docker_run_agent.sh` (forward-identity block). Fix: rewrite to the pure-`-c` + env-from-setup.bash reality.
+- [ ] (must-fix) exit-contract prints `Result: OK` even when the entry's `**Status**` is `failed`/`partial` — `dispatch_subagent.sh` OK branch. Fix: read `entries[-1].status`, headline FAILED/PARTIAL, exit non-zero. (High value: #492 greps this.)
+- [ ] (suggestion) env-fallback identity diverges from the `-c` literals: `setup.bash`→`set_git_identity_env.sh --detect` re-derives `claude-code` instead of honoring forwarded `AGENT_NAME/EMAIL` (only differs for a custom agent name; benign for human-misattribution). Fix: entrypoint export `GIT_AUTHOR_*/GIT_COMMITTER_*` from forwarded vars before sourcing setup.bash.
+- [ ] (suggestion) OK-branch last-entry printer is unfiltered; show the `--type`-filtered last entry to match the gate — `dispatch_subagent.sh`.
+- [ ] (suggestion) `--prompt`/`--prompt-file` "mutually exclusive" claimed in help but not enforced — `docker_run_agent.sh`. Enforce or soften.
+- [ ] (suggestion) add "never write credentials into files/commits/output" to the handoff contract — `dispatch_subagent.sh` (defense-in-depth).
+- [ ] (suggestion) warn when the layer-worktree glob matches >1 dir (silently picks first) — `dispatch_subagent.sh`/`docker_run_agent.sh`.
+- [ ] (suggestion) validate `--output-format` against stream-json|json|text up front — `dispatch_subagent.sh`.
+- [ ] (ask-first) add `docker_run_agent.sh` row to AGENTS.md Script Reference (sibling of the dispatch row; still missing).
+- [ ] (ask-first) sync `configure_git_identity.sh` containerized-identity docs (`.agent/scripts/README.md`, `.agent/AI_IDENTITY_STRATEGY.md`) — now stale after the entrypoint step was removed.
+- [ ] (follow-up) `framework_config.sh` model entry stale (`Claude Opus 4.6`) — pre-existing, cosmetic; separate from this PR.
