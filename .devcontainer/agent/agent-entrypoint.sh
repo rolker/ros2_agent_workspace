@@ -139,4 +139,12 @@ echo ""
 # Drop privileges: run CMD as the non-root target user.
 # setpriv uses setuid(2) directly (no setuid bits) so it works with
 # --security-opt no-new-privileges:true.
-exec setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- "$@"
+#
+# setpriv inherits the entrypoint's environment, where HOME is still /root
+# (the entrypoint runs as root). Without resetting it, the dropped `ros`
+# process would resolve HOME=/root and fail with EACCES trying to write
+# under /root/.claude (e.g. Claude Code's per-session env dir). Set HOME
+# (and USER/LOGNAME) to the target user so $HOME-relative paths land in
+# the user-owned /home/ros.
+exec setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- \
+    env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
