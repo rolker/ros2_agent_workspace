@@ -211,17 +211,27 @@ fi
 
 # Count progress.md entries (optionally of a given type) — used to require a
 # *newer* entry after dispatch. Missing file => 0.
+#
+# Type matching is done here, NOT via progress_read.py's `--type` filter,
+# because that filter matches `type`/`base_type` exactly and `Local Review
+# (Pre-Push)` is itself a canonical type (its `base_type` is the full
+# `Local Review (Pre-Push)`, not the stripped `Local Review`). review-code in
+# pre-push mode resolves ENTRY_TYPE="Local Review" but writes a
+# `## Local Review (Pre-Push)` heading, so an exact filter misses it and the
+# count stays flat → a false "died before reporting". We therefore count an
+# entry when its full type equals ENTRY_TYPE, its base_type equals ENTRY_TYPE,
+# OR its type begins with ENTRY_TYPE (catching the parenthetical variant).
 entry_count() {
     [ -f "$PROGRESS_FILE" ] || { echo 0; return 0; }
-    local out
-    if [ -n "$ENTRY_TYPE" ]; then
-        out="$(python3 "$SCRIPT_DIR/progress_read.py" --type "$ENTRY_TYPE" "$PROGRESS_FILE" 2>/dev/null || true)"
-    else
-        out="$(python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null || true)"
-    fi
-    printf '%s' "$out" | python3 -c 'import sys,json
-try: print(len(json.load(sys.stdin).get("entries", [])))
-except Exception: print(0)' 2>/dev/null || echo 0
+    python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
+        | ENTRY_TYPE="$ENTRY_TYPE" python3 -c 'import os,sys,json
+want = os.environ.get("ENTRY_TYPE", "")
+try: entries = json.load(sys.stdin).get("entries", [])
+except Exception: print(0); sys.exit(0)
+def match(e):
+    t = e.get("type") or ""
+    return (not want) or t == want or e.get("base_type") == want or t.startswith(want)
+print(sum(1 for e in entries if match(e)))' 2>/dev/null || echo 0
 }
 
 PRE_COUNT="$(entry_count)"
@@ -256,27 +266,30 @@ POST_COUNT="$(entry_count)"
 # false "Result: OK".
 [[ "$POST_COUNT" =~ ^[0-9]+$ ]] || POST_COUNT=0
 if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
-    echo "  Result: FAILED — no new \`## ${ENTRY_TYPE:-<typed>}\` progress.md entry"
-    echo "          (count ${PRE_COUNT} -> ${POST_COUNT}); sub-agent likely died before reporting."
+    echo "  Result: FAILED — no new \`## ${ENTRY_TYPE:-<typed>}\` entry"
+    echo "          (count ${PRE_COUNT} -> ${POST_COUNT}); sub-agent died before"
+    echo "          reporting, or wrote an entry of an unexpected type."
     echo "  Inspect the worktree: $WORKTREE_PATH"
     exit 1
 fi
 
-# A new entry exists. Read its status (last entry of the gated --type, to match
-# the count check) and make the headline track it — #492 greps "Result: …".
-# Read the last entry (filtered by --type when set, matching the gate) once,
-# emitting STATUS on the first line and the display fields after.
+# A new entry exists. Read its status (last entry matching the gate, same
+# type/base_type/prefix predicate as entry_count, so the displayed entry is the
+# one the count gate keyed on) and make the headline track it — #492 greps
+# "Result: …". Emits STATUS on the first line and the display fields after.
 LAST_ENTRY="$(
-    if [ -n "$ENTRY_TYPE" ]; then
-        python3 "$SCRIPT_DIR/progress_read.py" --type "$ENTRY_TYPE" "$PROGRESS_FILE" 2>/dev/null
-    else
-        python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null
-    fi | python3 -c '
-import sys, json
+    python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
+    | ENTRY_TYPE="$ENTRY_TYPE" python3 -c '
+import os, sys, json
+want = os.environ.get("ENTRY_TYPE", "")
 try:
-    e = json.load(sys.stdin).get("entries", [])
+    entries = json.load(sys.stdin).get("entries", [])
 except Exception:
-    e = []
+    entries = []
+def match(e):
+    t = e.get("type") or ""
+    return (not want) or t == want or e.get("base_type") == want or t.startswith(want)
+e = [x for x in entries if match(x)]
 if e:
     x = e[-1]
     print((x.get("status") or "").strip().lower())
