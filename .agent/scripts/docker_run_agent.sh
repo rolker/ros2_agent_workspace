@@ -101,6 +101,7 @@ while [[ $# -gt 0 ]]; do
                 echo "ERROR: --prompt and --prompt-file are mutually exclusive." >&2
                 exit 1
             fi
+            [ -n "$2" ] || { echo "ERROR: --prompt is empty." >&2; exit 1; }
             PROMPT="$2"; PROMPT_SET=true; shift 2 ;;
         --prompt-file)
             if [[ $# -lt 2 ]]; then
@@ -151,9 +152,12 @@ if [ -z "$ISSUE" ]; then
     exit 1
 fi
 
-# Dispatch mode is active when a kickoff prompt was provided.
+# Dispatch mode is active when a prompt source was explicitly provided. Gate on
+# PROMPT_SET (the intent), not [ -n "$PROMPT" ] (the value): an empty prompt is
+# already rejected at parse time, but keying on intent keeps a future empty
+# prompt from silently falling back to an interactive `-it` container.
 DISPATCH_MODE=false
-[ -n "$PROMPT" ] && DISPATCH_MODE=true
+[ "$PROMPT_SET" = true ] && DISPATCH_MODE=true
 
 # --shell and dispatch mode are mutually exclusive (one wants a TTY, the
 # other is headless).
@@ -178,7 +182,7 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; t
         "") : ;;  # stat unavailable; skip the check
         *) echo "⚠️  $CLAUDE_OAUTH_TOKEN_FILE is mode $PERM — recommend 'chmod 600'." >&2 ;;
     esac
-    read -r CLAUDE_CODE_OAUTH_TOKEN < "$CLAUDE_OAUTH_TOKEN_FILE" || true
+    IFS= read -r CLAUDE_CODE_OAUTH_TOKEN < "$CLAUDE_OAUTH_TOKEN_FILE" || true
     export CLAUDE_CODE_OAUTH_TOKEN
 fi
 
@@ -342,8 +346,13 @@ AGENT_GH_TOKEN="${AGENT_GH_TOKEN:-}"
 GH_TOKEN_FILE="$HOME/.config/ros2-agent/gh-readonly-token"
 
 if [ -z "$AGENT_GH_TOKEN" ] && [ -f "$GH_TOKEN_FILE" ]; then
-    read -r AGENT_GH_TOKEN < "$GH_TOKEN_FILE" || true
+    IFS= read -r AGENT_GH_TOKEN < "$GH_TOKEN_FILE" || true
 fi
+
+# Export the read-only GH token so it forwards via the bare `-e GH_TOKEN` below
+# (value-in-env, not value-in-argv) — keeping it out of the host's `ps`/cmdline,
+# matching the CLAUDE_CODE_OAUTH_TOKEN handling above.
+[ -n "$AGENT_GH_TOKEN" ] && export GH_TOKEN="$AGENT_GH_TOKEN"
 
 # ---------- Container environment ----------
 
@@ -368,7 +377,7 @@ fi
 ENV_ARGS=(
     ${CLAUDE_CODE_OAUTH_TOKEN:+-e "CLAUDE_CODE_OAUTH_TOKEN"}
     ${ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY"}
-    ${AGENT_GH_TOKEN:+-e "GH_TOKEN=$AGENT_GH_TOKEN"}
+    ${AGENT_GH_TOKEN:+-e GH_TOKEN}
     ${AGENT_NAME:+-e "AGENT_NAME=$AGENT_NAME"}
     ${AGENT_EMAIL:+-e "AGENT_EMAIL=$AGENT_EMAIL"}
     ${AGENT_MODEL:+-e "AGENT_MODEL=$AGENT_MODEL"}
