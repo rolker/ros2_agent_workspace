@@ -113,6 +113,10 @@ fi
 if [ -n "$PROMPT_FILE" ] && [ ! -f "$PROMPT_FILE" ]; then
     echo "ERROR: --prompt-file not found: $PROMPT_FILE" >&2; exit 1
 fi
+case "$OUTPUT_FORMAT" in
+    stream-json|json|text) : ;;
+    *) echo "ERROR: --output-format must be one of stream-json|json|text (got '$OUTPUT_FORMAT')." >&2; exit 1 ;;
+esac
 
 # Resolve the expected entry type: explicit --entry-type wins, else derive from
 # the skill. May be empty for a raw prompt with no declared type.
@@ -129,13 +133,20 @@ fi
 # ---------- Resolve the worktree + its progress.md ----------
 
 WORKTREE_PATH=""
+WORKTREE_MATCHES=0
 for candidate in \
     "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
     "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
-    if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; break; fi
+    if [ -d "$candidate" ]; then
+        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+    fi
 done
 if [ -z "$WORKTREE_PATH" ]; then
     echo "ERROR: no worktree found for issue #$ISSUE (create it first)." >&2; exit 1
+fi
+if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
 fi
 PROGRESS_FILE="$WORKTREE_PATH/.agent/work-plans/issue-$ISSUE/progress.md"
 
@@ -168,7 +179,8 @@ literals (AGENTS.md § Agent Commit Identity):
     git -c user.name="$DISPATCH_AGENT_NAME" -c user.email="$DISPATCH_AGENT_EMAIL" commit -m "..."
 
 Never use \`--no-verify\`. Do **not** \`git push\` — the host performs pushes
-with its own credentials.
+with its own credentials. Never write credentials/tokens (e.g.
+\`\$CLAUDE_CODE_OAUTH_TOKEN\`) into files, commits, or output.
 
 **Exit contract** — before you finish, $ENTRY_CLAUSE:
 
@@ -213,6 +225,9 @@ except Exception: print(0)' 2>/dev/null || echo 0
 }
 
 PRE_COUNT="$(entry_count)"
+# Fail closed: a non-numeric PRE_COUNT becomes -1 so any valid POST_COUNT
+# (>= 0) still requires a real new entry rather than spuriously passing.
+[[ "$PRE_COUNT" =~ ^[0-9]+$ ]] || PRE_COUNT=-1
 
 PROMPT_TMP="$(mktemp /tmp/dispatch_handoff.XXXXXX.md)"
 trap 'rm -f "$PROMPT_TMP"' EXIT
@@ -236,6 +251,10 @@ if [ "$RC" -ne 0 ]; then
 fi
 
 POST_COUNT="$(entry_count)"
+# Fail closed: a non-numeric POST_COUNT becomes 0 so the `-le "$PRE_COUNT"`
+# comparison below can't error (status 2) into the success branch and print a
+# false "Result: OK".
+[[ "$POST_COUNT" =~ ^[0-9]+$ ]] || POST_COUNT=0
 if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
     echo "  Result: FAILED — no new \`## ${ENTRY_TYPE:-<typed>}\` progress.md entry"
     echo "          (count ${PRE_COUNT} -> ${POST_COUNT}); sub-agent likely died before reporting."
@@ -243,14 +262,48 @@ if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
     exit 1
 fi
 
-echo "  Result: OK — sub-agent wrote a new entry. Last entry:"
-python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null | python3 -c '
+# A new entry exists. Read its status (last entry of the gated --type, to match
+# the count check) and make the headline track it — #492 greps "Result: …".
+# Read the last entry (filtered by --type when set, matching the gate) once,
+# emitting STATUS on the first line and the display fields after.
+LAST_ENTRY="$(
+    if [ -n "$ENTRY_TYPE" ]; then
+        python3 "$SCRIPT_DIR/progress_read.py" --type "$ENTRY_TYPE" "$PROGRESS_FILE" 2>/dev/null
+    else
+        python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null
+    fi | python3 -c '
 import sys, json
-d = json.load(sys.stdin)
-e = d.get("entries", [])
+try:
+    e = json.load(sys.stdin).get("entries", [])
+except Exception:
+    e = []
 if e:
     x = e[-1]
+    print((x.get("status") or "").strip().lower())
     for k in ("type", "status", "by", "when"):
         print("    %-7s %s" % (k + ":", x.get(k)))
-' || echo "    (could not parse progress.md)"
-echo "  Next: the host reviews the entry and runs the next phase / does the push."
+'
+)"
+LAST_STATUS="$(printf '%s\n' "$LAST_ENTRY" | head -n1)"
+ENTRY_DISPLAY="$(printf '%s\n' "$LAST_ENTRY" | tail -n +2)"
+
+case "$LAST_STATUS" in
+    failed)
+        echo "  Result: FAILED — sub-agent reported \`**Status**: failed\`. Last entry:" ;;
+    partial)
+        echo "  Result: PARTIAL — sub-agent reported \`**Status**: partial\`. Last entry:" ;;
+    complete)
+        echo "  Result: OK — sub-agent wrote a \`complete\` entry. Last entry:" ;;
+    *)
+        echo "  Result: OK — sub-agent wrote a new entry (status '${LAST_STATUS:-unknown}'). Last entry:" ;;
+esac
+if [ -n "$ENTRY_DISPLAY" ]; then
+    printf '%s\n' "$ENTRY_DISPLAY"
+else
+    echo "    (could not parse progress.md)"
+fi
+case "$LAST_STATUS" in
+    failed)  echo "  Next: the host inspects the failure in $WORKTREE_PATH."; exit 1 ;;
+    partial) echo "  Next: the host inspects the partial work in $WORKTREE_PATH."; exit 1 ;;
+    *)       echo "  Next: the host reviews the entry and runs the next phase / does the push." ;;
+esac

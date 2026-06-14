@@ -20,8 +20,9 @@ fi
 # A throwaway worktree so the script's worktree-resolution succeeds.
 TEST_ISSUE=999999
 FAKE_WT="$ROOT_DIR/.workspace-worktrees/issue-workspace-$TEST_ISSUE"
+FAKE_WT2="$ROOT_DIR/layers/worktrees/issue-test-$TEST_ISSUE"
 mkdir -p "$FAKE_WT/.agent/work-plans/issue-$TEST_ISSUE"
-trap 'rm -rf "$FAKE_WT"' EXIT
+trap 'rm -rf "$FAKE_WT" "$FAKE_WT2"' EXIT
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); printf '  ok   - %s\n' "$1"; }
@@ -60,6 +61,10 @@ assert_fails "rejects missing prompt-file" "--prompt-file not found" \
     --mode container --issue "$TEST_ISSUE" --prompt-file /nonexistent/path.md
 assert_fails "rejects unknown worktree" "no worktree found" \
     --mode in-process --issue 888888 --skill review-code
+assert_fails "rejects bad --output-format" "must be one of stream-json|json|text" \
+    --mode container --issue "$TEST_ISSUE" --skill review-code --output-format yaml
+assert_emits "accepts a valid --output-format (in-process)" "BEGIN HANDOFF" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-code --output-format json
 
 # --- in-process handoff content ---
 assert_emits "embeds git -c identity literals" 'git -c user.name="Claude Code Agent" -c user.email="roland+claude-code@ccom.unh.edu"' \
@@ -67,6 +72,8 @@ assert_emits "embeds git -c identity literals" 'git -c user.name="Claude Code Ag
 assert_emits "embeds the no-push / no--no-verify rule" 'Never use `--no-verify`' \
     --mode in-process --issue "$TEST_ISSUE" --skill review-code
 assert_emits "embeds the progress.md exit contract" ".agent/work-plans/issue-$TEST_ISSUE/progress.md" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-code
+assert_emits "embeds the no-credentials-in-output rule" "Never write credentials/tokens" \
     --mode in-process --issue "$TEST_ISSUE" --skill review-code
 assert_emits "has copy markers" "BEGIN HANDOFF" \
     --mode in-process --issue "$TEST_ISSUE" --skill review-code
@@ -117,6 +124,15 @@ case "$out" in
     *'git -c user.name="Tester Bot" -c user.email="roland+tester@ccom.unh.edu"'*) ok "honors AGENT_NAME/AGENT_EMAIL override" ;;
     *) bad "honors AGENT_NAME/AGENT_EMAIL override" "override not reflected in handoff" ;;
 esac
+
+# --- ambiguous worktree match warns on stderr ---
+mkdir -p "$FAKE_WT2/.agent/work-plans/issue-$TEST_ISSUE"
+err="$("$DISPATCH" --mode in-process --issue "$TEST_ISSUE" --skill review-code 2>&1 >/dev/null)"
+case "$err" in
+    *"worktrees matched issue #$TEST_ISSUE"*) ok "warns on ambiguous worktree match" ;;
+    *) bad "warns on ambiguous worktree match" "no warning emitted to stderr" ;;
+esac
+rm -rf "$FAKE_WT2"
 
 echo ""
 echo "Passed: $PASS  Failed: $FAIL"
