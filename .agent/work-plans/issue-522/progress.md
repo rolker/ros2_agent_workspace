@@ -22,3 +22,22 @@ issue: 522
 
 ### Related
 - Completes #520. rqt_operator_tools#62 fixes the one real bad key (libqt5opengl5-dev→libqt5-opengl-dev); skip-keys makes the bake resilient regardless.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-15 03:24 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: approved
+
+**Branch**: feature/issue-522 at `01b24a4`
+**Mode**: pre-push
+**Depth**: Standard (reason: Makefile override-trigger + 137/14 lines, 6 files; no Deep trigger)
+**Must-fix**: 0 | **Suggestions**: 4
+
+### Findings
+- [ ] (suggestion) Makefile trap armed after staging — partial `.rosdep-manifests/` leak window if staging fails; arm before, for parity with docker_run_agent.sh — `Makefile:277-279`
+- [ ] (suggestion) `tr '\n' ' '` leaves trailing space → one inert empty `--skip-keys` entry; trim it — `.devcontainer/agent/Dockerfile:103`
+- [ ] (suggestion) sed only catches "Cannot locate rosdep definition"; other unresolvable forms fall through to launch-time (graceful via `|| echo WARNING`) — `.devcontainer/agent/Dockerfile:101-102`
+- [ ] (suggestion) `$(CURDIR)` absolute staging path vs relative build-context/trap; works via make cwd, pass explicit STAGE_DIR for consistency — `Makefile:278`
+
+Static analysis clean (shellcheck, bash -n, make -n). Core ignore-walk + dynamic skip-keys verified correct by two disjoint-lens adversarial passes (one read rosdep source) and a recorded real `make agent-build`. No must-fix.
