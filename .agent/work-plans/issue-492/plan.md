@@ -31,14 +31,20 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
    | `## Plan Review` | any | run implementation, then `review-code` | **always** |
    | `## Local Review (Pre-Push)` | approved | push → PR (or field-push) | **yes** (before publish) |
    | `## Local Review (Pre-Push)` | changes-requested | address inline, re-run `review-code` | maybe |
+   | `## Local Review (Pre-Push)` | (PR published) | dispatch `triage-reviews` after review comments land | **yes** (async — host waits for comments) |
    | `## Integrated Review` | open findings | dispatch `address-findings` | **yes** (non-trivial findings) |
    | `## Integrated Review` | none | merge | **yes** (before merge) |
    | `## Implementation` **preceded by** `## Integrated Review` | — | dispatch `review-code` (re-review) | — |
 
-   The last row is the **shared-routing-key disambiguation**: `## Implementation`
-   is written by both `address-findings` and a future `implement` skill, so route
-   on the *preceding* entry (Integrated Review before ⇒ address-findings pass ⇒
-   re-review).
+   The shared-routing-key disambiguation: `## Implementation` is written by both
+   `address-findings` and a future `implement` skill, so route on the *preceding*
+   entry (Integrated Review before ⇒ address-findings pass ⇒ re-review).
+   **Entry-type variant matching**: the table keys on `## Local Review
+   (Pre-Push)`, but `skill_workflows.md`'s handoff table says `## Local Review`;
+   the orchestrator must match by **base type / prefix** (the same rule
+   `dispatch_subagent.sh:217-235` already uses), not exact string.
+   **PR-published ⇒ triage-reviews** is the one transition the host can't fully
+   drive — it waits for review comments to arrive before dispatching.
 2. **Checkpoints** via `AskUserQuestion`, never silent: after `## Issue Review`
    iff open questions; **always** after `## Plan Review`; after each
    `## Integrated Review` with non-trivial findings; and **before any
@@ -52,7 +58,11 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
    The orchestrator pushes + opens the PR at the end. This ships **in this PR**.
    Downstream `review-plan` already accepts a plan **file / `--issue <N>`** (not
    only a PR), so it still works with no early PR — verify and adjust its default
-   resolution to prefer the local plan file when no PR exists.
+   resolution to prefer the local plan file when no PR exists. Note:
+   `worktree_create.sh --plan-file` is a **second** publish-early entry point
+   (it auto-opens a draft PR) — it's the equivalent opt-in to the new
+   `--draft-pr` flag; document the relationship so the two paths stay coherent
+   (no code change to the script).
 5. **Field mode** (ADR-0011): at the publish step, branch on `field_mode.sh` —
    gitcloud-origin repos push to the field remote with **no PR and no Copilot**.
 6. **Consequences**: adapter skill lists + `skill_workflows.md`.
@@ -63,6 +73,7 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
 | `.claude/skills/run-issue/SKILL.md` | **New** — orchestrator (decision table + checkpoints + publish step incl. field-mode + opt-in Copilot) |
 | `.claude/skills/plan-task/SKILL.md` | **Flip default**: step 7 no longer opens a draft PR; add `--draft-pr` opt-in; update the "Next step" + "During implementation" prose that assumes an early PR |
 | `.claude/skills/review-plan/SKILL.md` | Confirm/adjust no-PR resolution: prefer the local plan file via `--issue <N>` when no PR exists |
+| `.claude/skills/review-issue/SKILL.md` | **(must-fix, review-plan)** line 272 "A draft PR will follow when `plan-task` runs" is false post-flip — correct it |
 | `.agent/knowledge/skill_workflows.md` | Document `/run-issue` as the lifecycle driver; note plan-task no longer auto-publishes |
 | `AGENTS.md` | Post-Task-Verification "Plan-first workflow" wording mentions "if the PR opened with a work plan" — already conditional, but verify it reads correctly now that no early PR is the default (**instruction file — confirm with user before edit**) |
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `run-issue` to skill lists |
