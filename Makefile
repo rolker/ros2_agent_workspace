@@ -274,7 +274,10 @@ generate-skills:
 # --- Agent container targets ---
 
 agent-build:
-	@docker build \
+	@set -e; \
+	./.agent/scripts/stage_rosdep_manifests.sh "$(CURDIR)"; \
+	trap 'rm -rf .devcontainer/agent/.rosdep-manifests' EXIT; \
+	docker build \
 		--build-arg USER_UID=$$(id -u) \
 		--build-arg USER_GID=$$(id -g) \
 		-t ros2-agent-workspace-agent:latest \

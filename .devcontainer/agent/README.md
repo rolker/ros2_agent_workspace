@@ -49,12 +49,21 @@ The build passes your host UID/GID to match file ownership.
 ### Dependency Baking
 
 The build **bakes the workspace's layer system-dependencies into the image**
-(#520). Before `docker build`, `docker_run_agent.sh` gathers every layer
-`package.xml` (recursively — multi-package repos nest manifests in subdirs)
-into a staging dir (`.rosdep-manifests/`, gitignored) under the build context;
-the Dockerfile `COPY`s those manifests and runs `rosdep install` so the deps
-land in a read-only image layer. The source itself stays mounted at runtime,
-never copied into the image.
+(#520, #522). Before `docker build`, `stage_rosdep_manifests.sh` gathers every
+layer `package.xml` (recursively — multi-package repos nest manifests in
+subdirs; `COLCON_IGNORE`/`AMENT_IGNORE`/`CATKIN_IGNORE` packages are skipped so
+non-built packages can't poison the bake) into a staging dir
+(`.rosdep-manifests/`, gitignored) under the build context; the Dockerfile
+`COPY`s those manifests and runs `rosdep install` so the deps land in a
+read-only image layer. The source itself stays mounted at runtime, never copied
+into the image.
+
+All layers are installed in a single rosdep pass so `--ignore-src` correctly
+ignores local packages across layers (an overlay package may depend on a local
+package in a lower layer). Because `rosdep install` aborts entirely if *any*
+key is unresolvable, the bake first computes the genuinely-unresolvable external
+keys (`rosdep check`) and passes them as `--skip-keys` — so one bad key skips
+only itself rather than nuking the whole bake (#522).
 
 This is what makes the launch-time `rosdep check` in `agent-entrypoint.sh`
 actually skip: with deps already baked, each launch installs only the *delta*
