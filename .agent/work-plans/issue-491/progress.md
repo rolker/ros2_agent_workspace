@@ -19,3 +19,16 @@ issue: 491
 - [ ] Persist a typed `progress.md` entry per ADR-0013 (follows from the entry-type decision).
 - [ ] Scope the triage-reviews/review-code de-duplication (in-PR vs follow-up) so findings aren't double-handled.
 - [ ] Update the #491 issue body to note #485 is merged (blocker cleared).
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-15 09:45 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Plan**: `.agent/work-plans/issue-491/plan.md` at `52f523a`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/524 (`[PLAN]` prefix)
+**Phases**: single
+
+### Open questions
+- [ ] Entry type (ADR-0013): recommend reusing `## Implementation`; confirm vs mint `## Findings Addressed` via superseding ADR.
+- [ ] De-dup scope: remove old ad-hoc external-review handling in this PR or a follow-up (recommend follow-up).
