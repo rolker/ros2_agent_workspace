@@ -77,7 +77,8 @@ describes how to hand off to the subsequent phase. The full lifecycle map:
 | `plan-task` | `## Plan Authored` | `review-plan` | `## Plan Review` |
 | `review-plan` | `## Plan Review` | implement (no skill yet) → `review-code` | `## Local Review` |
 | `review-code` | `## Local Review` | `triage-reviews` | `## Integrated Review` |
-| `triage-reviews` | `## Integrated Review` | address findings / done | — |
+| `triage-reviews` | `## Integrated Review` | `address-findings` (if open findings) / done | `## Implementation` |
+| `address-findings` | `## Implementation` | `review-code` (re-review) | `## Local Review` |
 
 ### How to hand off
 

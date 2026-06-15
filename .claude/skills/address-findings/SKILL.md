@@ -51,14 +51,21 @@ python3 .agent/scripts/progress_read.py \
     .agent/work-plans/issue-<N>/progress.md --type "Integrated Review"
 ```
 
-`progress_read.py` emits JSON; take the **last** `Integrated Review`
-entry's `findings[]` array. Each finding is
-`{section, checked, source_hint, text}`. The action items are the
-entries with `checked == false`. (False positives are plain bullets, so
-they never appear in `findings[]` — no special handling needed.)
+`progress_read.py` emits JSON; filter to `Integrated Review` entries
+(its `entries[]` already only contains the requested `--type`). Then:
 
-If there are no unchecked findings, report "nothing to address — the
-latest Integrated Review has no open actions" and exit without a commit.
+- **No `Integrated Review` entry at all** (empty list — the file exists
+  but `triage-reviews` never ran, or only earlier phases have run):
+  report "no Integrated Review to address — run `triage-reviews` first"
+  and exit without a commit. Do **not** fall back to other entry types.
+- Otherwise take the **last** `Integrated Review` entry's `findings[]`
+  array. Each finding is `{section, checked, source_hint, text}`. The
+  action items are the entries with `checked == false`. (False positives
+  are plain bullets, so they never appear in `findings[]` — no special
+  handling needed.)
+- **No unchecked findings** in that entry: report "nothing to address —
+  the latest Integrated Review has no open actions" and exit without a
+  commit.
 
 ### 3. Address each open finding
 
