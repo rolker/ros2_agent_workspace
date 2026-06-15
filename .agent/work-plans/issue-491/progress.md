@@ -93,14 +93,17 @@ issue: 491
 **Must-fix**: 3 | **Suggestions**: 5
 
 ### Findings
-- [ ] (must-fix) `## Implementation` template omits ADR-0013's required correlation field (`**PR**:`/`**Branch**: <name> at <sha>`); `progress_read.py` lists Implementation in `_PR_BRANCH_TYPES` → entries parse to `correlation: null` — `.claude/skills/address-findings/SKILL.md:107-120`
-- [ ] (must-fix) ADR-0013 Writer column for `## Implementation` still says "future implement skill" only; `address-findings` is now a second writer and must be registered (light addendum, no new ADR) — `docs/decisions/0013-progress-md-entry-type-vocabulary.md:56`
-- [ ] (must-fix) Step-5 heading "Commit and push" but block only commits; contradicts the sub-agent no-push dispatch contract — `.claude/skills/address-findings/SKILL.md:122`
-- [ ] (suggestion) Deferred-finding dead-end: not-actionable items stay unchecked and are re-attempted every run; nothing consumes the deferred list — `.claude/skills/address-findings/SKILL.md:78-81,117-119`
-- [ ] (suggestion) `## Implementation` doubles as orchestrator routing key; ambiguous once a future `implement` skill also writes it — flag for #492 — `.claude/skills/address-findings/SKILL.md:32-36`
-- [ ] (suggestion) Internal tension: "stage only the files for this finding" vs box-check riding in same commit — `.claude/skills/address-findings/SKILL.md:83-94`
-- [ ] (suggestion) `progress_read.py --type "Integrated Review"` also matches legacy `## External Review`; take last entry whose base type is Integrated Review — `.claude/skills/address-findings/SKILL.md:50-61`
-- [ ] (suggestion) Step 3 bare `git commit` vs step 5 `git -C <worktree>` with undefined `<worktree>` placeholder — `.claude/skills/address-findings/SKILL.md:87,126`
+- [x] (must-fix) `## Implementation` template omits ADR-0013's required correlation field — FIXED `25b0ecd`: template now carries `**Branch**:`/`**PR**: <name> at <sha>`.
+- [x] (must-fix) ADR-0013 Writer registration for `## Implementation` — FIXED `adab51c`: ADR-0012 cross-reference addendum registers `address-findings` as a second writer (Decision table unchanged; user-approved approach).
+- [x] (must-fix) Step-5 "Commit and push" contradicted the no-push dispatch contract — FIXED `25b0ecd`: commit only, host pushes.
+- [x] (suggestion) Deferred-finding dead-end — FIXED `25b0ecd`: deferred items written checked+`(deferred:)` so they're not re-attempted (`address-findings` acts only on `checked == false`).
+- [x] (suggestion) `## Implementation` shared routing key — FIXED `25b0ecd`: forward-flag note added for #492 (orchestrator disambiguates by preceding entry).
+- [x] (suggestion) Staging vs box-check tension — FIXED `25b0ecd`: box-check is the one permitted addition to a finding's commit.
+- [x] (suggestion) `## External Review` legacy match — FIXED `25b0ecd`: step 2 filters on `base_type == "Integrated Review"`.
+- [x] (suggestion) Worktree/commit-consistency — FIXED `25b0ecd`: commits run from the issue worktree; placeholder removed.
+
+### Resolution (round 2)
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-15. Sandboxed re-review = changes-requested (3 must-fix + 5 suggestions); all 8 addressed in `25b0ecd` (skill) + `adab51c` (ADR-0013 addendum). The ADR registration approach (ADR-0012 addendum vs superseding ADR) was confirmed with the user. Round-2 cross-confirmed-clean items (dispatcher exit-contract, Scope-E, adapters, tables) left intact.
 
 ### Notes
 - Cross-confirmed clean: dispatcher exit-contract is **not** confused by the shared `## Implementation` type — both adversarial passes independently verified the count-delta (`entry_count` PRE vs POST) mechanism in `dispatch_subagent.sh`.
