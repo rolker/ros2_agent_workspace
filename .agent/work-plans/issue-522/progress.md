@@ -18,7 +18,7 @@ issue: 522
 ### Verification
 - `bash -n` clean (helper); Makefile recipe parses (`make -n agent-build`).
 - Staging skips image_warper (107 staged, 0 image_warper).
-- Pending: real `make agent-build` to confirm apt installs now happen (the #520 build baked zero).
+- **Confirmed**: real `make agent-build` (exit 0) staged 107 (skipped image_warper), computed `--skip-keys libqt5opengl5-dev`, and **installed real deps** (ros-jazzy-grid-map-rviz-plugin, zenoh, rqt-*, …) — vs. the #520 build which baked zero. Staging dir trap-cleaned.
 
 ### Related
 - Completes #520. rqt_operator_tools#62 fixes the one real bad key (libqt5opengl5-dev→libqt5-opengl-dev); skip-keys makes the bake resilient regardless.
