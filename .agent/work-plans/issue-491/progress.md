@@ -61,3 +61,19 @@ issue: 491
 - [x] `skill_workflows.md` diagram + Skill Index updated.
 - [x] `address-findings` added to all 3 framework adapter skill lists.
 - [ ] De-dup of old triage-reviews/review-code external-review handling — **deferred to a follow-up PR** (per settled open question).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-15 10:33 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-491 at `6d1f30e`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance/workflow files — dispatcher, adapters, lifecycle docs)
+**Must-fix**: 2 | **Suggestions**: 1
+
+### Findings
+- [ ] (must-fix) Lifecycle Handoff Convention table not updated for `address-findings`; same-file diagram + Skill Index were — internally inconsistent — `.agent/knowledge/skill_workflows.md:80`
+- [ ] (must-fix) `triage-reviews` "Next step" still claims it is the terminal automated skill with no handoff; now false — `.claude/skills/triage-reviews/SKILL.md:363-381`
+- [ ] (suggestion) Step 2 doesn't handle the "file exists, zero Integrated Review entries" case — `.claude/skills/address-findings/SKILL.md:45-62`
