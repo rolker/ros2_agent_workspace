@@ -74,6 +74,9 @@ issue: 491
 **Must-fix**: 2 | **Suggestions**: 1
 
 ### Findings
-- [ ] (must-fix) Lifecycle Handoff Convention table not updated for `address-findings`; same-file diagram + Skill Index were — internally inconsistent — `.agent/knowledge/skill_workflows.md:80`
-- [ ] (must-fix) `triage-reviews` "Next step" still claims it is the terminal automated skill with no handoff; now false — `.claude/skills/triage-reviews/SKILL.md:363-381`
-- [ ] (suggestion) Step 2 doesn't handle the "file exists, zero Integrated Review entries" case — `.claude/skills/address-findings/SKILL.md:45-62`
+- [x] (must-fix) Lifecycle Handoff Convention table not updated for `address-findings`; same-file diagram + Skill Index were — internally inconsistent — `.agent/knowledge/skill_workflows.md:80`. FIXED in `b53086e`: table now lists triage→address-findings→re-review rows.
+- [x] (must-fix) `triage-reviews` "Next step" still claims it is the terminal automated skill with no handoff; now false — `.claude/skills/triage-reviews/SKILL.md:363-381`. FIXED in `b53086e`: points to the address-findings handoff (Scope-E note retained).
+- [x] (suggestion) Step 2 doesn't handle the "file exists, zero Integrated Review entries" case — `.claude/skills/address-findings/SKILL.md:45-62`. FIXED in `b53086e`: explicit no-entry guard (don't fall back to other types).
+
+### Resolution
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-15. Sandboxed review-code = changes-requested; all 3 findings addressed in `b53086e`. Lifecycle coherence verified (address-findings named consistently across diagram, both tables, and triage-reviews handoff).
