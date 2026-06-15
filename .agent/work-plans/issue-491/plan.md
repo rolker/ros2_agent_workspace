@@ -58,8 +58,9 @@ The integration points already exist:
 | Add a skill that writes progress.md | Use an ADR-0013 type | Yes (`## Implementation`) |
 
 ## Open Questions
-- [ ] **Entry type (ADR-0013 gate)** — recommend reusing `## Implementation` (no new ADR). Confirm, or mint `## Findings Addressed` via a superseding ADR.
-- [ ] **De-dup scope** — remove the ad-hoc external-review handling from `triage-reviews`/`review-code` in *this* PR, or a focused follow-up? Recommend follow-up.
+_Both resolved with the user (2026-06-15):_
+- [x] **Entry type** → **reuse `## Implementation`** (no new ADR). Confirmed.
+- [x] **De-dup scope** → **follow-up PR** (this PR only adds the skill). Confirmed; file the de-dup follow-up after merge.
 
 ## Estimated Scope
 Single PR (skill + adapter lists). De-dup follow-up tracked separately.

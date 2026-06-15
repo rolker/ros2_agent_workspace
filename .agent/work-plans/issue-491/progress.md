@@ -30,5 +30,5 @@ issue: 491
 **Phases**: single
 
 ### Open questions
-- [ ] Entry type (ADR-0013): recommend reusing `## Implementation`; confirm vs mint `## Findings Addressed` via superseding ADR.
-- [ ] De-dup scope: remove old ad-hoc external-review handling in this PR or a follow-up (recommend follow-up).
+- [x] Entry type → **reuse `## Implementation`** (no new ADR). Confirmed with user 2026-06-15.
+- [x] De-dup scope → **follow-up PR**; this PR only adds the skill. Confirmed with user 2026-06-15.
