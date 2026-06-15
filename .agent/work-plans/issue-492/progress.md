@@ -20,3 +20,16 @@ issue: 492
 - [ ] (plan-task) Enumerate checkpoints precisely (post Issue Review iff open Qs; always post Plan Review; post each Integrated Review w/ findings; before any push/PR/merge).
 - [ ] (consequences) Adapter skill lists + skill_workflows.md.
 - [ ] Note overlap with the pending #491 de-dup follow-up so findings aren't double-handled.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-15 14:20 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Plan**: `.agent/work-plans/issue-492/plan.md` at `HEAD`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/525 (`[PLAN]` prefix)
+**Phases**: single (possible stacked plan-task tweak — open question 1)
+
+### Open questions
+- [ ] plan-task PR-deferral mechanism: (a) suppress signal for orchestrated runs [recommended] vs (b) flip default to no-early-PR; and in-PR vs stacked follow-up.
+- [ ] Copilot at publish: default off, `--copilot` opt-in surfaced as a checkpoint option — confirm.
