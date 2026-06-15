@@ -34,3 +34,21 @@ issue: 492
 - [x] plan-task PR behavior → **flip default to no-early-PR** (publish-early = opt-in `--draft-pr`); ships **in this PR**. Confirmed 2026-06-15.
 - [x] Copilot at publish → **off by default**, `--copilot` opt-in at the publish checkpoint. Confirmed 2026-06-15.
 - [ ] AGENTS.md "Plan-first workflow" wording tweak — confirm exact change with user before editing (instruction file).
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-15 15:40 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Plan**: `.agent/work-plans/issue-492/plan.md` at `3068207`
+**PR**: https://github.com/rolker/ros2_agent_workspace/pull/525
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (must-fix) plan-task-flip ripple incomplete: `review-issue/SKILL.md:272` states "A draft PR will follow when `plan-task` runs" — false once the default flips. Add `review-issue/SKILL.md` to Files to Change. — `plan.md:60-68`
+- [ ] (suggestion) Second early-PR path unreconciled: `worktree_create.sh --plan-file` also auto-opens a draft PR. Note it as the equivalent opt-in to `--draft-pr` so the two publish-early paths stay consistent (no code change required). — `plan.md:64`
+- [ ] (suggestion) Decision table has no row for "PR published ⇒ dispatch `triage-reviews`"; the async wait for review comments to arrive is the one transition the host can't fully automate. Add a row/prose note so the gap is explicit. — `plan.md:23-37`
+- [ ] (suggestion) Decision-table key `## Local Review (Pre-Push)` is correct, but `skill_workflows.md` handoff table still lists `## Local Review`; the orchestrator must match the parenthetical variant (dispatch_subagent.sh already does this — count-by-prefix at lines 217-235). Call this matching rule out in the skill. — `plan.md:32`
+- [ ] (good) Claim #3 (orchestrator needs no `skill_entry_type` row) verified — `dispatch_subagent.sh:53-62` map has no `run-issue` case; the driver is never dispatched as a phase.
+- [ ] (good) ADR-0011 field-mode + never-auto-push guarantee solid: checkpoint before every push/PR/merge, publish branches on `field_mode.sh` (push, no PR/Copilot). — `plan.md:42-57`
+- [ ] (good) Shared-`## Implementation` disambiguation (route by preceding entry) matches the address-findings note at `address-findings/SKILL.md:37-42`. — `plan.md:36`
