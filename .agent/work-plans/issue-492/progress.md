@@ -52,3 +52,20 @@ issue: 492
 - [ ] (good) Claim #3 (orchestrator needs no `skill_entry_type` row) verified — `dispatch_subagent.sh:53-62` map has no `run-issue` case; the driver is never dispatched as a phase.
 - [ ] (good) ADR-0011 field-mode + never-auto-push guarantee solid: checkpoint before every push/PR/merge, publish branches on `field_mode.sh` (push, no PR/Copilot). — `plan.md:42-57`
 - [ ] (good) Shared-`## Implementation` disambiguation (route by preceding entry) matches the address-findings note at `address-findings/SKILL.md:37-42`. — `plan.md:36`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-15 15:10 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Branch**: feature/issue-492 at `7ea516b`
+**Addressed**: `## Plan Review` (approve-with-suggestions) — all 4 findings folded into the plan + implemented.
+**Commits**: `7ea516b` (orchestrator + plan-task flip + ripple + adapters)
+
+### Actions
+- [x] New `.claude/skills/run-issue/SKILL.md` — decision table, checkpoints, shared-`## Implementation` disambiguation, entry-type variant matching, field-mode-aware local-first publish, Copilot opt-in.
+- [x] plan-task flipped to local-first: `--draft-pr` opt-in; step 7 optional, step 8 conditional push, step 9 + Plan Authored template + During-implementation prose updated.
+- [x] (review-plan must-fix) review-issue:272 corrected.
+- [x] (review-plan sugg) decision-table row for PR-published ⇒ triage-reviews; `## Local Review (Pre-Push)` variant-matching rule; `worktree_create.sh --plan-file` noted as equivalent publish-early opt-in.
+- [x] skill_workflows.md driver note + Skill Index row; run-issue added to all 3 adapters.
+- [x] review-plan + AGENTS.md confirmed **no change needed** (PR-less-capable / already conditional).
