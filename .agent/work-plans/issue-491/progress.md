@@ -121,10 +121,13 @@ issue: 491
 **Must-fix**: 1 | **Suggestions**: 3
 
 ### Findings
-- [ ] (must-fix) Guidelines bullet "Deferred/non-actionable items stay **unchecked**" contradicts the skill's own Steps (3.2 + Step 5), which write deferred items **checked** — breaks the documented re-run idempotency — `.claude/skills/address-findings/SKILL.md:175-176`. Cross-confirmed by both adversarial lenses.
-- [ ] (suggestion) The "re-attempted every run" deferral rationale overstates the mechanism (skill reads only the last Integrated Review; lifecycle never re-runs against the same entry) — `.claude/skills/address-findings/SKILL.md:91-95,142-145`. Reconcile when fixing the must-fix.
-- [ ] (suggestion) Cross-round dropout: a still-open `(deferred:)` finding is indistinguishable from a resolved checked one to `progress_read.py`; `triage-reviews` isn't told to re-raise it → may be silently dropped. Candidate for the de-dup follow-up — `.claude/skills/triage-reviews/SKILL.md`.
-- [ ] (suggestion) `review-code` Next-step doesn't acknowledge the new re-review entry path; existing wording mostly covers it (low priority, file not in diff) — `.claude/skills/review-code/SKILL.md:916-928`.
+- [x] (must-fix) Guidelines bullet "Deferred/non-actionable items stay **unchecked**" contradicted Steps 3.2/5 (which write deferred items checked) — FIXED `aa8c25d`: Guidelines bullet reconciled to the checked+annotated convention.
+- [x] (suggestion) "re-attempted every run" rationale overstated — FIXED `aa8c25d`: reworded as an idempotency guard for a re-run against the *same* entry, not "every run".
+- [ ] (suggestion, deferred → de-dup follow-up) Cross-round dropout: a still-open `(deferred:)` finding looks the same as a resolved checked one to `progress_read.py`; `triage-reviews` isn't told to re-raise it. Reviewer tagged this for the de-dup follow-up (touches `triage-reviews`, out of this PR's scope). Carry into the de-dup follow-up issue.
+- [ ] (suggestion, deferred → low priority) `review-code` "Next step" doesn't explicitly acknowledge the re-review entry path; existing wording mostly covers it and the file isn't in this diff. Optional polish.
+
+### Resolution (round 3)
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-15. Sandboxed re-review (round 3) = changes-requested (1 must-fix + 3 suggestions). The must-fix was a self-introduced round-2 contradiction (Guidelines vs Steps), now fixed in `aa8c25d` along with the related rationale suggestion. The 2 remaining suggestions are deferred by design — one to the de-dup follow-up (reviewer-tagged), one low-priority polish on a file not in this diff. Findings converged 3→8→1; round 3 cross-confirmed all mechanics clean (consequences 3/3 adapters + dispatcher + skill_workflows + ADR addendum, Scope-E, commit-identity/no-push, shellcheck).
 
 ### Notes
 - Round-3 cross-confirmed clean (unchanged, re-verified): all consequence categories (3/3 adapters, dispatcher `skill_entry_type`+`skill_model`, `skill_workflows.md` index/diagram/handoff table, ADR-0013 addendum), Scope-E, commit-identity/no-push, and the ADR-0012-addendum governance choice. shellcheck clean on `dispatch_subagent.sh`.
