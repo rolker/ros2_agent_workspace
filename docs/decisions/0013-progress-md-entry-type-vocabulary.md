@@ -201,3 +201,13 @@ name for new entries; no migration of historical files.
   `## Integrated Review`. Read that paragraph as describing the transitional
   state, not current write behavior; this addendum is the current source of
   truth for what gets written.
+- Issue [#491](https://github.com/rolker/ros2_agent_workspace/issues/491) — the
+  `address-findings` skill (#481 phase C) is now an **additional writer of
+  `## Implementation`**: after `triage-reviews`, it works the open
+  `## Integrated Review` actions and records a `## Implementation` entry. The
+  Decision table's `## Implementation` Writer cell ("future `implement` skill")
+  is the original intent and is **unchanged**; this note registers the second
+  writer navigationally (no new entry type, no semantics change — a substantive
+  change would require a superseding ADR). Consumers filtering by entry type are
+  unaffected: `## Implementation` keeps its meaning ("implementation work
+  completed; references the commit SHA(s)").
