@@ -74,8 +74,8 @@ RUN npm install -g @anthropic-ai/claude-code
 # Initialize rosdep (as root, then update as user)
 RUN rosdep init 2>/dev/null || true
 
-# Bake workspace layer dependencies into the image (#520).
-# docker_run_agent.sh stages the layer package.xml manifests into
+# Bake workspace layer dependencies into the image (#520, #522).
+# stage_rosdep_manifests.sh stages the layer package.xml manifests into
 # .rosdep-manifests/ (build context); rosdep install them here so the system
 # deps live in a read-only image layer. Each container FS is ephemeral (--rm),
 # so this is what lets the launch-time `rosdep check` in agent-entrypoint.sh
@@ -83,14 +83,29 @@ RUN rosdep init 2>/dev/null || true
 # Runs as root (apt needs root; the image has no sudo) and needs its own rosdep
 # cache, hence the root-side `rosdep update`. The dev-tools blocks above each
 # end with `rm -rf /var/lib/apt/lists/*`, so refresh the apt index first.
-# Best-effort: a dep that won't resolve at bake time is logged and falls through
-# to the launch-time install path rather than breaking the build (matches the
-# entrypoint posture). The image must be built via docker_run_agent.sh --build,
-# which creates .rosdep-manifests/; a bare `docker build` won't have it.
+#
+# All layers are installed in a SINGLE rosdep pass so --ignore-src ignores
+# local packages across layers (an overlay package may depend on a local
+# package in a lower layer — a per-layer pass would treat it as an
+# unresolvable system key). But `rosdep install` is all-or-nothing on key
+# resolution: a single unresolvable EXTERNAL key aborts the whole install.
+# So first compute the genuinely-unresolvable keys via `rosdep check` and
+# pass them as --skip-keys — one bad key then only skips itself instead of
+# nuking the entire bake (#522). Still best-effort overall: anything skipped
+# or failed falls through to the launch-time install path.
+# The image must be built via docker_run_agent.sh --build or `make agent-build`,
+# which create .rosdep-manifests/; a bare `docker build` won't have it.
 COPY .rosdep-manifests/ /tmp/rosdep-manifests/
 RUN apt-get update || echo "WARNING: apt-get update failed — skipping dep bake"; \
     rosdep update || echo "WARNING: rosdep update failed — skipping dep bake"; \
+    skip_keys="$(rosdep check --from-paths /tmp/rosdep-manifests --ignore-src --rosdistro jazzy 2>&1 \
+        | sed -n 's/.*Cannot locate rosdep definition for \[\([^]]*\)\].*/\1/p' \
+        | sort -u | tr '\n' ' ' | sed 's/  *$//')"; \
+    if [ -n "$skip_keys" ]; then \
+        echo "rosdep bake: skipping unresolvable keys: $skip_keys"; \
+    fi; \
     rosdep install --from-paths /tmp/rosdep-manifests --ignore-src -y --rosdistro jazzy \
+        ${skip_keys:+--skip-keys "$skip_keys"} \
         || echo "WARNING: some layer deps did not resolve at bake time — they will install at launch"; \
     rm -rf /tmp/rosdep-manifests /var/lib/apt/lists/*
 

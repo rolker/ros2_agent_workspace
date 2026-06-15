@@ -51,9 +51,31 @@ rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR"
 
 manifest_count=0
+skipped_count=0
 for src_dir in "$ROOT_DIR"/layers/main/*_ws/src; do
     [ -d "$src_dir" ] || continue
     while IFS= read -r -d '' pkgxml; do
+        # Skip packages that colcon/ament/catkin ignore. rosdep does NOT honor
+        # COLCON_IGNORE, so a non-built package (e.g. a leftover ROS1 package
+        # with deps that aren't rosdep keys) would otherwise be staged and
+        # abort the whole bake — `rosdep install --from-paths` fails if ANY
+        # key across the set is unresolvable. Walk from the package dir up to
+        # src_dir looking for an ignore marker.
+        pkgdir="$(dirname "$pkgxml")"
+        ignored=0
+        d="$pkgdir"
+        while :; do
+            if [ -e "$d/COLCON_IGNORE" ] || [ -e "$d/AMENT_IGNORE" ] || [ -e "$d/CATKIN_IGNORE" ]; then
+                ignored=1
+                break
+            fi
+            [ "$d" = "$src_dir" ] && break
+            d="$(dirname "$d")"
+        done
+        if [ "$ignored" = 1 ]; then
+            skipped_count=$((skipped_count + 1))
+            continue
+        fi
         rel="${pkgxml#"$ROOT_DIR"/}"
         dest="$STAGE_DIR/$rel"
         mkdir -p "$(dirname "$dest")"
@@ -62,4 +84,5 @@ for src_dir in "$ROOT_DIR"/layers/main/*_ws/src; do
     done < <(find "$src_dir" -name package.xml -type f -print0)
 done
 
-echo "Staged $manifest_count layer package.xml manifest(s) into $STAGE_DIR"
+echo "Staged $manifest_count layer package.xml manifest(s) into $STAGE_DIR" \
+     "(skipped $skipped_count ignored package(s))"
