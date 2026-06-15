@@ -34,6 +34,13 @@ next `review-code` pass). It only *acts on an agreed fix plan*.
 no new type is minted). The orchestrator (`/run-issue`, #492) reads the
 last entry: `## Implementation` → dispatch a re-review.
 
+> **Note for #492:** `## Implementation` is shared — both this skill and a
+> future `implement` skill write it — so the orchestrator can't route on
+> entry type alone (a fresh implement pass and a post-triage fix pass both
+> land as `## Implementation`). It should disambiguate by what *precedes*
+> the entry (a `## Integrated Review` immediately before ⇒ this was an
+> address-findings pass ⇒ next is re-review). Flagged here for #492's design.
+
 ## Steps
 
 ### 1. Locate the issue and its progress.md
@@ -51,15 +58,17 @@ python3 .agent/scripts/progress_read.py \
     .agent/work-plans/issue-<N>/progress.md --type "Integrated Review"
 ```
 
-`progress_read.py` emits JSON; filter to `Integrated Review` entries
-(its `entries[]` already only contains the requested `--type`). Then:
+`progress_read.py` emits JSON. **Filter on `base_type == "Integrated
+Review"`**, not the raw `--type` match: `--type "Integrated Review"`
+also returns legacy `## External Review` entries (its recognized
+predecessor), which this skill must not act on. Then:
 
-- **No `Integrated Review` entry at all** (empty list — the file exists
-  but `triage-reviews` never ran, or only earlier phases have run):
+- **No `Integrated Review` entry at all** (no entry whose `base_type` is
+  `Integrated Review` — the file exists but `triage-reviews` never ran,
+  or only earlier phases / a legacy `External Review` are present):
   report "no Integrated Review to address — run `triage-reviews` first"
   and exit without a commit. Do **not** fall back to other entry types.
-- Otherwise take the **last** `Integrated Review` entry's `findings[]`
-  array. Each finding is `{section, checked, source_hint, text}`. The
+- Otherwise take the **last** such entry's `findings[]` array. Each finding is `{section, checked, source_hint, text}`. The
   action items are the entries with `checked == false`. (False positives
   are plain bullets, so they never appear in `findings[]` — no special
   handling needed.)
@@ -76,22 +85,29 @@ For each unchecked finding, in listed order (cross-confirmed first):
    against the current source before acting (a finding can be stale if
    an earlier round already touched the area).
 2. If, on inspection, the finding is **not** actionable (already fixed,
-   or a genuine false negative on re-read), do **not** fake a change —
-   leave the box unchecked and record why in the `## Implementation`
-   entry's deferred list (step 5). Never check a box you didn't act on.
-3. Stage only the files for this finding and commit atomically with
-   pre-commit hooks and per-invocation identity (AGENTS.md § Agent
-   Commit Identity):
+   or a genuine false negative on re-read), do **not** fake a change.
+   Record it as a **deferred** item: check its box in the `## Integrated
+   Review` entry with a `(deferred: <reason>)` annotation and list it in
+   the `## Implementation` deferred actions (step 5). Checking it (rather
+   than leaving it open) is deliberate — a later run acts only on
+   `checked == false` items, so an unchecked deferral would be
+   re-attempted every run. "Checked" here means *consciously handled*,
+   not *code changed*; the `(deferred: …)` annotation records which.
+3. From the issue worktree, stage the files for this finding and commit
+   atomically with pre-commit hooks and per-invocation identity (AGENTS.md
+   § Agent Commit Identity):
 
    ```bash
    git -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
        commit -m "<area>: <what was fixed> (#<N>)"
    ```
 
-   Never `--no-verify`. One logical fix per commit.
+   Never `--no-verify`. One logical fix per commit. The `## Integrated
+   Review` box-check (next step) is the one permitted addition to a
+   finding's commit beyond the finding's own files.
 4. Check the box for that finding in the `## Integrated Review` entry
-   (`- [ ]` → `- [x]`) so the timeline tracks resolution. This edit can
-   ride in the same commit as the fix, or a trailing progress commit.
+   (`- [ ]` → `- [x]`) so the timeline tracks resolution — in the same
+   commit as the fix, or a trailing progress commit.
 
 ### 4. Re-run hooks / quick local checks
 
@@ -102,7 +118,10 @@ the re-review.
 
 ### 5. Write the `## Implementation` entry
 
-Append one entry (per ADR-0013; reuse `## Implementation`):
+Append one entry (per ADR-0013; reuse `## Implementation`). ADR-0013 lists
+`## Implementation` among the PR/Branch-correlated types, so the entry **must**
+carry a `**Branch**:`/`**PR**:` line — without it `progress_read.py` parses the
+entry's `correlation` as `null`:
 
 ```markdown
 
@@ -111,19 +130,26 @@ Append one entry (per ADR-0013; reuse `## Implementation`):
 **When**: <YYYY-MM-DD HH:MM ±HH:MM>
 **By**: <agent name> (<model>)
 
-**Addressed**: <integrated-review entry timestamp/sha it consumed>
+**Branch**: <branch-name> at `<short-sha>`   <!-- or **PR**: #<N> at `<sha>` if a PR exists -->
+**Addressed**: <the ## Integrated Review entry's When/SHA it consumed>
 **Commits**: <short-shas of the fix commits>
 
 ### Actions
 - [x] <finding addressed> — `file:line`
-- [ ] <finding deferred / not actionable> — `file:line` (reason)
+- [x] <finding consciously deferred — checked so it is NOT re-attempted> — `file:line` (deferred: <reason>)
 ```
 
-Commit and push:
+Deferred / not-actionable findings are written **checked** with a `(deferred:
+…)` annotation — checked means "consciously handled," so a later
+`address-findings` run (which acts only on `checked == false` items) won't
+re-attempt them. Never leave a deliberately-skipped finding unchecked.
+
+Commit (do **not** push — when dispatched as a sub-agent the host performs
+pushes; AGENTS.md § Agent Commit Identity). Run from the issue worktree:
 
 ```bash
-git -C <worktree> add .agent/work-plans/issue-<N>/progress.md
-git -C <worktree> -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
+git add .agent/work-plans/issue-<N>/progress.md
+git -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
     commit -m "progress: addressed integrated-review findings for #<N>"
 ```
 
