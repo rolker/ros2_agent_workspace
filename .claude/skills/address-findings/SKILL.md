@@ -89,10 +89,13 @@ For each unchecked finding, in listed order (cross-confirmed first):
    Record it as a **deferred** item: check its box in the `## Integrated
    Review` entry with a `(deferred: <reason>)` annotation and list it in
    the `## Implementation` deferred actions (step 5). Checking it (rather
-   than leaving it open) is deliberate — a later run acts only on
-   `checked == false` items, so an unchecked deferral would be
-   re-attempted every run. "Checked" here means *consciously handled*,
-   not *code changed*; the `(deferred: …)` annotation records which.
+   than leaving it open) is deliberate: a finding's checkbox should reflect
+   whether it still needs attention, and a deferred one does not. It also
+   keeps the skill idempotent — if `address-findings` is ever re-run against
+   the same `## Integrated Review` entry, it acts only on `checked == false`
+   items and so won't re-attempt a deferral. "Checked" here means
+   *consciously handled*, not *code changed*; the `(deferred: …)` annotation
+   records which.
 3. From the issue worktree, stage the files for this finding and commit
    atomically with pre-commit hooks and per-invocation identity (AGENTS.md
    § Agent Commit Identity):
@@ -136,13 +139,14 @@ entry's `correlation` as `null`:
 
 ### Actions
 - [x] <finding addressed> — `file:line`
-- [x] <finding consciously deferred — checked so it is NOT re-attempted> — `file:line` (deferred: <reason>)
+- [x] <finding consciously deferred — checked, so it reads as handled> — `file:line` (deferred: <reason>)
 ```
 
 Deferred / not-actionable findings are written **checked** with a `(deferred:
-…)` annotation — checked means "consciously handled," so a later
-`address-findings` run (which acts only on `checked == false` items) won't
-re-attempt them. Never leave a deliberately-skipped finding unchecked.
+…)` annotation — checked means "consciously handled," so the checkbox reflects
+that the finding no longer needs attention (and a re-run against the same entry,
+which acts only on `checked == false` items, won't re-attempt it). Never leave a
+deliberately-skipped finding unchecked.
 
 Commit (do **not** push — when dispatched as a sub-agent the host performs
 pushes; AGENTS.md § Agent Commit Identity). Run from the issue worktree:
@@ -172,8 +176,12 @@ user checkpoints. This step only emits this prompt and its `progress.md` entry.
 - **Act on the agreed plan, don't re-litigate it** — `triage-reviews` already
   classified each finding. If you disagree with a finding on inspection, defer
   it with a reason; don't silently drop it or argue it in the commit.
-- **Never fake resolution** — a checked box must correspond to a real commit.
-  Deferred/non-actionable items stay unchecked with a recorded reason.
+- **Never fake resolution** — a checked box on an *actioned* finding must
+  correspond to a real commit. A finding you consciously **defer** is also
+  checked, but annotated `(deferred: <reason>)` so it reads as "handled, not
+  changed" (see Step 3.2 / Step 5). What you must never do is leave a finding
+  *silently* untouched — every finding ends either fixed-and-checked or
+  deferred-checked-with-reason.
 - **Atomic commits** — one finding per commit where practical, so a re-review
   (and a revert) can reason about each fix independently.
 - **Stay thin** — no re-classification, no self-review. The next `review-code`
