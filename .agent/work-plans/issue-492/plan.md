@@ -72,10 +72,10 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
 |------|--------|
 | `.claude/skills/run-issue/SKILL.md` | **New** — orchestrator (decision table + checkpoints + publish step incl. field-mode + opt-in Copilot) |
 | `.claude/skills/plan-task/SKILL.md` | **Flip default**: step 7 no longer opens a draft PR; add `--draft-pr` opt-in; update the "Next step" + "During implementation" prose that assumes an early PR |
-| `.claude/skills/review-plan/SKILL.md` | Confirm/adjust no-PR resolution: prefer the local plan file via `--issue <N>` when no PR exists |
-| `.claude/skills/review-issue/SKILL.md` | **(must-fix, review-plan)** line 272 "A draft PR will follow when `plan-task` runs" is false post-flip — correct it |
-| `.agent/knowledge/skill_workflows.md` | Document `/run-issue` as the lifecycle driver; note plan-task no longer auto-publishes |
-| `AGENTS.md` | Post-Task-Verification "Plan-first workflow" wording mentions "if the PR opened with a work plan" — already conditional, but verify it reads correctly now that no early PR is the default (**instruction file — confirm with user before edit**) |
+| `.claude/skills/review-plan/SKILL.md` | **No change needed** — already supports PR-less review via `--issue <N>` / file-path forms (SKILL.md:16-30) |
+| `.claude/skills/review-issue/SKILL.md` | **(must-fix, review-plan)** ✅ line 272 corrected — plan-task no longer auto-opens a PR |
+| `.agent/knowledge/skill_workflows.md` | ✅ `/run-issue` documented as the lifecycle driver + Skill Index row; local-first note (plan-task no auto-publish) |
+| `AGENTS.md` | **No change needed** — "Plan-first workflow" wording is already conditional ("if the PR opened with a work plan…") and reads correctly post-flip (confirmed by review-plan) |
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `run-issue` to skill lists |
 
 ## Principles Self-Check
