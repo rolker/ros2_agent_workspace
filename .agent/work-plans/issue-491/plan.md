@@ -32,6 +32,8 @@ The integration points already exist:
 | File | Change |
 |------|--------|
 | `.claude/skills/address-findings/SKILL.md` | **New** — the thin skill |
+| `.agent/scripts/dispatch_subagent.sh` | **(must-fix, review-plan)** add `address-findings) echo "Implementation"` to `skill_entry_type()` — `skill_model()` already lists it, so the file is half-wired; without this the orchestrator's exit-contract check silently no-ops |
+| `.agent/knowledge/skill_workflows.md` | Add `address-findings` to the Skill Index + lifecycle diagram (triage-reviews → address-findings → re-review) |
 | `.github/copilot-instructions.md` | Add skill to list |
 | `.agent/instructions/gemini-cli.instructions.md` | Add skill to list |
 | `.agent/AGENT_ONBOARDING.md` | Add skill to list |
@@ -55,6 +57,8 @@ The integration points already exist:
 | If we change... | Also update... | In plan? |
 |---|---|---|
 | Add a workflow skill | Skill list in non-Claude adapters | Yes |
+| Add a workflow skill | `dispatch_subagent.sh` `skill_entry_type()` + `skill_model()` | Yes (entry_type was the gap — review-plan must-fix) |
+| Add a workflow skill | `.agent/knowledge/skill_workflows.md` Skill Index + diagram | Yes (review-plan suggestion) |
 | Add a skill that writes progress.md | Use an ADR-0013 type | Yes (`## Implementation`) |
 
 ## Open Questions
