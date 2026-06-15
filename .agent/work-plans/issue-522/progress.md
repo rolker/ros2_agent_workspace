@@ -35,9 +35,12 @@ issue: 522
 **Must-fix**: 0 | **Suggestions**: 4
 
 ### Findings
-- [ ] (suggestion) Makefile trap armed after staging — partial `.rosdep-manifests/` leak window if staging fails; arm before, for parity with docker_run_agent.sh — `Makefile:277-279`
-- [ ] (suggestion) `tr '\n' ' '` leaves trailing space → one inert empty `--skip-keys` entry; trim it — `.devcontainer/agent/Dockerfile:103`
-- [ ] (suggestion) sed only catches "Cannot locate rosdep definition"; other unresolvable forms fall through to launch-time (graceful via `|| echo WARNING`) — `.devcontainer/agent/Dockerfile:101-102`
-- [ ] (suggestion) `$(CURDIR)` absolute staging path vs relative build-context/trap; works via make cwd, pass explicit STAGE_DIR for consistency — `Makefile:278`
+- [x] (suggestion) Makefile trap armed after staging — partial `.rosdep-manifests/` leak window if staging fails; arm before, for parity with docker_run_agent.sh — `Makefile:277-279`. FIXED: trap now armed before the stage call.
+- [x] (suggestion) `tr '\n' ' '` leaves trailing space → one inert empty `--skip-keys` entry; trim it — `.devcontainer/agent/Dockerfile:103`. FIXED: appended `sed 's/  *$//'`.
+- [ ] (suggestion, declined) sed only catches "Cannot locate rosdep definition"; other unresolvable forms fall through to launch-time (graceful via `|| echo WARNING`) — `.devcontainer/agent/Dockerfile:101-102`. LEFT AS-IS: standard unresolvable-key form; other forms degrade gracefully to launch-time install; broadening risks over-matching.
+- [x] (suggestion) `$(CURDIR)` absolute staging path vs relative build-context/trap; works via make cwd, pass explicit STAGE_DIR for consistency — `Makefile:278`. FIXED: Makefile passes an explicit `STAGE_DIR` to the helper and trap.
 
 Static analysis clean (shellcheck, bash -n, make -n). Core ignore-walk + dynamic skip-keys verified correct by two disjoint-lens adversarial passes (one read rosdep source) and a recorded real `make agent-build`. No must-fix.
+
+### Findings resolution
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context)) — 2026-06-14. Sandboxed (container) review = approved, 0 must-fix. 3 of 4 suggestions applied; 1 left graceful-by-design. Trim is cosmetic (the empty `--skip-keys` was inert), so no rebuild needed — the prior real `make agent-build` already validated the bake mechanism.

@@ -100,7 +100,7 @@ RUN apt-get update || echo "WARNING: apt-get update failed — skipping dep bake
     rosdep update || echo "WARNING: rosdep update failed — skipping dep bake"; \
     skip_keys="$(rosdep check --from-paths /tmp/rosdep-manifests --ignore-src --rosdistro jazzy 2>&1 \
         | sed -n 's/.*Cannot locate rosdep definition for \[\([^]]*\)\].*/\1/p' \
-        | sort -u | tr '\n' ' ')"; \
+        | sort -u | tr '\n' ' ' | sed 's/  *$//')"; \
     if [ -n "$skip_keys" ]; then \
         echo "rosdep bake: skipping unresolvable keys: $skip_keys"; \
     fi; \

@@ -275,8 +275,9 @@ generate-skills:
 
 agent-build:
 	@set -e; \
-	./.agent/scripts/stage_rosdep_manifests.sh "$(CURDIR)"; \
-	trap 'rm -rf .devcontainer/agent/.rosdep-manifests' EXIT; \
+	STAGE_DIR="$(CURDIR)/.devcontainer/agent/.rosdep-manifests"; \
+	trap 'rm -rf "$$STAGE_DIR"' EXIT; \
+	./.agent/scripts/stage_rosdep_manifests.sh "$(CURDIR)" "$$STAGE_DIR"; \
 	docker build \
 		--build-arg USER_UID=$$(id -u) \
 		--build-arg USER_GID=$$(id -g) \
