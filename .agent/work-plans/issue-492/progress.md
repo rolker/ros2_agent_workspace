@@ -69,3 +69,21 @@ issue: 492
 - [x] (review-plan sugg) decision-table row for PR-published ⇒ triage-reviews; `## Local Review (Pre-Push)` variant-matching rule; `worktree_create.sh --plan-file` noted as equivalent publish-early opt-in.
 - [x] skill_workflows.md driver note + Skill Index row; run-issue added to all 3 adapters.
 - [x] review-plan + AGENTS.md confirmed **no change needed** (PR-less-capable / already conditional).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-15 22:26 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-492 at `64d2e83`
+**Mode**: pre-push
+**Depth**: Deep (reason: 398 changed lines ≥200; 7 governance override-trigger files)
+**Must-fix**: 2 | **Suggestions**: 3
+
+### Findings
+- [ ] (must-fix) `## Local Review` vs `## Local Review (Pre-Push)` routing ambiguous — post-PR re-review can match the pre-push publish row / no post-publish entry to key on (mitigated by always-on publish checkpoint) — `.claude/skills/run-issue/SKILL.md:54-62`
+- [ ] (must-fix) `progress_read.py --type "<Entry Type>"` read command contradicts the prefix-matching rule; `--type "Local Review"` misses `## Local Review (Pre-Push)` — use the dispatcher's `startswith` approach — `.claude/skills/run-issue/SKILL.md:56,59-62`
+- [ ] (suggestion) Reconcile plan prose "adjust review-plan default resolution" with "No change needed" Files-to-Change row — `.agent/work-plans/issue-492/plan.md:120-122`
+- [ ] (suggestion) Clarify what `--copilot` consumes at the publish step (push + `gh pr create` only) — `.claude/skills/run-issue/SKILL.md` (Publish step)
+- [ ] (suggestion) Confirm `Agent`-tool availability in container mode for the review-code fan-out path — `.claude/skills/run-issue/SKILL.md:46-48`
