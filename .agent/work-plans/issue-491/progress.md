@@ -108,3 +108,24 @@ issue: 491
 ### Notes
 - Cross-confirmed clean: dispatcher exit-contract is **not** confused by the shared `## Implementation` type — both adversarial passes independently verified the count-delta (`entry_count` PRE vs POST) mechanism in `dispatch_subagent.sh`.
 - Scope-E (no auto-chaining) and commit-identity/no-`--no-verify` verified consistent across `triage-reviews`, `address-findings`, and `skill_workflows.md`. Adapters (3/3), lifecycle diagram + both tables, and the dispatcher mapping all updated correctly.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-15 12:53 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-491 at `3707c49`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance/workflow files — new workflow skill, dispatcher, framework adapters, lifecycle docs, ADR addendum)
+**Must-fix**: 1 | **Suggestions**: 3
+
+### Findings
+- [ ] (must-fix) Guidelines bullet "Deferred/non-actionable items stay **unchecked**" contradicts the skill's own Steps (3.2 + Step 5), which write deferred items **checked** — breaks the documented re-run idempotency — `.claude/skills/address-findings/SKILL.md:175-176`. Cross-confirmed by both adversarial lenses.
+- [ ] (suggestion) The "re-attempted every run" deferral rationale overstates the mechanism (skill reads only the last Integrated Review; lifecycle never re-runs against the same entry) — `.claude/skills/address-findings/SKILL.md:91-95,142-145`. Reconcile when fixing the must-fix.
+- [ ] (suggestion) Cross-round dropout: a still-open `(deferred:)` finding is indistinguishable from a resolved checked one to `progress_read.py`; `triage-reviews` isn't told to re-raise it → may be silently dropped. Candidate for the de-dup follow-up — `.claude/skills/triage-reviews/SKILL.md`.
+- [ ] (suggestion) `review-code` Next-step doesn't acknowledge the new re-review entry path; existing wording mostly covers it (low priority, file not in diff) — `.claude/skills/review-code/SKILL.md:916-928`.
+
+### Notes
+- Round-3 cross-confirmed clean (unchanged, re-verified): all consequence categories (3/3 adapters, dispatcher `skill_entry_type`+`skill_model`, `skill_workflows.md` index/diagram/handoff table, ADR-0013 addendum), Scope-E, commit-identity/no-push, and the ADR-0012-addendum governance choice. shellcheck clean on `dispatch_subagent.sh`.
+- The single must-fix is a **new** finding (internal Guidelines↔Steps contradiction) not surfaced in rounds 1–2; the deferred-checkbox prose was added in round 2 (`25b0ecd`) and the Guidelines bullet was not reconciled with it.
