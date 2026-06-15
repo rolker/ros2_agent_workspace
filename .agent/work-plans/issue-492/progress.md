@@ -31,5 +31,6 @@ issue: 492
 **Phases**: single (possible stacked plan-task tweak — open question 1)
 
 ### Open questions
-- [ ] plan-task PR-deferral mechanism: (a) suppress signal for orchestrated runs [recommended] vs (b) flip default to no-early-PR; and in-PR vs stacked follow-up.
-- [ ] Copilot at publish: default off, `--copilot` opt-in surfaced as a checkpoint option — confirm.
+- [x] plan-task PR behavior → **flip default to no-early-PR** (publish-early = opt-in `--draft-pr`); ships **in this PR**. Confirmed 2026-06-15.
+- [x] Copilot at publish → **off by default**, `--copilot` opt-in at the publish checkpoint. Confirmed 2026-06-15.
+- [ ] AGENTS.md "Plan-first workflow" wording tweak — confirm exact change with user before editing (instruction file).

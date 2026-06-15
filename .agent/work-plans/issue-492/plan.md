@@ -46,9 +46,13 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
 3. **Implementation phase**: there is no `implement` skill yet — the host runs
    implementation inline (then dispatches `review-code`). Documented as such, not
    stubbed.
-4. **Local-first PR-at-end**: orchestrated `plan-task` must **not** open its
-   early `[PLAN]` draft PR (step 7); the orchestrator pushes + opens the PR at
-   the end. Mechanism = open question 1.
+4. **Local-first PR-at-end** (decided): **flip `plan-task`'s default** — step 7
+   no longer opens an early `[PLAN]` draft PR; the plan is committed to the
+   branch and "publish early" becomes an **opt-in flag** (e.g. `--draft-pr`).
+   The orchestrator pushes + opens the PR at the end. This ships **in this PR**.
+   Downstream `review-plan` already accepts a plan **file / `--issue <N>`** (not
+   only a PR), so it still works with no early PR — verify and adjust its default
+   resolution to prefer the local plan file when no PR exists.
 5. **Field mode** (ADR-0011): at the publish step, branch on `field_mode.sh` —
    gitcloud-origin repos push to the field remote with **no PR and no Copilot**.
 6. **Consequences**: adapter skill lists + `skill_workflows.md`.
@@ -56,9 +60,11 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
 ## Files to Change
 | File | Change |
 |------|--------|
-| `.claude/skills/run-issue/SKILL.md` | **New** — orchestrator (decision table + checkpoints + publish step) |
-| `.claude/skills/plan-task/SKILL.md` | Make step-7 early draft PR suppressible when orchestrated (open question 1) |
-| `.agent/knowledge/skill_workflows.md` | Document `/run-issue` as the lifecycle driver |
+| `.claude/skills/run-issue/SKILL.md` | **New** — orchestrator (decision table + checkpoints + publish step incl. field-mode + opt-in Copilot) |
+| `.claude/skills/plan-task/SKILL.md` | **Flip default**: step 7 no longer opens a draft PR; add `--draft-pr` opt-in; update the "Next step" + "During implementation" prose that assumes an early PR |
+| `.claude/skills/review-plan/SKILL.md` | Confirm/adjust no-PR resolution: prefer the local plan file via `--issue <N>` when no PR exists |
+| `.agent/knowledge/skill_workflows.md` | Document `/run-issue` as the lifecycle driver; note plan-task no longer auto-publishes |
+| `AGENTS.md` | Post-Task-Verification "Plan-first workflow" wording mentions "if the PR opened with a work plan" — already conditional, but verify it reads correctly now that no early PR is the default (**instruction file — confirm with user before edit**) |
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `run-issue` to skill lists |
 
 ## Principles Self-Check
@@ -83,8 +89,12 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
 | plan-task PR behavior | plan-task SKILL.md + its "During implementation" notes | Yes (open question 1) |
 
 ## Open Questions
-- [ ] **plan-task PR-deferral mechanism** — (a) add a suppress signal (env/flag) so *orchestrated* plan-task skips the early PR, standalone default unchanged [recommended, least disruptive]; or (b) flip plan-task's default to no-early-PR with publish-early opt-in (changes standalone behavior). And: ship the plan-task tweak **in this PR** or a stacked follow-up?
-- [ ] **Copilot at publish** — default off (per the quota opt-in decision), `--copilot` opt-in surfaced as a checkpoint option? Confirm.
+_Resolved with the user (2026-06-15):_
+- [x] **plan-task PR behavior** → **flip the default to no-early-PR**; publish-early becomes an opt-in flag. Ships **in this PR** (not a stacked follow-up).
+- [x] **Copilot at publish** → **off by default**; the publish checkpoint offers `--copilot` as a per-run opt-in.
+- [ ] **AGENTS.md edit** — the "Plan-first workflow" wording may need a light tweak; AGENTS.md is an "ask first" instruction file → confirm the exact change with the user during implementation before editing.
 
 ## Estimated Scope
-Single PR (orchestrator + small plan-task tweak + adapters), unless we split the plan-task change to a stacked follow-up (open question 1).
+Single PR: orchestrator + plan-task default flip (+ `--draft-pr` opt-in) +
+review-plan no-PR resolution + skill_workflows + adapters. Larger than a typical
+new-skill PR because of the plan-task default flip and its ripple.
