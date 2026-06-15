@@ -8,6 +8,7 @@ post-PR review triage:
 ```
 brainstorm → review-issue → plan-task → review-plan → implement
           → review-code → push / open PR → triage-reviews
+          → address-findings → review-code (re-review) → …
 ```
 
 Most steps are optional — simple issues can skip straight to
@@ -42,6 +43,7 @@ accepts a PR number / URL for post-PR review of someone else's work.
 | `review-plan` | After plan-task, before implementation | Independent evaluation of a committed work plan (accepts PR / file path / `--issue <N>`) |
 | `review-code` | Between implement and push / open PR (also post-PR for someone else's diff) | Lead reviewer orchestrating specialist sub-reviews (static analysis, governance, plan drift, adversarial). Pre-push mode is the default; depth tiers (Light / Standard / Deep) scale specialist count to change risk |
 | `triage-reviews` | After PR review comments arrive | Classifies each comment (human + bot) against current code, persists triage to `progress.md` |
+| `address-findings` | After triage-reviews, before a re-review | Works the open `- [ ]` actions from the latest `## Integrated Review`, commits each fix atomically, writes a `## Implementation` entry |
 
 ### Utility skills (on-demand / periodic)
 
@@ -75,7 +77,8 @@ describes how to hand off to the subsequent phase. The full lifecycle map:
 | `plan-task` | `## Plan Authored` | `review-plan` | `## Plan Review` |
 | `review-plan` | `## Plan Review` | implement (no skill yet) → `review-code` | `## Local Review` |
 | `review-code` | `## Local Review` | `triage-reviews` | `## Integrated Review` |
-| `triage-reviews` | `## Integrated Review` | address findings / done | — |
+| `triage-reviews` | `## Integrated Review` | `address-findings` (if open findings) / done | `## Implementation` |
+| `address-findings` | `## Implementation` | `review-code` (re-review) | `## Local Review` |
 
 ### How to hand off
 

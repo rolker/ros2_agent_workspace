@@ -358,26 +358,29 @@ persistence.)
 
 ### Next step
 
-Lifecycle: **Integrated Review** → address findings / done
+Lifecycle: **Integrated Review** → `address-findings` (if open findings) / done
 
-`triage-reviews` is the last automated skill in the per-issue lifecycle. After
-the `## Integrated Review` entry is committed, the next action is manual:
+After the `## Integrated Review` entry is committed:
 
-- **If must-fix or cross-confirmed findings remain** — address each item from
-  the `### Findings` list, commit, push, and re-run `/triage-reviews` for
-  another round. Each round writes a new `## Integrated Review` entry.
+- **If must-fix or cross-confirmed findings remain** — hand off to
+  `address-findings`, which works each open `- [ ]` action, commits the fixes
+  atomically, and writes a `## Implementation` entry; a re-review (`review-code`)
+  then follows. Dispatch to a fresh-context sub-agent:
+
+      .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill address-findings
+
+  (You may still address findings by hand and re-run `/triage-reviews` for
+  another round instead — each round writes a new `## Integrated Review` entry.)
 - **If no must-fix findings remain** — the PR is ready for merge. Use
   `.agent/scripts/merge_pr.sh` (or `make merge-pr`) to merge, remove the
   worktree, delete the branches, and sync.
 
-No `dispatch_subagent.sh` call is issued here — there is no next skill to hand
-off to. The host orchestrator (`/run-issue`,
+**No auto-chaining (Scope E):** this skill does not dispatch `address-findings`
+itself — it only emits the handoff prompt + `progress.md` entry. The host
+orchestrator (`/run-issue`,
 [#492](https://github.com/rolker/ros2_agent_workspace/issues/492)) reads the
-last `## Integrated Review` entry and surfaces the outcome and recommended
-actions to the operator.
-
-**No auto-chaining (Scope E):** no skill in the lifecycle dispatches the next
-phase autonomously — the host orchestrator drives, pausing at user checkpoints.
+last `## Integrated Review` entry and drives the next phase, pausing at user
+checkpoints.
 
 ## Guidelines
 

@@ -57,6 +57,7 @@ skill_entry_type() {
         review-plan)     echo "Plan Review" ;;
         review-code)     echo "Local Review" ;;
         triage-reviews)  echo "Integrated Review" ;;
+        address-findings) echo "Implementation" ;;
         *)               echo "" ;;
     esac
 }
