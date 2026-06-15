@@ -25,7 +25,7 @@ issue: 491
 **When**: 2026-06-15 09:45 -04:00
 **By**: Claude Code Agent (Claude Opus 4.8 (1M context))
 
-**Plan**: `.agent/work-plans/issue-491/plan.md` at `52f523a`
+**Plan**: `.agent/work-plans/issue-491/plan.md` at `108a089` (refreshed from `52f523a` after open-questions resolution)
 **PR**: https://github.com/rolker/ros2_agent_workspace/pull/524 (`[PLAN]` prefix)
 **Phases**: single
 
@@ -43,6 +43,21 @@ issue: 491
 **Verdict**: approve-with-suggestions
 
 ### Findings
-- [ ] (must-fix) Missing consequence: `dispatch_subagent.sh` `skill_entry_type()` (lines 53-61) has no `address-findings` case → returns `""`, so the exit-contract "newer entry of the expected type" check is silently skipped when the orchestrator (#492) dispatches this skill. Since the plan commits to writing `## Implementation`, add `address-findings) echo "Implementation"` to that case. Note `skill_model()` (line 72) already lists `address-findings` → opus, so the file is half-wired and the asymmetry is a latent bug. — `plan.md:54` (Consequences table)
-- [ ] (suggestion) Missing consequence: `.agent/knowledge/skill_workflows.md` is the canonical lifecycle reference (diagram lines 8-11 + Skill Index table lines 35-44). `address-findings` is a new lifecycle step (triage-reviews → address-findings → re-review); the plan's consequences only list the three framework adapters, not this doc. Add a Skill Index row / lifecycle-diagram mention. — `plan.md:54`
-- [ ] (suggestion) Stale SHA: the `## Plan Authored` entry references plan SHA `52f523a`, but the open-questions resolution landed in `108a089`. Minor; consider refreshing per plan-task's "keep plan/progress in sync" rule. — `progress.md:28`
+- [x] (must-fix) Missing consequence: `dispatch_subagent.sh` `skill_entry_type()` had no `address-findings` case → returned `""`, silently skipping the exit-contract check. FIXED in `8a91aef`: added `address-findings) echo "Implementation"` (verified resolves). Plan consequences table updated.
+- [x] (suggestion) Missing consequence: `.agent/knowledge/skill_workflows.md`. FIXED in `8a91aef`: added `address-findings` to the lifecycle diagram + Skill Index row; plan consequences updated.
+- [x] (suggestion) Stale SHA in `## Plan Authored`. FIXED: refreshed `52f523a` → `108a089`.
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-15 10:45 -04:00
+**By**: Claude Code Agent (Claude Opus 4.8 (1M context))
+
+**Addressed**: `## Plan Review` (approve-with-suggestions) — all 3 findings.
+**Commits**: `8a91aef` (skill + dispatcher wiring + lifecycle doc + 3 adapters + plan consequences)
+
+### Actions
+- [x] New `.claude/skills/address-findings/SKILL.md` (thin; reads last `## Integrated Review` via `progress_read.py`, commits each fix atomically, writes `## Implementation`).
+- [x] `dispatch_subagent.sh` `skill_entry_type()` → `address-findings) echo "Implementation"` (must-fix).
+- [x] `skill_workflows.md` diagram + Skill Index updated.
+- [x] `address-findings` added to all 3 framework adapter skill lists.
+- [ ] De-dup of old triage-reviews/review-code external-review handling — **deferred to a follow-up PR** (per settled open question).
