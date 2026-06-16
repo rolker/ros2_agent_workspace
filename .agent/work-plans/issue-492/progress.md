@@ -87,3 +87,24 @@ issue: 492
 - [ ] (suggestion) Reconcile plan prose "adjust review-plan default resolution" with "No change needed" Files-to-Change row — `.agent/work-plans/issue-492/plan.md:120-122`
 - [ ] (suggestion) Clarify what `--copilot` consumes at the publish step (push + `gh pr create` only) — `.claude/skills/run-issue/SKILL.md` (Publish step)
 - [ ] (suggestion) Confirm `Agent`-tool availability in container mode for the review-code fan-out path — `.claude/skills/run-issue/SKILL.md:46-48`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-16 02:21 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-492 at `29fafef`
+**Mode**: pre-push
+**Depth**: Deep (reason: 455 changed lines ≥200; multiple governance override-trigger files — SKILL.md / knowledge / instruction files)
+**Must-fix**: 2 | **Suggestions**: 4
+
+Round 2. Prior round-1 must-fixes (entry-type routing ambiguity, `--type` filter contradiction) verified **resolved** against `progress_read.py` + `dispatch_subagent.sh`.
+
+### Findings
+- [ ] (must-fix) Dangling `$DRAFT_PR` var: `[ -n "$DRAFT_PR" ] && git push` tests a never-set var (gate is the `--draft-pr` flag everywhere else), so the push is silently skipped even with `--draft-pr` — contradicts step 7 + step 8 prose — `.claude/skills/plan-task/SKILL.md:266`
+- [ ] (must-fix) SKILL claims `## Local Review` (no parenthetical) "appears only as the abbreviation in skill_workflows.md … not routed on" — but it is the real canonical heading `review-code` writes in post-PR mode (`review-code/SKILL.md:872`); decision table has no row for it. Clarify pre-push-only dispatch or add a post-PR row — `.claude/skills/run-issue/SKILL.md:109-112`
+- [ ] (suggestion) `(PR published)` table state not determinable from last entry (Publish step writes no progress.md entry); a re-run could double-publish — document out-of-band tracking or write a publish marker — `.claude/skills/run-issue/SKILL.md:102,140-160`
+- [ ] (suggestion) Field path omits the `no-commit-to-branch` hook caveat (AGENTS.md § Field Mode); add a one-line pointer (never `--no-verify`) — `.claude/skills/run-issue/SKILL.md:157-160`
+- [ ] (suggestion) Note in PR body that 3 instruction (adapter) files were edited (additive list-only; consequence-map ripple) so the "Ask First" touch is visible — PR body
+- [ ] (suggestion) Forward-compat: "table is unchanged" for a future `implement` skill doesn't hold — a bare `## Implementation` (not preceded by `## Integrated Review`) has no row (unreachable today) — `.claude/skills/run-issue/SKILL.md:114-122`
