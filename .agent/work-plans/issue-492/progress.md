@@ -108,3 +108,20 @@ Round 2. Prior round-1 must-fixes (entry-type routing ambiguity, `--type` filter
 - [ ] (suggestion) Field path omits the `no-commit-to-branch` hook caveat (AGENTS.md § Field Mode); add a one-line pointer (never `--no-verify`) — `.claude/skills/run-issue/SKILL.md:157-160`
 - [ ] (suggestion) Note in PR body that 3 instruction (adapter) files were edited (additive list-only; consequence-map ripple) so the "Ask First" touch is visible — PR body
 - [ ] (suggestion) Forward-compat: "table is unchanged" for a future `implement` skill doesn't hold — a bare `## Implementation` (not preceded by `## Integrated Review`) has no row (unreachable today) — `.claude/skills/run-issue/SKILL.md:114-122`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-16 03:00 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: approved
+
+**Branch**: feature/issue-492 at `da56e4a`
+**Mode**: pre-push
+**Depth**: Deep (reason: governance override-trigger files — SKILL/knowledge/instruction files; new orchestrator + plan-task default flip)
+**Must-fix**: 0 | **Suggestions**: 2
+
+Round 3. Both round-2 must-fixes verified **resolved** against source: (1) `$DRAFT_PR` dead var fully removed from plan-task — push now flag-gated by prose, consistent with step 7; (2) post-PR `## Local Review` fallback row present + accurate vs `review-code/SKILL.md:871`. One Lens-B "must-fix" (re-add `if [ -n "$DRAFT_PR" ]`) **dismissed as false positive** — it would regress the round-2 fix. Plan in sync; no scope creep.
+
+### Findings
+- [ ] (suggestion) Note the 3 instruction/adapter-file edits in the PR body at publish (Ask First governance touch; additive list-only) — PR body
+- [ ] (suggestion) `skill_workflows.md` handoff table abbreviates `## Local Review` (drops `(Pre-Push)`); already documented as intentional shorthand in run-issue SKILL — optional — `.agent/knowledge/skill_workflows.md:88`
