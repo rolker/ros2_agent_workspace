@@ -43,23 +43,48 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
 .agent/scripts/dispatch_subagent.sh --mode <in-process|container> --issue <N> --skill <phase>
 ```
 
-- **in-process** (default) for reviews and short phases — fast, same context root.
+- **in-process** (default) for reviews and short phases — fast, same context
+  root. In-process dispatch spawns the phase via Claude Code's **`Agent` tool**,
+  which exists in the **host** session but **not** inside a headless container.
+  This is precisely why `run-issue` is a *host* orchestrator (see Scope E): run
+  it on the host, where it can fan phases out in-process; it is never itself
+  dispatched into a container. (Non-Claude host runtimes lack the `Agent` tool
+  too — there, drive the phases manually or use `--mode container`.)
 - **container** when isolation is wanted (e.g. running the full review-code
-  specialist fan-out, or implementation that benefits from a clean OS).
+  specialist fan-out, or implementation that benefits from a clean OS). Container
+  mode is headless and self-contained, so it needs no host `Agent` tool.
 
 The dispatcher already verifies the sub-agent wrote the expected entry type
 (PRE/POST entry-count delta — `dispatch_subagent.sh:216-282`); treat a `FAILED`
 report as a stop-and-surface, not a silent retry. After each dispatch, read the
-**newest** matching entry:
+timeline and act on the **last** entry — that is the one the phase just wrote:
 
 ```bash
-python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<N>/progress.md --type "<Entry Type>"
+# Whole timeline; `.entries[-1]` is the just-written entry, whatever its type.
+python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<N>/progress.md
 ```
 
-**Entry-type matching is by base type / prefix, not exact string.** `review-code`
-pre-push writes `## Local Review (Pre-Push)`; `skill_workflows.md`'s handoff
-table abbreviates it `## Local Review`. Match the same way the dispatcher does
-(`dispatch_subagent.sh:217-235`) so the variant doesn't slip past.
+To pull a *specific* phase's entry later (e.g. an Integrated Review's findings),
+filter with `--type`, **passing the full canonical entry type verbatim** — not
+an abbreviation:
+
+```bash
+python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<N>/progress.md \
+    --type "Local Review (Pre-Push)"
+```
+
+**`Local Review (Pre-Push)` is its own canonical type, distinct from `Local
+Review`.** The parenthetical is part of the name (`progress_read.py`
+`CANONICAL_TYPES`), and `--type` matches on the full heading / `base_type`
+*exactly* — so `--type "Local Review"` will **not** match the `(Pre-Push)`
+variant. (The dispatcher's PRE/POST gate, by contrast, adds a `startswith`
+prefix match in its own one-liner — `dispatch_subagent.sh:225-235` — which is
+why a pre-push dispatch resolved as `Local Review` still counts the
+`(Pre-Push)` entry. The `--type` filter does not have that fallback; pass the
+real type.) Pre-push `review-code` always writes `## Local Review (Pre-Push)`;
+`skill_workflows.md`'s handoff table abbreviates it `## Local Review`, but the
+orchestrator routes on the real heading. When you need either Local Review
+variant, pass both (`--type` is repeatable).
 
 ## Decision table (the spine)
 
@@ -78,6 +103,13 @@ Read the **last** progress.md entry; act per its type + verdict:
 | `## Integrated Review` | open findings remain | dispatch `address-findings` | **yes** (non-trivial findings) |
 | `## Integrated Review` | none | merge | **yes** (before merge) |
 | `## Implementation` **preceded by** `## Integrated Review` | — | dispatch `review-code` (re-review) | — |
+
+**`## Local Review (Pre-Push)` is the exact heading** every pre-push
+`review-code` writes; the table keys on it verbatim. `## Local Review` (no
+parenthetical) appears only as the abbreviation in `skill_workflows.md`'s
+handoff table — it is *not* a separate entry the orchestrator routes on, and it
+is not the same canonical type (see "How phases are dispatched" above). Route on
+`## Local Review (Pre-Push)`.
 
 **Shared `## Implementation` routing key**: `## Implementation` is written by
 both `address-findings` and a future `implement` skill. Disambiguate by the
@@ -112,10 +144,16 @@ at the publish checkpoint. Branch on origin via
 [`field_mode.sh`](../../.agent/scripts/field_mode.sh):
 
 - **GitHub-origin (dev mode)**: `git push`, then `gh pr create` (drop any
-  `[PLAN]` framing — this is the real PR). **Copilot is off by default**; the
-  publish checkpoint offers `--copilot` as a per-run opt-in (the standing quota
-  decision — see review-code). After the PR accrues review comments, resume at
-  the `triage-reviews` row.
+  `[PLAN]` framing — this is the real PR). After the PR accrues review comments,
+  resume at the `triage-reviews` row.
+  - **Copilot opt-in scope**: `--copilot` is a **`review-code` flag** governing
+    its Copilot Adversarial specialist — it is *not* consumed by `git push` or
+    `gh pr create`. **Off by default** (the standing quota decision — see
+    review-code). The publish checkpoint surfaces it as a per-run choice because
+    that is where the user decides whether to spend Premium quota on cross-model
+    coverage for this PR; if opted in, pass `--copilot` to the `review-code`
+    re-runs (pre-push and any post-triage re-review), not to the publish
+    commands.
 - **Field mode (gitcloud / non-GitHub origin)**: push to the field remote with
   **no PR and no Copilot** (the field workflow — see AGENTS.md § Field Mode).
   The lifecycle ends at the push; reconciliation to GitHub is a later dev-side

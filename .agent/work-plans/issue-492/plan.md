@@ -57,8 +57,9 @@ new script (reuses `dispatch_subagent.sh` + `progress_read.py`). Its spine is a
    branch and "publish early" becomes an **opt-in flag** (e.g. `--draft-pr`).
    The orchestrator pushes + opens the PR at the end. This ships **in this PR**.
    Downstream `review-plan` already accepts a plan **file / `--issue <N>`** (not
-   only a PR), so it still works with no early PR — verify and adjust its default
-   resolution to prefer the local plan file when no PR exists. Note:
+   only a PR — see review-plan SKILL.md:16-32), so it works with no early PR with
+   **no change**: the orchestrator dispatches it with `--issue <N>`, which
+   resolves the local `.agent/work-plans/issue-<N>/plan.md`. Note:
    `worktree_create.sh --plan-file` is a **second** publish-early entry point
    (it auto-opens a draft PR) — it's the equivalent opt-in to the new
    `--draft-pr` flag; document the relationship so the two paths stay coherent
