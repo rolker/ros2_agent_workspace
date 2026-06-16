@@ -105,11 +105,18 @@ Read the **last** progress.md entry; act per its type + verdict:
 | `## Implementation` **preceded by** `## Integrated Review` | — | dispatch `review-code` (re-review) | — |
 
 **`## Local Review (Pre-Push)` is the exact heading** every pre-push
-`review-code` writes; the table keys on it verbatim. `## Local Review` (no
-parenthetical) appears only as the abbreviation in `skill_workflows.md`'s
-handoff table — it is *not* a separate entry the orchestrator routes on, and it
-is not the same canonical type (see "How phases are dispatched" above). Route on
-`## Local Review (Pre-Push)`.
+`review-code` writes, and **the orchestrator only ever dispatches `review-code`
+in pre-push mode** — so within this flow that is the only Local-Review heading
+produced, and the table keys on it verbatim. `## Local Review` (no parenthetical)
+is review-code's real **post-PR** heading (`review-code/SKILL.md:864-866, 872`),
+*not* a mere abbreviation — but the orchestrator never drives post-PR
+`review-code`: post-PR review feedback is consumed by `triage-reviews`, which
+writes `## Integrated Review`. (`skill_workflows.md`'s handoff table does
+abbreviate the pre-push entry as `## Local Review`; that is a doc shorthand, not
+the routed heading.) **Fallback**: if a bare `## Local Review` (post-PR) is
+nonetheless the last entry — e.g. someone ran `/review-code <PR>` by hand —
+route it like the `## Integrated Review` rows (open findings ⇒ `address-findings`;
+none ⇒ merge checkpoint).
 
 **Shared `## Implementation` routing key**: `## Implementation` is written by
 both `address-findings` and a future `implement` skill. Disambiguate by the
@@ -119,7 +126,11 @@ an address-findings pass, so the next action is a re-review.
 **Implementation phase**: there is no `implement` skill yet. After
 `## Plan Review`, the host runs implementation **inline** (edits, commits,
 plan-sync), then dispatches `review-code`. When an `implement` skill lands,
-swap the inline step for a dispatch — the table is unchanged.
+swap the inline step for a dispatch — **and add a table row** for a bare
+`## Implementation` *not* preceded by `## Integrated Review` (a fresh
+implementation pass ⇒ dispatch `review-code`). That state is unreachable today
+(inline implementation writes no such entry before the host itself runs
+`review-code`), so the table has no row for it yet.
 
 ## Checkpoints
 
@@ -143,6 +154,19 @@ Reached when a `## Local Review (Pre-Push)` is `approved` and the user confirms
 at the publish checkpoint. Branch on origin via
 [`field_mode.sh`](../../.agent/scripts/field_mode.sh):
 
+**Idempotency guard (publish writes no progress.md entry).** The publish step
+does **not** append an entry, so after a successful publish the last entry is
+*still* `## Local Review (Pre-Push)` (`approved`) — the same state that triggered
+publish. A naive re-run would double-publish. Before publishing, check for an
+already-open real PR on the branch and, if found, treat the work as published —
+skip to the `triage-reviews` wait instead of pushing/opening again:
+
+```bash
+# A non-[PLAN] open PR on this branch ⇒ already published.
+gh pr list --head "$(git branch --show-current)" --state open \
+    --json url,title --jq '.[] | select(.title | startswith("[PLAN]") | not) | .url'
+```
+
 - **GitHub-origin (dev mode)**: `git push`, then `gh pr create` (drop any
   `[PLAN]` framing — this is the real PR). After the PR accrues review comments,
   resume at the `triage-reviews` row.
@@ -157,7 +181,10 @@ at the publish checkpoint. Branch on origin via
 - **Field mode (gitcloud / non-GitHub origin)**: push to the field remote with
   **no PR and no Copilot** (the field workflow — see AGENTS.md § Field Mode).
   The lifecycle ends at the push; reconciliation to GitHub is a later dev-side
-  `/import-field-changes`.
+  `/import-field-changes`. **Hook caveat**: if the field repo lists its default
+  branch in a `no-commit-to-branch` pre-commit hook, commits fail there — fix the
+  project's hook config (drop its default branch from the list), **never
+  `--no-verify`** (AGENTS.md § Field Mode).
 
 Never `git push`, open a PR, or merge without having passed the corresponding
 checkpoint.

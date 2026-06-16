@@ -253,18 +253,27 @@ under that header so the section stays uniformly parseable per
 ADR-0013's checkbox-list schema:
 `- [ ] No open questions — plan is review-plan-ready.`
 
-Commit (and push only with `--draft-pr`):
+Commit the progress entry:
 
 ```bash
 git add .agent/work-plans/issue-<N>/progress.md
 git -c user.name="$AGENT_NAME" \
     -c user.email="$AGENT_EMAIL" \
     commit -m "progress: plan authored for #<N>"
-# Push ONLY when --draft-pr was used (step 7 published a PR this commit must
-# appear on). In the default local-first flow nothing is pushed here — the
-# orchestrator (or a later --draft-pr / manual push) publishes.
-[ -n "$DRAFT_PR" ] && git push
 ```
+
+**Then push only if `--draft-pr` was passed** (step 7 published a PR this commit
+must appear on) — same flag gate as step 7, decided from the invocation, not a
+shell variable:
+
+```bash
+# Run ONLY in the --draft-pr path:
+git push
+```
+
+In the default local-first flow nothing is pushed here — the branch stays local
+and the `/run-issue` orchestrator (or a later manual `--draft-pr` / push)
+publishes.
 
 The per-invocation `-c` overrides are required by
 [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
