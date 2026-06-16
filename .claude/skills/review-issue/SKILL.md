@@ -268,8 +268,11 @@ issues — same logic as `plan-task` step 4). Create the worktree:
   ```
 
 `worktree_create.sh` does NOT open a draft PR when invoked without
-`--plan-file`; only the worktree + branch are created. A draft PR
-will follow when `plan-task` runs.
+`--plan-file`; only the worktree + branch are created. `plan-task` then
+commits the plan to the branch but, by default, does **not** open a PR
+(local-first, #492) — a draft PR follows only if `plan-task` is run with
+`--draft-pr` (or the worktree was created with `--plan-file`); otherwise
+the `/run-issue` orchestrator opens the real PR at the end.
 
 **8b. Append the entry.** Create the parent directory if needed
 (`review-issue` typically runs *before* `plan-task`, so

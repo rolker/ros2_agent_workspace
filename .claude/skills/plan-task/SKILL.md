@@ -8,8 +8,15 @@ description: Generate a principles-aware work plan for an issue. Saves to `.agen
 ## Usage
 
 ```
-/plan-task <issue-number>
+/plan-task <issue-number> [--draft-pr]
 ```
+
+By default `plan-task` keeps the work **local** — it commits the plan to the
+feature branch but does **not** push or open a PR (local-first, #492; the
+`/run-issue` orchestrator opens the PR at the end). Pass **`--draft-pr`** to
+publish an early `[PLAN]` draft PR now (the standalone "publish early" path;
+`worktree_create.sh --plan-file` is the equivalent opt-in at worktree-creation
+time).
 
 ## Overview
 
@@ -161,11 +168,18 @@ Step 8 (progress.md) uses the same pattern; both commits land on
 `feature/issue-<N>` and would otherwise trip the `check_pr_authors.py`
 CI check (Mechanism C from [#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
 
-### 7. Create or update a draft PR
+### 7. (Opt-in) Create or update a draft PR
 
-Push the branch and create (or update) a draft PR with a `[PLAN]` title
-prefix and the plan as the body. The prefix prevents agents from confusing
-the PR number with the issue number.
+**Skip this step unless `--draft-pr` was passed.** By default plan-task is
+local-first: the plan is committed to the branch (step 6) and that is enough for
+`review-plan` (which reads the plan via `--issue <N>` / the local file) and for
+the `/run-issue` orchestrator, which pushes and opens the real PR at the end.
+The branch is **not pushed** by default.
+
+When `--draft-pr` is passed (or the worktree was created with
+`worktree_create.sh --plan-file`), push the branch and create (or update) a
+draft PR with a `[PLAN]` title prefix and the plan as the body. The prefix
+prevents agents from confusing the PR number with the issue number.
 
 ```bash
 # Push current branch (name may vary: feature/issue-<N> or feature/ISSUE-<N>-<desc>)
@@ -227,7 +241,7 @@ Append:
 **By**: <agent name> (<model>)
 
 **Plan**: `.agent/work-plans/issue-<N>/plan.md` at `<short-sha-of-plan-commit>`
-**PR**: <draft-PR-URL> (`[PLAN]` prefix)
+**Branch**: <branch-name> at `<short-sha>`   <!-- default; or **PR**: <draft-PR-URL> (`[PLAN]` prefix) when --draft-pr published one -->
 **Phases**: <count, if the plan describes a stacked-PR breakdown; else "single">
 
 ### Open questions
@@ -239,25 +253,38 @@ under that header so the section stays uniformly parseable per
 ADR-0013's checkbox-list schema:
 `- [ ] No open questions — plan is review-plan-ready.`
 
-Commit and push:
+Commit the progress entry:
 
 ```bash
 git add .agent/work-plans/issue-<N>/progress.md
 git -c user.name="$AGENT_NAME" \
     -c user.email="$AGENT_EMAIL" \
     commit -m "progress: plan authored for #<N>"
+```
+
+**Then push only if `--draft-pr` was passed** (step 7 published a PR this commit
+must appear on) — same flag gate as step 7, decided from the invocation, not a
+shell variable:
+
+```bash
+# Run ONLY in the --draft-pr path:
 git push
 ```
+
+In the default local-first flow nothing is pushed here — the branch stays local
+and the `/run-issue` orchestrator (or a later manual `--draft-pr` / push)
+publishes.
 
 The per-invocation `-c` overrides are required by
 [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
 agents run each bash invocation in a fresh subshell, so the env
 exports from `set_git_identity_env.sh` aren't reliable here.
 
-The push is required — step 7 already pushed the branch (whether it
-created a new draft PR or updated an existing one), so the new commit
-needs its own push to appear on the PR alongside the plan. Without it
-the report (step 9) would cite a SHA that's only local.
+The `## Plan Authored` entry records a **`**Branch**: <name> at <sha>`** line by
+default, or a **`**PR**: <url>`** line when `--draft-pr` published one. With
+`--draft-pr`, the push above is required so the progress commit appears on the
+PR alongside the plan; without it, the commit stays local until the orchestrator
+publishes.
 
 ### 9. Report to user
 
@@ -265,7 +292,9 @@ Summarize:
 - What the plan proposes
 - Which principles and ADRs were considered
 - Any open questions that need input
-- Link to the draft PR
+- Link to the draft PR **if `--draft-pr` opened one**; otherwise state the plan
+  is committed locally on the branch (no PR yet — the orchestrator opens it at
+  the end, or re-run with `--draft-pr` to publish early)
 - **Cite the `progress.md` commit SHA from step 8** (`progress: plan
   authored for #<N>`) so the report references the durable timeline
   artifact, not just the PR
@@ -299,7 +328,8 @@ pausing at user checkpoints. This step only emits this prompt and its
 ## During implementation
 
 The `plan-task` skill's primary artifact is the committed plan file
-created in steps 5–6; step 7 publishes that plan into a draft PR.
+created in steps 5–6 (step 7 optionally publishes it into a draft PR with
+`--draft-pr`; otherwise it stays local until the orchestrator publishes).
 Implementation then proceeds on the same branch — and typically deviates
 from the plan: types get refined, functions change signatures, a "pure
 logic" module picks up a dependency. Keep the plan in sync as this

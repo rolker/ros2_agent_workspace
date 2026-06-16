@@ -11,6 +11,15 @@ brainstorm → review-issue → plan-task → review-plan → implement
           → address-findings → review-code (re-review) → …
 ```
 
+**`/run-issue` orchestrates this whole sequence** (#492): it dispatches each
+phase as a fresh-context sub-agent, reads each phase's `progress.md` entry to
+choose the next action, and pauses at `AskUserQuestion` checkpoints. It is the
+*driver*, not a dispatched phase — running the lifecycle by hand (one
+`/review-issue`, `/plan-task`, … at a time) is the manual equivalent. The
+pipeline is **local-first**: `plan-task` no longer opens a PR by default (commit
+to branch only; `--draft-pr` to publish early), and `/run-issue` creates the PR
+**at the end**, after a clean local `review-code`, gated by a user checkpoint.
+
 Most steps are optional — simple issues can skip straight to
 `plan-task` or implementation. **`review-code` is the exception**:
 AGENTS.md Post-Task Verification step 5 makes a pre-push `review-code`
@@ -37,6 +46,7 @@ accepts a PR number / URL for post-PR review of someone else's work.
 
 | Skill | Position | Purpose |
 |-------|----------|---------|
+| `run-issue` | **Driver** (orchestrates the whole sequence) | Host orchestrator: dispatches each phase, reads its `progress.md` entry, pauses at checkpoints; local-first PR-at-end. Not itself a dispatched phase (#492) |
 | `brainstorm` | Before review-issue | Explore possibilities using research digests and project knowledge |
 | `review-issue` | Before plan-task | Evaluate issue scope, principle alignment, and ADR applicability |
 | `plan-task` | Before implementation | Generate a principles-aware work plan, commit to branch |
