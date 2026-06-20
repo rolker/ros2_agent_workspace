@@ -31,7 +31,7 @@ Issue proposes creating `.claude/skills/wrap-up-deployment/SKILL.md` + AGENTS.md
 ### Actions
 - [ ] Update non-Claude adapter skill lists when adding the skill (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`)
 - [ ] Run `make generate-skills` after adding `.claude/skills/wrap-up-deployment/`
-- [ ] Decide and document ADR-0013 entry type used by the skill before implementation starts
+- [x] **RESOLVED** (operator, 2026-06-20): skill writes **NO `progress.md` entry**. `/wrap-up-deployment` is a deployment-lifecycle skill (writes the deployment dev log + GitHub issue), mirroring `/start-deployment`; `progress.md`/ADR-0013 govern the per-issue *development* pipeline only. No ADR-0013 addendum needed.
 - [ ] Keep project-specific config in `.agents/deployment.yaml`, not in SKILL.md (ADR-0003 three-tier split)
-- [ ] Post review-comment.md as GitHub issue comment (blocked by missing `gh` auth in this container)
+- [x] Posted by host (gh auth available on host) — #530 issue comment.
 - [ ] After merge: consider updating ADR-0014 Status from "Proposed" to "Accepted"
