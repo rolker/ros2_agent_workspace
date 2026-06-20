@@ -2,9 +2,11 @@
 
 ## Status
 
-Proposed — recorded ahead of full implementation so the design has a stable
-reference; lifecycle skills (`/start-deployment` first, [#501](https://github.com/rolker/ros2_agent_workspace/issues/501))
-may land before this ADR is marked Accepted.
+Accepted — both lifecycle skills have shipped (`/start-deployment`,
+[#501](https://github.com/rolker/ros2_agent_workspace/issues/501); `/wrap-up-deployment`,
+[#530](https://github.com/rolker/ros2_agent_workspace/issues/530)) and the urgency
+contract has been exercised across multiple live deployments
+(`unh_echoboats_project11` #277 / #289 / #295 / #299).
 
 ## Context
 
