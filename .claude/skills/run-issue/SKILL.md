@@ -66,7 +66,13 @@ poll genuinely external state. In-process (`Agent`-tool) phases already return
 control to the host's turn, so this applies specifically to the container path.
 When backgrounded, the dispatcher's `FAILED` / exit-contract report arrives
 **with the completion notification** (and in the task's captured output) — read
-it there and stop-and-surface, exactly as for a foreground dispatch.
+it there and stop-and-surface, exactly as for a foreground dispatch. **Gate on
+that report before routing on the timeline**: a FAILED dispatch may have written
+no entry (or a stale one), so acting on `progress.md` without first checking the
+dispatch outcome risks routing on the wrong state. Background re-invocation
+relies on the host runtime delivering a completion callback; a runtime without
+one must drive phases foreground / manually (the same caveat as the `Agent` tool
+above).
 
 The dispatcher already verifies the sub-agent wrote the expected entry type
 (PRE/POST entry-count delta — `dispatch_subagent.sh:216-282`); treat a `FAILED`
@@ -116,7 +122,7 @@ Read the **last** progress.md entry; act per its type + verdict:
 | (PR published) | review comments landed | dispatch `triage-reviews` | **yes** (async wait) |
 | `## Integrated Review` | open findings remain | dispatch `address-findings` | **yes** (non-trivial findings) |
 | `## Integrated Review` | none | merge | **yes** (before merge) |
-| `## Implementation` **preceded by** `## Integrated Review` | — | dispatch `review-code` (re-review) | — |
+| `## Implementation` **preceded by** `## Integrated Review` or `## Local Review (Pre-Push)` | — | dispatch `review-code` (re-review) | — |
 
 **`## Local Review (Pre-Push)` is the exact heading** every pre-push
 `review-code` writes, and **the orchestrator only ever dispatches `review-code`
@@ -164,7 +170,9 @@ a convergence / ship-recommendation signal is tracked in
 [#537](https://github.com/rolker/ros2_agent_workspace/issues/537). Until it
 lands, after ~2–3 rounds the host should **surface the loop state to the
 operator** (remaining-finding severity, ship-vs-continue) rather than spinning —
-especially for guidance-doc diffs, where review can demand precision indefinitely.
+especially for guidance-doc diffs, where review can demand precision
+indefinitely. The round number is just the count of `## Local Review (Pre-Push)`
+entries in `progress.md` — a cheap durable counter the host can read at any time.
 
 ## Checkpoints
 
