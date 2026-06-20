@@ -22,3 +22,21 @@ issue: 531
 - [ ] (suggestion) Document where the dispatcher FAILED report surfaces on the background re-invocation path — `.claude/skills/run-issue/SKILL.md:57`
 - [ ] (suggestion) Note that "single latest entry" relies on progress.md append order — `.claude/skills/address-findings/SKILL.md:75`
 - [ ] (consequence) Update `review-code/SKILL.md` Next-step to document the pre-push changes-requested → address-findings branch (file not in this diff) — `.claude/skills/review-code/SKILL.md:918`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-20 19:43 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-531 at `529d390`
+**Mode**: pre-push
+**Depth**: Standard (reason: `.claude/skills/*/SKILL.md` is a Governance override-trigger)
+**Must-fix**: 1 | **Suggestions**: 4
+
+### Findings
+- [ ] (must-fix) Decision-table row not generalized: `## Implementation` preceded by `## Local Review (Pre-Push)` (the new pre-push address-findings state) matches no table row, contradicting the prose at :137 — add "or `## Local Review (Pre-Push)`" — `.claude/skills/run-issue/SKILL.md:119`
+- [ ] (suggestion) Background path: instruct gating on the dispatch exit/FAILED report before routing on the timeline, so a no-entry failure isn't silently re-tried — `.claude/skills/run-issue/SKILL.md:67`
+- [ ] (suggestion) Give the host a durable round counter for the address-findings⇄review-code loop (count `## Local Review (Pre-Push)` entries) — `.claude/skills/run-issue/SKILL.md:162`
+- [ ] (suggestion) Caveat that background re-invocation depends on the host-runtime completion callback (mirror the Agent-tool caveat at :48-51) — `.claude/skills/run-issue/SKILL.md:61`
+- [ ] (suggestion) Round-1 findings addressed in `529d390` but checkboxes remain unchecked and no `## Implementation` entry recorded — timeline misrepresents resolution state — `.agent/work-plans/issue-531/progress.md:19`
