@@ -12,10 +12,12 @@
 #   dispatch_subagent.sh --mode in-process|container --issue <N> \
 #       (--skill <name> | --prompt-file <path>) \
 #       [--entry-type <type>] [--output-format <fmt>] [--model <id>]
+#   dispatch_subagent.sh --check    # container-auth preflight (#532), then exit
 #
-#   --model defaults per-skill (Opus for review/implement, Sonnet otherwise);
-#   pass an alias ('opus'/'sonnet') to override. Container mode forwards it;
-#   in-process mode only recommends it (the host picks the Agent's model).
+#   --model defaults per-skill (Opus for review/implement, Sonnet otherwise),
+#   or per --entry-type for a raw --prompt-file dispatch (#539); pass an alias
+#   ('opus'/'sonnet') to override. Container forwards it; in-process recommends
+#   it. --check verifies the container auth tokens and exits.
 #
 # Examples:
 #   dispatch_subagent.sh --mode in-process --issue 490 --skill review-code
@@ -41,6 +43,7 @@ PROMPT_FILE=""
 ENTRY_TYPE=""
 OUTPUT_FORMAT="stream-json"
 MODEL=""   # --model override; empty => derive from the skill (see skill_model)
+CHECK=""   # --check: run the container-auth preflight and exit (#532)
 
 # Identity literals embedded in the handoff (AGENTS.md § Agent Commit Identity).
 # Prefer the session's exported identity; fall back to the Claude default.
@@ -76,8 +79,91 @@ skill_model() {
     esac
 }
 
+# Entry-type -> model, for raw-prompt (--prompt-file) dispatches that carry no
+# --skill to map. Without this a custom-prompt dispatch silently defaulted to
+# Sonnet even for an Implementation / review pass (#539).
+#
+# The tier is NOT duplicated here: this maps the entry type to the skill that
+# writes it and defers to skill_model() — the single source of truth — so adding
+# an Opus tier in skill_model can't silently downgrade an entry type. Only the
+# entry-type -> skill map below is local; test_dispatch_model.sh asserts it.
+entry_type_model() {
+    local skill
+    case "$1" in
+        "Local Review"|"Local Review (Pre-Push)") skill="review-code" ;;
+        "Integrated Review")                       skill="triage-reviews" ;;
+        Implementation)                            skill="address-findings" ;;
+        "Plan Review")                             skill="review-plan" ;;
+        "Issue Review")                            skill="review-issue" ;;
+        "Plan Authored")                           skill="plan-task" ;;
+        *)                                         skill="" ;;  # unknown -> skill_model default (sonnet)
+    esac
+    skill_model "$skill"
+}
+
+# Model alias -> version-less display name for the sub-agent's progress.md
+# `By:` line (#540). The alias resolves to the current release inside the
+# container, so a sub-agent must NOT invent a version (e.g. "Opus 4.6"); the
+# dispatcher hands it this exact string to stamp.
+model_display() {
+    case "$1" in
+        opus)   echo "Claude Opus" ;;
+        sonnet) echo "Claude Sonnet" ;;
+        haiku)  echo "Claude Haiku" ;;
+        *)      echo "$1" ;;
+    esac
+}
+
+# Canonical container-auth token paths (read by docker_run_agent.sh). Documented
+# here too so they're discoverable without grepping that script (#532).
+CLAUDE_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
+GH_TOKEN_FILE="$HOME/.config/ros2-agent/gh-readonly-token"
+
+# Container-dispatch auth preflight (#532). Verifies the long-lived Claude
+# subscription token (env or file) and reports the optional read-only GH token.
+# Prints the canonical paths + a ready/not-ready verdict. Returns non-zero when
+# the Claude token is missing. In-process mode uses the host session and needs
+# neither token, so this is a container-mode concern.
+preflight_check() {
+    local ok=0
+    echo "Container-dispatch auth preflight (#532)"
+    echo "  Claude subscription token:"
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "    ok  \$CLAUDE_CODE_OAUTH_TOKEN set in env"
+    elif [ -s "$CLAUDE_TOKEN_FILE" ]; then
+        echo "    ok  $CLAUDE_TOKEN_FILE"
+    elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        echo "    ok  \$ANTHROPIC_API_KEY set (API billing, not subscription)"
+    elif [ -f "$HOME/.claude/.credentials.json" ]; then
+        echo "    ok  ~/.claude/.credentials.json (mounted OAuth — accepted by"
+        echo "        docker_run_agent.sh, but short-lived and can't refresh"
+        echo "        in-container; 'claude setup-token' is more robust)"
+    else
+        echo "    MISSING — generate with 'claude setup-token', then save to:"
+        echo "             $CLAUDE_TOKEN_FILE   (chmod 600)"
+        ok=1
+    fi
+    echo "  GitHub token (optional — container reads only; the host publishes):"
+    if [ -n "${AGENT_GH_TOKEN:-}" ]; then
+        echo "    ok  \$AGENT_GH_TOKEN set in env"
+    elif [ -s "$GH_TOKEN_FILE" ]; then
+        echo "    ok  $GH_TOKEN_FILE"
+    else
+        echo "    none — container can't post to GitHub; that is expected (the host"
+        echo "          publishes review comments / PRs — local-first, see #532)."
+    fi
+    if [ "$ok" -eq 0 ]; then
+        echo "  => READY for container dispatch."
+    else
+        echo "  => NOT READY (Claude token missing)."
+    fi
+    return "$ok"
+}
+
 usage() {
-    sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Keep the end line in sync with the header Usage block (currently ends at
+    # line 20 — the --model/--check note); a too-small range truncates --help.
+    sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # ---------- Argument parsing ----------
@@ -91,10 +177,19 @@ while [[ $# -gt 0 ]]; do
         --entry-type)    ENTRY_TYPE="${2:-}"; shift 2 ;;
         --model)         MODEL="${2:-}"; shift 2 ;;
         --output-format) OUTPUT_FORMAT="${2:-}"; shift 2 ;;
+        --check)         CHECK=1; shift ;;
         -h|--help)       usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
     esac
 done
+
+# ---------- Auth preflight (#532): `--check` runs standalone and exits ----------
+
+if [ -n "$CHECK" ]; then
+    # Explicit if/else: under `set -e` a bare `preflight_check` returning
+    # non-zero would exit before `exit $?` ran (making it partly dead code).
+    if preflight_check; then exit 0; else exit 1; fi
+fi
 
 # ---------- Validation ----------
 
@@ -125,11 +220,16 @@ if [ -z "$ENTRY_TYPE" ] && [ -n "$SKILL" ]; then
     ENTRY_TYPE="$(skill_entry_type "$SKILL")"
 fi
 
-# Resolve the model: explicit --model wins, else derive from the skill, else the
-# default ('sonnet'). For a raw prompt with no --model, the default applies.
+# Resolve the model: explicit --model wins; else derive from the skill; else,
+# for a raw --prompt-file dispatch (no skill), derive from the declared
+# --entry-type so an Implementation / review pass isn't silently downgraded to
+# Sonnet (#539); else the default ('sonnet').
 if [ -z "$MODEL" ]; then
-    if [ -n "$SKILL" ]; then MODEL="$(skill_model "$SKILL")"; else MODEL="sonnet"; fi
+    if [ -n "$SKILL" ]; then MODEL="$(skill_model "$SKILL")"
+    elif [ -n "$ENTRY_TYPE" ]; then MODEL="$(entry_type_model "$ENTRY_TYPE")"
+    else MODEL="sonnet"; fi
 fi
+MODEL_DISPLAY="$(model_display "$MODEL")"
 
 # ---------- Resolve the worktree + its progress.md ----------
 
@@ -182,6 +282,11 @@ literals (AGENTS.md § Agent Commit Identity):
 Never use \`--no-verify\`. Do **not** \`git push\` — the host performs pushes
 with its own credentials. Never write credentials/tokens (e.g.
 \`\$CLAUDE_CODE_OAUTH_TOKEN\`) into files, commits, or output.
+
+**Your runtime model** is **$MODEL_DISPLAY** (dispatched with \`--model $MODEL\`).
+Stamp **exactly that string** in the \`**By**:\` line of your progress.md entry —
+do not add to or embellish it (never expand "Claude Opus" into a guessed
+"Opus 4.6"; if a pinned model id was given, stamp it verbatim).
 
 **Exit contract** — before you finish, $ENTRY_CLAUSE:
 
@@ -243,6 +348,12 @@ PRE_COUNT="$(entry_count)"
 PROMPT_TMP="$(mktemp /tmp/dispatch_handoff.XXXXXX.md)"
 trap 'rm -f "$PROMPT_TMP"' EXIT
 printf '%s\n' "$HANDOFF" > "$PROMPT_TMP"
+
+# Soft auth preflight (#532): warn early and actionably if the Claude token is
+# absent, rather than failing opaquely deep inside docker_run_agent.sh.
+if ! preflight_check >/dev/null 2>&1; then
+    echo "⚠️  Container auth not ready — run '${BASH_SOURCE[0]} --check' for details." >&2
+fi
 
 echo "Dispatching issue #$ISSUE into a container (headless, model=$MODEL)…" >&2
 RC=0
