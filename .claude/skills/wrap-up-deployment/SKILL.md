@@ -149,7 +149,7 @@ files are already on disk, and revisit the fetch before step 5.)
 Gather all log files for this deployment in `<log_dir>/<YYYY>/`:
 
 ```bash
-ls <log_dir>/<YYYY>/<start-date>_*_logs.md
+ls "<project-repo-worktree-path>/<log_dir>/<YYYY>/<start-date>_*_logs.md"
 ```
 
 If the glob matches no files, note "no per-host field logs found for
@@ -166,7 +166,7 @@ for wrap-up additions. Check that it exists; if not, create it with a minimal
 header now (using `dlog.sh` for the timestamp):
 
 ```bash
-LOGFILE="<log_dir>/<YYYY>/<start-date>_dev_logs.md"
+LOGFILE="<project-repo-worktree-path>/<log_dir>/<YYYY>/<start-date>_dev_logs.md"
 <workspace_root>/.agent/scripts/dlog.sh "$LOGFILE" "wrap-up started"
 ```
 
@@ -200,10 +200,17 @@ If the fetch fails, stop and report to the operator before merging — merging
 from a stale remote risks missing field commits. Resolve the fetch error
 (network, wrong remote name) before continuing.
 
-Then merge:
+Then merge (carry identity flags — merge commits do not trigger the pre-commit
+identity hook, so the identity must travel with the command; `$AGENT_NAME` and
+`$AGENT_EMAIL` come from `set_git_identity_env.sh`; substitute literal values
+if the env vars are not live in this shell — AGENTS.md § Agent Commit Identity):
 
 ```bash
-git -C "<project-repo-worktree-path>" merge gitcloud/<default_branch>
+GIT_EDITOR=true git -C "<project-repo-worktree-path>" \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
+    merge gitcloud/<default_branch> \
+    -m "merge: field commits from gitcloud/<default_branch> into wrap-up branch"
 ```
 
 If conflicts arise that cannot be cleanly resolved, abort and surface for the
@@ -361,9 +368,11 @@ git -C "<project-repo-worktree-path>" add \
     "<log_dir>/<YYYY>/<start-date>_dev_logs.md" \
     "<log_dir>/<YYYY>/<start-date>_*_logs.md"
 git -C "<project-repo-worktree-path>" \
-    -c user.name="Claude Code Agent" \
-    -c user.email="roland+claude-code@ccom.unh.edu" \
+    -c user.name="$AGENT_NAME" \
+    -c user.email="$AGENT_EMAIL" \
     commit -m "chore: wrap-up deployment #<N> — consolidated dev log and operator corrections"
+# $AGENT_NAME/$AGENT_EMAIL come from set_git_identity_env.sh; substitute
+# literal values if the env vars are not live in this shell (AGENTS.md § Agent Commit Identity).
 ```
 
 ### 8. `/import-field-changes` — other repos
@@ -379,7 +388,8 @@ NOT attempt to merge those repos directly; it delegates:
 **Prerequisite**: `/import-field-changes` reads `field_remote` from
 `.agent/project_config.yaml` (not `.agents/deployment.yaml`) — verify that
 file exists and contains the `field_remote` key before invoking the skill.
-If missing, create it: `echo "field_remote: gitcloud" > .agent/project_config.yaml`
+If missing, create it (run from workspace root):
+`echo "field_remote: gitcloud" > .agent/project_config.yaml`
 (substituting the actual remote name if different).
 
 Ask the operator: "Which other repos received field commits during this
@@ -410,7 +420,9 @@ feature branch is local-only until this push, and with two remotes on the
 project repo `gh` cannot auto-pick:
 
 ```bash
-git -C "<project-repo-worktree-path>" push -u origin "<branch-name>"
+BRANCH="$(git -C "<project-repo-worktree-path>" branch --show-current)"
+# or: BRANCH="feature/issue-<N>"
+git -C "<project-repo-worktree-path>" push -u origin "$BRANCH"
 ```
 
 **Open the wrap-up PR** (skip if already open or merged):
@@ -431,26 +443,32 @@ The PR body must include:
 - Link to each per-host log file and each import-field-changes PR.
 - AI signature.
 
-**Merge** — use a **merge commit** (not squash, not rebase):
+**Merge** — use a **merge commit** (not squash, not rebase). `gh pr merge --merge`
+with pending required CI checks fails immediately — nothing drives the merge from
+that point — so poll checks first:
 
 ```bash
+# 1. Wait for required CI checks to pass (re-run until all required checks show "pass")
+gh pr checks <PR_number>
+
+# 2. Once checks are green, merge
 gh pr merge <PR_number> --merge
+# Alternative when the repo has auto-merge enabled:
+#   gh pr merge <PR_number> --merge --auto
 ```
 
 Squash would discard the field-commit history folded in by step 5; rebase
 would break the SHA-preserving intent. The deployment issue closes automatically
 via the `Closes #<N>` reference.
 
-**Confirm the PR merged** before starting the gitcloud reconcile — poll until
-the state is `MERGED`:
+**Confirm the PR merged** before starting the gitcloud reconcile:
 
 ```bash
 gh pr view <PR_number> --json state --jq '.state'
 # Must output "MERGED" before continuing
 ```
 
-If the state is not `MERGED` (e.g., CI checks still pending), wait and
-re-poll. Do not force-push or skip checks.
+Do not force-push or skip checks.
 
 **Reconcile gitcloud** after the PR merges to `<default_branch>`. Re-fetch
 both remotes to get their latest states — gitcloud may have received commits
@@ -565,8 +583,9 @@ push in step 9 succeeded):
   everything else. Do not conflate them — cherry-pick or squash on the primary
   repo would break the gitcloud fast-forward.
 - **Merge commit, not squash.** The PR merge MUST be `--merge`. Squash discards
-  the field-commit SHAs folded in by step 5, making gitcloud reconciliation a
-  force-push rather than a fast-forward.
+  the field-commit SHAs folded in by step 5; the resulting non-fast-forward would
+  be refused by gitcloud when pushing (step 9's ancestor check would also fail).
+  The merge approach keeps gitcloud reconcilable by fast-forward.
 - **`issue_sync` is optional on dev side.** If `dev_push` is absent from the
   config, skip silently — `gh` handles everything. Only field-side wrap-up
   (which is disallowed) would need the full `issue_sync` suite.
