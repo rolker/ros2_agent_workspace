@@ -251,8 +251,11 @@ on the same host are unaffected.
 See [ADR-0014](docs/decisions/0014-deployment-mode.md) for the decision record
 and [`.agent/knowledge/deployment_mode.md`](.agent/knowledge/deployment_mode.md)
 for the operational reference (urgency contract, lifecycle phases, log-naming
-convention, project-config schema). The wrap-up half (`/wrap-up-deployment`)
-and recovery checklist are tracked under umbrella [#495](https://github.com/rolker/ros2_agent_workspace/issues/495).
+convention, project-config schema). The wrap-up skill
+([`.claude/skills/wrap-up-deployment/SKILL.md`](.claude/skills/wrap-up-deployment/SKILL.md))
+closes the deployment issue, reconciles field code, and files RCA follow-ups.
+The recovery checklist ([#496](https://github.com/rolker/ros2_agent_workspace/issues/496))
+remains a follow-up.
 
 ## AI Signature (Required on all GitHub Issues/PRs/Comments)
 

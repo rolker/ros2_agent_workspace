@@ -22,9 +22,10 @@ Two halves, both load-bearing:
 1. **An urgency contract** — sterile-cockpit-style behavioral adjustments that
    keep the agent fast and operator-responsive during live ops.
 2. **Lifecycle tooling** — the skills and templates that run inside the mode
-   (`/start-deployment` is the first; `/wrap-up-deployment` and
-   `/next-deployment` are tracked as follow-ups under the umbrella
-   [#495](https://github.com/rolker/ros2_agent_workspace/issues/495)).
+   (`/start-deployment` for phase [0] and `/wrap-up-deployment`
+   (`.claude/skills/wrap-up-deployment/SKILL.md`) for phase [3] are
+   implemented; `/next-deployment` is tracked as a follow-up under the
+   umbrella [#495](https://github.com/rolker/ros2_agent_workspace/issues/495)).
 
 It's a sibling to **field mode** ([ADR-0011](../../docs/decisions/0011-field-mode-for-non-github-origins.md)):
 field mode is detected by origin URL and scopes *where commits go*; deployment
@@ -138,9 +139,9 @@ analysis is the *expected* work.
 
 [3] Wrap-up — dev-side
     Contract relaxes. Import field changes; review-loop import
-    PRs; consolidate logs; extract bag DB; run standard
-    analyses; file analysis sub-issues; merge wrap-up PR
-    (closes deployment issue).
+    PRs; consolidate logs; merge wrap-up PR (closes deployment
+    issue). (Bag extraction and standard analyses are the debrief
+    skill's job — see #435; out of scope for v1 wrap-up.)
 
 [4] Next deployment-issue drafted from analysis outputs.
 ```
@@ -236,8 +237,8 @@ on-disk artifacts that already exist:
   links here as they appear).
 - Operator-authored sections (Purpose, Must-verify, Operators, Hosts in use,
   Notes) are left untouched.
-- No automatic wrap-up checklist (the future `/wrap-up-deployment` skill owns
-  that procedure).
+- No automatic wrap-up checklist (`/wrap-up-deployment` owns that procedure;
+  see `.claude/skills/wrap-up-deployment/SKILL.md`).
 - If the body is suspiciously empty, warn — don't impose structure.
 
 ## Project-config schema (`.agents/deployment.yaml`)
@@ -302,8 +303,6 @@ to GitHub, the skill auto-switches without any code change.
 
 Tracked separately under [#495](https://github.com/rolker/ros2_agent_workspace/issues/495):
 
-- `/wrap-up-deployment` — phase [3] orchestration (review-loop, log
-  integration, analysis kickoff).
 - `/next-deployment` — phase [4] drafting of the next deployment issue from
   analysis outputs.
 - Framework-level hook for auto-injecting the urgency contract into every
