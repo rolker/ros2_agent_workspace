@@ -63,3 +63,22 @@ Issue proposes creating `.claude/skills/wrap-up-deployment/SKILL.md` + AGENTS.md
 - [ ] (suggestion) State bag-extraction/analysis as operator-driven / out-of-scope for v1 in SKILL.md so adopters see the deferral — `plan.md:108-112`
 
 Plan is well-scoped, addresses all review-issue findings, and correctly resolves the ADR-0003 (project-agnostic config) and ADR-0013 (no per-issue progress entry) risks. Config keys referenced (`log_dir`, `issue_sync.dev_push`) verified against the template. Ready for implementation; the three items are refinements, not blockers.
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-20 (sub-agent)
+**By**: Claude Code Agent (Claude Sonnet 4.6)
+
+Created `.claude/skills/wrap-up-deployment/SKILL.md` — a 9-step wrap-up orchestrator mirroring `start-deployment/SKILL.md` in structure and tone. The skill adds an operator-correction interview (step 5, one question at a time before consolidating logs) and separates field-code reconciliation into two distinct mechanisms: SHA-preserving `git merge` for the primary deployment repo (step 7a) and `/import-field-changes` for other repos (step 7b). Bag extraction is explicitly deferred to the project debrief checklist (#435). `issue_sync`/`dev_push` absence is graceful (dev-side optional, mirroring start-deployment).
+
+Also updated AGENTS.md "Deployment mode" section (replaced #495 placeholder with skill pointer + #496 recovery note), all three non-Claude adapter skill lists, and plan.md to reflect the 9-step implemented flow. `make generate-skills` ran successfully (generated `.claude/skills/make_*/` files which are gitignored).
+
+**Host follow-up**: ADR-0014 Status "Proposed"→"Accepted" flip requires `gh` auth to post — post once the PR merges to main.
+
+**Files changed**:
+- `.claude/skills/wrap-up-deployment/SKILL.md` — created (main deliverable)
+- `AGENTS.md` — deployment mode section updated
+- `.github/copilot-instructions.md` — `wrap-up-deployment` added to skill list
+- `.agent/instructions/gemini-cli.instructions.md` — `wrap-up-deployment` added to skill list
+- `.agent/AGENT_ONBOARDING.md` — `wrap-up-deployment` added to skill list
+- `.agent/work-plans/issue-530/plan.md` — synced to reflect 9-step flow
