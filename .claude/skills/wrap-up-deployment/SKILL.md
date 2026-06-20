@@ -133,8 +133,9 @@ The deployment start date from the issue title is `<start-date>` (format
 Fetch the field remote so its branches are up to date. Use `git -C` to target
 the project-repo worktree (not the workspace root); the `gitcloud` remote is
 configured there. The project-repo worktree path is derived from the config:
-`<workspace_root>/.workspace-worktrees/issue-<N>/layers/main/<layer>_ws/src/<packages[0]>` —
-confirm with `<workspace_root>/.agent/scripts/worktree_list.sh`.
+`<workspace_root>/layers/worktrees/issue-<REPO_SLUG>-<N>/<layer>_ws/src/<packages[0]>` —
+where `<REPO_SLUG>` is the project-repo directory name — confirm with
+`<workspace_root>/.agent/scripts/worktree_list.sh`.
 
 ```bash
 git -C "<project-repo-worktree-path>" fetch gitcloud
@@ -143,7 +144,7 @@ git -C "<project-repo-worktree-path>" fetch gitcloud
 (If `gitcloud` is not a configured remote for the project repo, ask the
 operator for the correct field-remote name. If the fetch fails — network
 unreachable, wrong remote name — note the error, continue with whatever log
-files are already on disk, and revisit the fetch before step 7a.)
+files are already on disk, and revisit the fetch before step 5.)
 
 Gather all log files for this deployment in `<log_dir>/<YYYY>/`:
 
@@ -169,7 +170,57 @@ LOGFILE="<log_dir>/<YYYY>/<start-date>_dev_logs.md"
 <workspace_root>/.agent/scripts/dlog.sh "$LOGFILE" "wrap-up started"
 ```
 
-### 5. Operator-correction interview
+### 5. Reconcile field code — SHA-preserving merge
+
+Merge the deployment repo's own field commits into the wrap-up branch
+**before** interviewing the operator. Editing field logs in place before the
+gitcloud merge risks merge conflicts on every corrected log — merging first
+gives a clean, up-to-date base for the operator interview and corrections.
+
+All git operations below target the **project-repo worktree** — the git repo
+for `<packages[0]>` inside the deployment worktree, where the `gitcloud` and
+`origin` remotes live:
+
+```
+<project-repo-worktree-path> =
+  <workspace_root>/layers/worktrees/issue-<REPO_SLUG>-<N>/<layer>_ws/src/<packages[0]>
+```
+
+(Confirm with `<workspace_root>/.agent/scripts/worktree_list.sh` if the exact
+path is uncertain.)
+
+Re-fetch gitcloud to get its latest state before the merge — field hosts may
+have pushed commits during the interval since step 4:
+
+```bash
+git -C "<project-repo-worktree-path>" fetch gitcloud
+```
+
+If the fetch fails, stop and report to the operator before merging — merging
+from a stale remote risks missing field commits. Resolve the fetch error
+(network, wrong remote name) before continuing.
+
+Then merge:
+
+```bash
+git -C "<project-repo-worktree-path>" merge gitcloud/<default_branch>
+```
+
+If conflicts arise that cannot be cleanly resolved, abort and surface for the
+operator:
+
+```bash
+git -C "<project-repo-worktree-path>" merge --abort
+```
+
+Do not auto-resolve anything that touches control logic.
+
+After a successful merge, the wrap-up branch is ahead of both
+`origin/<default_branch>` (via the PR) and `gitcloud/<default_branch>`
+(which will fast-forward after merge). Record the merge commit SHA in the
+dev log via `dlog.sh`.
+
+### 6. Operator-correction interview
 
 **This is the highest-value step. Do not skip or compress it.**
 
@@ -206,21 +257,30 @@ Ask follow-up questions if an answer surfaces a new issue (e.g., a mislabeled
 log file implies all its timestamps may also be off). This step is conversational,
 not mechanical.
 
-### 6. Consolidate the dev log
+### 7. Consolidate the dev log
 
 Append the following sections to the dev log file
 (`<log_dir>/<YYYY>/<start-date>_dev_logs.md`). Use
 `<workspace_root>/.agent/scripts/dlog.sh` for any entries that need a
 timestamp; write Markdown section headers and body prose directly.
 
-#### 6a. Apply operator corrections to field logs in place
+#### 7a. Apply operator corrections to field logs in place
 
 For each correction from the interview that pertains to a specific field log
 file (wrong label, misdated entry, incorrect root cause attributed to the
 agent):
 
-- **Mislabeled log file**: rename the file to the correct name (preserving the
-  `<start-date>_<label>_logs.md` pattern with the corrected label).
+- **Mislabeled log file**: use `git mv` to rename the file to the correct name
+  (preserving the `<start-date>_<label>_logs.md` pattern with the corrected
+  label) — a shell-glob `git add` only stages existing paths and leaves the
+  old path as an unstaged deletion:
+
+  ```bash
+  git -C "<project-repo-worktree-path>" mv \
+      "<log_dir>/<YYYY>/<start-date>_<old-label>_logs.md" \
+      "<log_dir>/<YYYY>/<start-date>_<corrected-label>_logs.md"
+  ```
+
 - **Misdated entry**: edit the entry's timestamp in the file to the corrected
   value; add an inline note: `<!-- corrected at wrap-up: operator reported
   actual time was <HH:MM> -->`.
@@ -231,13 +291,14 @@ agent):
   > **Wrap-up correction**: [operator's correction verbatim or paraphrased]
   ```
 
-Stage all corrected field log files:
+Stage all corrected field log files (including any renames already done with
+`git mv`):
 
 ```bash
-git -C "<project-repo-worktree-path>" add <log_dir>/<YYYY>/<start-date>_*_logs.md
+git -C "<project-repo-worktree-path>" add -A "<log_dir>/<YYYY>/"
 ```
 
-#### 6b. Append structured summary to dev log
+#### 7b. Append structured summary to dev log
 
 Append these four sections to the dev log (use `dlog.sh` only for
 timestamped *events*; section headers and prose go in directly):
@@ -250,7 +311,7 @@ Written in past tense. No invented mechanisms; only what happened.>
 
 ## Operator Corrections
 
-<Verbatim or close-to-verbatim record of corrections from step 5.
+<Verbatim or close-to-verbatim record of corrections from step 6.
 If the operator reported no corrections, write "Operator confirmed
 logs accurate; no corrections." Attribute each item: "Operator:
 '…'">
@@ -266,10 +327,10 @@ Bullet list. No speculation.>
 <Items deferred from live ops or surfaced by this wrap-up that
 need a GitHub issue. Format: "- [ ] <title> — <one-line root
 cause or outstanding question>". Dedup against existing open issues
-before this list drives issue-filing in step 9.>
+before this list drives issue-filing in step 10.>
 ```
 
-#### 6c. Stamp the dev log link in the deployment issue
+#### 7c. Stamp the dev log link in the deployment issue
 
 Verify the deployment issue's `## Logs` section includes a link to the dev
 log:
@@ -288,10 +349,10 @@ gh issue edit <N> --body-file <tmpfile>
 `--body-file`. Use `gh issue view <N> --json body --jq '.body'` to get the
 current body.)
 
-#### 6d. Commit the consolidated dev log
+#### 7d. Commit the consolidated dev log
 
 Stage the dev log and all corrected field logs, then commit. This commit
-**must land on the branch before `gh pr create`** in step 8 — without it the
+**must land on the branch before `gh pr create`** in step 9 — without it the
 log additions and operator corrections are never part of the PR and are lost
 when the worktree is removed:
 
@@ -305,62 +366,7 @@ git -C "<project-repo-worktree-path>" \
     commit -m "chore: wrap-up deployment #<N> — consolidated dev log and operator corrections"
 ```
 
-### 7. Reconcile field code
-
-Two distinct mechanisms. Do both.
-
-#### 7a. SHA-preserving merge — deployment repo's own field commits
-
-The deployment repo (primary project repo in `packages[0]`) accumulates field
-commits on `gitcloud/<default_branch>` during live ops. Bring these into the
-deployment branch with a **merge commit** — NOT cherry-pick, NOT squash — to
-preserve SHA lineage and make reconciliation to gitcloud a fast-forward after
-the wrap-up PR merges.
-
-All git operations below target the **project-repo worktree** — the git repo
-for `<packages[0]>` inside the deployment worktree, where the `gitcloud` and
-`origin` remotes live:
-
-```
-<project-repo-worktree-path> =
-  <workspace_root>/.workspace-worktrees/issue-<N>/layers/main/<layer>_ws/src/<packages[0]>
-```
-
-(Confirm with `<workspace_root>/.agent/scripts/worktree_list.sh` if the exact
-path is uncertain.)
-
-Re-fetch gitcloud to get its latest state before the merge — field hosts may
-have pushed commits during the wrap-up window:
-
-```bash
-git -C "<project-repo-worktree-path>" fetch gitcloud
-```
-
-If the fetch fails, stop and report to the operator before merging — merging
-from a stale remote risks missing field commits. Resolve the fetch error
-(network, wrong remote name) before continuing.
-
-Then merge:
-
-```bash
-git -C "<project-repo-worktree-path>" merge gitcloud/<default_branch>
-```
-
-If conflicts arise that cannot be cleanly resolved, abort and surface for the
-operator:
-
-```bash
-git -C "<project-repo-worktree-path>" merge --abort
-```
-
-Do not auto-resolve anything that touches control logic.
-
-After a successful merge, the wrap-up branch is ahead of both
-`origin/<default_branch>` (via the PR) and `gitcloud/<default_branch>`
-(which will fast-forward after merge). Record the merge commit SHA in the
-dev log via `dlog.sh`.
-
-#### 7b. `/import-field-changes` — other repos
+### 8. `/import-field-changes` — other repos
 
 Other repos that received field commits (nav packages, sensors, interfaces,
 etc.) use the `/import-field-changes` skill — that skill opens per-repo import
@@ -370,6 +376,12 @@ NOT attempt to merge those repos directly; it delegates:
 > Invoke `/import-field-changes` for each repo that has field commits on
 > `gitcloud` but is NOT the primary deployment repo (`packages[0]`).
 
+**Prerequisite**: `/import-field-changes` reads `field_remote` from
+`.agent/project_config.yaml` (not `.agents/deployment.yaml`) — verify that
+file exists and contains the `field_remote` key before invoking the skill.
+If missing, create it: `echo "field_remote: gitcloud" > .agent/project_config.yaml`
+(substituting the actual remote name if different).
+
 Ask the operator: "Which other repos received field commits during this
 deployment?" Run `/import-field-changes` for each answer. Record the resulting
 PR URLs in the dev log.
@@ -377,7 +389,7 @@ PR URLs in the dev log.
 If no other repos had field commits, record that explicitly in the dev log:
 "No other repos had field commits; `/import-field-changes` not needed."
 
-### 8. PR → merge → gitcloud reconcile → remove worktree
+### 9. PR → merge → gitcloud reconcile
 
 **If re-running after interruption**, check what already completed before
 repeating any irreversible action:
@@ -388,9 +400,18 @@ gh issue view <N> --json state --jq '.state'
 ```
 
 - PR already merged and issue closed → skip PR create and merge; proceed to
-  the gitcloud reconcile and worktree removal below if not yet done.
+  the gitcloud reconcile if not yet done, then step 10.
 - PR open but not merged → skip `gh pr create`; proceed from the merge step.
-- Issue already closed and worktree already removed → no further action needed.
+- Issue already closed and gitcloud already reconciled → skip to step 10 if
+  not yet done.
+
+**Push the deployment branch** so `gh pr create` can find it on origin — the
+feature branch is local-only until this push, and with two remotes on the
+project repo `gh` cannot auto-pick:
+
+```bash
+git -C "<project-repo-worktree-path>" push -u origin "<branch-name>"
+```
 
 **Open the wrap-up PR** (skip if already open or merged):
 
@@ -416,9 +437,20 @@ The PR body must include:
 gh pr merge <PR_number> --merge
 ```
 
-Squash would discard the field-commit history folded in by step 7a; rebase
+Squash would discard the field-commit history folded in by step 5; rebase
 would break the SHA-preserving intent. The deployment issue closes automatically
 via the `Closes #<N>` reference.
+
+**Confirm the PR merged** before starting the gitcloud reconcile — poll until
+the state is `MERGED`:
+
+```bash
+gh pr view <PR_number> --json state --jq '.state'
+# Must output "MERGED" before continuing
+```
+
+If the state is not `MERGED` (e.g., CI checks still pending), wait and
+re-poll. Do not force-push or skip checks.
 
 **Reconcile gitcloud** after the PR merges to `<default_branch>`. Re-fetch
 both remotes to get their latest states — gitcloud may have received commits
@@ -452,11 +484,11 @@ Only after the ancestor check passes:
 git -C "<project-repo-worktree-path>" push gitcloud origin/<default_branch>:<default_branch>
 ```
 
-**Verify the push succeeded** before proceeding to worktree removal. If the
-push fails, stop here — the worktree is the retry context. Do not remove it.
+**Verify the push succeeded** before proceeding. If the push fails, stop here —
+the worktree is the retry context. Do not remove it.
 
 This fast-forwards `gitcloud/<default_branch>` to match `origin/<default_branch>`,
-completing the SHA-preserving round-trip from step 7a.
+completing the SHA-preserving round-trip from step 5.
 
 If `issue_sync.dev_push` is configured **and is not the literal string `TODO`**,
 run it now to propagate the closed issue status to the field-visible issue source:
@@ -468,13 +500,10 @@ run it now to propagate the closed issue status to the field-visible issue sourc
 On failure, print `issue_sync.failure_hint`. This is advisory — the GitHub
 issue is already closed; `dev_push` just keeps the field-side view in sync.
 
-**Remove the worktree** (only after a successful gitcloud push):
+### 10. File new RCA issues selectively
 
-```bash
-<workspace_root>/.agent/scripts/worktree_remove.sh --issue <N>
-```
-
-### 9. File new RCA issues selectively
+File RCA issues **before** removing the worktree — worktree removal breaks
+`gh` origin auto-detection for the project repo.
 
 From the `## RCA / Follow-up Backlog` in the dev log and any items surfaced
 during wrap-up, decide which warrant a GitHub issue.
@@ -515,6 +544,13 @@ link to the deployment issue.
 issues from prior deployments that were never wrapped up, list them for the
 operator and ask whether to close them with a note. Do not close them unilaterally.
 
+**Remove the worktree** (only after RCA filing is complete and the gitcloud
+push in step 9 succeeded):
+
+```bash
+<workspace_root>/.agent/scripts/worktree_remove.sh --issue <N>
+```
+
 ## Guidelines
 
 - **This is a dev-side-only skill.** The very first step after reading config is
@@ -524,12 +560,12 @@ operator and ask whether to close them with a note. Do not close them unilateral
   are written under sterile-cockpit pressure and may contain misattributions,
   premature conclusions, or events that didn't happen as logged. This is the only
   opportunity to fix the permanent record before it propagates.
-- **Two merge mechanisms, not one.** The SHA-preserving `git merge` (step 7a) is
-  for the primary deployment repo. `/import-field-changes` (step 7b) is for
+- **Two merge mechanisms, not one.** The SHA-preserving `git merge` (step 5) is
+  for the primary deployment repo. `/import-field-changes` (step 8) is for
   everything else. Do not conflate them — cherry-pick or squash on the primary
   repo would break the gitcloud fast-forward.
 - **Merge commit, not squash.** The PR merge MUST be `--merge`. Squash discards
-  the field-commit SHAs folded in by step 7a, making gitcloud reconciliation a
+  the field-commit SHAs folded in by step 5, making gitcloud reconciliation a
   force-push rather than a fast-forward.
 - **`issue_sync` is optional on dev side.** If `dev_push` is absent from the
   config, skip silently — `gh` handles everything. Only field-side wrap-up
@@ -555,7 +591,7 @@ operator and ask whether to close them with a note. Do not close them unilateral
 - [`.claude/skills/start-deployment/SKILL.md`](../start-deployment/SKILL.md) — sibling skill (phase [0])
 - [`.agent/knowledge/deployment_mode.md`](../../../.agent/knowledge/deployment_mode.md) — operational reference (fuller treatment of contract, lifecycle, schema)
 - [`.agent/templates/deployment_config.yaml`](../../../.agent/templates/deployment_config.yaml) — per-project config template
-- [`.agent/scripts/import-field-changes`](../../../.agent/scripts/) (skill: `/import-field-changes`) — per-repo field import PRs (step 7b)
+- [`.claude/skills/import-field-changes/SKILL.md`](../import-field-changes/SKILL.md) (skill: `/import-field-changes`) — per-repo field import PRs (step 8)
 - [#435](https://github.com/rolker/ros2_agent_workspace/issues/435) — debrief / bag analysis checklist (out of scope here; tracked there)
 - [#495](https://github.com/rolker/ros2_agent_workspace/issues/495) — umbrella for the full deployment lifecycle
 - [#496](https://github.com/rolker/ros2_agent_workspace/issues/496) — recovery checklist (phase [2]; follow-up)

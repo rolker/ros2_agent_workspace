@@ -139,9 +139,9 @@ analysis is the *expected* work.
 
 [3] Wrap-up — dev-side
     Contract relaxes. Import field changes; review-loop import
-    PRs; consolidate logs; extract bag DB; run standard
-    analyses; file analysis sub-issues; merge wrap-up PR
-    (closes deployment issue).
+    PRs; consolidate logs; merge wrap-up PR (closes deployment
+    issue). (Bag extraction and standard analyses are the debrief
+    skill's job — see #435; out of scope for v1 wrap-up.)
 
 [4] Next deployment-issue drafted from analysis outputs.
 ```
