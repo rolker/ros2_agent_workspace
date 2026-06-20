@@ -736,9 +736,11 @@ review indefinitely:
     tracked.
   - **recommended** at **round ≥ 2** when the Must-fix count is **low and not
     rising** versus the previous round and the remaining must-fixes are
-    mechanical/clear — recommend addressing them and shipping rather than
-    another full round (each round costs a container cycle for diminishing
-    return, especially on guidance docs after the calibration above).
+    mechanical/clear (low ≈ **≤ 2** must-fixes, each a precise file:line fix with
+    an obvious correction — not a design question) — recommend addressing them
+    and shipping rather than another full round (each round costs a container
+    cycle for diminishing return, especially on guidance docs after the
+    calibration above).
   - **continue** when Must-fix is **rising, high, or includes a genuine
     design / correctness concern** that warrants another independent read.
 - Surface the round, verdict, and a one-line reason in the report header
@@ -814,6 +816,7 @@ Existing Review Comments sections. Use:
 
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
+**Round**: <N> (pre-push) — **Ship: <recommended | continue>**   <!-- pre-push only; see Convergence assessment -->
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Claude Adversarial**: 1 pass (Lens A)
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
