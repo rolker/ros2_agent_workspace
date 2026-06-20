@@ -161,3 +161,50 @@ must-fix claims verified against `worktree_create.sh` (760/763/942) and
 - [ ] (suggestion) Broken reference link: `import-field-changes` is a skill, not `.agent/scripts/`; point to `.claude/skills/import-field-changes/SKILL.md` — `.claude/skills/wrap-up-deployment/SKILL.md:558`
 - [ ] (suggestion) Surface `/import-field-changes`'s own config prereq (`.agent/project_config.yaml:field_remote`, different file than deployment.yaml) — `.claude/skills/wrap-up-deployment/SKILL.md:363`
 - [ ] (suggestion) deployment_mode.md phase [3] lists bag-DB extraction/analyses as wrap-up work, contradicting SKILL's explicit out-of-scope (#435); add a parenthetical — `.agent/knowledge/deployment_mode.md:~141`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-20
+**By**: Claude Code Agent (Claude Sonnet 4.6)
+
+Addressed review-code round 2: 3 must-fix + 6 suggestions. Commit: `0bb34a6`.
+
+**Must-fix**:
+1. Fixed wrong project-repo worktree path template in both occurrences — changed `.workspace-worktrees/issue-<N>/layers/main/...` to `layers/worktrees/issue-<REPO_SLUG>-<N>/...` (the correct layer-worktree path from `worktree_create.sh`).
+2. Added explicit `git push -u origin "<branch-name>"` before `gh pr create` in step 9.
+3. Changed `git add <glob>` in step 7a to `git mv` for renames + `git add -A <log_dir>/<YYYY>/` to correctly stage old-path deletions.
+
+**Suggestions (all applied)**:
+4. Reordered: SHA-preserving gitcloud merge (step 5) now precedes operator interview (step 6) and log corrections (step 7) — avoids merge conflicts on every corrected log.
+5. Moved RCA issue filing (step 10) before worktree removal (which is now the last action inside step 10) — `gh` origin auto-detection intact during RCA filing.
+6. Added `gh pr view <PR_number> --json state --jq '.state'` confirm-MERGED poll before gitcloud reconcile in step 9.
+7. Fixed broken reference link: `.agent/scripts/import-field-changes` → `.claude/skills/import-field-changes/SKILL.md`.
+8. Added `/import-field-changes` config prereq note (reads `field_remote` from `.agent/project_config.yaml`) at step 8 invocation.
+9. Added parenthetical to `deployment_mode.md` phase [3] noting bag extraction/analyses are the debrief skill's job (#435), not v1 wrap-up.
+
+**Files changed**: `.claude/skills/wrap-up-deployment/SKILL.md`, `.agent/knowledge/deployment_mode.md`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-20 15:05 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-530 at `0bb34a6`
+**Mode**: pre-push
+**Depth**: Deep (reason: 598-line new SKILL.md orchestrating irreversible git/gh ops + governance-trigger files AGENTS.md/deployment_mode.md/ADR-0006 adapters)
+**Must-fix**: 4 | **Suggestions**: 3
+
+Round 3. All 11 round-1 + 9 round-2 findings verified applied (not re-reported).
+4 new must-fix from reading the final flow end-to-end (2 Lens B, 2 Lens A); both
+Lens B merge/CI claims verified against git/pre-commit stage semantics and the
+`gh pr merge --auto` queue behavior. Static analysis: `.md` only, no linter profile.
+
+### Findings
+- [ ] (must-fix) Step-5 `git merge gitcloud/<default_branch>` omits `-c user.name/-c user.email`; merge commit lands under wrong/absent author silently (identity hook is `pre-commit` stage, doesn't fire on merge commits) — `.claude/skills/wrap-up-deployment/SKILL.md:206`
+- [ ] (must-fix) `gh pr merge --merge` (no `--auto`) + "wait and re-poll" hangs forever on required CI checks — the command fails immediately, nothing drives the merge; use `--auto` or re-invoke after checks — `.claude/skills/wrap-up-deployment/SKILL.md:437,452`
+- [ ] (must-fix) `<branch-name>` is an undefined placeholder (used only at the push), never derived like every other identifier — define as `feature/issue-<N>` or read worktree HEAD — `.claude/skills/wrap-up-deployment/SKILL.md:413`
+- [ ] (must-fix) Dev-log/field-log paths bare-relative: `dlog.sh`/`ls` resolve against CWD, `git -C` staging against worktree root; run from workspace root → dev log written but never committed, lost on worktree removal — anchor to `<project-repo-worktree-path>` — `.claude/skills/wrap-up-deployment/SKILL.md:152,169-170`
+- [ ] (suggestion) `.agent/project_config.yaml` write uses CWD-dependent bare path; anchor to `<workspace_root>/.agent/...` or note run-from-root — `.claude/skills/wrap-up-deployment/SKILL.md:382`
+- [ ] (suggestion) Step-7d hardcodes `Claude Code Agent` identity; skill is advertised to non-Claude runtimes (gemini/copilot adapter lists) → wrong author lands silently; use `$AGENT_NAME`/`$AGENT_EMAIL` or placeholder — `.claude/skills/wrap-up-deployment/SKILL.md:363-366`
+- [ ] (suggestion) "squash → force-push" rationale imprecise: a squash would fail the ancestor check and block the push, not force it; reword — `.claude/skills/wrap-up-deployment/SKILL.md:568`
