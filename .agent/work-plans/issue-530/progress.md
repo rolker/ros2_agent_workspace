@@ -35,3 +35,15 @@ Issue proposes creating `.claude/skills/wrap-up-deployment/SKILL.md` + AGENTS.md
 - [ ] Keep project-specific config in `.agents/deployment.yaml`, not in SKILL.md (ADR-0003 three-tier split)
 - [x] Posted by host (gh auth available on host) — #530 issue comment.
 - [ ] After merge: consider updating ADR-0014 Status from "Proposed" to "Accepted"
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-20 10:30 +00:00
+**By**: Claude Code Agent (Claude Sonnet 4.6)
+
+**Plan**: `.agent/work-plans/issue-530/plan.md` at `7cc1133`
+**Branch**: feature/issue-530 at `7cc1133`
+**Phases**: single
+
+### Open questions
+- [ ] Should `.agents/deployment.yaml` gain a `wrap_up:` section for project-specific steps (bag extraction commands, analysis scripts)? V1 defers bag extraction to operator/debrief (#435); out of scope unless a project has concrete needs.
