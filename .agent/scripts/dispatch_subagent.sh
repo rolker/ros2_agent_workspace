@@ -83,17 +83,22 @@ skill_model() {
 # --skill to map. Without this a custom-prompt dispatch silently defaulted to
 # Sonnet even for an Implementation / review pass (#539).
 #
-# KEEP THE TIERS IN SYNC WITH skill_model() — each entry type is written by a
-# skill, and the two must agree on its model: Local Review*(review-code),
-# Integrated Review(triage-reviews), Implementation(implement/address-findings),
-# Plan Review(review-plan) -> opus; Issue Review(review-issue),
-# Plan Authored(plan-task) -> sonnet. test_dispatch_model.sh asserts this parity.
+# The tier is NOT duplicated here: this maps the entry type to the skill that
+# writes it and defers to skill_model() — the single source of truth — so adding
+# an Opus tier in skill_model can't silently downgrade an entry type. Only the
+# entry-type -> skill map below is local; test_dispatch_model.sh asserts it.
 entry_type_model() {
+    local skill
     case "$1" in
-        Implementation|"Local Review"|"Local Review (Pre-Push)"|"Integrated Review"|"Plan Review") echo "opus" ;;
-        "Issue Review"|"Plan Authored")          echo "sonnet" ;;
-        *)                                       echo "sonnet" ;;
+        "Local Review"|"Local Review (Pre-Push)") skill="review-code" ;;
+        "Integrated Review")                       skill="triage-reviews" ;;
+        Implementation)                            skill="address-findings" ;;
+        "Plan Review")                             skill="review-plan" ;;
+        "Issue Review")                            skill="review-issue" ;;
+        "Plan Authored")                           skill="plan-task" ;;
+        *)                                         skill="" ;;  # unknown -> skill_model default (sonnet)
     esac
+    skill_model "$skill"
 }
 
 # Model alias -> version-less display name for the sub-agent's progress.md
@@ -129,6 +134,10 @@ preflight_check() {
         echo "    ok  $CLAUDE_TOKEN_FILE"
     elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
         echo "    ok  \$ANTHROPIC_API_KEY set (API billing, not subscription)"
+    elif [ -f "$HOME/.claude/.credentials.json" ]; then
+        echo "    ok  ~/.claude/.credentials.json (mounted OAuth — accepted by"
+        echo "        docker_run_agent.sh, but short-lived and can't refresh"
+        echo "        in-container; 'claude setup-token' is more robust)"
     else
         echo "    MISSING — generate with 'claude setup-token', then save to:"
         echo "             $CLAUDE_TOKEN_FILE   (chmod 600)"
@@ -152,7 +161,9 @@ preflight_check() {
 }
 
 usage() {
-    sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Keep the end line in sync with the header Usage block (currently ends at
+    # line 20 — the --model/--check note); a too-small range truncates --help.
+    sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # ---------- Argument parsing ----------
