@@ -106,3 +106,58 @@ Also updated AGENTS.md "Deployment mode" section (replaced #495 placeholder with
 - [ ] (suggestion) Verify gitcloud push succeeded before removing the worktree (removal destroys retry context) — `.claude/skills/wrap-up-deployment/SKILL.md:355`
 - [ ] (suggestion) `rca` label may not exist; create-or-skip when filing RCA issues — `.claude/skills/wrap-up-deployment/SKILL.md:404`
 - [ ] (suggestion) `ls` log glob errors on no-match; add "if none, note and continue" guard — `.claude/skills/wrap-up-deployment/SKILL.md:145`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-20
+**By**: Claude Code Agent (Claude Sonnet 4.6)
+
+**Commit**: `7230154`
+**Summary**: Addressed review-code round 1 — all 6 must-fix findings and all 5 suggestions applied to `.claude/skills/wrap-up-deployment/SKILL.md` and `.agent/knowledge/deployment_mode.md`.
+
+**Changes by finding:**
+- **#1 (git -C project-repo worktree)**: Added `git -C "<project-repo-worktree-path>"` to all git ops in steps 4, 6a, 6d, 7a, and 8. Path derivation note added in step 4 and step 7a.
+- **#2 (gitcloud push ff-guard)**: Step 8 now re-fetches gitcloud + origin after PR merge, runs `merge-base --is-ancestor` to verify ff before pushing, stops on divergence with actionable message.
+- **#3 (draft PR → mergeable)**: Removed `--draft` flag from `gh pr create` in step 8.
+- **#4 (commit before PR create)**: Step 6a no longer says "do NOT commit yet"; new step 6d commits the dev log and all corrected field logs before step 8.
+- **#5 (idempotency/recovery)**: Step 8 opens with a "if re-running after interruption" block that checks PR state and issue state before repeating irreversible actions.
+- **#6 (deployment_mode.md)**: Three stale "future follow-up" references updated — lifecycle tooling description (line 25), wrap-up checklist note (line 239), and "What's NOT in v1" section (removed `/wrap-up-deployment` line from list).
+- **#7 (TODO guard)**: `issue_sync.dev_push` check now guards `== "TODO"` as absent.
+- **#8 (re-fetch + merge --abort)**: Step 7a now fetches gitcloud before merge, stops on fetch failure, documents `merge --abort` safe-out.
+- **#9 (verify push before remove)**: Step 8 notes "verify the push succeeded before proceeding to worktree removal."
+- **#10 (rca label create-or-skip)**: Step 9 adds `gh label create rca … 2>/dev/null || true` before filing.
+- **#11 (glob no-match guard)**: Step 4 adds "if the glob matches no files, note and continue — do not abort."
+
+**Files changed**:
+- `.claude/skills/wrap-up-deployment/SKILL.md` — steps 4, 6a, 6d (new), 7a, 8, 9 updated
+- `.agent/knowledge/deployment_mode.md` — 3 stale future-references updated
+
+**Next step**: re-review (`/review-code`) before opening the PR.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-20 14:40 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-530 at `7230154`
+**Mode**: pre-push
+**Depth**: Deep (reason: 562-line new SKILL.md + governance-trigger files AGENTS.md/deployment_mode.md/ADR-0006 adapters)
+**Must-fix**: 3 | **Suggestions**: 6
+
+Round 2. All 11 round-1 findings verified applied and correct (not re-reported).
+3 new must-fix items, all from SKILL.md assumptions about how `/start-deployment`'s
+worktree is actually created, plus a `git add` rename-staging bug. Both Lens B
+must-fix claims verified against `worktree_create.sh` (760/763/942) and
+`start-deployment/SKILL.md` (--type layer, no --plan-file).
+
+### Findings
+- [ ] (must-fix) Project-repo worktree path template wrong in all 3 segments — should be `layers/worktrees/issue-<REPO_SLUG>-<N>/<layer>_ws/src/<packages[0]>` (not `.workspace-worktrees/issue-<N>/layers/main/...`) — `.claude/skills/wrap-up-deployment/SKILL.md:136,325`
+- [ ] (must-fix) Deployment branch never pushed before `gh pr create`; start-deployment creates worktree without --plan-file (local-only branch), repo has two remotes so gh can't auto-pick — add explicit `git push -u origin <branch>` — `.claude/skills/wrap-up-deployment/SKILL.md:395`
+- [ ] (must-fix) Renamed mislabeled log's old-path deletion unstaged: shell-glob `git add` only sees existing files — use `git mv` or `git add -A <log_dir>/<YYYY>/` — `.claude/skills/wrap-up-deployment/SKILL.md:234,299`
+- [ ] (suggestion) Editing field logs in place (6a) before merging gitcloud (7a) guarantees a merge conflict on every corrected log; merge first or document expected-conflict resolution — `.claude/skills/wrap-up-deployment/SKILL.md:216,343`
+- [ ] (suggestion) Worktree removed (step 8) before RCA filing (step 9) breaks `gh` origin auto-detection; file RCA before removal or pass `-R <owner/repo>` — `.claude/skills/wrap-up-deployment/SKILL.md:471,477`
+- [ ] (suggestion) gitcloud reconcile doesn't confirm PR actually merged before re-fetch/ancestor-check; poll `gh pr view --json state` for MERGED first — `.claude/skills/wrap-up-deployment/SKILL.md:423`
+- [ ] (suggestion) Broken reference link: `import-field-changes` is a skill, not `.agent/scripts/`; point to `.claude/skills/import-field-changes/SKILL.md` — `.claude/skills/wrap-up-deployment/SKILL.md:558`
+- [ ] (suggestion) Surface `/import-field-changes`'s own config prereq (`.agent/project_config.yaml:field_remote`, different file than deployment.yaml) — `.claude/skills/wrap-up-deployment/SKILL.md:363`
+- [ ] (suggestion) deployment_mode.md phase [3] lists bag-DB extraction/analyses as wrap-up work, contradicting SKILL's explicit out-of-scope (#435); add a parenthetical — `.agent/knowledge/deployment_mode.md:~141`
