@@ -76,8 +76,13 @@ the skill puts the contract in context. The fuller treatment below explains
    durable lie the wrap-up integration and downstream analysis will trust;
    for an operator-reported event, `date`-stamp when you log it and mark
    their time `~HH:MM (operator-reported)`. (And `date '+…'`, not
-   `date | sed`.) The `start-deployment` skill provides a `dlog` helper that
-   bakes `date` into each entry so this is the easy path.
+   `date | sed`.) Use the committed `.agent/scripts/dlog.sh <logfile>
+   <message>` helper — it bakes `date` into each entry and, allowlisted
+   once (`Bash(<workspace_root>/.agent/scripts/dlog.sh:*)`), makes
+   prompt-free logging the easy path.
+   The Edit tool is **not** a substitute: it dodges the prompt but cannot
+   run `date`, forcing a typed (inaccurate) time — the very failure this
+   rule prevents (see #515 / #516).
 7. **Sterile cockpit.** During live on-water ops, do *only* operation-essential
    work — no doc polish, refactors, or "while we're here" cleanups. Write
    them down for wrap-up.

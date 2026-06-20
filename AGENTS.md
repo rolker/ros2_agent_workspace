@@ -462,6 +462,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
+| `.agent/scripts/dlog.sh` | Prompt-free, `date`-stamped deployment log appender (`dlog.sh <logfile> <message>`); allowlist once for prompt-free + accurate live-ops logging (#515/#516) |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dispatch_subagent.sh` | Dispatch a workflow skill into a fresh-context sub-agent (in-process or container); reads the progress.md exit contract |
 | `.agent/scripts/docker_run_agent.sh` | Launch the sandboxed agent container for a worktree; interactive or headless dispatch (`--prompt`/`--prompt-file`, `--model`), reads `CLAUDE_CODE_OAUTH_TOKEN`. `--build` also stages layer `package.xml` manifests into the image build context to bake their rosdep deps (#520) |

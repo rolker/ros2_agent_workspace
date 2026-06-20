@@ -298,22 +298,35 @@ Any title / body / log-stamp warnings emitted below append to this
 file. It is the canonical sink for field-side drift warnings; dev side
 also appends here for parity.
 
-**Append entries with a `date`-baked helper.** Define this once after
-creating the log file, then use it for every entry so a measured
-timestamp is the path of least resistance (rule 6 — never type times by
-hand):
+**Append entries with the committed `dlog` helper** —
+`<workspace_root>/.agent/scripts/dlog.sh`. It bakes the timestamp from
+`date` at write time (never typed, never approval-delayed) and appends
+one entry, so a measured timestamp is the path of least resistance
+(rule 6 — never type times by hand):
 
 ```bash
 LOGFILE="<project_repo>/<log_dir>/<YYYY>/<YYYY-MM-DD>_<label>_logs.md"
-dlog() { printf '\n**%s** — %s\n' "$(date '+%Y-%m-%d %H:%M %:z')" "$1" >> "$LOGFILE"; }
-dlog "charger disconnected; controls check good; going to launch"
+<workspace_root>/.agent/scripts/dlog.sh "$LOGFILE" "charger disconnected; controls check good; going to launch"
 ```
 
+`$LOGFILE` does not survive across the agent's separate Bash invocations
+(fresh subshell each call), so pass the **literal log-file path** to
+`dlog.sh` every time — the path is stable for the deployment.
+
+**Allowlist it once** so live-ops logging is prompt-free: add
+`Bash(<workspace_root>/.agent/scripts/dlog.sh:*)` to
+`.claude/settings.local.json` (one generic entry, reused across every
+deployment — *not* a per-deployment script). **Do not substitute the Edit
+tool for logging:** it avoids the prompt but cannot run `date`, so it
+forces a *typed* timestamp — the inaccurate, approval-skewed "durable
+lie" times #515 exists to prevent. `dlog.sh` is the only method that is
+both prompt-free *and* accurately stamped.
+
 For an event the operator reports after the fact — whose time you did
-**not** measure — let `dlog` stamp when you're recording it and put the
+**not** measure — let `dlog.sh` stamp when you're recording it and put the
 operator's time in the text, marked approximate:
-`dlog "in water (operator-reported ~12:35)"`. Never back-fill the
-header timestamp to the operator's time; the header is when *you* logged.
+`dlog.sh "$LOGFILE" "in water (operator-reported ~12:35)"`. Never
+back-fill the stamp to the operator's time; the stamp is when *you* logged.
 
 **Verify the issue title** (form: `Deployment <YYYY-MM-DD>: <scope>`):
 
