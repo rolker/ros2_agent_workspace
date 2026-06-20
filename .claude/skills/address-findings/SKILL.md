@@ -70,9 +70,11 @@ python3 .agent/scripts/progress_read.py \
 
 `progress_read.py` emits JSON. Consider only entries whose `base_type` is
 **`Integrated Review`** or **`Local Review (Pre-Push)`** — *not* the raw
-`--type` match, which also surfaces legacy `## External Review` (Integrated
-Review's recognized predecessor) and the post-PR `## Local Review`, neither of
-which this skill acts on. Take the **single latest** such entry — the *source
+`--type` match, which for `"Integrated Review"` also surfaces legacy
+`## External Review` (its recognized predecessor), which this skill must not
+act on. (`--type "Local Review (Pre-Push)"` matches only that exact heading —
+it does **not** also return the post-PR `## Local Review`, which `run-issue`
+never produces here anyway.) Take the **single latest** such entry — the *source
 review entry* — and act only on it; never merge findings across entries or fall
 back to an older one (so a stale pre-push review is ignored once a later
 Integrated Review exists, and vice-versa). Then:
@@ -88,6 +90,17 @@ Integrated Review exists, and vice-versa). Then:
   in `findings[]` — no special handling needed.)
 - **No unchecked findings** in the source review entry: report "nothing to
   address — the latest review has no open actions" and exit without a commit.
+
+> **"Latest" is progress.md append order** — entries are appended chronologically,
+> so the last qualifying entry in file order is the most recent review. (The
+> `run-issue` loop never reorders the file.)
+>
+> **Pre-push actions *all* unchecked findings — including suggestions.** Post-PR
+> `triage-reviews` curates which findings become `- [ ]` actions; pre-push
+> `review-code` writes both must-fix *and* suggestions as unchecked checkboxes,
+> so address-findings will action the suggestions too. That's intended (suggestions
+> on your own pre-push diff are cheap to apply) — defer any you disagree with via
+> the Step 3.2 `(deferred: …)` path rather than skipping them.
 
 ### 3. Address each open finding
 

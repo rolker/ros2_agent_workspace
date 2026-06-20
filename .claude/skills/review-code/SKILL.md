@@ -917,6 +917,12 @@ Key points:
 
 Lifecycle: **Local Review** → push / open PR → **triage-reviews**
 
+That path is for an **approved** pre-push review. If the verdict is
+**changes-requested**, the host (`/run-issue`) instead dispatches
+**`address-findings`** to work the open findings from this
+`## Local Review (Pre-Push)` entry, then re-dispatches `review-code` — the diff
+is not pushed until a pre-push review comes back **approved**.
+
 Once findings are addressed and the branch is pushed (or a PR opened), hand off
 to the next phase in a **fresh-context sub-agent** — independence between
 lifecycle steps is what makes the timeline trustworthy. Use the dispatcher:

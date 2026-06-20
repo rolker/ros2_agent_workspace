@@ -64,6 +64,9 @@ decision table from the completion notification. **Don't poll** a
 harness-tracked background dispatch (the completion signal is automatic) — only
 poll genuinely external state. In-process (`Agent`-tool) phases already return
 control to the host's turn, so this applies specifically to the container path.
+When backgrounded, the dispatcher's `FAILED` / exit-contract report arrives
+**with the completion notification** (and in the task's captured output) — read
+it there and stop-and-surface, exactly as for a foreground dispatch.
 
 The dispatcher already verifies the sub-agent wrote the expected entry type
 (PRE/POST entry-count delta — `dispatch_subagent.sh:216-282`); treat a `FAILED`
@@ -155,6 +158,13 @@ warranted only when a fix needs operator ground truth the sub-agent can't have
 (a convention learned from live operations, say); then make the edits, commit,
 and re-dispatch `review-code` directly. (To convey ground truth *to*
 `address-findings` instead, leave it as a note in the review entry it reads.)
+
+The `address-findings` ⇄ `review-code` loop has **no built-in round cap yet** —
+a convergence / ship-recommendation signal is tracked in
+[#537](https://github.com/rolker/ros2_agent_workspace/issues/537). Until it
+lands, after ~2–3 rounds the host should **surface the loop state to the
+operator** (remaining-finding severity, ship-vs-continue) rather than spinning —
+especially for guidance-doc diffs, where review can demand precision indefinitely.
 
 ## Checkpoints
 
