@@ -80,9 +80,14 @@ skill_model() {
 }
 
 # Entry-type -> model, for raw-prompt (--prompt-file) dispatches that carry no
-# --skill to map. Mirrors skill_model's tiers: reasoning-heavy review/implement
-# entries get Opus; lighter ones Sonnet. Without this a custom-prompt dispatch
-# silently defaulted to Sonnet even for an Implementation / review pass (#539).
+# --skill to map. Without this a custom-prompt dispatch silently defaulted to
+# Sonnet even for an Implementation / review pass (#539).
+#
+# KEEP THE TIERS IN SYNC WITH skill_model() — each entry type is written by a
+# skill, and the two must agree on its model: Local Review*(review-code),
+# Integrated Review(triage-reviews), Implementation(implement/address-findings),
+# Plan Review(review-plan) -> opus; Issue Review(review-issue),
+# Plan Authored(plan-task) -> sonnet. test_dispatch_model.sh asserts this parity.
 entry_type_model() {
     case "$1" in
         Implementation|"Local Review"|"Local Review (Pre-Push)"|"Integrated Review"|"Plan Review") echo "opus" ;;
@@ -130,8 +135,8 @@ preflight_check() {
         ok=1
     fi
     echo "  GitHub token (optional — container reads only; the host publishes):"
-    if [ -n "${GH_TOKEN:-}" ]; then
-        echo "    ok  \$GH_TOKEN set in env"
+    if [ -n "${AGENT_GH_TOKEN:-}" ]; then
+        echo "    ok  \$AGENT_GH_TOKEN set in env"
     elif [ -s "$GH_TOKEN_FILE" ]; then
         echo "    ok  $GH_TOKEN_FILE"
     else
@@ -170,8 +175,9 @@ done
 # ---------- Auth preflight (#532): `--check` runs standalone and exits ----------
 
 if [ -n "$CHECK" ]; then
-    preflight_check
-    exit $?
+    # Explicit if/else: under `set -e` a bare `preflight_check` returning
+    # non-zero would exit before `exit $?` ran (making it partly dead code).
+    if preflight_check; then exit 0; else exit 1; fi
 fi
 
 # ---------- Validation ----------
@@ -267,8 +273,9 @@ with its own credentials. Never write credentials/tokens (e.g.
 \`\$CLAUDE_CODE_OAUTH_TOKEN\`) into files, commits, or output.
 
 **Your runtime model** is **$MODEL_DISPLAY** (dispatched with \`--model $MODEL\`).
-Stamp exactly that string in the \`**By**:\` line of your progress.md entry — do
-NOT invent or guess a version number (e.g. never "Opus 4.6").
+Stamp **exactly that string** in the \`**By**:\` line of your progress.md entry —
+do not add to or embellish it (never expand "Claude Opus" into a guessed
+"Opus 4.6"; if a pinned model id was given, stamp it verbatim).
 
 **Exit contract** — before you finish, $ENTRY_CLAUSE:
 

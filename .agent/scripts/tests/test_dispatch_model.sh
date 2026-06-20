@@ -34,9 +34,15 @@ check "Issue Review -> sonnet"            sonnet "$(entry_type_model 'Issue Revi
 check "Plan Authored -> sonnet"           sonnet "$(entry_type_model 'Plan Authored')"
 check "unknown entry-type -> sonnet"      sonnet "$(entry_type_model 'Whatever')"
 
-# parity with skill_model: review/implement skills are Opus, lighter ones Sonnet
-check "skill review-code -> opus"         opus   "$(skill_model 'review-code')"
-check "skill review-issue -> sonnet"      sonnet "$(skill_model 'review-issue')"
+# Drift guard: each entry type's model MUST equal the model of the skill that
+# writes it (the two case statements must not diverge — see #539 / the
+# keep-in-sync comment on entry_type_model).
+check "parity Local Review (Pre-Push) == review-code"  "$(skill_model review-code)"     "$(entry_type_model 'Local Review (Pre-Push)')"
+check "parity Integrated Review == triage-reviews"     "$(skill_model triage-reviews)"  "$(entry_type_model 'Integrated Review')"
+check "parity Implementation == address-findings"      "$(skill_model address-findings)" "$(entry_type_model 'Implementation')"
+check "parity Plan Review == review-plan"              "$(skill_model review-plan)"     "$(entry_type_model 'Plan Review')"
+check "parity Issue Review == review-issue"            "$(skill_model review-issue)"    "$(entry_type_model 'Issue Review')"
+check "parity Plan Authored == plan-task"             "$(skill_model plan-task)"       "$(entry_type_model 'Plan Authored')"
 
 # #540 — version-less display names
 check "display opus"                      "Claude Opus"   "$(model_display opus)"
