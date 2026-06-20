@@ -29,19 +29,32 @@ development-pipeline step. ADR-0013 governs the development pipeline only.
    2. Verify dev-side (wrap-up must run on dev — `gh` access required for closing the issue)
    3. Find the open deployment issue via `gh issue list --label deployment`
    4. Collect all per-host log files for this deployment (match on `<start-date>_*_logs.md`)
-   5. Import field changes via `/import-field-changes` (each field host's repo)
-   6. Review and merge field-import PRs (standard review-loop flow)
-   7. Consolidate — add a `## Wrap-up` summary to the dev log; stamp the
-      deployment issue body with a summary (bag references, outcomes, follow-up
-      issue links); `dlog.sh` for all entries
-   8. File deferred analysis sub-issues from deployment logs (items marked
-      "deferred to wrap-up" during live ops)
-   9. Close the deployment issue: `gh issue close <N> --comment "Wrap-up complete."`
+   5. **Operator-correction interview — ONE QUESTION AT A TIME** (new, highest-value step):
+      interview the operator before consolidating to catch field-agent misreads —
+      misdated/mislabeled logs, wrong root-causes, agent overreach, premature conclusions.
+      Ask one question, wait for the answer, then the next.
+   6. Consolidate the dev log — append `## Summary`, `## Operator Corrections`,
+      `## Lessons Learned`, `## RCA / Follow-up Backlog`; fix misdated/mislabeled field
+      logs **in place**; use `dlog.sh` for timestamped entries.
+   7. **Reconcile field code — two distinct mechanisms** (clarified from original 7-step plan):
+      a. **SHA-preserving merge** of `gitcloud/<default_branch>` INTO the deployment branch
+         (`git merge`, NOT cherry-pick/squash) — for the primary deployment repo.
+         After the wrap-up PR merges to `<default_branch>`, gitcloud reconciles by
+         fast-forward: `git push gitcloud origin/<default_branch>:<default_branch>`.
+      b. **`/import-field-changes`** for OTHER repos that received field commits
+         (nav, sensors, etc.) — that skill opens per-repo import PRs.
+   8. PR (`Closes #<N>`) → merge (merge commit, NOT squash) → reconcile gitcloud →
+      remove the worktree.
+   9. File genuinely-NEW RCA issues selectively — dedup-check existing issues first;
+      close stale deployment issues. Do NOT over-file.
 
    ADR-0003 compliance: SKILL.md must not embed platform-specific paths, host
    names, or bag-extraction commands — these come from `.agents/deployment.yaml`.
-   The skill reads the `log_dir` key and `issue_sync.dev_push` as needed;
-   bag-extraction specifics are out of scope for v1.
+   The skill reads the `log_dir` key and `issue_sync.dev_push` as needed.
+   Bag-extraction/analysis is explicitly stated as operator-driven and out of
+   scope for v1 (deferred to debrief checklist #435).
+   `issue_sync`/`dev_push` absence is graceful — dev-side `issue_sync` is optional,
+   mirroring `start-deployment`.
 
 2. **Update `AGENTS.md` lines 254-255** — replace the placeholder "The wrap-up
    half (`/wrap-up-deployment`) and recovery checklist are tracked under umbrella
