@@ -47,3 +47,19 @@ Issue proposes creating `.claude/skills/wrap-up-deployment/SKILL.md` + AGENTS.md
 
 ### Open questions
 - [ ] Should `.agents/deployment.yaml` gain a `wrap_up:` section for project-specific steps (bag extraction commands, analysis scripts)? V1 defers bag extraction to operator/debrief (#435); out of scope unless a project has concrete needs.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-20 13:34 +00:00
+**By**: Claude Code Agent (Claude Opus 4.6) (in-context — author self-review)
+
+**Plan**: `.agent/work-plans/issue-530/plan.md` at `7cc1133`
+**PR**: PR-less (--issue mode; dispatched sub-agent review)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) Make `issue_sync`/`dev_push` absence graceful in SKILL.md — dev-side optional per `deployment_config.yaml:79-81`; mirror `start-deployment` — `plan.md:40`
+- [ ] (suggestion) Open the ADR-0014 Status-flip ("Proposed"→"Accepted") follow-up issue rather than leaving it implicit — `plan.md:102`
+- [ ] (suggestion) State bag-extraction/analysis as operator-driven / out-of-scope for v1 in SKILL.md so adopters see the deferral — `plan.md:108-112`
+
+Plan is well-scoped, addresses all review-issue findings, and correctly resolves the ADR-0003 (project-agnostic config) and ADR-0013 (no per-issue progress entry) risks. Config keys referenced (`log_dir`, `issue_sync.dev_push`) verified against the template. Ready for implementation; the three items are refinements, not blockers.
