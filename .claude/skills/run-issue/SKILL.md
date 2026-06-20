@@ -54,6 +54,26 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
   specialist fan-out, or implementation that benefits from a clean OS). Container
   mode is headless and self-contained, so it needs no host `Agent` tool.
 
+**Dispatch container phases in the *background* so the host stays available.**
+A synchronous (foreground) container dispatch blocks the host's turn for the
+entire phase — a review-issue / review-code / implement run is minutes — leaving
+the operator unable to chat or redirect the whole time. Launch the container
+dispatch as a **background task**; the host runtime re-invokes the orchestrator
+on completion, so the host stays responsive between phases and resumes the
+decision table from the completion notification. **Don't poll** a
+harness-tracked background dispatch (the completion signal is automatic) — only
+poll genuinely external state. In-process (`Agent`-tool) phases already return
+control to the host's turn, so this applies specifically to the container path.
+When backgrounded, the dispatcher's `FAILED` / exit-contract report arrives
+**with the completion notification** (and in the task's captured output) — read
+it there and stop-and-surface, exactly as for a foreground dispatch. **Gate on
+that report before routing on the timeline**: a FAILED dispatch may have written
+no entry (or a stale one), so acting on `progress.md` without first checking the
+dispatch outcome risks routing on the wrong state. Background re-invocation
+relies on the host runtime delivering a completion callback; a runtime without
+one must drive phases foreground / manually (the same caveat as the `Agent` tool
+above).
+
 The dispatcher already verifies the sub-agent wrote the expected entry type
 (PRE/POST entry-count delta — `dispatch_subagent.sh:216-282`); treat a `FAILED`
 report as a stop-and-surface, not a silent retry. After each dispatch, read the
@@ -98,11 +118,11 @@ Read the **last** progress.md entry; act per its type + verdict:
 | `## Plan Authored` | — | dispatch `review-plan` | — |
 | `## Plan Review` | any verdict | run implementation, then `review-code` | **always** |
 | `## Local Review (Pre-Push)` | `approved` | push → open PR (or field-push) | **yes** (before publish) |
-| `## Local Review (Pre-Push)` | `changes-requested` | address inline, re-dispatch `review-code` | maybe |
+| `## Local Review (Pre-Push)` | `changes-requested` | dispatch `address-findings`, then re-dispatch `review-code` | maybe |
 | (PR published) | review comments landed | dispatch `triage-reviews` | **yes** (async wait) |
 | `## Integrated Review` | open findings remain | dispatch `address-findings` | **yes** (non-trivial findings) |
 | `## Integrated Review` | none | merge | **yes** (before merge) |
-| `## Implementation` **preceded by** `## Integrated Review` | — | dispatch `review-code` (re-review) | — |
+| `## Implementation` **preceded by** `## Integrated Review` or `## Local Review (Pre-Push)` | — | dispatch `review-code` (re-review) | — |
 
 **`## Local Review (Pre-Push)` is the exact heading** every pre-push
 `review-code` writes, and **the orchestrator only ever dispatches `review-code`
@@ -120,8 +140,9 @@ none ⇒ merge checkpoint).
 
 **Shared `## Implementation` routing key**: `## Implementation` is written by
 both `address-findings` and a future `implement` skill. Disambiguate by the
-**preceding** entry — a `## Integrated Review` immediately before means this was
-an address-findings pass, so the next action is a re-review.
+**preceding** entry — a `## Integrated Review` **or `## Local Review (Pre-Push)`**
+immediately before means this was an address-findings pass (post-PR or pre-push
+respectively), so the next action is a re-review.
 
 **Implementation phase**: there is no `implement` skill yet. After
 `## Plan Review`, the host runs implementation **inline** (edits, commits,
@@ -131,6 +152,27 @@ swap the inline step for a dispatch — **and add a table row** for a bare
 implementation pass ⇒ dispatch `review-code`). That state is unreachable today
 (inline implementation writes no such entry before the host itself runs
 `review-code`), so the table has no row for it yet.
+
+**The changes-requested fix pass uses `address-findings`, not host-inline
+editing.** When pre-push `review-code` returns `changes-requested`, dispatch
+`address-findings` — it reads the open findings straight from the latest
+`## Local Review (Pre-Push)` entry, applies them, and writes `## Implementation`
+— then re-dispatch `review-code`. Prefer this over hand-authoring a per-round
+fix prompt: the findings are already structured in `progress.md`, so re-encoding
+them by hand is wasted host effort. **Host-inline editing is the exception**,
+warranted only when a fix needs operator ground truth the sub-agent can't have
+(a convention learned from live operations, say); then make the edits, commit,
+and re-dispatch `review-code` directly. (To convey ground truth *to*
+`address-findings` instead, leave it as a note in the review entry it reads.)
+
+The `address-findings` ⇄ `review-code` loop has **no built-in round cap yet** —
+a convergence / ship-recommendation signal is tracked in
+[#537](https://github.com/rolker/ros2_agent_workspace/issues/537). Until it
+lands, after ~2–3 rounds the host should **surface the loop state to the
+operator** (remaining-finding severity, ship-vs-continue) rather than spinning —
+especially for guidance-doc diffs, where review can demand precision
+indefinitely. The round number is just the count of `## Local Review (Pre-Push)`
+entries in `progress.md` — a cheap durable counter the host can read at any time.
 
 ## Checkpoints
 
