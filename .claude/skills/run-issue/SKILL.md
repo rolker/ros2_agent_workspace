@@ -165,14 +165,17 @@ warranted only when a fix needs operator ground truth the sub-agent can't have
 and re-dispatch `review-code` directly. (To convey ground truth *to*
 `address-findings` instead, leave it as a note in the review entry it reads.)
 
-The `address-findings` ⇄ `review-code` loop has **no built-in round cap yet** —
-a convergence / ship-recommendation signal is tracked in
-[#537](https://github.com/rolker/ros2_agent_workspace/issues/537). Until it
-lands, after ~2–3 rounds the host should **surface the loop state to the
-operator** (remaining-finding severity, ship-vs-continue) rather than spinning —
-especially for guidance-doc diffs, where review can demand precision
-indefinitely. The round number is just the count of `## Local Review (Pre-Push)`
-entries in `progress.md` — a cheap durable counter the host can read at any time.
+The `address-findings` ⇄ `review-code` loop has no hard round cap — instead,
+each pre-push `review-code` now emits a **`Round`** + a **`Ship: recommended |
+continue`** verdict in its `## Local Review (Pre-Push)` entry (the convergence
+signal, [#537](https://github.com/rolker/ros2_agent_workspace/issues/537)).
+**Route on it**: `Ship: recommended` means address any remaining must-fixes and
+publish rather than spin another full round; `Ship: continue` means another
+independent read is worth it. When the verdict is `recommended` (or after ~2–3
+rounds regardless), **surface the loop state to the operator** (remaining-finding
+severity, ship-vs-continue) rather than looping — especially for guidance-doc
+diffs, where review can demand precision indefinitely. (`Round` is the count of
+`## Local Review (Pre-Push)` entries in `progress.md` — a cheap durable counter.)
 
 ## Checkpoints
 

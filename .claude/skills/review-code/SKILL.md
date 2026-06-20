@@ -707,9 +707,46 @@ Collect all findings from all dispatched specialists and filter:
      consequences
    - **Suggestion** — improvements worth the author's time
    - Drop anything below suggestion threshold.
+   - **Guidance-doc calibration (#537).** When the changed file is a
+     *guidance document* — prose an agent reads and *adapts* (a
+     `.claude/skills/**/SKILL.md`, a `.agent/knowledge/` doc, an ADR) rather
+     than code it *executes verbatim* — apply a lighter bar: a finding an agent
+     following the procedure would obviously catch or adapt on its own is a
+     **Suggestion, not a Must-fix**. Reserve Must-fix for guidance that would
+     actively mislead — a command that fails silently, a wrong path/flag, an
+     internal contradiction, a missing consequence. A SKILL.md is applied with
+     judgment, not executed literally; holding prose to executable-grade
+     precision is what makes a review loop fail to converge. (Genuinely
+     executable snippets *inside* a guidance doc — a copy-paste command block —
+     keep the code bar.)
 5. **Silence check** — if no findings survive the filter, report "No
    issues found." Don't invent feedback to fill the report. Target: ≥85%
    of reported findings should be actionable.
+
+**Convergence assessment (pre-push, #537).** Before writing the report, in
+pre-push mode, assess whether the review loop is converging — so the host
+(`/run-issue`) gets a ship-vs-continue signal instead of looping a guidance-doc
+review indefinitely:
+
+- **Round** = the count of prior `## Local Review (Pre-Push)` entries for this
+  branch in `progress.md`, plus 1 (this review). Round 1 has no prior entry.
+- **Ship verdict**:
+  - **recommended** when there are **no Must-fix** findings (only Suggestions,
+    or nothing) — the diff is shippable; remaining Suggestions can be applied or
+    tracked.
+  - **recommended** at **round ≥ 2** when the Must-fix count is **low and not
+    rising** versus the previous round and the remaining must-fixes are
+    mechanical/clear (low ≈ **≤ 2** must-fixes, each a precise file:line fix with
+    an obvious correction — not a design question) — recommend addressing them
+    and shipping rather than another full round (each round costs a container
+    cycle for diminishing return, especially on guidance docs after the
+    calibration above).
+  - **continue** when Must-fix is **rising, high, or includes a genuine
+    design / correctness concern** that warrants another independent read.
+- Surface the round, verdict, and a one-line reason in the report header
+  (`Round`) and Summary, and in the `progress.md` entry (step 8), so the
+  orchestrator can route on it. The verdict is **advisory** — the operator/host
+  decides; this skill never blocks a ship.
 
 ### 7. Produce the report
 
@@ -722,6 +759,7 @@ Collect all findings from all dispatched specialists and filter:
 **Repo**: workspace | <project-repo>
 **Files changed**: <count> (+<additions> -<deletions>)
 **Review depth**: <Light|Standard|Deep> (reason: <primary signal>)
+**Round**: <N> (pre-push) — **Ship: <recommended | continue>** (see Convergence)
 **Static analysis**: <run | skipped (--skip-static)>
 **Claude Adversarial**: <1 pass (Lens A) | 2 passes (Lens A + Lens B)>
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
@@ -778,6 +816,7 @@ Existing Review Comments sections. Use:
 
 **PR / Branch**: ...
 **Review depth**: Light (reason: <primary signal>)
+**Round**: <N> (pre-push) — **Ship: <recommended | continue>**   <!-- pre-push only; see Convergence assessment -->
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Claude Adversarial**: 1 pass (Lens A)
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
@@ -880,6 +919,7 @@ timeline without one overwriting the other. Append only one header line
 **Mode**: <pre-push | post-PR>
 **Depth**: <tier> (reason: <signal>)
 **Must-fix**: <count> | **Suggestions**: <count>
+**Round**: <N> | **Ship**: <recommended | continue> — <one-line reason>  <!-- pre-push only; from the Convergence assessment (#537) -->
 
 ### Findings
 - [ ] (must-fix) <one-line summary> — `file:line`
