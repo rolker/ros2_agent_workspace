@@ -78,7 +78,8 @@ the skill puts the contract in context. The fuller treatment below explains
    their time `~HH:MM (operator-reported)`. (And `date '+…'`, not
    `date | sed`.) Use the committed `.agent/scripts/dlog.sh <logfile>
    <message>` helper — it bakes `date` into each entry and, allowlisted
-   once (`Bash(.../dlog.sh:*)`), makes prompt-free logging the easy path.
+   once (`Bash(<workspace_root>/.agent/scripts/dlog.sh:*)`), makes
+   prompt-free logging the easy path.
    The Edit tool is **not** a substitute: it dodges the prompt but cannot
    run `date`, forcing a typed (inaccurate) time — the very failure this
    rule prevents (see #515 / #516).

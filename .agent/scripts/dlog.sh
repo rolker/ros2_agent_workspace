@@ -4,8 +4,8 @@
 #
 # Bakes the timestamp from `date` at WRITE time (never typed, never
 # approval-delayed) and appends one entry to a deployment log file. Allowlist
-# this ONE script -- Bash(.agent/scripts/dlog.sh:*) -- and every log entry is
-# then prompt-free AND carries a measured timestamp.
+# this ONE script -- Bash(<workspace_root>/.agent/scripts/dlog.sh:*) -- and
+# every log entry is then prompt-free AND carries a measured timestamp.
 #
 # Why a script (not the Edit tool): the Edit tool avoids per-entry permission
 # prompts (#516) but cannot run `date`, so the agent must TYPE the timestamp --
@@ -43,11 +43,20 @@ LOGFILE="$1"
 shift
 MSG="$*"
 
+# Reject an empty / whitespace-only message -- writing a contentless entry is a
+# silent live-ops logging failure (the contract is "fail loud on bad usage").
+if [[ ! "$MSG" =~ [^[:space:]] ]]; then
+    echo "dlog.sh: empty log message" >&2
+    exit 2
+fi
+
 if [[ ! -d "$(dirname "$LOGFILE")" ]]; then
     echo "dlog.sh: log directory does not exist: $(dirname "$LOGFILE")" >&2
     exit 1
 fi
 
+# %:z (colon timezone offset, e.g. -04:00) is a GNU coreutils `date` extension --
+# fine on the Linux dev/field hosts; would emit a literal "%:z" on BSD/macOS.
 TS="$(date '+%Y-%m-%d %H:%M %:z')"
 printf '\n**%s** — %s\n' "$TS" "$MSG" >> "$LOGFILE"
 printf 'logged: %s — %s\n' "$TS" "$MSG"

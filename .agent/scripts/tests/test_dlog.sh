@@ -23,14 +23,17 @@ trap 'rm -rf "$TMPD"' EXIT
 LOG="$TMPD/2026-01-01_dev_logs.md"
 : > "$LOG"
 
-# 1. appends a well-formed entry stamped with a real `date` value
+# 1. appends an entry stamped with the CURRENT (measured) date -- not just any
+#    well-formed timestamp. A frozen/typed stamp (the exact #515 failure) would
+#    pass a format-only check; pinning today's date catches it.
+TODAY="$(date '+%Y-%m-%d')"
 out=$("$DLOG" "$LOG" "boat in water" 2>&1); rc=$?
 if [ "$rc" -eq 0 ] \
-    && grep -qE '^\*\*[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} [+-][0-9]{2}:[0-9]{2}\*\* ' "$LOG" \
+    && grep -qE "^\\*\\*${TODAY} [0-9]{2}:[0-9]{2} [+-][0-9]{2}:[0-9]{2}\\*\\* " "$LOG" \
     && grep -q 'boat in water' "$LOG"; then
-    pass "appends a timestamped, well-formed entry"
+    pass "appends an entry stamped with the current date (measured, not frozen)"
 else
-    fail "appends a timestamped, well-formed entry (rc=$rc, out=$out)"
+    fail "appends an entry stamped with the current date (rc=$rc, out=$out)"
 fi
 
 # 2. multi-arg message is joined, not dropped
@@ -51,6 +54,16 @@ fi
 # 4. logfile but no message -> usage error, exit 2
 "$DLOG" "$LOG" > /dev/null 2>&1
 [ "$?" -eq 2 ] && pass "missing message exits 2" || fail "missing message exits 2"
+
+# 4b. empty / whitespace-only message -> exit 2 and write nothing (no contentless entry)
+before=$(grep -cE '^\*\*[0-9]' "$LOG")
+"$DLOG" "$LOG" "   " > /dev/null 2>&1; rc=$?
+after=$(grep -cE '^\*\*[0-9]' "$LOG")
+if [ "$rc" -eq 2 ] && [ "$before" -eq "$after" ]; then
+    pass "empty/blank message exits 2 and writes nothing"
+else
+    fail "empty/blank message exits 2 and writes nothing (rc=$rc, before=$before after=$after)"
+fi
 
 # 5. no args -> usage error, exit 2
 "$DLOG" > /dev/null 2>&1
