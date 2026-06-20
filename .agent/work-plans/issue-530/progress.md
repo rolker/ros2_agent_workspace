@@ -82,3 +82,27 @@ Also updated AGENTS.md "Deployment mode" section (replaced #495 placeholder with
 - `.agent/instructions/gemini-cli.instructions.md` — `wrap-up-deployment` added to skill list
 - `.agent/AGENT_ONBOARDING.md` — `wrap-up-deployment` added to skill list
 - `.agent/work-plans/issue-530/plan.md` — synced to reflect 9-step flow
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-20 14:14 +00:00
+**By**: Claude Code Agent (Claude Opus 4.8)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-530 at `6b09e11`
+**Mode**: pre-push
+**Depth**: Deep (reason: 455-line new SKILL.md / 743 lines >200 + governance-trigger files)
+**Must-fix**: 6 | **Suggestions**: 5
+
+### Findings
+- [ ] (must-fix) Step-8/7a git ops don't specify the project-repo worktree (gitcloud/origin remotes live there, not workspace root); add `git -C` — `.claude/skills/wrap-up-deployment/SKILL.md:292,355`
+- [ ] (must-fix) gitcloud push assumes unconditional fast-forward; no `--ff-only`/re-fetch guard for a gitcloud that advances during the long wrap-up window — `.claude/skills/wrap-up-deployment/SKILL.md:356`
+- [ ] (must-fix) Draft PR cannot be merged: `--draft` create then immediate `gh pr merge --merge`; need `gh pr ready` or drop `--draft` — `.claude/skills/wrap-up-deployment/SKILL.md:330,345`
+- [ ] (must-fix) Operator corrections + dev-log sections are staged/written but step 8 has no `git commit` before `gh pr create` → corrections never enter PR, lost on worktree removal — `.claude/skills/wrap-up-deployment/SKILL.md:225,320`
+- [ ] (must-fix) No idempotency/interruption recovery across irreversible step 8 (PR-merge closes issue; re-run is stranded, worktree orphaned) — `.claude/skills/wrap-up-deployment/SKILL.md:320`
+- [ ] (must-fix) Consequence miss: knowledge doc still calls `/wrap-up-deployment` a future follow-up in 3 places — `.agent/knowledge/deployment_mode.md:25,239,303`
+- [ ] (suggestion) Treat `issue_sync.dev_push == "TODO"` as absent so step 8 doesn't run `TODO` as a shell command — `.claude/skills/wrap-up-deployment/SKILL.md:362`
+- [ ] (suggestion) Re-fetch gitcloud before 7a merge, handle fetch failure, document `git merge --abort` safe-out — `.claude/skills/wrap-up-deployment/SKILL.md:136,292`
+- [ ] (suggestion) Verify gitcloud push succeeded before removing the worktree (removal destroys retry context) — `.claude/skills/wrap-up-deployment/SKILL.md:355`
+- [ ] (suggestion) `rca` label may not exist; create-or-skip when filing RCA issues — `.claude/skills/wrap-up-deployment/SKILL.md:404`
+- [ ] (suggestion) `ls` log glob errors on no-match; add "if none, note and continue" guard — `.claude/skills/wrap-up-deployment/SKILL.md:145`
