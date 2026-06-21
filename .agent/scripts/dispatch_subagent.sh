@@ -144,6 +144,60 @@ resolve_progress_file() {
     else printf '%s\n' "$wt/.agent/work-plans/issue-$issue/progress.md"; fi
 }
 
+# Return the LAST matching entry's `when|status` signature (Gap 2, #552). Uses
+# the SAME match predicate as entry_count (full type == want, base_type == want,
+# OR type startswith want) so the freshness gate keys on the same entry the
+# count gate does. Empty string when the file is absent or no entry matches.
+# Lives above the source-guard so the regression test can source + call it
+# without docker.
+#
+# The signature is `when|status` (operator decision, #552: `by` dropped). A
+# same-minute/same-status re-dispatch yields an IDENTICAL signature and so reads
+# as not-fresh => FAILED. That is FAIL-CLOSED (the safe direction: a genuinely
+# stuck re-dispatch is the far more likely cause of a same-minute/same-status
+# flat count than a real success), and is the accepted trade-off.
+last_entry_signature() {
+    local progress_file="$1" want="${2:-}"
+    [ -f "$progress_file" ] || { printf '%s' ""; return 0; }
+    python3 "$SCRIPT_DIR/progress_read.py" "$progress_file" 2>/dev/null \
+        | ENTRY_TYPE="$want" python3 -c 'import os,sys,json
+want = os.environ.get("ENTRY_TYPE", "")
+try: entries = json.load(sys.stdin).get("entries", [])
+except Exception: print(""); sys.exit(0)
+def match(e):
+    t = e.get("type") or ""
+    return (not want) or t == want or e.get("base_type") == want or t.startswith(want)
+m = [e for e in entries if match(e)]
+if m:
+    e = m[-1]
+    print("%s|%s" % ((e.get("when") or ""), (e.get("status") or "")))
+else:
+    print("")' 2>/dev/null || printf '%s' ""
+}
+
+# Pure freshness test (Gap 2, #552): is POST a genuine new/updated entry vs PRE?
+# Fresh iff:
+#   - POST_COUNT > PRE_COUNT                                  (append — new entry)
+#   - OR (POST_COUNT == PRE_COUNT AND POST_SIG non-empty
+#         AND POST_SIG != PRE_SIG)                            (replace — the typed
+#                                                              entry's when|status
+#                                                              changed in place)
+# A flat count with an identical (or empty) signature is NOT fresh => the gate
+# reports FAILED ("died before reporting"). No side effects, no globals — the
+# regression test exercises all three branches without docker. Returns 0 (true)
+# when fresh, 1 otherwise. Callers MUST invoke it inside an `if`/`! ` so the
+# false return doesn't trip `set -e`.
+is_fresh_entry() {
+    local pre_count="$1" post_count="$2" pre_sig="$3" post_sig="$4"
+    if [ "$post_count" -gt "$pre_count" ]; then
+        return 0
+    fi
+    if [ "$post_count" -eq "$pre_count" ] && [ -n "$post_sig" ] && [ "$post_sig" != "$pre_sig" ]; then
+        return 0
+    fi
+    return 1
+}
+
 # Canonical container-auth token paths (read by docker_run_agent.sh). Documented
 # here too so they're discoverable without grepping that script (#532).
 CLAUDE_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
@@ -444,6 +498,9 @@ PRE_COUNT="$(entry_count)"
 # Fail closed: a non-numeric PRE_COUNT becomes -1 so any valid POST_COUNT
 # (>= 0) still requires a real new entry rather than spuriously passing.
 [[ "$PRE_COUNT" =~ ^[0-9]+$ ]] || PRE_COUNT=-1
+# Capture the PRE signature alongside the count so the freshness gate (Gap 2,
+# #552) can detect a same-count REPLACE (re-dispatch overwriting the typed entry).
+PRE_SIG="$(last_entry_signature "$(resolve_progress_file "$WORKTREE_PATH" "$ISSUE")" "$ENTRY_TYPE")"
 
 PROMPT_TMP="$(mktemp /tmp/dispatch_handoff.XXXXXX.md)"
 trap 'rm -f "$PROMPT_TMP"' EXIT
@@ -474,14 +531,23 @@ if [ "$RC" -ne 0 ]; then
 fi
 
 POST_COUNT="$(entry_count)"
-# Fail closed: a non-numeric POST_COUNT becomes 0 so the `-le "$PRE_COUNT"`
-# comparison below can't error (status 2) into the success branch and print a
-# false "Result: OK".
+# Fail closed: a non-numeric POST_COUNT becomes 0 so the integer comparisons in
+# is_fresh_entry below can't error (status 2) into the success branch and print
+# a false "Result: OK".
 [[ "$POST_COUNT" =~ ^[0-9]+$ ]] || POST_COUNT=0
-if [ "$POST_COUNT" -le "$PRE_COUNT" ]; then
-    echo "  Result: FAILED — no new \`## ${ENTRY_TYPE:-<typed>}\` entry"
-    echo "          (count ${PRE_COUNT} -> ${POST_COUNT}); sub-agent died before"
-    echo "          reporting, or wrote an entry of an unexpected type."
+POST_SIG="$(last_entry_signature "$(resolve_progress_file "$WORKTREE_PATH" "$ISSUE")" "$ENTRY_TYPE")"
+# Gate on last-entry FRESHNESS, not raw count delta (Gap 2, #552). A re-dispatch
+# that REPLACES a typed entry (e.g. a prior `failed ## Issue Review` -> a
+# `complete` one) keeps the count flat (1->1); the old count-delta gate read
+# that as a false FAILED. is_fresh_entry treats a flat count with a changed
+# `when|status` signature as fresh (replace), and only a flat count AND an
+# identical/empty signature as FAILED. The existing fail-closed numeric guards
+# above are preserved. NOTE: a same-minute/same-status re-dispatch yields an
+# identical signature => FAILED — fail-closed, accepted (see last_entry_signature).
+if ! is_fresh_entry "$PRE_COUNT" "$POST_COUNT" "$PRE_SIG" "$POST_SIG"; then
+    echo "  Result: FAILED — no fresh \`## ${ENTRY_TYPE:-<typed>}\` entry"
+    echo "          (count ${PRE_COUNT} -> ${POST_COUNT}, signature unchanged);"
+    echo "          sub-agent died before reporting, or wrote no new/updated entry."
     echo "  Inspect the worktree: $WORKTREE_PATH"
     exit 1
 fi
