@@ -64,3 +64,14 @@ Per the consequences map:
 - [ ] Verify `dispatch_subagent.sh`: confirm that a `complete` progress.md entry from the skill results in exit 0 (no code change likely needed — the current logic already maps `complete → exit 0`; add a comment if helpful)
 - [ ] If `dispatch_subagent.sh` is changed, update AGENTS.md script reference table entry for `dispatch_subagent.sh`
 - [ ] Skill docs updated per acceptance criteria
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-21 00:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-466/plan.md`
+**Scope**: Post-side only — `review-issue` SKILL.md posting behavior; `review-plan` has no posting step (no change needed); `dispatch_subagent.sh` already maps `complete → exit 0` (no code change needed).
+
+### Findings
+- [ ] Plan looks solid. Ready for implementation.
