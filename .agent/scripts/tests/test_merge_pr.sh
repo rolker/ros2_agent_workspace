@@ -134,6 +134,34 @@ out=$(cd "$fieldwt" && PATH="$ghstub:$PATH" "$MERGE_PR" 2>&1); rc=$?
     && ok "field-mode refused before any gh call" || bad "field-mode guard (rc=$rc, out: $(head -1 <<<"$out"))"
 rm -rf "$fieldwt" "$ghstub"
 
+# A `colcon build` creates artifact dirs at <layer>_ws/install/<pkg> and
+# <layer>_ws/build/<pkg> with the SAME depth+name as the source repo at
+# <layer>_ws/src/<pkg>. The slug `find` must resolve the source under src/, not
+# an artifact (issue #514). Contrast test (no reliance on filesystem ordering):
+# make install/testpkg a *github*-origin repo and src/testpkg a *gitcloud*
+# (field-mode) repo, then assert the field-mode guard FIRES — which can only
+# happen if src/testpkg was resolved. A regression to install/testpkg (github
+# origin) would proceed PAST the field-mode guard, a distinguishable outcome.
+echo "Test: --repo-slug resolves src/ project repo, not colcon install/ artifact (#514)"
+artwt="$ROOT_DIR/layers/main/testlayer_ws"
+mkdir -p "$artwt/build/testpkg"
+git -C "$ROOT_DIR" init -q "$artwt/install/testpkg"
+git -C "$artwt/install/testpkg" remote add origin "git@github.com:test/testpkg.git"
+git -C "$ROOT_DIR" init -q "$artwt/src/testpkg"
+git -C "$artwt/src/testpkg" remote add origin "git@gitcloud:field/testpkg.git"
+ghstub514=$(mktemp -d)
+cat >"$ghstub514/gh" <<'STUB'
+#!/bin/bash
+echo "GH_WAS_CALLED" >&2
+exit 99
+STUB
+chmod +x "$ghstub514/gh"
+out=$(cd "$ROOT_DIR" && PATH="$ghstub514:$PATH" "$MERGE_PR" --pr 1 --repo-slug testpkg 2>&1); rc=$?
+{ [[ $rc -ne 0 ]] && grep -qF "is a field-mode repo" <<<"$out" && ! grep -qF "GH_WAS_CALLED" <<<"$out"; } \
+    && ok "src/ repo resolved (field-mode guard fired), not install/ artifact" \
+    || bad "src/ vs install/ resolution (#514) (rc=$rc, out: $(head -1 <<<"$out"))"
+rm -rf "$artwt" "$ghstub514"
+
 echo "Test: --issue and --pr together → mutually-exclusive usage error (exit 2)"
 out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
 { [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
