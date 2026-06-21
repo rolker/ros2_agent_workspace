@@ -89,3 +89,45 @@ Per the consequences map:
 - [ ] (must-fix) Reorder makes persistence run first, so the GitHub comment URL is unknown when the `## Issue Review` entry is written — change #3's "When posting succeeded: `**Comment**: <URL>`" is unobtainable at write time. Specify placeholder-then-amend+recommit, or drop the on-success-URL case. — `plan.md:70`
 - [ ] (suggestion) "Swap steps 7↔8" must also fix stale internal cross-refs that assume posting precedes persistence: "After posting the comment, append…" (`SKILL.md:161`) and `**Comment**: <URL … from step 7>` (`SKILL.md:305`). — `plan.md:36`
 - [ ] (suggestion) Bug-#2 framing: current SKILL.md never instructs self-marking `partial`; step 8 hardcodes `complete`. Real failure mode is abort-at-step-7-before-persist (see commit `a38b523`). Align wording with the actual mechanism. — `plan.md:23`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 05:37 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Issue**: #466 (post-side only; read-side + exit-contract gaps tracked in #552)
+
+Implemented the approved revised plan (commit 87ac99e), post-side only.
+
+### What changed
+- `.claude/skills/review-issue/SKILL.md`:
+  - Reordered steps: **step 7 = Persist to progress.md** (canonical record,
+    written + committed first); **step 8 = Post findings as a comment**
+    (best-effort, last). Renumbered sub-steps `8a`/`8b` → `7a`/`7b`.
+  - Gated the post on `gh auth status --active`: skips silently with a
+    `[review-issue]` note when auth is absent; phase status stays `complete`
+    regardless of post outcome.
+  - Dropped the inline comment-URL case from `**Comment**:` (URL unknown at
+    write time now) → `(best-effort post follows this entry; not recorded
+    inline)`. Single-write entry, no amend+recommit.
+  - Reconciled all stale cross-refs with the new order: precondition para
+    ("Steps 1 and 8", "Step 7's owning-repo probe", "step 7a.1's probe"),
+    former `:161` ("After posting…" → persist-first intro), former `:305`
+    (no inline URL).
+  - Added a "Posting behavior" note to the Overview making the best-effort
+    contract explicit (plan change #4).
+- `.agent/scripts/dispatch_subagent.sh`: verified `complete → exit 0` —
+  `complete` falls through the status `case` with no `exit` (lines ~483/494),
+  while `failed`/`partial` map to `exit 1`. No code change (and none to
+  AGENTS.md, per plan).
+
+### Verification
+- Re-grepped SKILL.md for `step N` / `8a` / `8b` / "after posting" /
+  "from step 7" references — all reconciled; step numbering coherent 1–8
+  with 7a–7b sub-steps.
+- Pre-commit passed (no `--no-verify`). Committed as `3b70c73` with agent
+  identity.
+
+### Out of scope (not touched)
+- Read-side host-injected context and false-FAILED-on-redispatch (count 1→1)
+  — tracked in #552.
