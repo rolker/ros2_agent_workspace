@@ -125,13 +125,20 @@ case "$out" in
     *) bad "honors AGENT_NAME/AGENT_EMAIL override" "override not reflected in handoff" ;;
 esac
 
-# --- ambiguous worktree match warns on stderr ---
+# --- ambiguous worktree match fails loud (#526) ---
+# Two worktrees (workspace FAKE_WT + layer FAKE_WT2) match the same bare issue
+# number. The dispatcher must refuse to guess and exit non-zero, telling the
+# operator to disambiguate with --repo-slug. (Was warn-and-proceed before #526.)
 mkdir -p "$FAKE_WT2/.agent/work-plans/issue-$TEST_ISSUE"
-err="$("$DISPATCH" --mode in-process --issue "$TEST_ISSUE" --skill review-code 2>&1 >/dev/null)"
-case "$err" in
-    *"worktrees matched issue #$TEST_ISSUE"*) ok "warns on ambiguous worktree match" ;;
-    *) bad "warns on ambiguous worktree match" "no warning emitted to stderr" ;;
-esac
+out="$("$DISPATCH" --mode in-process --issue "$TEST_ISSUE" --skill review-code 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ]; then
+    bad "fails loud on ambiguous worktree match" "expected non-zero exit, got 0"
+else
+    case "$out" in
+        *"worktrees match issue #$TEST_ISSUE"*"refusing to guess"*) ok "fails loud on ambiguous worktree match" ;;
+        *) bad "fails loud on ambiguous worktree match" "stderr missing the refuse-to-guess message" ;;
+    esac
+fi
 rm -rf "$FAKE_WT2"
 
 echo ""

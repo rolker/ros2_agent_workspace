@@ -13,7 +13,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCH="$SCRIPT_DIR/../dispatch_subagent.sh"
 
 # Resolve ROOT_DIR exactly as dispatch_subagent.sh does (strip worktree prefix).
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# This test lives one dir deeper than dispatch_subagent.sh (tests/), so it walks
+# up THREE levels (tests -> scripts -> .agent -> root), not two. Getting this
+# wrong points the fake worktrees at .agent/layers/... while the script looks
+# under <root>/layers/... — a mismatch the worktree-prefix strip masks locally
+# (when run from inside a worktree) but CI exposes (#548).
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 case "$ROOT_DIR" in
     *"/.workspace-worktrees/"*) ROOT_DIR="${ROOT_DIR%%/.workspace-worktrees/*}" ;;
     *"/layers/worktrees/"*)     ROOT_DIR="${ROOT_DIR%%/layers/worktrees/*}" ;;
