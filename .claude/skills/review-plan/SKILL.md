@@ -266,7 +266,7 @@ appending, resolve the right place to write:
      — already in hand, no extra lookup needed.
    - **`--issue` or file-path mode**: no PR metadata available. Don't
      pass `--repo <owner/repo>` — that's the value we're resolving.
-     Probe in order (matches `review-issue` step 8a.1):
+     Probe in order (matches `review-issue` step 7a.1):
 
      1. **Workspace root first** — from the workspace root,
         `gh issue view <N> --json repository --jq '.repository.nameWithOwner'`
@@ -288,7 +288,7 @@ appending, resolve the right place to write:
    `worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`,
    and `$WORKTREE_ISSUE` — but not the repo slug. Derive it from
    `$WORKTREE_ROOT`'s basename (same pattern as `review-issue` step
-   8a.2):
+   7a.2):
    ```bash
    if [ -z "${WORKTREE_ROOT:-}" ]; then
        # Not in a worktree — fall through to sub-step 3 (find or create)
@@ -307,7 +307,7 @@ appending, resolve the right place to write:
    iff `WORKTREE_SLUG == "workspace"`; project-repo issue matches iff
    `WORKTREE_SLUG` equals the repo-name portion of `owner/repo`.
 3. **Find an existing worktree** with an anchored, repo-aware match —
-   same pattern as `review-issue` step 8a.3:
+   same pattern as `review-issue` step 7a.3:
    ```bash
    .agent/scripts/worktree_list.sh \
      | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
@@ -317,7 +317,7 @@ appending, resolve the right place to write:
    repos, pass `--repo-slug <slug>` if entering via
    `worktree_enter.sh`.
 4. **Otherwise create one on demand**, mirroring `review-issue` step
-   8a.5:
+   7a.5:
    - **Workspace issues**: `.agent/scripts/worktree_create.sh --issue <N> --type workspace`.
    - **Project-repo issues**: derive `<layer>` and `<project_repo>`
      from the project repo's path. Step 1 returned the owning
