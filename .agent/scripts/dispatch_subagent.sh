@@ -13,6 +13,10 @@
 #       (--skill <name> | --prompt-file <path>) \
 #       [--entry-type <type>] [--output-format <fmt>] [--model <id>]
 #       [--repo-slug <slug>]   # disambiguate a layer worktree on issue-# collision (#526)
+#       [--context-file <path>] # host-fetched issue/PR body spliced into the
+#                               # handoff so a no-GitHub-auth container phase can
+#                               # read it instead of `gh issue view` (#552);
+#                               # composable with --skill (unlike --prompt-file)
 #   dispatch_subagent.sh --check    # container-auth preflight (#532), then exit
 #
 #   --model defaults per-skill (Opus for review/implement, Sonnet otherwise),
@@ -46,6 +50,8 @@ OUTPUT_FORMAT="stream-json"
 MODEL=""   # --model override; empty => derive from the skill (see skill_model)
 CHECK=""   # --check: run the container-auth preflight and exit (#532)
 REPO_SLUG="" # --repo-slug: disambiguate a layer worktree (issue-<slug>-<N>) (#526)
+CONTEXT_FILE="" # --context-file: host-fetched issue/PR body to splice into the
+                # handoff (#552); composable with --skill
 
 # Identity literals embedded in the handoff (AGENTS.md § Agent Commit Identity).
 # Prefer the session's exported identity; fall back to the Claude default.
@@ -209,6 +215,7 @@ while [[ $# -gt 0 ]]; do
         --model)         MODEL="${2:-}"; shift 2 ;;
         --output-format) OUTPUT_FORMAT="${2:-}"; shift 2 ;;
         --repo-slug)     REPO_SLUG="${2:-}"; shift 2 ;;
+        --context-file)  CONTEXT_FILE="${2:-}"; shift 2 ;;
         --check)         CHECK=1; shift ;;
         -h|--help)       usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -246,6 +253,13 @@ if [ -z "$SKILL" ] && [ -z "$PROMPT_FILE" ]; then
 fi
 if [ -n "$PROMPT_FILE" ] && [ ! -f "$PROMPT_FILE" ]; then
     echo "ERROR: --prompt-file not found: $PROMPT_FILE" >&2; exit 1
+fi
+# --context-file is COMPOSABLE with --skill (unlike --prompt-file): it injects a
+# host-fetched issue/PR body into the handoff while the skill keeps its auto
+# entry-type + auto model (#552). Validate existence the same way as
+# --prompt-file; no mutual-exclusion check.
+if [ -n "$CONTEXT_FILE" ] && [ ! -f "$CONTEXT_FILE" ]; then
+    echo "ERROR: --context-file not found: $CONTEXT_FILE" >&2; exit 1
 fi
 case "$OUTPUT_FORMAT" in
     stream-json|json|text) : ;;
@@ -319,9 +333,36 @@ else
     ENTRY_CLAUSE="append your final typed entry (per ADR-0013) to"
 fi
 
+# ---------- Optional host-injected read context (Gap 1, #552) ----------
+# When --context-file is set, splice the host-fetched GitHub context (issue/PR
+# body) into the handoff AFTER the task body and BEFORE the handoff contract, so
+# a container phase with no GitHub read auth reads the injected section instead
+# of running `gh issue view`. CONTEXT_SECTION is empty (and the handoff is
+# byte-identical to the no-context case) when the flag is unset.
+CONTEXT_SECTION=""
+if [ -n "$CONTEXT_FILE" ]; then
+    CONTEXT_BODY="$(cat "$CONTEXT_FILE")"
+    CONTEXT_SECTION="$(cat <<EOF
+
+## Injected GitHub context (issue/PR body, fetched host-side)
+
+$CONTEXT_BODY
+
+Use the injected context above **instead of** \`gh issue view\` / \`gh pr view\`
+— this dispatch has no GitHub read auth. Treat it as the canonical issue/PR body.
+EOF
+)"
+    # Transparency (#552, human-control principle): log WHAT went into the handoff
+    # — byte size + first non-empty line — never the raw contents (which could
+    # carry tokens/secrets in pathological inputs).
+    ctx_bytes="$(wc -c < "$CONTEXT_FILE" | tr -d ' ')"
+    ctx_heading="$(grep -m1 '[^[:space:]]' "$CONTEXT_FILE" 2>/dev/null || true)"
+    echo "Injected host-side context from $CONTEXT_FILE (${ctx_bytes} bytes; first line: ${ctx_heading:-<empty>})" >&2
+fi
+
 HANDOFF="$(cat <<EOF
 $TASK_BODY
-
+$CONTEXT_SECTION
 ---
 ## Sub-agent handoff contract (#490)
 
