@@ -75,3 +75,17 @@ Per the consequences map:
 
 ### Findings
 - [ ] Plan looks solid. Ready for implementation.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-21 05:25 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-466/plan.md` at `abfc8bc`
+**PR**: PR-less (`--issue` mode; no gh auth in container)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (must-fix) Reorder makes persistence run first, so the GitHub comment URL is unknown when the `## Issue Review` entry is written — change #3's "When posting succeeded: `**Comment**: <URL>`" is unobtainable at write time. Specify placeholder-then-amend+recommit, or drop the on-success-URL case. — `plan.md:70`
+- [ ] (suggestion) "Swap steps 7↔8" must also fix stale internal cross-refs that assume posting precedes persistence: "After posting the comment, append…" (`SKILL.md:161`) and `**Comment**: <URL … from step 7>` (`SKILL.md:305`). — `plan.md:36`
+- [ ] (suggestion) Bug-#2 framing: current SKILL.md never instructs self-marking `partial`; step 8 hardcodes `complete`. Real failure mode is abort-at-step-7-before-persist (see commit `a38b523`). Align wording with the actual mechanism. — `plan.md:23`
