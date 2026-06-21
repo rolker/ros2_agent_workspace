@@ -128,3 +128,25 @@ Fits in a single PR. The issue lives in the workspace repo (infra script).
 - [x] Scope both `find` calls (anchored `*_ws/src/*`) + git-repo-root verify.
 - [x] Regression test (github `install/` vs gitcloud `src/`, field-mode-guard assertion).
 - [x] `--pr` escape-hatch `REPO_PATH` derivation uses the scoped `find`.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 15:28 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-514 at `f30034d`
+**Mode**: pre-push
+**Depth**: Deep (reason: destructive tool that shells out with user input; 283-line diff)
+**Must-fix**: 0 | **Suggestions**: 0
+**Round**: 1 | **Ship**: recommended — fix correct, empirically verified in main tree, 16/16 tests pass, no Must-fix.
+
+### Findings
+- [ ] No issues found. LGTM. Both adversarial passes (Lens A logic, Lens B
+  systemic/safety) independently confirmed the anchored `-path '*_ws/src/*'`
+  excludes colcon artifacts and the git-root verify fails closed before any
+  merge/delete. Verified end-to-end in the real main tree: `find` resolves
+  `site_ws/src/ccomjhc_project11` and `git rev-parse --show-toplevel` matches.
+  Lens A's theoretical symlink/realpath mismatch does not apply (`$ROOT_DIR/layers/main`
+  is a real dir; were it symlinked, the failure mode is fail-closed, not a wrong merge).
+  No plan drift; consequences addressed (regression test ships in same commit).
