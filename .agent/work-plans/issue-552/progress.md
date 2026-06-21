@@ -167,7 +167,7 @@ same-minute fail-closed accurate). Plan adherence: no drift (6 files, 5 gaps, bo
 operator decisions honored). Copilot off (not opted in).
 
 ### Findings
-- [ ] (must-fix) `--context-file` body spliced verbatim above the handoff contract — attacker-influenceable issue/PR body can forge a second `## Sub-agent handoff contract` section; fence/neutralize as untrusted data + assert real contract authority — `.agent/scripts/dispatch_subagent.sh:397-408`
+- [x] (must-fix) `--context-file` body spliced verbatim above the handoff contract — attacker-influenceable issue/PR body can forge a second `## Sub-agent handoff contract` section; fence/neutralize as untrusted data + assert real contract authority — `.agent/scripts/dispatch_subagent.sh:397-408`
 - [ ] (suggestion) Injection transparency log shows only first non-empty line — buried payload never surfaces; add line count + `---`/heading flag — `.agent/scripts/dispatch_subagent.sh:412-414`
 - [ ] (suggestion) run-issue overpromises `--context-file` covers post-PR `triage-reviews`, which needs `fetch_pr_reviews.sh`/`gh api` a body file can't supply — scope the claim — `.claude/skills/run-issue/SKILL.md:49`
 - [ ] (suggestion) Missing blank line before closing `---` makes it a setext-H2 underline, blurring the contract boundary — `.agent/scripts/dispatch_subagent.sh:405-406`
