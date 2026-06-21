@@ -61,6 +61,13 @@ with `--skill` so the auto entry-type + model still apply. Pre-push `review-code
 / `review-plan` need no GitHub read (they work from the diff / local `plan.md`),
 so they take no `--context-file`.
 
+**Limitation — `--context-file` carries the issue/PR *body* only.** It does not
+convey labels, assignees, comments, or linked-PR metadata that `review-issue`'s
+full `gh issue view --json …` step would otherwise read. For the scope check
+the body is sufficient; a phase that genuinely needs that richer metadata under
+container dispatch is not yet supported by body-only injection (fetch the richer
+JSON host-side and widen the context file if/when such a phase appears).
+
 `--context-file` carries a **single body** — it satisfies a phase that only needs
 the issue/PR body (`review-issue`). It does **not** cover post-PR `triage-reviews`,
 which also reads PR review comments and CI status via `fetch_pr_reviews.sh` /

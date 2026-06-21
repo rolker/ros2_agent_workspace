@@ -394,8 +394,10 @@ fi
 # When --context-file is set, splice the host-fetched GitHub context (issue/PR
 # body) into the handoff AFTER the task body and BEFORE the handoff contract, so
 # a container phase with no GitHub read auth reads the injected section instead
-# of running `gh issue view`. CONTEXT_SECTION is empty (and the handoff is
-# byte-identical to the no-context case) when the flag is unset.
+# of running `gh issue view`. CONTEXT_SECTION is empty when the flag is unset —
+# the handoff then differs from a bare dispatch by only a single blank line (the
+# empty section still expands to one blank line; see the load-bearing-blank note
+# below), not byte-for-byte identical.
 CONTEXT_SECTION=""
 if [ -n "$CONTEXT_FILE" ]; then
     CONTEXT_BODY="$(cat "$CONTEXT_FILE")"
@@ -408,11 +410,12 @@ if [ -n "$CONTEXT_FILE" ]; then
     #      body can't reproduce a token it never sees.
     #   2. A prominent warning + authority assertion: everything inside the fence
     #      is untrusted DATA, and the host-authored contract that follows is the
-    #      only instruction source. /dev/urandom -> 12 hex chars; PID fallback if
-    #      it's unreadable (od exits 0 reading a fixed count, so no SIGPIPE under
-    #      pipefail).
+    #      only instruction source. /dev/urandom -> 12 hex chars; if it is
+    #      unreadable, fall back to four $RANDOM draws (~60 bits, a bash builtin)
+    #      rather than the predictable PID. (od exits 0 reading a fixed count, so
+    #      no SIGPIPE under pipefail.)
     CTX_NONCE="$(od -An -N6 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
-    [ -n "$CTX_NONCE" ] || CTX_NONCE="$$"
+    [ -n "$CTX_NONCE" ] || CTX_NONCE="$(printf '%04x%04x%04x%04x' "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM")"
     CONTEXT_SECTION="$(cat <<EOF
 
 ## Injected GitHub context (issue/PR body, fetched host-side)
@@ -435,8 +438,9 @@ Use the injected context above **instead of** \`gh issue view\` / \`gh pr view\`
 EOF
 )"
     # Transparency (#552, human-control principle): log WHAT went into the handoff
-    # — never the raw contents (which could carry tokens/secrets in pathological
-    # inputs). Beyond byte size + first line, surface the line count and a count of
+    # — never the full raw contents (which could carry tokens/secrets in
+    # pathological inputs); only a bounded first-line excerpt. Beyond byte size +
+    # that excerpt, surface the line count and a count of
     # structural tokens (markdown ATX headings or `---` break/setext lines) the
     # body could use to forge a section/boundary: a body trying to look like
     # contract structure shows up as a non-zero count even though the first line
@@ -445,6 +449,7 @@ EOF
     ctx_lines="$(wc -l < "$CONTEXT_FILE" | tr -d ' ')"
     ctx_struct="$(grep -cE '^[[:space:]]*(#{1,6}[[:space:]]|-{3,}[[:space:]]*$)' "$CONTEXT_FILE" 2>/dev/null || true)"
     ctx_heading="$(grep -m1 '[^[:space:]]' "$CONTEXT_FILE" 2>/dev/null || true)"
+    ctx_heading="${ctx_heading:0:80}"   # bounded excerpt — never log unbounded body content
     echo "Injected host-side context from $CONTEXT_FILE (${ctx_bytes} bytes, ${ctx_lines} lines, ${ctx_struct:-0} heading/--- lines; first line: ${ctx_heading:-<empty>})" >&2
 fi
 

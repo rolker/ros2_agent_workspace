@@ -51,7 +51,10 @@ dispatcher splices the body into the handoff under an
 auth inside the container. `--context-file` is composable with `--skill`, so the
 auto entry-type and model still apply. When the injected section is present,
 prefer it over step 1's `gh issue view` — the host has already fetched the
-canonical body.
+canonical body. **Caveat:** the injected context is the issue/PR **body only** —
+it omits the `labels`, `assignees`, `comments`, and linked-PR fields that step 1's
+`gh issue view --json …` would otherwise surface. Review from the body; if a
+specific check needs that metadata, note its absence rather than assuming it.
 
 **Precondition: invoke from the owning repo's cwd.** Issue numbers are
 scoped per-repo (`rolker/ros2_agent_workspace#42` and
