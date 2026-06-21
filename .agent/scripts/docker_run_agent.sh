@@ -32,6 +32,7 @@ CONTAINER_PREFIX="ros2-agent"
 # ---------- Argument parsing ----------
 
 ISSUE=""
+REPO_SLUG=""           # --repo-slug: disambiguate a layer worktree (issue-<slug>-<N>) (#526)
 BUILD_IMAGE=false
 SHELL_MODE=false
 PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
@@ -49,6 +50,8 @@ Required:
   --issue <N>       Issue number (worktree must exist on host)
 
 Options:
+  --repo-slug <slug>    Disambiguate a layer worktree (issue-<slug>-<N>) when
+                        multiple repos share the issue number (#526)
   --build               Build/rebuild the Docker image before launch
   --shell               Drop into bash instead of Claude Code (debugging)
   --prompt <text>       Dispatch mode: run a headless `claude -p` with this
@@ -87,6 +90,13 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ISSUE="$2"; shift 2 ;;
+        --repo-slug)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --repo-slug requires a value." >&2
+                show_usage >&2
+                exit 1
+            fi
+            REPO_SLUG="$2"; shift 2 ;;
         --build)
             BUILD_IMAGE=true; shift ;;
         --shell)
@@ -151,6 +161,13 @@ if [ -z "$ISSUE" ]; then
     show_usage >&2
     exit 1
 fi
+if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --issue must be a number (got '$ISSUE')." >&2
+    exit 1
+fi
+# Sanitize --repo-slug to match worktree_create.sh dir naming (non [A-Za-z0-9_]
+# -> _), so a hyphenated slug still resolves (#526).
+[ -n "$REPO_SLUG" ] && REPO_SLUG="${REPO_SLUG//[^A-Za-z0-9_]/_}"
 
 # Dispatch mode is active when a prompt source was explicitly provided. Gate on
 # PROMPT_SET (the intent), not [ -n "$PROMPT" ] (the value): an empty prompt is
@@ -226,23 +243,39 @@ fi
 # Find worktree for this issue
 WORKTREE_PATH=""
 WORKTREE_MATCHES=0
-for candidate in \
-    "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
-    "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
-    if [ -d "$candidate" ]; then
-        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
-        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
-    fi
-done
+MATCHED=()
+if [ -n "$REPO_SLUG" ]; then
+    # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>) — no
+    # glob, no cross-repo issue-# collision (#526).
+    candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
+    if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
+else
+    for candidate in \
+        "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
+        "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
+        if [ -d "$candidate" ]; then
+            MATCHED+=("$candidate")
+            WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+            [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+        fi
+    done
+fi
 
 if [ -z "$WORKTREE_PATH" ]; then
-    echo "ERROR: No worktree found for issue #$ISSUE." >&2
+    echo "ERROR: No worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')}." >&2
     echo "Create one first:" >&2
     echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
     exit 1
 fi
 if [ "$WORKTREE_MATCHES" -gt 1 ]; then
-    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
+    # FAIL LOUD (#526) — was warn-and-proceed; multiple repos can share an issue
+    # number and guessing the first match ran a container against the wrong repo.
+    {
+        echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
+        echo "       Disambiguate with --repo-slug <slug>. Candidates:"
+        printf '         %s\n' "${MATCHED[@]}"
+    } >&2
+    exit 1
 fi
 
 WORKTREE_ID="$(basename "$WORKTREE_PATH")"

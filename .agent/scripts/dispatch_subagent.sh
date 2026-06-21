@@ -12,6 +12,7 @@
 #   dispatch_subagent.sh --mode in-process|container --issue <N> \
 #       (--skill <name> | --prompt-file <path>) \
 #       [--entry-type <type>] [--output-format <fmt>] [--model <id>]
+#       [--repo-slug <slug>]   # disambiguate a layer worktree on issue-# collision (#526)
 #   dispatch_subagent.sh --check    # container-auth preflight (#532), then exit
 #
 #   --model defaults per-skill (Opus for review/implement, Sonnet otherwise),
@@ -44,6 +45,7 @@ ENTRY_TYPE=""
 OUTPUT_FORMAT="stream-json"
 MODEL=""   # --model override; empty => derive from the skill (see skill_model)
 CHECK=""   # --check: run the container-auth preflight and exit (#532)
+REPO_SLUG="" # --repo-slug: disambiguate a layer worktree (issue-<slug>-<N>) (#526)
 
 # Identity literals embedded in the handoff (AGENTS.md § Agent Commit Identity).
 # Prefer the session's exported identity; fall back to the Claude default.
@@ -163,7 +165,7 @@ preflight_check() {
 usage() {
     # Keep the end line in sync with the header Usage block (currently ends at
     # line 20 — the --model/--check note); a too-small range truncates --help.
-    sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # ---------- Argument parsing ----------
@@ -177,6 +179,7 @@ while [[ $# -gt 0 ]]; do
         --entry-type)    ENTRY_TYPE="${2:-}"; shift 2 ;;
         --model)         MODEL="${2:-}"; shift 2 ;;
         --output-format) OUTPUT_FORMAT="${2:-}"; shift 2 ;;
+        --repo-slug)     REPO_SLUG="${2:-}"; shift 2 ;;
         --check)         CHECK=1; shift ;;
         -h|--help)       usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -200,6 +203,12 @@ esac
 if [ -z "$ISSUE" ]; then
     echo "ERROR: --issue <N> is required." >&2; exit 1
 fi
+if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --issue must be a number (got '$ISSUE')." >&2; exit 1
+fi
+# Sanitize --repo-slug to match how worktree_create.sh names dirs (non
+# [A-Za-z0-9_] -> _), so a hyphenated slug still resolves (#526).
+[ -n "$REPO_SLUG" ] && REPO_SLUG="${REPO_SLUG//[^A-Za-z0-9_]/_}"
 if [ -n "$SKILL" ] && [ -n "$PROMPT_FILE" ]; then
     echo "ERROR: pass exactly one of --skill or --prompt-file, not both." >&2; exit 1
 fi
@@ -235,19 +244,36 @@ MODEL_DISPLAY="$(model_display "$MODEL")"
 
 WORKTREE_PATH=""
 WORKTREE_MATCHES=0
-for candidate in \
-    "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
-    "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
-    if [ -d "$candidate" ]; then
-        WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
-        [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
-    fi
-done
+MATCHED=()
+if [ -n "$REPO_SLUG" ]; then
+    # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>), like
+    # worktree_remove.sh. No glob -> no cross-repo collision (#526).
+    candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
+    if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
+else
+    for candidate in \
+        "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
+        "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
+        if [ -d "$candidate" ]; then
+            MATCHED+=("$candidate")
+            WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+            [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+        fi
+    done
+fi
 if [ -z "$WORKTREE_PATH" ]; then
-    echo "ERROR: no worktree found for issue #$ISSUE (create it first)." >&2; exit 1
+    echo "ERROR: no worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')} (create it first)." >&2; exit 1
 fi
 if [ "$WORKTREE_MATCHES" -gt 1 ]; then
-    echo "⚠️  $WORKTREE_MATCHES worktrees matched issue #$ISSUE; using: $WORKTREE_PATH" >&2
+    # FAIL LOUD (#526) — was warn-and-proceed. Multiple repos can share an issue
+    # number; guessing the first match alphabetically once ran a review against
+    # the wrong repo. Refuse, and tell the operator how to disambiguate.
+    {
+        echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
+        echo "       Disambiguate with --repo-slug <slug>. Candidates:"
+        printf '         %s\n' "${MATCHED[@]}"
+    } >&2
+    exit 1
 fi
 PROGRESS_FILE="$WORKTREE_PATH/.agent/work-plans/issue-$ISSUE/progress.md"
 
@@ -359,6 +385,7 @@ echo "Dispatching issue #$ISSUE into a container (headless, model=$MODEL)…" >&
 RC=0
 "$SCRIPT_DIR/docker_run_agent.sh" \
     --issue "$ISSUE" \
+    ${REPO_SLUG:+--repo-slug "$REPO_SLUG"} \
     --output-format "$OUTPUT_FORMAT" \
     --model "$MODEL" \
     --prompt-file "$PROMPT_TMP" || RC=$?
