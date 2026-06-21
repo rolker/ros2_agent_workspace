@@ -148,10 +148,24 @@ if [[ -n "$ARG_PR" ]]; then
         REPO_PATH="$ROOT_DIR"
         REPO_SLUG=""
     else
-        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$ARG_REPO_SLUG" -print -quit 2>/dev/null || true)
+        # Anchor on '*_ws/src/*' so a `colcon build` artifact at
+        # <layer>_ws/install/<pkg> or <layer>_ws/build/<pkg> (same depth+name as
+        # the source) can't be picked before the real source repo (issue #514).
+        # Anchored on the layer-workspace structure (not a bare '*/src/*'): a
+        # workspace checked out under a path containing a /src/ segment would
+        # still match install/build dirs with the bare form.
+        REPO_PATH=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -path '*_ws/src/*' -name "$ARG_REPO_SLUG" -print -quit 2>/dev/null || true)
         if [[ -z "$REPO_PATH" ]]; then
             echo "ERROR: --repo-slug '$ARG_REPO_SLUG' not found under layers/main." >&2
             echo "  Check the spelling, or pass --repo-slug workspace for the workspace repo." >&2
+            exit 1
+        fi
+        # Belt-and-suspenders: the candidate must be a git repo root, not a stray
+        # dir that slipped past the path filter. Only error on found-but-not-a-
+        # git-root — an empty find already exited above.
+        if [[ "$(git -C "$REPO_PATH" rev-parse --show-toplevel 2>/dev/null)" != "$REPO_PATH" ]]; then
+            echo "ERROR: --repo-slug '$ARG_REPO_SLUG' resolved to '$REPO_PATH', which is not a git repo root." >&2
+            echo "  Expected a project repo under layers/main/<layer>_ws/src/." >&2
             exit 1
         fi
         REPO_SLUG="$ARG_REPO_SLUG"
@@ -218,7 +232,17 @@ fi
 if [[ -z "$REPO_SLUG" ]]; then
     BRANCH_REPO="$ROOT_DIR"
 else
-    BRANCH_REPO=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -name "$REPO_SLUG" -print -quit 2>/dev/null || true)
+    # Anchor on '*_ws/src/*' for the same reason as the --pr derivation above:
+    # exclude colcon install/build artifacts that share the source's depth+name
+    # (issue #514).
+    BRANCH_REPO=$(find "$ROOT_DIR/layers/main" -maxdepth 3 -type d -path '*_ws/src/*' -name "$REPO_SLUG" -print -quit 2>/dev/null || true)
+    # An EMPTY result is a legitimate signal — fall through to the REPO_PATH
+    # fallback below. Only error when a non-empty candidate isn't a git repo root.
+    if [[ -n "$BRANCH_REPO" && "$(git -C "$BRANCH_REPO" rev-parse --show-toplevel 2>/dev/null)" != "$BRANCH_REPO" ]]; then
+        echo "ERROR: repo-slug '$REPO_SLUG' resolved to '$BRANCH_REPO', which is not a git repo root." >&2
+        echo "  Expected a project repo under layers/main/<layer>_ws/src/." >&2
+        exit 1
+    fi
     [[ -z "$BRANCH_REPO" ]] && BRANCH_REPO="$REPO_PATH"
 fi
 
