@@ -347,17 +347,26 @@ skipped or failed post does **not** change the phase status — it stays
 **Model**: `$AGENT_MODEL`
 ```
 
-Use `--body-file` for the comment (not `--body`), and gate the post on
-gh auth so it skips cleanly when none is present:
+Use `--body-file` for the comment (not `--body`). The post is best-effort:
+gate it on gh auth so it skips cleanly when none is present, **and** treat a
+failed post itself as non-fatal. The auth gate is necessary but not
+sufficient — a read-only token (e.g. the container's `GH_TOKEN`) makes
+`gh auth status --active` pass, yet `gh issue comment` then fails with a 403.
+Because the comment is wrapped (`|| { … }`) the phase still completes; the
+progress.md entry written in step 7 is the record regardless of post outcome.
 
 ```bash
 BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
 cat << 'COMMENT_EOF' > "$BODY_FILE"
 [review content]
 COMMENT_EOF
-# Best-effort only — skip silently if gh auth is absent
+# Best-effort only — never fail the phase on a post problem.
+# Two distinct failure modes, both tolerated:
+#   1. no auth at all          → gh auth status --active fails → skip
+#   2. read-only/insufficient  → auth passes but `gh issue comment` 403s → catch
 if gh auth status --active 2>/dev/null; then
-    gh issue comment <N> --body-file "$BODY_FILE"
+    gh issue comment <N> --body-file "$BODY_FILE" \
+        || echo "[review-issue] Comment post failed (e.g. read-only token / 403) — continuing; progress.md is the record."
 else
     echo "[review-issue] No GitHub auth — skipping comment post (progress.md is the record)."
 fi
