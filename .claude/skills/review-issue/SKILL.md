@@ -32,6 +32,15 @@ gh auth is present (e.g., container dispatch per
 post does **not** change the phase status — the skill reports `complete` as
 long as the progress.md entry was committed.
 
+The best-effort guarantee covers the *write* path only. The **read** path
+remains an auth dependency: step 1's `gh issue view <N>` (and the step 7a.1
+owning-repo probe) need at least a read token to fetch the issue body the
+review is built from. With no read auth those calls fail before any
+progress.md entry can be written, so the "persist-first ⇒ always `complete`"
+guarantee holds only when a read token is present. A read-only token (the
+common container case) satisfies the read path while still tripping the
+write-path 403 the post handles above.
+
 **Precondition: invoke from the owning repo's cwd.** Issue numbers are
 scoped per-repo (`rolker/ros2_agent_workspace#42` and
 `rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 8

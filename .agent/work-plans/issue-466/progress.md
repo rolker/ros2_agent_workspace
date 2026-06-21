@@ -148,4 +148,4 @@ Implemented the approved revised plan (commit 87ac99e), post-side only.
 - [x] (must-fix) Step rename `8a.x`→`7a.x` left 4 dangling cross-refs in sibling skill — `.claude/skills/review-plan/SKILL.md:269,291,310,320` (→ 7a.1/7a.2/7a.3/7a.5)
 - [x] (must-fix) gh-auth gate handles only no-token; read-only container `GH_TOKEN` makes `gh auth status --active` pass, then unguarded `gh issue comment` fails loudly (403) — reintroduces bad status in the #532 target env — `.claude/skills/review-issue/SKILL.md:359`
 - [x] (suggestion) `description:`/Overview still flatly say "Posts findings as a comment"; posting is now best-effort — `.claude/skills/review-issue/SKILL.md:3`
-- [ ] (suggestion) Read path (step 1 `gh issue view`, 7a.1 probe) remains ungated auth dependency; "persist-first complete" guarantee only holds with a read token — `.claude/skills/review-issue/SKILL.md:26`
+- [x] (suggestion) Read path (step 1 `gh issue view`, 7a.1 probe) remains ungated auth dependency; "persist-first complete" guarantee only holds with a read token — `.claude/skills/review-issue/SKILL.md:26`
