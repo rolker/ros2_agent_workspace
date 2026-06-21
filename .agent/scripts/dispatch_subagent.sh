@@ -16,7 +16,8 @@
 #       [--context-file <path>] # host-fetched issue/PR body spliced into the
 #                               # handoff so a no-GitHub-auth container phase can
 #                               # read it instead of `gh issue view` (#552);
-#                               # composable with --skill (unlike --prompt-file)
+#                               # orthogonal to the task source — composes with
+#                               # either --skill or --prompt-file
 #   dispatch_subagent.sh --check    # container-auth preflight (#532), then exit
 #
 #   --model defaults per-skill (Opus for review/implement, Sonnet otherwise),
@@ -246,8 +247,8 @@ preflight_check() {
 
 usage() {
     # Keep the end line in sync with the header Usage block (currently ends at
-    # line 20 — the --model/--check note); a too-small range truncates --help.
-    sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # line 21 — the --check note); a too-small range truncates --help.
+    sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # Source-guard: when this script is `source`d (e.g. by the regression test to
@@ -308,9 +309,11 @@ fi
 if [ -n "$PROMPT_FILE" ] && [ ! -f "$PROMPT_FILE" ]; then
     echo "ERROR: --prompt-file not found: $PROMPT_FILE" >&2; exit 1
 fi
-# --context-file is COMPOSABLE with --skill (unlike --prompt-file): it injects a
-# host-fetched issue/PR body into the handoff while the skill keeps its auto
-# entry-type + auto model (#552). Validate existence the same way as
+# --context-file is ORTHOGONAL to the task source: unlike --skill/--prompt-file
+# (which are mutually exclusive with each other), it composes with EITHER. With
+# --skill the skill keeps its auto entry-type + auto model; with --prompt-file the
+# file is the task body and the context is injected after it. Both are deliberate
+# and exercised by the regression tests (#552). Validate existence the same way as
 # --prompt-file; no mutual-exclusion check.
 if [ -n "$CONTEXT_FILE" ] && [ ! -f "$CONTEXT_FILE" ]; then
     echo "ERROR: --context-file not found: $CONTEXT_FILE" >&2; exit 1

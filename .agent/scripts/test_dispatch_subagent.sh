@@ -153,6 +153,21 @@ assert_emits "--context-file is composable with --skill (entry-type kept)" 'fina
     --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
 assert_fails "rejects missing --context-file" "--context-file not found" \
     --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file /nonexistent/ctx.md
+
+# --context-file is orthogonal to the task source: it composes with --prompt-file
+# too (not only --skill). Both the prompt body and the injected context land (#552).
+PF2="$(mktemp /tmp/dispatch_test_prompt.XXXXXX.md)"
+echo "RAW_PROMPT_MARKER_88" > "$PF2"
+assert_emits "--context-file composes with --prompt-file (prompt body lands)" "RAW_PROMPT_MARKER_88" \
+    --mode in-process --issue "$TEST_ISSUE" --prompt-file "$PF2" --context-file "$CTXF"
+assert_emits "--context-file composes with --prompt-file (context lands)" "INJECTED_CONTEXT_MARKER_77" \
+    --mode in-process --issue "$TEST_ISSUE" --prompt-file "$PF2" --context-file "$CTXF"
+rm -f "$PF2"
+
+# The injected body is fenced as untrusted data with an authority assertion, so a
+# body that forges a `## Sub-agent handoff contract` heading can't pose as one (#552).
+assert_emits "--context-file fences the body as untrusted" "UNTRUSTED INJECTED CONTEXT" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
 rm -f "$CTXF"
 
 # --- sourced unit tests for the Gap-2 freshness gate (#552) ---
