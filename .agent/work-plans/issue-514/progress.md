@@ -83,3 +83,48 @@ Fits in a single PR. The issue lives in the workspace repo (infra script).
 - [ ] (suggestion) `-path '*/src/*'` is defeated by a checkout path containing a `/src/` segment (e.g. `~/src/...`) — the install/ artifact path then still matches; degrades to a false hard error via git-verify, not a wrong merge. Use anchored `-path '*_ws/src/*'`. — `plan.md:28`
 - [ ] (suggestion) Scope the new git-verify error to found-but-not-git-root; preserve the legit empty→`REPO_PATH` fallback at `merge_pr.sh:222`. — `plan.md:32`
 - [ ] (suggestion) Stronger test discriminator: make `install/testpkg` a github-origin git repo so buggy vs fixed resolution gives a positive/positive contrast (no reliance on filesystem ordering). — `plan.md:39`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 00:00 +00:00
+**By**: Claude Opus
+
+**Branch**: feature/issue-514 at `e0e1477`
+**Commit**: `e0e1477` (fix + regression test, atomic)
+
+### Changes
+- `.agent/scripts/merge_pr.sh` — both slug-resolution `find` calls now anchor on
+  `-path '*_ws/src/*'` (the `--pr` escape-hatch `REPO_PATH` derivation, and the
+  `BRANCH_REPO` derivation), excluding colcon `install/<pkg>` and `build/<pkg>`
+  artifacts that share the source's depth+name. Anchored on the layer-workspace
+  structure rather than a bare `*/src/*`, per the review-plan finding (a workspace
+  under a `/src/` parent dir would defeat the bare form).
+- Added git-repo-root verification after each `find`
+  (`git -C "$cand" rev-parse --show-toplevel` must equal the candidate). Scoped
+  to the **found-but-not-git-root** case only: the `--pr` path errors after its
+  own non-empty `find`; the `BRANCH_REPO` path guards the check behind
+  `[[ -n "$BRANCH_REPO" && ... ]]` so an EMPTY result still flows to the existing
+  `REPO_PATH` fallback (no regression of the escape-hatch path).
+- `.agent/scripts/tests/test_merge_pr.sh` — new regression test: fabricates
+  `layers/main/testlayer_ws/{install,build,src}/testpkg`, makes `install/testpkg`
+  a github-origin repo and `src/testpkg` a gitcloud (field-mode) repo, invokes
+  `merge_pr.sh --pr 1 --repo-slug testpkg`, and asserts the field-mode guard
+  fires (proving `src/` resolved). Positive/positive contrast — a regression to
+  `install/testpkg` (github origin) would proceed past the guard. `gh` is stubbed
+  to a loud failure to prove no GitHub call escapes.
+
+### Verification
+- `bash .agent/scripts/tests/test_merge_pr.sh` → **16 passed, 0 failed** (incl. the new #514 case).
+- `PYTHON=python3 ./.agent/scripts/tests/run_script_tests.sh` → `test_merge_pr.sh` green; all
+  pytest (51) green. One pre-existing unrelated failure in
+  `test_check_commit_identity.sh` ("no propagation rejection"), an `$AGENT_NAME`/git-config
+  env-gate test that touches neither changed file (confirmed pre-existing).
+- `bash -n .agent/scripts/merge_pr.sh` → clean.
+- `shellcheck .agent/scripts/merge_pr.sh` → only pre-existing info/style notes
+  (SC2317/SC1091/SC2001/SC2015), none in the edited regions; passes the pre-commit
+  shellcheck hook.
+
+### Actions
+- [x] Scope both `find` calls (anchored `*_ws/src/*`) + git-repo-root verify.
+- [x] Regression test (github `install/` vs gitcloud `src/`, field-mode-guard assertion).
+- [x] `--pr` escape-hatch `REPO_PATH` derivation uses the scoped `find`.
