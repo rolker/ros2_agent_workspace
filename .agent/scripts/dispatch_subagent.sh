@@ -116,6 +116,28 @@ model_display() {
     esac
 }
 
+# Resolve the worktree's real progress.md, with a worktree-root fallback.
+# Workspace worktrees keep it at depth 4 ($wt/.agent/work-plans/issue-N/
+# progress.md), but LAYER worktrees nest the project repo at <layer>_ws/src/
+# <repo>/, putting progress.md at depth 7. find -maxdepth 7 reaches the nested
+# case (maxdepth 6 falls short — confirmed off-by-one); -quit stops at the first
+# hit. When no file exists yet (the first-phase pre-creation case), fall back to
+# the root path so a PRE count reads "absent -> 0". Callers MUST re-resolve per
+# invocation: on the first phase the file is absent pre-dispatch, so only a
+# fresh post-dispatch resolve discovers the freshly-written nested file.
+# Assumes a single progress.md per issue per worktree (one issue == one project
+# repo); -print -quit returns the first hit, whose order is filesystem-dependent,
+# so a second match would make resolution nondeterministic. That invariant holds
+# for the worktrees worktree_create.sh produces.
+resolve_progress_file() {
+    local wt="$1" issue="$2" f
+    f="$(find "$wt" -maxdepth 7 -type f \
+        -path "*/.agent/work-plans/issue-$issue/progress.md" \
+        -print -quit 2>/dev/null)"
+    if [ -n "$f" ]; then printf '%s\n' "$f"
+    else printf '%s\n' "$wt/.agent/work-plans/issue-$issue/progress.md"; fi
+}
+
 # Canonical container-auth token paths (read by docker_run_agent.sh). Documented
 # here too so they're discoverable without grepping that script (#532).
 CLAUDE_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
@@ -167,6 +189,13 @@ usage() {
     # line 20 — the --model/--check note); a too-small range truncates --help.
     sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
+
+# Source-guard: when this script is `source`d (e.g. by the regression test to
+# unit-test resolve_progress_file), stop here so only the function definitions
+# above load — no dispatch runs. Direct execution ($0 == this file) falls
+# through unchanged. The `[[ ]] && return` is an AND-OR list, so the false
+# branch is exempt from `set -e`.
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
 
 # ---------- Argument parsing ----------
 
@@ -240,7 +269,7 @@ if [ -z "$MODEL" ]; then
 fi
 MODEL_DISPLAY="$(model_display "$MODEL")"
 
-# ---------- Resolve the worktree + its progress.md ----------
+# ---------- Resolve the worktree (progress.md is resolved per-call below) ----------
 
 WORKTREE_PATH=""
 WORKTREE_MATCHES=0
@@ -275,7 +304,6 @@ if [ "$WORKTREE_MATCHES" -gt 1 ]; then
     } >&2
     exit 1
 fi
-PROGRESS_FILE="$WORKTREE_PATH/.agent/work-plans/issue-$ISSUE/progress.md"
 
 # ---------- Build the handoff prompt ----------
 
@@ -354,6 +382,11 @@ fi
 # entry when its full type equals ENTRY_TYPE, its base_type equals ENTRY_TYPE,
 # OR its type begins with ENTRY_TYPE (catching the parenthetical variant).
 entry_count() {
+    # Re-resolve every call: on the first phase the file is absent pre-dispatch,
+    # so only a fresh post-dispatch resolve finds the freshly-written (possibly
+    # layer-nested) file. PRE: absent -> 0; POST: nested file found -> 1.
+    local PROGRESS_FILE
+    PROGRESS_FILE="$(resolve_progress_file "$WORKTREE_PATH" "$ISSUE")"
     [ -f "$PROGRESS_FILE" ] || { echo 0; return 0; }
     python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
         | ENTRY_TYPE="$ENTRY_TYPE" python3 -c 'import os,sys,json
@@ -416,6 +449,7 @@ fi
 # type/base_type/prefix predicate as entry_count, so the displayed entry is the
 # one the count gate keyed on) and make the headline track it — #492 greps
 # "Result: …". Emits STATUS on the first line and the display fields after.
+PROGRESS_FILE="$(resolve_progress_file "$WORKTREE_PATH" "$ISSUE")"
 LAST_ENTRY="$(
     python3 "$SCRIPT_DIR/progress_read.py" "$PROGRESS_FILE" 2>/dev/null \
     | ENTRY_TYPE="$ENTRY_TYPE" python3 -c '

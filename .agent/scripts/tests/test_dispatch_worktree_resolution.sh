@@ -32,7 +32,21 @@ B="$WTBASE/issue-zzztestb-$N"
 C="$WTBASE/issue-zzz_test_c-$N"
 mkdir -p "$A/.agent/work-plans/issue-$N" "$B/.agent/work-plans/issue-$N" \
          "$C/.agent/work-plans/issue-$N"
-cleanup() { rm -rf "$A" "$B" "$C"; }
+
+# resolve_progress_file fixtures (#550):
+#   LAYER  — depth-7 nested project repo; resolver must find the NESTED file.
+#   WS     — workspace layout (file at worktree root); resolver returns ROOT.
+#   ABSENT — repo dir exists but no progress.md; resolver returns ROOT fallback.
+LAYER="$WTBASE/issue-zzzlayer-$N"
+WS="$WTBASE/issue-zzzws-$N"
+ABSENT="$WTBASE/issue-zzzabsent-$N"
+mkdir -p "$LAYER/ui_ws/src/fake_repo/.agent/work-plans/issue-$N" \
+         "$WS/.agent/work-plans/issue-$N" \
+         "$ABSENT/ui_ws/src/fake_repo"
+: > "$LAYER/ui_ws/src/fake_repo/.agent/work-plans/issue-$N/progress.md"
+: > "$WS/.agent/work-plans/issue-$N/progress.md"
+
+cleanup() { rm -rf "$A" "$B" "$C" "$LAYER" "$WS" "$ABSENT"; }
 trap cleanup EXIT
 
 TEST_PASS=0
@@ -81,6 +95,41 @@ if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "must be a number"; then
     pass "non-numeric --issue rejected"
 else
     fail "non-numeric --issue rejected (rc=$rc; out=$out)"
+fi
+
+# 6-8. resolve_progress_file directly (#550). Source the script (the source-guard
+# loads only the function defs, no dispatch) in a subshell so the script's
+# `set -euo pipefail` does not leak into this test shell, then call the resolver.
+
+# 6. Layer-nested fixture at depth 7 -> resolver returns the NESTED path
+#    (guards the maxdepth-7 off-by-one; -maxdepth 6 would miss it).
+# shellcheck disable=SC1090  # $DISPATCH is resolved at runtime; sourced for its funcs only
+got=$(source "$DISPATCH"; resolve_progress_file "$LAYER" "$N")
+want="$LAYER/ui_ws/src/fake_repo/.agent/work-plans/issue-$N/progress.md"
+if [ "$got" = "$want" ]; then
+    pass "resolve_progress_file finds depth-7 layer-nested progress.md"
+else
+    fail "resolve_progress_file depth-7 layer (got=$got; want=$want)"
+fi
+
+# 7. Workspace fixture (file at worktree root) -> resolver returns the ROOT path.
+# shellcheck disable=SC1090
+got=$(source "$DISPATCH"; resolve_progress_file "$WS" "$N")
+want="$WS/.agent/work-plans/issue-$N/progress.md"
+if [ "$got" = "$want" ]; then
+    pass "resolve_progress_file returns root path for workspace layout"
+else
+    fail "resolve_progress_file workspace root (got=$got; want=$want)"
+fi
+
+# 8. Absent file (repo dir exists, no progress.md) -> resolver returns ROOT fallback.
+# shellcheck disable=SC1090
+got=$(source "$DISPATCH"; resolve_progress_file "$ABSENT" "$N")
+want="$ABSENT/.agent/work-plans/issue-$N/progress.md"
+if [ "$got" = "$want" ]; then
+    pass "resolve_progress_file returns root fallback when file absent"
+else
+    fail "resolve_progress_file absent fallback (got=$got; want=$want)"
 fi
 
 echo
