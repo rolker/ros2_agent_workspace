@@ -24,30 +24,40 @@ Both find invocations are affected:
 
 ## Approach
 
-1. **Scope both `find` calls to `*/src/*`** — colcon artifacts always live
-   under `*/install/*` or `*/build/*`, never under `*/src/*`. Adding
-   `-path '*/src/*'` to both find calls excludes artifacts entirely.
+1. **Scope both `find` calls to the layer-workspace `src/` with an *anchored*
+   path: `-path '*_ws/src/*'`** — colcon artifacts live under
+   `<layer>_ws/install/*` / `<layer>_ws/build/*`, the source under
+   `<layer>_ws/src/*`. **Not** a bare `-path '*/src/*'`: if the whole workspace
+   is checked out under a path that itself contains a `/src/` segment (e.g.
+   `~/src/project11/…`), then `…/install/<pkg>` *also* matches `*/src/*` and the
+   artifact dir is not excluded (review-plan finding). Anchoring on `_ws/src/`
+   keys on the layer-workspace structure, which the artifact paths never share.
 
 2. **Add git-repo verification after each `find` (belt-and-suspenders)** —
    after finding a candidate path, verify it is a git repo root via
-   `git -C "$path" rev-parse --show-toplevel 2>/dev/null`. If the result
-   does not equal `$path`, emit a clear error (not a silent wrong-path
-   fallback). This defends against future layout changes that `-path`
-   alone can't catch.
+   `git -C "$path" rev-parse --show-toplevel 2>/dev/null`. **Scope the new error
+   to the *found-but-not-a-git-root* case only** — an empty `find` result is a
+   legitimate signal that must keep flowing to the existing `REPO_PATH` fallback
+   at `merge_pr.sh:222` (do not convert an empty result into a hard error, or the
+   escape-hatch path regresses). Emit the clear error only when a non-empty
+   candidate fails the git-root check.
 
 3. **Add a regression test to `test_merge_pr.sh`** — fabricate a fake
-   `layers/main/testlayer_ws/{install,build,src}/testpkg` structure where
-   `src/testpkg` is a git repo with a gitcloud (field-mode) origin. Invoke
-   `merge_pr.sh --pr 1 --repo-slug testpkg` and assert the field-mode guard
-   fires (proving `src/testpkg` was resolved), not any other error
-   (which would indicate `install/testpkg` or `build/testpkg` was found first).
+   `layers/main/testlayer_ws/{install,build,src}/testpkg` structure. Make
+   **`install/testpkg` a *github*-origin git repo** and **`src/testpkg` a
+   *gitcloud* (field-mode) git repo**, so buggy vs fixed resolution produces a
+   **positive/positive contrast** rather than relying on filesystem ordering or
+   an error: invoke `merge_pr.sh --pr 1 --repo-slug testpkg` and assert the
+   **field-mode guard fires** (proving `src/testpkg` was resolved). If resolution
+   regressed to `install/testpkg`, the github-origin path would instead proceed
+   past the field-mode guard — a clearly distinguishable outcome.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/merge_pr.sh` | Add `-path '*/src/*'` to the two `find` calls on lines 151 and 221; add git-repo verification after each |
-| `.agent/scripts/tests/test_merge_pr.sh` | Add regression test: fake artifact dirs + src git repo, assert field-mode guard fires (src resolved) |
+| `.agent/scripts/merge_pr.sh` | Add anchored `-path '*_ws/src/*'` to the two `find` calls (L151, L221); add git-repo verification scoped to the found-but-not-git-root case (preserve the empty→`REPO_PATH` fallback at L222) |
+| `.agent/scripts/tests/test_merge_pr.sh` | Add regression test: github-origin `install/testpkg` + gitcloud-origin `src/testpkg`, assert the field-mode guard fires (positive/positive contrast, no filesystem-order reliance) |
 
 ## Principles Self-Check
 
@@ -78,7 +88,9 @@ Both find invocations are affected:
 
 ## Open Questions
 
-- [ ] No open questions — plan is review-plan-ready.
+- [x] None. Review-plan's 3 suggestions folded in: anchored `*_ws/src/*` (not
+  bare `*/src/*`); git-verify error scoped to found-but-not-git-root (empty
+  fallback preserved); contrast-based test (github `install/` vs gitcloud `src/`).
 
 ## Estimated Scope
 
