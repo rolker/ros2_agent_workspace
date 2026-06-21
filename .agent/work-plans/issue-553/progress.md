@@ -72,3 +72,32 @@ issue: 553
 - [ ] (suggestion) Carry into SKILL.md prose that the re-orientation header rides in the `AskUserQuestion` `question` field, not the 12-char `header` chip — `plan.md:30`
 
 <!-- Independence: Plan Authored by "Claude Code Agent (Claude Sonnet)"; this review is a fresh-context dispatch on Claude Opus, not an in-context author self-review. Agent-name match is a false positive of the generic shared name, so no self-review annotation applied. -->
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 18:00 +00:00
+**By**: Claude Opus
+
+**Branch**: feature/issue-553 at `c2973e1`
+**Files**: `.claude/skills/run-issue/SKILL.md`
+
+Expanded the Checkpoints section of `run-issue/SKILL.md` (verified live at lines
+242–256, Publish step at 258 — matching the review-plan correction) with two new
+requirements, inserted after the intro line and the 4-item checkpoint list:
+
+- **Re-orientation header** — every `AskUserQuestion` opens its `question`-field
+  text with `Issue #N: <title> — phase X of Y; <one-line state>`. Guidance states
+  explicitly that this rides in the `question` field, **not** the ~12-char
+  `header` chip.
+- **Finding-embedding** — when a checkpoint is triggered by a `## Plan Review`,
+  `## Local Review (Pre-Push)`, or `## Integrated Review` finding, the finding's
+  severity + condensed text must appear verbatim in the `question` field or an
+  option `description`; labels stay short, the *why* rides in the description.
+
+Added a worked example (sample `question` string + two labelled options) making
+both concrete, and stated both apply to all four mandatory checkpoints.
+
+Collateral-change check passed: `git diff` shows only a 33-line insertion within
+the Checkpoints section — the decision table, the 4-item checkpoint list, the
+Publish step, and all other sections are untouched. Pre-commit passed (no
+`--no-verify`). Committed as `c2973e1`. Per task scope: no push, no PR.
