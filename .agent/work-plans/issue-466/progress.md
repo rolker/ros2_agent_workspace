@@ -131,3 +131,21 @@ Implemented the approved revised plan (commit 87ac99e), post-side only.
 ### Out of scope (not touched)
 - Read-side host-injected context and false-FAILED-on-redispatch (count 1→1)
   — tracked in #552.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 05:48 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-466 at `d430610`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching skill doc; lifecycle-procedure change)
+**Must-fix**: 2 | **Suggestions**: 2
+**Round**: 1 | **Ship**: continue — two must-fix, one a genuine correctness concern in the gh-auth gate
+
+### Findings
+- [ ] (must-fix) Step rename `8a.x`→`7a.x` left 4 dangling cross-refs in sibling skill — `.claude/skills/review-plan/SKILL.md:269,291,310,320` (→ 7a.1/7a.2/7a.3/7a.5)
+- [ ] (must-fix) gh-auth gate handles only no-token; read-only container `GH_TOKEN` makes `gh auth status --active` pass, then unguarded `gh issue comment` fails loudly (403) — reintroduces bad status in the #532 target env — `.claude/skills/review-issue/SKILL.md:359`
+- [ ] (suggestion) `description:`/Overview still flatly say "Posts findings as a comment"; posting is now best-effort — `.claude/skills/review-issue/SKILL.md:3`
+- [ ] (suggestion) Read path (step 1 `gh issue view`, 7a.1 probe) remains ungated auth dependency; "persist-first complete" guarantee only holds with a read token — `.claude/skills/review-issue/SKILL.md:26`
