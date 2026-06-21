@@ -212,3 +212,29 @@ a fresh-context sub-agent:
     .agent/scripts/dispatch_subagent.sh --mode in-process --issue 552 --skill review-code
 
 No push / no PR — left for the host per the dispatch contract.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 13:44 +00:00
+**By**: Claude Opus
+**Verdict**: approved
+
+**Branch**: feature/issue-552 at `6121331`
+**Mode**: pre-push
+**Depth**: Deep (reason: new ADR-0015 + governance files AGENTS.md / two SKILL.md)
+**Must-fix**: 0 | **Suggestions**: 4
+**Round**: 2 | **Ship**: recommended — no must-fix; Round-1 must-fix + 4 suggestions all verified addressed, only low-severity polish remains
+
+Static analysis clean (shellcheck `--severity=warning`, `bash -n`); tests 37/37
+(incl. `--context-file` compose, nonce-fence, sourced freshness-gate units). Two
+disjoint-lens Claude Adversarial passes both confirmed: nonce fence unforgeable on
+the normal path (48-bit per-dispatch entropy), no shell-eval/command-injection on
+the spliced body, freshness gate uses the same match predicate as `entry_count`
+and is correctly fail-closed. Plan adherence: no drift; both operator decisions
+honored. Governance/consequences all addressed. Copilot off (not opted in).
+
+### Findings
+- [ ] (suggestion) "byte-identical to the no-context case" comment is inaccurate — empty CONTEXT_SECTION still adds a blank line; contradicts the correct comment at 451-455 — `.agent/scripts/dispatch_subagent.sh:397-398`
+- [ ] (suggestion) Transparency-log comment says "never the raw contents" but logs the verbatim first body line — soften comment or truncate `ctx_heading` — `.agent/scripts/dispatch_subagent.sh:437-438`
+- [ ] (suggestion) `--context-file` is body-only (loses labels/comments/linked-PR that review-issue step 1 consumes) — note the limitation or fetch richer JSON — `.claude/skills/review-issue/SKILL.md:78` / `.claude/skills/run-issue/SKILL.md:53`
+- [ ] (suggestion) Nonce `$$` fallback is guessable in the `/dev/urandom`-unreadable degraded path — use higher-entropy fallback — `.agent/scripts/dispatch_subagent.sh:414-415`
