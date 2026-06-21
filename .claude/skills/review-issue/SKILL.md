@@ -1,6 +1,6 @@
 ---
 name: review-issue
-description: Evaluate a GitHub issue against workspace principles and ADRs before work begins. Posts findings as a comment on the issue.
+description: Evaluate a GitHub issue against workspace principles and ADRs before work begins. Records findings in progress.md and best-effort posts them as a comment on the issue.
 ---
 
 # Review Issue
@@ -14,8 +14,9 @@ description: Evaluate a GitHub issue against workspace principles and ADRs befor
 ## Overview
 
 Evaluate an issue before work begins. Checks scope, principle alignment, ADR
-relevance, repo placement, and dependencies. Posts findings as a comment on
-the issue — does not modify the issue body.
+relevance, repo placement, and dependencies. Records findings in progress.md
+(the canonical record) and best-effort posts them as a comment on the issue —
+does not modify the issue body. See **Posting behavior** below.
 
 **Lifecycle position**: **review-issue** → plan-task → review-plan → implement → review-code
 
