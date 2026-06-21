@@ -149,3 +149,22 @@ Implemented the approved revised plan (commit 87ac99e), post-side only.
 - [x] (must-fix) gh-auth gate handles only no-token; read-only container `GH_TOKEN` makes `gh auth status --active` pass, then unguarded `gh issue comment` fails loudly (403) — reintroduces bad status in the #532 target env — `.claude/skills/review-issue/SKILL.md:359`
 - [x] (suggestion) `description:`/Overview still flatly say "Posts findings as a comment"; posting is now best-effort — `.claude/skills/review-issue/SKILL.md:3`
 - [x] (suggestion) Read path (step 1 `gh issue view`, 7a.1 probe) remains ungated auth dependency; "persist-first complete" guarantee only holds with a read token — `.claude/skills/review-issue/SKILL.md:26`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 05:55 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-466 at `4ca424f`
+**Addressed**: ## Local Review (Pre-Push) (When 2026-06-21 05:48 +00:00, branch feature/issue-466 at `d430610`)
+**Commits**: 2c0fe36, c0401b4, ba48532, 4ca424f
+
+Addressed all 4 open findings (2 must-fix, 2 suggestions) from the pre-push
+review. Doc-only changes to two sibling skills; pre-commit passed on every
+commit (no `--no-verify`).
+
+### Actions
+- [x] (must-fix) Fixed 4 dangling `8a.x`→`7a.x` cross-refs in sibling skill after the review-issue step renumber — `.claude/skills/review-plan/SKILL.md:269,291,310,320` (commit 2c0fe36)
+- [x] (must-fix) gh-auth gate only handled no-token; wrapped `gh issue comment` so a read-only-token 403 is caught and the phase still completes — `.claude/skills/review-issue/SKILL.md` posting block (commit c0401b4)
+- [x] (suggestion) Reframed `description:` and Overview to state posting is best-effort, not unconditional — `.claude/skills/review-issue/SKILL.md:3,17` (commit ba48532)
+- [x] (suggestion) Documented that the read path (step 1 `gh issue view`, step 7a.1 probe) remains an auth dependency, so the persist-first `complete` guarantee holds only with a read token — `.claude/skills/review-issue/SKILL.md` Posting behavior note (commit 4ca424f)
