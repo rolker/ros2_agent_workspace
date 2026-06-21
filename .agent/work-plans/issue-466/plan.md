@@ -14,16 +14,23 @@ re-dispatch replacing a typed entry (count 1→1).
 
 The persistence half of issue #466 is already shipped: both `review-issue` and
 `review-plan` write typed `## Issue Review` / `## Plan Review` entries to
-`progress.md` (observed driving #550). What remains is a posting-order and
-reporting bug in `review-issue`:
+`progress.md` (observed driving #550). What remains is a **posting-order** bug in
+`review-issue`:
 
-1. **Wrong order**: step 7 (GitHub comment) runs before step 8 (progress.md
-   commit). If posting fails, progress.md may not yet have been written.
-2. **Wrong status**: when posting fails due to missing gh auth (the normal
-   container case), the skill self-marks `**Status**: partial`, even though it
-   produced a complete progress.md entry. `dispatch_subagent.sh` maps
-   `partial → exit 1`, so a fully-successful container phase pages the host as
-   "FAILED".
+1. **Wrong order is the root cause**: SKILL.md posts the GitHub comment (step 7)
+   *before* persisting + committing the `## Issue Review` entry (step 8). When
+   gh auth is absent (the normal container case), the agent has no way to
+   complete step 7 and aborts there — *before* reaching step 8's persist — so
+   either nothing is written, or it records a non-`complete` status. Observed
+   live: commit `a38b523` wrote `**Status**: failed`; the #550 run wrote
+   `partial`. `dispatch_subagent.sh` maps both `partial` and `failed` to a
+   non-zero exit, so a phase whose only real gap is the optional post pages the
+   host as "FAILED".
+2. **Note on framing**: the current SKILL.md does *not* literally instruct the
+   skill to self-mark `partial` — step 8 hardcodes `complete`. The bad status
+   comes from the agent improvising when it can't complete the earlier posting
+   step. Persisting **first** removes the ability of the optional post to block
+   (or downgrade) the canonical record, which is the actual fix.
 
 `review-plan` has no posting step at all — no change needed there.
 
@@ -64,16 +71,33 @@ fi
 Do not set `**Status**: partial` based on this branch. The status is `complete`
 regardless of whether the post succeeded.
 
-### 3. Update `**Comment**:` field in the progress.md template
+### 3. Update `**Comment**:` field in the progress.md template (no inline URL)
 
-The `**Comment**:` line in the `## Issue Review` entry currently expects a
-GitHub comment URL. With best-effort posting it may not have one. Use:
+Because the entry is now written + committed in step 7 **before** any posting
+attempt (step 8), the **comment URL is not known at write time** — so the
+template must not depend on it. Drop the on-success-URL case entirely; the
+`**Comment**:` line records posting *intent*, not a resulting URL:
 
-- When posting succeeded: `**Comment**: <URL>`
-- When posting was skipped: `**Comment**: (not posted — no GitHub auth)`
+- `**Comment**: (best-effort post follows this entry; not recorded inline)`
 
-This is already the pattern used by the review performed while driving #550
-(see the existing `## Issue Review` entry in this file).
+If a posted comment's URL is ever wanted, it lives on the GitHub issue thread —
+do **not** round-trip back to amend+recommit the entry just to capture it (that
+churn is out of proportion to the value, and re-committing the same entry would
+also trip the #552 replace-vs-append count edge). Keep the `## Issue Review`
+entry single-write.
+
+### 3b. Fix stale internal cross-references in SKILL.md
+
+Swapping steps 7↔8 leaves dangling references that assume posting precedes
+persistence. Fix them so the doc is internally consistent:
+
+- `SKILL.md:161` — "After posting the comment, append…" → reword to "After
+  committing the progress.md entry, (best-effort) post…" (persistence now first).
+- `SKILL.md:305` — `**Comment**: <URL … from step 7>` → align with change #3
+  (no inline URL; the persist step is the new step 7).
+
+Grep the file for any other "step 7"/"step 8" or "after posting" phrasing and
+reconcile all of it with the new order.
 
 ### 4. Document the decision in SKILL.md
 
@@ -97,7 +121,7 @@ AGENTS.md script table only if `dispatch_subagent.sh` is actually modified.
 
 | File | Change |
 |------|--------|
-| `.claude/skills/review-issue/SKILL.md` | Reorder steps 7↔8; add gh-auth gate; document best-effort decision in Overview |
+| `.claude/skills/review-issue/SKILL.md` | Reorder steps 7↔8; add gh-auth gate; drop inline-URL `**Comment**:` case; fix stale cross-refs (`:161`, `:305`, + any other "after posting"/"step 7/8" phrasing); document best-effort decision in Overview |
 | `.agent/scripts/dispatch_subagent.sh` | Read-only verification; comment only if modified |
 | `AGENTS.md` | Only if `dispatch_subagent.sh` changes (not expected) |
 
