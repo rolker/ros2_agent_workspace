@@ -93,3 +93,17 @@ This assumes `progress.md` lives at the worktree root, which is correct for work
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-21 04:07 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-550/plan.md` at `34ee993`
+**PR**: PR-less (`--issue` mode)
+**Verdict**: changes-requested
+
+### Findings
+- [ ] (must-fix) `find -maxdepth 6` is off-by-one — layer-nested `progress.md` is at depth 7 (`<layer>_ws/src/<repo>/.agent/work-plans/issue-N/progress.md`); reproduced that maxdepth 6 returns empty, 7 finds it. As written the fix falls through to the nonexistent workspace-root fallback and the false FAILED persists. Use `-maxdepth 7` (or unbounded). — `plan.md:26`
+- [ ] (must-fix) Test #6 runs `--mode in-process`, which exits at `dispatch_subagent.sh:339` *before* `PROGRESS_FILE` is ever read (only consumed at `:357-358` and `:420`, container-mode only). The "does NOT emit FAILED" assertion is vacuously true for both fixed and broken code — it cannot catch the regression or finding #1. Exercise the path resolver directly (sourceable function / path assertion). — `plan.md:37-41`
+- [ ] (suggestion) Note in the plan that `PROGRESS_FILE` resolution is container-mode-only, so any regression test must target the resolver, not the in-process exit path. — `plan.md:37`
