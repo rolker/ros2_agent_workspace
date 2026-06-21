@@ -252,6 +252,39 @@ Use `AskUserQuestion` — **never block silently**. Mandatory checkpoints:
 4. **Before any push, PR creation, or merge** — local-first: the user confirms
    that work publishes.
 
+**Every checkpoint dialog must stand on its own.** An operator returning to a
+checkpoint — possibly after attending to another issue running concurrently —
+should be able to adjudicate it from the dialog alone, without scrolling back
+for the context that triggered it. Two requirements make that true, and **both
+apply to all four checkpoints above**:
+
+- **Re-orientation header** — every `AskUserQuestion` call must open its
+  `question` text with a one-line header:
+  `Issue #N: <title> — phase X of Y; <one-line state>`. Put it in the
+  **`question` field, not the `header` field** — the `header` chip is capped at
+  ~12 chars and cannot hold it. This reloads the operator's context the moment
+  attention returns.
+- **Finding-embedding** — when a checkpoint is triggered by a review finding
+  (from `## Plan Review`, `## Local Review (Pre-Push)`, or
+  `## Integrated Review`), the finding's **severity and condensed text must
+  appear verbatim** in the `question` field or an option `description` — not
+  only in the prose above the dialog. Keep option **labels** short (the action);
+  the *why* rides in the `description`.
+
+Worked example — checkpoint 3, triggered by an `## Integrated Review` must-fix:
+
+```
+question: "Issue #466: Recover from GPS dropout — phase 6 of 7; Integrated
+           Review found 1 must-fix. [HIGH] stale fix published when RTK age
+           > 2s (nav_node.cpp:212). How should I proceed?"
+options:
+  - label:       "Fix via address-findings"
+    description: "Dispatch address-findings to gate publishing on RTK age —
+                  resolves the [HIGH] stale-fix finding above."
+  - label:       "Defer"
+    description: "Publish as-is; track the [HIGH] stale-fix finding separately."
+```
+
 Between checkpoints the orchestrator proceeds automatically, reporting each
 transition (entry read → next dispatch).
 
