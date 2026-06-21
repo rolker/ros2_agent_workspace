@@ -2,36 +2,65 @@
 issue: 466
 ---
 
-# Issue #466 — (title unknown — see below)
+# Issue #466 — Persist review-issue and review-plan output to progress.md
 
 ## Issue Review
-**Status**: failed
-**When**: 2026-06-21 00:00 +00:00
+**Status**: complete
+**When**: 2026-06-21 05:08 +00:00
 **By**: Claude Code Agent (Claude Sonnet)
 
 **Issue**: #466
-**Comment**: (not posted — GitHub auth unavailable)
-**Scope verdict**: (not determined)
+**Comment**: (not posted — GitHub posting is optional/best-effort per local-first contract #532)
+**Scope verdict**: well-scoped
 
-### Failure reason
+### Scope Assessment
 
-`gh auth status` reports no authenticated GitHub hosts. Neither `GH_TOKEN`,
-`GITHUB_TOKEN`, `AGENT_GH_TOKEN`, nor `~/.config/ros2-agent/gh-readonly-token`
-are present in this in-process dispatch context. Without GitHub auth, steps 1
-(read issue body) and 7 (post review comment) of the review-issue SKILL.md
-procedure cannot be completed.
+**Well-scoped?** Yes — the persistence half is already shipped (both `review-issue` and
+`review-plan` write typed `progress.md` entries). The remaining work is narrowly defined:
+(1) make `review-issue` report `complete` (not `partial`) when the only unmet step is the
+optional GitHub post, and (2) verify `dispatch_subagent.sh` does not surface a locally-
+complete phase as FAILED solely because the post was skipped. Both fit a single PR.
 
-git-bug was checked (`git-bug bug list`); only 10 closed bugs are cached and
-none correspond to issue #466. Workspace commit history and grep searches
-also turned up no cached copy of the issue body.
+**Right repo?** Yes — workspace repo. Changes are to `.claude/skills/review-issue/SKILL.md`
+and `.agent/scripts/dispatch_subagent.sh` (verification/documentation; may not need a code
+change). No project-repo changes required.
 
-### What was attempted
+**Dependencies**: The issue body confirms the persistence half is shipped (observed driving #550).
+No blocking open issues identified. Issue #532 (local-first posting contract) is referenced
+as context, not a blocker.
 
-- `gh issue view 466` → `gh auth login` required
-- `git-bug bug list` → no #466 entry
-- Searched `.agent/work-plans/`, git log, and all markdown files for issue #466 body
-- Confirmed no GH token environment variables or token files present
+### Principle Alignment
+
+| Principle | Status | Notes |
+|---|---|---|
+| Human control and transparency | OK | Silently skipping an optional post and recording the skip in `progress.md` keeps the record honest; no hidden state change |
+| Enforcement over documentation | OK | Skill instructions are the appropriate enforcement layer here; behavior fix in SKILL.md is sufficient |
+| Capture decisions, not just implementations | Watch | The "posting is best-effort/optional" decision should be explicit in SKILL.md — not just implied by the fix. Issue text calls for skill docs update, which covers this. |
+| A change includes its consequences | Action needed | SKILL.md must be updated; `dispatch_subagent.sh` behavior should be verified and documented; AGENTS.md/CLAUDE.md need no change (issue text confirms they don't reference per-skill persistence detail) |
+| Only what's needed | OK | Minimal change: update the complete/partial/failed logic in the skill and SKILL.md; no scope creep needed |
+| Improve incrementally | OK | Persistence half already shipped; this is a clean targeted follow-up |
+| Workspace vs. project separation | OK | Workspace skills and scripts only |
+| Workspace improvements cascade to projects | OK | All container-dispatched phases benefit from the corrected posting behavior |
+
+### ADR Applicability
+
+| ADR | Triggered | Notes |
+|---|---|---|
+| ADR-0002 — Worktree isolation | Yes | Work proceeds in the existing `issue-workspace-466` worktree |
+| ADR-0004 — Enforcement hierarchy | Watch | The optional-posting rule lives only in skill instructions; no hook/CI enforcement possible for skill behavior, so docs-only is acceptable here |
+| ADR-0006 — Shared AGENTS.md | No | Issue text explicitly confirms AGENTS.md/CLAUDE.md references are unchanged |
+| ADR-0013 — progress.md vocabulary | Yes | Entry type `## Issue Review` with `complete` status is per ADR-0013. The fix must ensure the entry is committed *before* the optional posting attempt, so the timeline is correct even if posting is skipped |
+
+### Consequences
+
+Per the consequences map:
+- Changing a framework skill → framework adapter file may need updating if it references posting behavior; issue text says no AGENTS.md/CLAUDE.md change needed
+- If `dispatch_subagent.sh` changes → update AGENTS.md script reference table (§ Script Reference)
+- The posting-as-optional change must be recorded in SKILL.md so the intent survives future reads
 
 ### Actions
-- [ ] Host: re-dispatch review-issue with GitHub auth available (GH_TOKEN env var
-  or `~/.config/ros2-agent/gh-readonly-token` populated) so steps 1 and 7 can run
+- [ ] Update `review-issue` SKILL.md: document GitHub posting as best-effort/optional; when no gh auth, skip silently and report `complete`
+- [ ] Ensure the `progress.md` write + commit happens *before* the optional posting attempt (so entry is always present regardless of posting outcome)
+- [ ] Verify `dispatch_subagent.sh`: confirm that a `complete` progress.md entry from the skill results in exit 0 (no code change likely needed — the current logic already maps `complete → exit 0`; add a comment if helpful)
+- [ ] If `dispatch_subagent.sh` is changed, update AGENTS.md script reference table entry for `dispatch_subagent.sh`
+- [ ] Skill docs updated per acceptance criteria
