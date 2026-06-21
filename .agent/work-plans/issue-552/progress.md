@@ -172,3 +172,43 @@ operator decisions honored). Copilot off (not opted in).
 - [x] (suggestion) run-issue overpromises `--context-file` covers post-PR `triage-reviews`, which needs `fetch_pr_reviews.sh`/`gh api` a body file can't supply — scope the claim — `.claude/skills/run-issue/SKILL.md:49`
 - [x] (suggestion) Missing blank line before closing `---` makes it a setext-H2 underline, blurring the contract boundary — `.agent/scripts/dispatch_subagent.sh:405-406`
 - [x] (suggestion) `--prompt-file` + `--context-file` compose silently — undocumented/untested; guard or document — `.agent/scripts/dispatch_subagent.sh:302-317`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 13:36 +00:00
+**By**: Claude Opus
+
+**Branch**: feature/issue-552 at `bb4612e`
+**Addressed**: `## Local Review (Pre-Push)` (changes-requested) — 2026-06-21 13:26 +00:00, branch at `da9b07f`
+**Commits**: `4a9e8aa`, `350b564`, `c49782a`, `8679014`, `bb4612e`
+
+All 5 findings (1 must-fix + 4 suggestions) fixed — none deferred. One atomic
+commit per finding. Tests grew 34 → 37 (new prompt-file+context compose +
+untrusted-fence assertions); 8/8 worktree-resolution still green; `shellcheck
+--severity=warning` and `bash -n` clean.
+
+### Actions
+- [x] (must-fix) `--context-file` body forged-section hardening — fenced the
+  injected body in **nonce-delimited** BEGIN/END markers (unforgeable close) with
+  a warning + authority assertion that the host-authored contract is the only
+  instruction source — `.agent/scripts/dispatch_subagent.sh:397-433` (`4a9e8aa`)
+- [x] (suggestion) Injection transparency log — added line count + structural-token
+  count (markdown headings / `---` lines) so a body posing as contract structure
+  surfaces — `.agent/scripts/dispatch_subagent.sh:434-445` (`350b564`)
+- [x] (suggestion) Blank line before the contract `---` so it parses as a thematic
+  break, not a setext-H2 underline — `.agent/scripts/dispatch_subagent.sh:447-452`
+  (`c49782a`)
+- [x] (suggestion) `--prompt-file` + `--context-file` compose — documented as
+  orthogonal-to-task-source (header + inline) and covered by two new regression
+  tests — `.agent/scripts/dispatch_subagent.sh:16-20,311-317` + `test_dispatch_subagent.sh` (`8679014`)
+- [x] (suggestion) run-issue overpromised `--context-file` covers `triage-reviews`
+  — scoped the claim to body-only phases (`review-issue`); noted triage-reviews
+  needs `fetch_pr_reviews.sh`/`gh api` — `.claude/skills/run-issue/SKILL.md:46-68` (`bb4612e`)
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to
+a fresh-context sub-agent:
+
+    .agent/scripts/dispatch_subagent.sh --mode in-process --issue 552 --skill review-code
+
+No push / no PR — left for the host per the dispatch contract.
