@@ -141,6 +141,89 @@ else
 fi
 rm -rf "$FAKE_WT2"
 
+# --- --context-file injects host-fetched read context into the handoff (#552) ---
+# Composable with --skill: the body lands AND the skill keeps its entry type.
+CTXF="$(mktemp /tmp/dispatch_test_ctx.XXXXXX.md)"
+echo "INJECTED_CONTEXT_MARKER_77" > "$CTXF"
+assert_emits "--context-file content lands in the handoff" "INJECTED_CONTEXT_MARKER_77" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
+assert_emits "--context-file adds the injected-context heading" "Injected GitHub context" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
+assert_emits "--context-file is composable with --skill (entry-type kept)" 'final `## Issue Review` entry' \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
+assert_fails "rejects missing --context-file" "--context-file not found" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file /nonexistent/ctx.md
+
+# --context-file is orthogonal to the task source: it composes with --prompt-file
+# too (not only --skill). Both the prompt body and the injected context land (#552).
+PF2="$(mktemp /tmp/dispatch_test_prompt.XXXXXX.md)"
+echo "RAW_PROMPT_MARKER_88" > "$PF2"
+assert_emits "--context-file composes with --prompt-file (prompt body lands)" "RAW_PROMPT_MARKER_88" \
+    --mode in-process --issue "$TEST_ISSUE" --prompt-file "$PF2" --context-file "$CTXF"
+assert_emits "--context-file composes with --prompt-file (context lands)" "INJECTED_CONTEXT_MARKER_77" \
+    --mode in-process --issue "$TEST_ISSUE" --prompt-file "$PF2" --context-file "$CTXF"
+rm -f "$PF2"
+
+# The injected body is fenced as untrusted data with an authority assertion, so a
+# body that forges a `## Sub-agent handoff contract` heading can't pose as one (#552).
+assert_emits "--context-file fences the body as untrusted" "UNTRUSTED INJECTED CONTEXT" \
+    --mode in-process --issue "$TEST_ISSUE" --skill review-issue --context-file "$CTXF"
+rm -f "$CTXF"
+
+# --- sourced unit tests for the Gap-2 freshness gate (#552) ---
+# Source the script (the source-guard returns before any dispatch runs), then
+# exercise is_fresh_entry / last_entry_signature directly — the gate lives in the
+# container path, unreachable by execution without docker. Run in a subshell
+# because sourcing enables `set -euo pipefail`; re-disable -e inside so the
+# intentional non-zero returns (the "not fresh" cases) don't abort the subshell.
+SOURCED_RESULT="$(
+    # shellcheck disable=SC1090  # $DISPATCH is resolved at runtime; the guard returns
+    source "$DISPATCH" >/dev/null 2>&1
+    set +e
+    p=0; f=0
+    chk() { if [ "$2" = "$3" ]; then p=$((p+1)); else f=$((f+1)); echo "MISMATCH: $1 (want $3 got $2)"; fi; }
+
+    # is_fresh_entry branches
+    is_fresh_entry 0 1 "" "T1|complete";            chk "append 0->1 fresh"            "$?" 0
+    is_fresh_entry 1 1 "T0|failed" "T1|complete";   chk "replace 1->1 diff-sig fresh"  "$?" 0
+    is_fresh_entry 1 1 "T0|failed" "T0|failed";     chk "no-write identical not-fresh" "$?" 1
+    is_fresh_entry 1 1 "T0|failed" "";              chk "empty post-sig not-fresh"     "$?" 1
+
+    # last_entry_signature against a REPLACE fixture (count stays 1->1, the #466 case)
+    TMP="$(mktemp -d)"
+    cat > "$TMP/progress.md" <<PEOF
+# Issue $TEST_ISSUE
+
+## Issue Review
+**Status**: failed
+**When**: 2026-06-21 10:00 +00:00
+**By**: X (Y)
+PEOF
+    pre="$(last_entry_signature "$TMP/progress.md" "Issue Review")"
+    cat > "$TMP/progress.md" <<PEOF
+# Issue $TEST_ISSUE
+
+## Issue Review
+**Status**: complete
+**When**: 2026-06-21 10:01 +00:00
+**By**: X (Y)
+PEOF
+    post="$(last_entry_signature "$TMP/progress.md" "Issue Review")"
+    rm -rf "$TMP"
+    [ -n "$pre" ] && [ -n "$post" ] && [ "$pre" != "$post" ]; chk "last_entry_signature replace differs" "$?" 0
+    is_fresh_entry 1 1 "$pre" "$post";              chk "fixture replace 1->1 is fresh" "$?" 0
+
+    echo "SUBPASS=$p SUBFAIL=$f"
+)"
+echo "$SOURCED_RESULT" | grep '^MISMATCH:' || true
+sub_p="$(printf '%s\n' "$SOURCED_RESULT" | sed -n 's/.*SUBPASS=\([0-9]*\).*/\1/p')"
+sub_f="$(printf '%s\n' "$SOURCED_RESULT" | sed -n 's/.*SUBFAIL=\([0-9]*\).*/\1/p')"
+if [ -n "$sub_p" ] && [ "${sub_f:-1}" = "0" ]; then
+    ok "sourced freshness-gate units ($sub_p checks)"
+else
+    bad "sourced freshness-gate units" "subpass=${sub_p:-?} subfail=${sub_f:-?}"
+fi
+
 echo ""
 echo "Passed: $PASS  Failed: $FAIL"
 [ "$FAIL" -eq 0 ]

@@ -43,6 +43,37 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
 .agent/scripts/dispatch_subagent.sh --mode <in-process|container> --issue <N> --skill <phase>
 ```
 
+**Context-needing phases: the host fetches the body and passes `--context-file`
+([#552](https://github.com/rolker/ros2_agent_workspace/issues/552)).** A
+container dispatch has no GitHub read auth, so a phase whose first step reads the
+issue/PR body (e.g. `review-issue`) would fail on `gh issue view`. For those
+phases the **host** fetches the body and passes it to the dispatcher:
+
+```bash
+gh issue view <N> --json body --jq .body > /tmp/issue-<N>.md
+.agent/scripts/dispatch_subagent.sh --mode container --issue <N> \
+    --skill review-issue --context-file /tmp/issue-<N>.md
+```
+
+The fetch lives in the **caller** (the dispatcher never needs GitHub auth — it
+only splices a file the host already fetched), and `--context-file` is composable
+with `--skill` so the auto entry-type + model still apply. Pre-push `review-code`
+/ `review-plan` need no GitHub read (they work from the diff / local `plan.md`),
+so they take no `--context-file`.
+
+**Limitation — `--context-file` carries the issue/PR *body* only.** It does not
+convey labels, assignees, comments, or linked-PR metadata that `review-issue`'s
+full `gh issue view --json …` step would otherwise read. For the scope check
+the body is sufficient; a phase that genuinely needs that richer metadata under
+container dispatch is not yet supported by body-only injection (fetch the richer
+JSON host-side and widen the context file if/when such a phase appears).
+
+`--context-file` carries a **single body** — it satisfies a phase that only needs
+the issue/PR body (`review-issue`). It does **not** cover post-PR `triage-reviews`,
+which also reads PR review comments and CI status via `fetch_pr_reviews.sh` /
+`gh api` — data a body file can't supply. Run `triage-reviews` where GitHub read
+auth is available (in-process on the host), not as a body-only container dispatch.
+
 - **in-process** for **quick / cheap phases** — fast, same context root. It
   spawns the phase via Claude Code's **`Agent` tool**, which exists in the
   **host** session but **not** inside a headless container. This is precisely
@@ -98,8 +129,15 @@ relies on the host runtime delivering a completion callback; a runtime without
 one must drive phases foreground / manually (the same caveat as the `Agent` tool
 above).
 
-The dispatcher already verifies the sub-agent wrote the expected entry type
-(PRE/POST entry-count delta — `dispatch_subagent.sh:216-282`); treat a `FAILED`
+The dispatcher already verifies the sub-agent wrote a **fresh** entry of the
+expected type — a *freshness* gate, not a raw count delta
+([#552](https://github.com/rolker/ros2_agent_workspace/issues/552),
+`is_fresh_entry` / `last_entry_signature` in `dispatch_subagent.sh`). An entry is
+fresh when the PRE→POST count **grew** (a new entry was appended) **or** the
+count stayed flat but the last matching entry's `when|status` **signature
+changed** (a re-dispatch *replaced* the typed entry in place — e.g. a prior
+`failed` Issue Review → a `complete` one, count 1→1). Only a flat count *and* an
+unchanged signature reads as `FAILED` ("died before reporting"). Treat a `FAILED`
 report as a stop-and-surface, not a silent retry. After each dispatch, read the
 timeline and act on the **last** entry — that is the one the phase just wrote:
 
@@ -121,9 +159,9 @@ python3 .agent/scripts/progress_read.py .agent/work-plans/issue-<N>/progress.md 
 Review`.** The parenthetical is part of the name (`progress_read.py`
 `CANONICAL_TYPES`), and `--type` matches on the full heading / `base_type`
 *exactly* — so `--type "Local Review"` will **not** match the `(Pre-Push)`
-variant. (The dispatcher's PRE/POST gate, by contrast, adds a `startswith`
-prefix match in its own one-liner — `dispatch_subagent.sh:225-235` — which is
-why a pre-push dispatch resolved as `Local Review` still counts the
+variant. (The dispatcher's freshness gate, by contrast, matches with a
+`startswith` prefix fallback in `entry_count` / `last_entry_signature` — which is
+why a pre-push dispatch resolved as `Local Review` still counts and signs the
 `(Pre-Push)` entry. The `--type` filter does not have that fallback; pass the
 real type.) Pre-push `review-code` always writes `## Local Review (Pre-Push)`;
 `skill_workflows.md`'s handoff table abbreviates it `## Local Review`, but the
