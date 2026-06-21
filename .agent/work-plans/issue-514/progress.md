@@ -69,3 +69,17 @@ Fits in a single PR. The issue lives in the workspace repo (infra script).
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-21 14:57 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-514/plan.md` at `5f4a41c`
+**PR**: PR-less (container dispatch, no GitHub auth)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) `-path '*/src/*'` is defeated by a checkout path containing a `/src/` segment (e.g. `~/src/...`) — the install/ artifact path then still matches; degrades to a false hard error via git-verify, not a wrong merge. Use anchored `-path '*_ws/src/*'`. — `plan.md:28`
+- [ ] (suggestion) Scope the new git-verify error to found-but-not-git-root; preserve the legit empty→`REPO_PATH` fallback at `merge_pr.sh:222`. — `plan.md:32`
+- [ ] (suggestion) Stronger test discriminator: make `install/testpkg` a github-origin git repo so buggy vs fixed resolution gives a positive/positive contrast (no reliance on filesystem ordering). — `plan.md:39`
