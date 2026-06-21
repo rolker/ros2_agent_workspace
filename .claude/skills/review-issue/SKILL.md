@@ -362,7 +362,7 @@ gate it on gh auth so it skips cleanly when none is present, **and** treat a
 failed post itself as non-fatal. The auth gate is necessary but not
 sufficient — a read-only token (e.g. the container's `GH_TOKEN`) makes
 `gh auth status --active` pass, yet `gh issue comment` then fails with a 403.
-Because the comment is wrapped (`|| { … }`) the phase still completes; the
+Because the comment is wrapped (`|| echo …`) the phase still completes; the
 progress.md entry written in step 7 is the record regardless of post outcome.
 
 ```bash
