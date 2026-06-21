@@ -113,8 +113,14 @@ gh issue list --label deployment --state open --json number,title,createdAt,body
 Run from inside the project repo (or with `-R <owner/repo>` if not). `gh`
 auto-detects the remote from `origin`.
 
-- **No open deployment issue**: nothing to wrap up; confirm with the operator
-  whether this was intentional.
+- **No open deployment issue**: before concluding there's nothing to wrap up,
+  **scan `<log_dir>` for an issue-less field start (#533)** — a per-host log
+  whose header line is the canonical `Deployment issue: pending`
+  (`grep -rl '^Deployment issue: pending' <log_dir>`). If found, that
+  deployment was started issue-less and never backfilled: **create + link its
+  issue now** (dated from the log filename), clear the `pending` marker, then
+  proceed to wrap it up. Otherwise confirm with the operator whether the
+  no-issue state was intentional.
 - **Exactly one**: proceed.
 - **Multiple**: list them and ask the operator which deployment this wrap-up is for.
 

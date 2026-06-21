@@ -231,9 +231,10 @@ on-disk artifacts that already exist:
 
 **Issue-less field start + reconciliation (#533).** Where the git-bug *lookup*
 is the slow, window-eating step, the **field side** can start **issue-less** —
-anchored to the per-host log's date (`issue: pending` header), skipping all
-`gh` / `issue_sync` calls. The **dev side** then **backfills**: on a later
-`/start-deployment`, scan `<log_dir>` for logs marked `pending`, create + link
+anchored to the per-host log's date (canonical `Deployment issue: pending`
+header), skipping all `gh` / `issue_sync` calls. The **dev side** then
+**backfills**: on a later `/start-deployment`, scan `<log_dir>` for logs whose
+header line is `Deployment issue: pending`, create + link
 their issues (dated from the log filename), and clear the marker — so
 `/wrap-up-deployment` (which discovers via `gh issue list`) can find them.
 

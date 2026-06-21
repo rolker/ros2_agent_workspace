@@ -230,12 +230,15 @@ So before running it, ask: **"Look for an existing deployment issue? (y/n)"**
 - **n** → start **issue-less**, anchored to the per-host log's date:
   - Ask **"Is this deployment for the current day? (y/n)."**
     - **y** → use **today's date** for the log filename (step 3) and seed the
-      header `Deployment issue: _pending — backfill from a dev host_`.
+      **canonical marker** (one exact, grep-safe string — see the log-header
+      note in 4b): `Deployment issue: pending (backfill from a dev host)`.
     - **n** → **clarify**: *continuing a prior deployment?* → use that
       deployment's **start date** (read it from an existing local
       `<log_dir>/<YYYY>/<date>_<label>_logs.md` on this host; if none, **ask
       the operator**) — the multi-day convention keeps the original date.
-      *Other situation?* → ask, then proceed once the start date is settled.
+      **But if that local log already exists, this is the Resume state (4c)
+      — re-attach to it, don't start a duplicate.** *Other situation?* → ask,
+      then proceed once the start date is settled.
   - Then go straight to the **log-init** (the per-host-log creation in 4b)
     and the **urgency contract** — *not* 4b's issue read / title / body /
     `## Logs` steps, which all require an issue that doesn't exist. Skip
@@ -243,8 +246,10 @@ So before running it, ask: **"Look for an existing deployment issue? (y/n)"**
 
 **Dev-side backfill of issue-less starts (#533) — the reconciliation mechanism.**
 On the **dev side**, after the issue lookup, **also scan `<log_dir>/<YYYY>/`
-for per-host logs whose header reads `issue: pending`** (an issue-less field
-start with no link yet). For each, **offer to create + link its deployment
+for per-host logs whose header line is the canonical marker
+`Deployment issue: pending`** (`grep -l '^Deployment issue: pending'`; the
+exact string the issue-less seed writes) — an issue-less field start with no
+link yet. For each, **offer to create + link its deployment
 issue**: derive the scope from the log's first entries, `gh issue create` it
 (dated from the log's filename — the multi-day anchor), stamp the number / URL
 back into the log header (clearing `pending`), then `dev_push`. Without this
@@ -261,7 +266,7 @@ the operator declines, leave the marker for a later run, and note it.)
   > create + label it), then `issue_sync.dev_push` so this field host sees it
   > on the next `field_pull`.
 - Otherwise take the **issue-less field start** (step 4's field-side branch):
-  start logging against the date *now*, header `issue: pending`; a dev host
+  start logging against the date *now*, header `Deployment issue: pending`; a dev host
   backfills the issue link later. This is the fast path when there's no time
   to prep an issue before launch.
 
@@ -324,6 +329,7 @@ next) exists by the time any warnings need to land in it.
 
 ```markdown
 # <YYYY-MM-DD> — <label> log (<platform> deployment #<N>)
+<!-- issue-less field start (#533): no #<N> / URL yet — use the variant below -->
 
 Deployment issue: <issue URL>
 Host: <hostname>
@@ -332,8 +338,9 @@ Started: <YYYY-MM-DD HH:MM ±HH:MM>
 ```
 
 For an **issue-less field start (#533)** there is no `#<N>` or URL yet:
-title the log `… (<platform> deployment — issue pending)` and seed
-`Deployment issue: _pending — backfill from a dev host_`. The date in the
+title the log `… (<platform> deployment — issue pending)` and seed the
+**canonical marker** — one exact, grep-safe string the dev-side backfill scans
+for: `Deployment issue: pending (backfill from a dev host)`. The date in the
 filename + header is the reconciliation anchor; a dev host fills in the
 number/URL later (it finds this log by date) and clears the marker.
 
