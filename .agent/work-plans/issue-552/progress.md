@@ -77,3 +77,18 @@ Both fixes land in the same script area and belong in one PR. No splitting neede
 ### Open questions
 - [ ] KEY DESIGN CHOICE — ADR placement: recommend a **new ADR-0015** over an ADR-0013 addendum (0013's subject is the progress.md entry-type vocabulary, not the dispatch auth boundary; ADR-0012 excludes substantive new decisions from its addendum carve-out). Confirm at review-plan before writing 0015.
 - [ ] Gap-2 freshness fingerprint: confirm `when`+`status` alone suffices, or keep `by` for robustness against same-minute same-status re-dispatches.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-21 06:42 +00:00
+**By**: Claude Code Agent (Claude Opus) (in-context — author self-review)
+
+**Plan**: `.agent/work-plans/issue-552/plan.md` at `11f0853`
+**PR**: PR-less (review-plan --issue mode)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) Gap 2 changes the dispatcher's exit gate from count-delta to a freshness test, but `run-issue/SKILL.md:102` still describes it as "PRE/POST entry-count delta" (and `:125` the startswith behavior) — add a run-issue edit refreshing the gate description; the planned Gap-4 run-issue edit covers only the `--context-file` caller note — `plan.md:114`,`plan.md:132`
+- [ ] (suggestion) Confirm the KEY DESIGN CHOICE: proceed with **new ADR-0015** (not an ADR-0013 addendum). ADR-0012's carve-out is navigational-only; this is a substantive decision; 0015 verified as the next free number — `plan.md:168`
+- [ ] (suggestion) Keep `when|status|by` as the Gap-2 fingerprint (all three fields already exposed by progress_read.py — free robustness); add a code comment noting the same-minute/same-status/same-by collision is fail-closed and acceptable — `plan.md:174`
+- [ ] Otherwise solid: all cited line numbers verified against source; all six Issue Review actions covered; scope correct (6 files, one component); WORKTREE_GUIDE.md correctly omitted (no dispatch references). Ready for implementation.
