@@ -81,3 +81,15 @@ This assumes `progress.md` lives at the worktree root, which is correct for work
 - [ ] Update `dispatch_subagent.sh` to resolve `PROGRESS_FILE` dynamically for layer worktrees (line 278)
 - [ ] Update `test_dispatch_worktree_resolution.sh` to include a layer-nested progress.md fixture and assert `entry_count()` finds it
 - [ ] NOTE: GitHub comment could not be posted (no GH auth in this environment). Host should post the review text above as a comment on issue #550 before proceeding to plan-task.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-21 00:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-550/plan.md` at `34ee993`
+**Branch**: feature/issue-550 at `34ee993`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
