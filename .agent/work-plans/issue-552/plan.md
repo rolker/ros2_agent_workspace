@@ -69,15 +69,17 @@ fetch logic buried in the `run-issue` markdown would help only that one path.
 
 1. **Add a sourceable `last_entry_signature()`** helper (above the source-guard,
    next to `resolve_progress_file`) that returns the last matching entry's
-   `when|status|by` using the *same* match predicate (`type == want ||
-   base_type == want || startswith(want)`) the count gate uses. Empty when no
-   match.
+   `when|status` (operator decision: `by` dropped) using the *same* match
+   predicate (`type == want || base_type == want || startswith(want)`) the count
+   gate uses. Empty when no match. Carry a comment that a same-minute/same-status
+   re-dispatch yields an identical signature → reads as FAILED (fail-closed,
+   accepted — see Open Questions).
 2. **Capture PRE signature** alongside `PRE_COUNT`; **capture POST signature**
    alongside `POST_COUNT`.
 3. **Replace the count-delta precondition** (`:440`) with a freshness test:
    an entry is *fresh* iff `POST_COUNT > PRE_COUNT` (append case — unchanged) **or**
    `POST_COUNT == PRE_COUNT && POST_SIG != PRE_SIG && POST_SIG non-empty`
-   (replace case — the newest typed entry changed `when`/`status`/`by`). Only a
+   (replace case — the newest typed entry changed `when`/`status`). Only a
    flat count **and** identical signature reads as FAILED ("died before
    reporting"). The existing fail-closed numeric guards (`:403-405`, `:436-439`)
    stay.
@@ -111,9 +113,14 @@ call, so it can't be reached by execution without docker). Source the script
   instead of `gh issue view`, satisfying the read path with zero container auth.
 - **`AGENTS.md`** script table row (`:470`): add `--context-file <path>`
   (host-injected issue/PR body; container needs no GitHub read auth).
-- **`run-issue/SKILL.md`** — "How phases are dispatched": for context-needing
-  phases the host fetches the body and passes `--context-file` (the fetch lives
-  in the caller, not the dispatcher).
+- **`run-issue/SKILL.md`** — two edits: (a) "How phases are dispatched": for
+  context-needing phases the host fetches the body and passes `--context-file`
+  (the fetch lives in the caller, not the dispatcher); (b) **refresh the
+  exit-gate description** at `:102` (and the `startswith` note at `:125`), which
+  still say "PRE/POST entry-count delta" — update to the freshness gate
+  (count-grow **or** same-count-but-changed-`when|status` signature), per the
+  review-plan suggestion. Otherwise the SKILL describes a gate the script no
+  longer uses.
 
 ### Gap 5 — record the decision (ADR)
 
@@ -163,18 +170,18 @@ write-side framing. See Open Questions for the addendum-vs-new-ADR call.
 | exit-contract gate logic | `test_dispatch_subagent.sh` regression | Yes (Gap 3) |
 | new dispatch contract | `docs/decisions/0015-*.md` | Yes (Gap 5) |
 
-## Open Questions
+## Open Questions (RESOLVED by operator, 2026-06-21)
 
-- [ ] **KEY DESIGN CHOICE — ADR placement.** Recommend a **new ADR (0015)** over
-  an ADR-0013 addendum: ADR-0013's subject is the progress.md entry-type
-  vocabulary, not the dispatch auth boundary, and ADR-0012 explicitly excludes
-  *substantive* new decisions from the cross-reference-addendum carve-out — so an
-  addendum would be the wrong home and out of policy. Confirm at the review-plan
-  checkpoint before writing 0015.
-- [ ] Gap-2 freshness signal: `when|status|by` is the proposed PRE/POST
-  fingerprint. Confirm `when`+`status` alone (per the issue wording) is
-  sufficient, or keep `by` for robustness against same-minute, same-status
-  re-dispatches.
+- [x] **ADR placement → new ADR-0015** (not an ADR-0013 addendum). Operator
+  confirmed; matches the plan's recommendation (ADR-0012's carve-out is
+  navigational-only, so a substantive new decision needs its own ADR).
+- [x] **Gap-2 fingerprint → `when|status`** (drop `by`). Operator chose the
+  simpler signal. The residual edge — two re-dispatches in the same minute that
+  both produce the *same* status — collapses to an identical `when|status`
+  signature and so reads as **not fresh (FAILED)**: this is **fail-closed** (the
+  safe direction; a genuinely stuck re-dispatch is the far more likely cause of a
+  same-minute/same-status flat count). The implementation must carry a code
+  comment documenting this accepted trade-off.
 
 ## Estimated Scope
 
