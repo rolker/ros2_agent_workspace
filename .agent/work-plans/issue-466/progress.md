@@ -168,3 +168,18 @@ commit (no `--no-verify`).
 - [x] (must-fix) gh-auth gate only handled no-token; wrapped `gh issue comment` so a read-only-token 403 is caught and the phase still completes — `.claude/skills/review-issue/SKILL.md` posting block (commit c0401b4)
 - [x] (suggestion) Reframed `description:` and Overview to state posting is best-effort, not unconditional — `.claude/skills/review-issue/SKILL.md:3,17` (commit ba48532)
 - [x] (suggestion) Documented that the read path (step 1 `gh issue view`, step 7a.1 probe) remains an auth dependency, so the persist-first `complete` guarantee holds only with a read token — `.claude/skills/review-issue/SKILL.md` Posting behavior note (commit 4ca424f)
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 06:09 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-466 at `fbff467`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching skill doc; lifecycle-procedure change)
+**Must-fix**: 0 | **Suggestions**: 1
+**Round**: 2 | **Ship**: recommended — no must-fix; all Round-1 findings addressed, only one cosmetic suggestion remains
+
+### Findings
+- [ ] (suggestion) Prose says comment is wrapped `|| { … }` but code uses `|| echo "…"`; align for internal consistency — `.claude/skills/review-issue/SKILL.md:365`
