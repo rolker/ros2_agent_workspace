@@ -107,3 +107,31 @@ This assumes `progress.md` lives at the worktree root, which is correct for work
 - [ ] (must-fix) `find -maxdepth 6` is off-by-one — layer-nested `progress.md` is at depth 7 (`<layer>_ws/src/<repo>/.agent/work-plans/issue-N/progress.md`); reproduced that maxdepth 6 returns empty, 7 finds it. As written the fix falls through to the nonexistent workspace-root fallback and the false FAILED persists. Use `-maxdepth 7` (or unbounded). — `plan.md:26`
 - [ ] (must-fix) Test #6 runs `--mode in-process`, which exits at `dispatch_subagent.sh:339` *before* `PROGRESS_FILE` is ever read (only consumed at `:357-358` and `:420`, container-mode only). The "does NOT emit FAILED" assertion is vacuously true for both fixed and broken code — it cannot catch the regression or finding #1. Exercise the path resolver directly (sourceable function / path assertion). — `plan.md:37-41`
 - [ ] (suggestion) Note in the plan that `PROGRESS_FILE` resolution is container-mode-only, so any regression test must target the resolver, not the in-process exit path. — `plan.md:37`
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 00:00 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+Implemented the approved, revised plan for #550.
+
+### What changed
+- `.agent/scripts/dispatch_subagent.sh`:
+  - Added `resolve_progress_file()` helper — `find -maxdepth 7 -type f -path "*/.agent/work-plans/issue-$issue/progress.md" -print -quit`, falling back to the worktree-root path when `find` returns empty. Comment explains the layer nesting (depth 7) and why callers re-resolve per call.
+  - `entry_count()` now re-resolves `PROGRESS_FILE` on every invocation (local), replacing the one-time global; the `LAST_ENTRY` display block re-resolves the same way. Per-call re-resolution fixes the first-phase pre-creation case (PRE absent → 0, POST nested file → 1).
+  - Removed the one-time global `PROGRESS_FILE` assignment (formerly line 278).
+  - Source-guarded the executable body with `[[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0` placed after the function/default definitions, so the script can be sourced to obtain just the function definitions. Direct-execution behavior is unchanged.
+- `.agent/scripts/tests/test_dispatch_worktree_resolution.sh`:
+  - Kept the existing 5 `--repo-slug` / fail-loud cases (#526/#548) intact.
+  - Added 3 direct `resolve_progress_file` assertions (sourcing the script for the function): depth-7 layer fixture → nested path (guards the maxdepth off-by-one); workspace fixture → root path; absent file → root fallback. Sourced in a subshell so the script's `set -euo pipefail` does not leak. Added `# shellcheck disable=SC1090` for the dynamic source.
+  - Extended the `trap` cleanup to remove the new fixtures.
+
+### Test results
+- `bash .agent/scripts/test_dispatch_subagent.sh` → 29 passed, 0 failed.
+- `bash .agent/scripts/tests/test_dispatch_worktree_resolution.sh` → 8 passed, 0 failed (5 prior + 3 new).
+- `PYTHON=python3 ./.agent/scripts/tests/run_script_tests.sh` → all shell suites pass and pytest 51 passed, EXCEPT `test_check_commit_identity.sh` (1 case: "no propagation rejection"). Verified pre-existing on the clean tree (stash + re-run) — it is an environment artifact (this worktree's on-disk git config carries the agent identity, so the no-override commit lands as the agent email and the hook accepts). Unrelated to this change.
+
+Pre-commit hooks (incl. shellcheck) passed; committed as 94f7372. Not pushed — the host publishes.
+
+### Next
+Host reviews the diff and performs the push / PR.
