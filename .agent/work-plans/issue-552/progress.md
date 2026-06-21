@@ -92,3 +92,58 @@ Both fixes land in the same script area and belong in one PR. No splitting neede
 - [ ] (suggestion) Confirm the KEY DESIGN CHOICE: proceed with **new ADR-0015** (not an ADR-0013 addendum). ADR-0012's carve-out is navigational-only; this is a substantive decision; 0015 verified as the next free number — `plan.md:168`
 - [ ] (suggestion) Keep `when|status|by` as the Gap-2 fingerprint (all three fields already exposed by progress_read.py — free robustness); add a code comment noting the same-minute/same-status/same-by collision is fail-closed and acceptable — `plan.md:174`
 - [ ] Otherwise solid: all cited line numbers verified against source; all six Issue Review actions covered; scope correct (6 files, one component); WORKTREE_GUIDE.md correctly omitted (no dispatch references). Ready for implementation.
+
+## Implementation
+**Status**: complete
+**When**: 2026-06-21 13:16 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-552 at `4f9c41e`
+**Plan**: `.agent/work-plans/issue-552/plan.md` at `f8396fb`
+**Phases**: single (one PR; both gaps + tests + docs + ADR)
+
+Implemented the approved, revised plan as 5 atomic commits. Both locked operator
+decisions honored: new ADR-0015 (not an ADR-0013 addendum); Gap-2 signature =
+`when|status` (`by` dropped), with a code comment documenting the
+same-minute/same-status fail-closed trade-off.
+
+### Commits
+- `8720d67` **Gap 1** — `--context-file <path>` flag on `dispatch_subagent.sh`:
+  validated like `--prompt-file` but **composable with `--skill`** (keeps auto
+  entry-type + auto model). When set, splices an `## Injected GitHub context`
+  section into the handoff after the task body / before the contract, instructing
+  the sub-agent to read it instead of `gh issue view`; logs injected size + first
+  line to stderr (never the contents).
+- `50f269b` **Gap 2** — freshness gate. Added sourceable `last_entry_signature()`
+  (last matching entry's `when|status`, same match predicate as `entry_count`)
+  and pure `is_fresh_entry pre post pre_sig post_sig` above the source-guard.
+  Captured PRE/POST signatures alongside counts; replaced the count-delta
+  precondition with `is_fresh_entry`. Existing fail-closed numeric guards and the
+  status routing unchanged. Fail-closed trade-off documented in a code comment.
+- `c16b285` **Gap 3** — regression tests. Sourced the script (guard supports it)
+  and unit-tested `is_fresh_entry` / `last_entry_signature`: replace (1→1,
+  failed@T0 → complete@T1) fresh; append (0→1) fresh; genuine no-write (1→1
+  identical sig) not-fresh; plus an in-process assertion that `--context-file`
+  content lands in the handoff. Existing 29 checks stay green (34 total).
+- `3f7772a` **Gap 4** — docs. `review-issue/SKILL.md` read-path note + step 1
+  (host-injection bypass); `run-issue/SKILL.md` "How phases are dispatched"
+  (host fetches body + passes `--context-file`) and the exit-gate / startswith
+  notes refreshed from "entry-count delta" to the freshness gate; `AGENTS.md`
+  script-table row gains `--context-file`.
+- `4f9c41e` **Gap 5** — `docs/decisions/0015-dispatch-handoff-context-contract.md`
+  (next free number, confirmed): host-injects read context / container-produces,
+  host-publishes write contract; references #532, #466/#550, #490/#481, #552.
+
+### Verification
+- `test_dispatch_subagent.sh`: **34 passed, 0 failed**.
+- `tests/test_dispatch_worktree_resolution.sh`: **8 passed, 0 failed**.
+- `tests/run_script_tests.sh` (`PYTHON=python3`): dispatch + Python suites pass
+  (51 pytest passed). One **pre-existing, unrelated** failure in
+  `test_check_commit_identity.sh` (on-disk human-email rejection, environment
+  sensitivity) — untouched by this work (last modified in `045948d`); not a
+  regression from #552.
+- `bash -n dispatch_subagent.sh` clean; the script still runs when executed
+  directly (`--check` and the validation path reach arg-parsing — source-guard
+  intact).
+
+**No push / no PR** — left for the host per the dispatch contract.
