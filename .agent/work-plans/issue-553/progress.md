@@ -57,3 +57,18 @@ issue: 553
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-06-21 16:04 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-553/plan.md` at `78f4c63`
+**PR**: PR-less (--issue mode)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) Stale line reference: Checkpoints section is at lines 242–256, not 244–253 (Publish step begins at 258) — `plan.md:22`
+- [ ] (suggestion) Carry into SKILL.md prose that the re-orientation header rides in the `AskUserQuestion` `question` field, not the 12-char `header` chip — `plan.md:30`
+
+<!-- Independence: Plan Authored by "Claude Code Agent (Claude Sonnet)"; this review is a fresh-context dispatch on Claude Opus, not an in-context author self-review. Agent-name match is a false positive of the generic shared name, so no self-review annotation applied. -->
