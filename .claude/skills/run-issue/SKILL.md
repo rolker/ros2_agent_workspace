@@ -46,9 +46,8 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
 **Context-needing phases: the host fetches the body and passes `--context-file`
 ([#552](https://github.com/rolker/ros2_agent_workspace/issues/552)).** A
 container dispatch has no GitHub read auth, so a phase whose first step reads the
-issue/PR (e.g. `review-issue`, or a post-PR `triage-reviews`) would fail on
-`gh issue view`. For those phases the **host** fetches the body and passes it to
-the dispatcher:
+issue/PR body (e.g. `review-issue`) would fail on `gh issue view`. For those
+phases the **host** fetches the body and passes it to the dispatcher:
 
 ```bash
 gh issue view <N> --json body --jq .body > /tmp/issue-<N>.md
@@ -61,6 +60,12 @@ only splices a file the host already fetched), and `--context-file` is composabl
 with `--skill` so the auto entry-type + model still apply. Pre-push `review-code`
 / `review-plan` need no GitHub read (they work from the diff / local `plan.md`),
 so they take no `--context-file`.
+
+`--context-file` carries a **single body** — it satisfies a phase that only needs
+the issue/PR body (`review-issue`). It does **not** cover post-PR `triage-reviews`,
+which also reads PR review comments and CI status via `fetch_pr_reviews.sh` /
+`gh api` — data a body file can't supply. Run `triage-reviews` where GitHub read
+auth is available (in-process on the host), not as a body-only container dispatch.
 
 - **in-process** for **quick / cheap phases** — fast, same context root. It
   spawns the phase via Claude Code's **`Agent` tool**, which exists in the
