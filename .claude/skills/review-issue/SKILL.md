@@ -23,18 +23,26 @@ the issue — does not modify the issue body.
 repo? conflicting with ADRs?). For evaluating an implementation plan, use
 `plan-task`. For evaluating a completed PR, use `review-code`.
 
+**Posting behavior**: GitHub posting is best-effort. The `progress.md`
+entry (step 7) is the canonical record, written and committed first. Step 8
+posts a comment for human visibility on GitHub, but skips silently when no
+gh auth is present (e.g., container dispatch per
+[#532](https://github.com/rolker/ros2_agent_workspace/issues/532)). A skipped
+post does **not** change the phase status — the skill reports `complete` as
+long as the progress.md entry was committed.
+
 **Precondition: invoke from the owning repo's cwd.** Issue numbers are
 scoped per-repo (`rolker/ros2_agent_workspace#42` and
-`rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 7
+`rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 8
 (`gh issue view <N>` and `gh issue comment <N>`) resolve the repo via
 the current directory's origin — so `cd` into the repo that owns the
 issue before invoking `/review-issue <N>`. From the wrong cwd the
 skill will either fail loudly (`NotFound`) or silently query/comment
-on a colliding-number issue in the wrong repo. Step 8's
+on a colliding-number issue in the wrong repo. Step 7's
 owning-repo probe creates the right worktree for progress.md even if
-cwd is mismatched, but the comment-and-view steps will already have
-hit the wrong repo by then. If you don't know which repo owns `<N>`,
-use step 8a.1's probe pattern up front (probe workspace, then project
+cwd is mismatched, but the view step (and any best-effort comment in
+step 8) will already have hit the wrong repo by then. If you don't know
+which repo owns `<N>`, use step 7a.1's probe pattern up front (probe workspace, then project
 repos under `layers/main/*/src/*`) and `cd` to the match before
 invoking. Cwd-independent owning-repo resolution is tracked as
 [#478](https://github.com/rolker/ros2_agent_workspace/issues/478) —
@@ -107,68 +115,22 @@ Using the consequences map: if this issue changes something in the "If you
 change..." column, note the corresponding "Also update..." items. These
 should be part of the issue scope or flagged as follow-up work.
 
-### 7. Post findings as a comment
+### 7. Persist to progress.md
 
-Post the review as a comment on the issue. **Do not modify the issue body.**
-
-```markdown
-## Review
-
-### Scope Assessment
-
-**Well-scoped?** Yes/No — [explanation]
-**Right repo?** Yes/No — [explanation]
-**Dependencies**: [list or "none identified"]
-
-### Principle Alignment
-
-| Principle | Status | Notes |
-|---|---|---|
-| ... | ... | ... |
-
-### ADR Applicability
-
-| ADR | Triggered | Notes |
-|---|---|---|
-| ... | ... | ... |
-
-### Consequences
-
-- [items that should be updated as part of this work]
-
-### Recommendations
-
-- [specific suggestions, if any]
-
----
-**Authored-By**: `$AGENT_NAME`
-**Model**: `$AGENT_MODEL`
-```
-
-Use `--body-file` for the comment (not `--body`):
-
-```bash
-BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-cat << 'COMMENT_EOF' > "$BODY_FILE"
-[review content]
-COMMENT_EOF
-gh issue comment <N> --body-file "$BODY_FILE"
-rm "$BODY_FILE"
-```
-
-### 8. Persist to progress.md
-
-After posting the comment, append a `## Issue Review` entry to
+Append a `## Issue Review` entry to
 `.agent/work-plans/issue-<N>/progress.md` so the timeline reflects
 that the issue has been governance-reviewed before plan-task starts.
 Per [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md).
+This is the **canonical record** — it is written and committed here,
+*before* the best-effort GitHub post (step 8), so the phase status
+never depends on whether the post succeeds.
 
-**8a. Locate-or-create the owning worktree.** `review-issue` is
+**7a. Locate-or-create the owning worktree.** `review-issue` is
 typically the *first* skill in the lifecycle, so a worktree may not
 exist yet. Since progress.md commits cannot land on a protected
 default branch, this step creates a worktree on demand:
 
-**8a.1.** **Resolve the owning repo first.** Issue numbers can collide
+**7a.1.** **Resolve the owning repo first.** Issue numbers can collide
 across the workspace repo and project repos (e.g., workspace `#42` is
 a different issue from `unh_echoboats_project11#42`), so the issue
 number alone is not enough to identify a worktree.
@@ -190,11 +152,11 @@ value we're trying to determine). Probe in order:
 This mirrors `plan-task` step 4's cwd-based `gh issue view <N>`
 pattern.
 
-**8a.2.** Check `$WORKTREE_ISSUE` and the worktree's repo slug. If
+**7a.2.** Check `$WORKTREE_ISSUE` and the worktree's repo slug. If
 `$WORKTREE_ISSUE` matches `<N>` *and* the worktree's repo slug
 matches the owning repo's short slug, you're already in the right
-worktree — skip to step 8b. If only the number matches, treat it as a
-miss and continue to step 8a.3 (you're in the wrong-repo worktree for
+worktree — skip to step 7b. If only the number matches, treat it as a
+miss and continue to step 7a.3 (you're in the wrong-repo worktree for
 a colliding number).
 
 `worktree_enter.sh` exports `$WORKTREE_ROOT`, `$WORKTREE_TYPE`, and
@@ -202,7 +164,7 @@ a colliding number).
 `$WORKTREE_ROOT`'s basename:
 ```bash
 if [ -z "${WORKTREE_ROOT:-}" ]; then
-    # Not in a worktree (or worktree_enter.sh never ran) — fall through to 8a.3
+    # Not in a worktree (or worktree_enter.sh never ran) — fall through to 7a.3
     WORKTREE_SLUG=""
 else
     WT_BASENAME=$(basename "$WORKTREE_ROOT")
@@ -214,16 +176,16 @@ else
 fi
 ```
 
-Compare `$WORKTREE_SLUG` against the owning repo. Step 8a.1 returned
+Compare `$WORKTREE_SLUG` against the owning repo. Step 7a.1 returned
 `owner/repo` form; the slug-relevant comparison depends on type:
-- **Workspace issue** — the `owner/repo` from step 8a.1 matches the
+- **Workspace issue** — the `owner/repo` from step 7a.1 matches the
   workspace repo's `nameWithOwner` (e.g., `rolker/ros2_agent_workspace`).
   Match iff `WORKTREE_SLUG == "workspace"`.
-- **Project-repo issue** — the `owner/repo` from step 8a.1 matches a
+- **Project-repo issue** — the `owner/repo` from step 7a.1 matches a
   project repo (e.g., `rolker/unh_marine_autonomy`). Match iff
   `WORKTREE_SLUG` equals the repo-name portion (`unh_marine_autonomy`).
 
-**8a.3.** If not, check whether a worktree for the issue already
+**7a.3.** If not, check whether a worktree for the issue already
 exists. Use an anchored, repo-aware pattern so neighbouring issue
 numbers (e.g. `4700` for `<N>=470`) and unrelated repo worktrees don't
 match:
@@ -239,7 +201,7 @@ Or grep `worktree_list.sh` output with a numeric boundary:
   | grep -E "issue-(workspace|<repo-slug>)-<N>($|[^0-9])"
 ```
 
-**8a.4.** If a worktree exists, source it to enter:
+**7a.4.** If a worktree exists, source it to enter:
 ```bash
 source .agent/scripts/worktree_enter.sh --issue <N> [--repo-slug <slug>]
 ```
@@ -247,17 +209,17 @@ source .agent/scripts/worktree_enter.sh --issue <N> [--repo-slug <slug>]
 issue number collides across repos, pass `--repo-slug <slug>` to
 disambiguate (see `WORKTREE_GUIDE.md`).
 
-**8a.5.** If neither: determine worktree type from the owning repo
+**7a.5.** If neither: determine worktree type from the owning repo
 (workspace for issues in the workspace repo, layer for project-repo
 issues — same logic as `plan-task` step 4). Create the worktree:
 
-- **Workspace issue** (`owner/repo` from step 8a.1 matches the
+- **Workspace issue** (`owner/repo` from step 7a.1 matches the
   workspace repo's `nameWithOwner`):
   ```bash
   .agent/scripts/worktree_create.sh --issue <N> --type workspace
   ```
 - **Project-repo issue**: derive `<layer>` and `<project_repo>` from
-  the local path the step 8a.1 probe matched (under
+  the local path the step 7a.1 probe matched (under
   `layers/main/<layer>_ws/src/<project_repo>/`). Parse `<layer>` as
   the directory name before `_ws/src/` and `<project_repo>` as the
   leaf directory. This mirrors `plan-task` step 4 and `review-plan`
@@ -274,7 +236,7 @@ commits the plan to the branch but, by default, does **not** open a PR
 `--draft-pr` (or the worktree was created with `--plan-file`); otherwise
 the `/run-issue` orchestrator opens the real PR at the end.
 
-**8b. Append the entry.** Create the parent directory if needed
+**7b. Append the entry.** Create the parent directory if needed
 (`review-issue` typically runs *before* `plan-task`, so
 `.agent/work-plans/issue-<N>/` may not exist yet):
 
@@ -302,7 +264,7 @@ Append:
 **By**: <agent name> (<model>)
 
 **Issue**: #<N>
-**Comment**: <URL of the posted issue comment from step 7>
+**Comment**: (best-effort post follows this entry; not recorded inline)
 **Scope verdict**: <well-scoped | needs-splitting | needs-more-detail>
 
 ### Actions
@@ -340,6 +302,67 @@ The branch (`feature/issue-<N>`) now exists with one commit. If the
 user decides not to proceed (and so plan-task never runs), they can
 remove the worktree + branch via
 `.agent/scripts/worktree_remove.sh --issue <N>`.
+
+### 8. Post findings as a comment (best-effort)
+
+With the canonical record committed (step 7), post the review as a
+comment on the issue for human visibility. **Do not modify the issue
+body.** This step is **best-effort**: it skips silently when no gh auth
+is present (e.g., container dispatch per
+[#532](https://github.com/rolker/ros2_agent_workspace/issues/532)), and a
+skipped or failed post does **not** change the phase status — it stays
+`complete` as long as step 7 committed the entry.
+
+```markdown
+## Review
+
+### Scope Assessment
+
+**Well-scoped?** Yes/No — [explanation]
+**Right repo?** Yes/No — [explanation]
+**Dependencies**: [list or "none identified"]
+
+### Principle Alignment
+
+| Principle | Status | Notes |
+|---|---|---|
+| ... | ... | ... |
+
+### ADR Applicability
+
+| ADR | Triggered | Notes |
+|---|---|---|
+| ... | ... | ... |
+
+### Consequences
+
+- [items that should be updated as part of this work]
+
+### Recommendations
+
+- [specific suggestions, if any]
+
+---
+**Authored-By**: `$AGENT_NAME`
+**Model**: `$AGENT_MODEL`
+```
+
+Use `--body-file` for the comment (not `--body`), and gate the post on
+gh auth so it skips cleanly when none is present:
+
+```bash
+BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+cat << 'COMMENT_EOF' > "$BODY_FILE"
+[review content]
+COMMENT_EOF
+# Best-effort only — skip silently if gh auth is absent
+if gh auth status --active 2>/dev/null; then
+    gh issue comment <N> --body-file "$BODY_FILE"
+else
+    echo "[review-issue] No GitHub auth — skipping comment post (progress.md is the record)."
+fi
+rm "$BODY_FILE"
+```
 
 ### Next step
 
