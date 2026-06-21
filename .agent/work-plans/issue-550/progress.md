@@ -135,3 +135,19 @@ Pre-commit hooks (incl. shellcheck) passed; committed as 94f7372. Not pushed —
 
 ### Next
 Host reviews the diff and performs the push / PR.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 04:30 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-550 at `1a29d1f`
+**Mode**: pre-push
+**Depth**: Standard (reason: override-trigger path `.agent/scripts/`, ~85 code/test lines)
+**Must-fix**: 0 | **Suggestions**: 2
+**Round**: 1 | **Ship**: recommended — no must-fix; static + 2 adversarial lenses + both test suites (8/0, 29/0) clean; matches the revised plan with no drift.
+
+### Findings
+- [ ] (suggestion) `-maxdepth 7` is exact, no headroom — coupled to the current `<layer>_ws/src/<repo>/` layout; a deeper nesting would silently fall back to root and re-introduce the false FAILED — `.agent/scripts/dispatch_subagent.sh:130`
+- [ ] (suggestion) `find … -print -quit` order is filesystem-dependent; resolver assumes a single progress.md per issue per worktree — worth a one-line note — `.agent/scripts/dispatch_subagent.sh:128`
