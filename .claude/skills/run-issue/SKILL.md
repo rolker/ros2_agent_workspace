@@ -58,7 +58,11 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
   the sandbox* and **never reach the operator's permission prompt** — zero
   approvals for the dispatched work. That prompt elimination is the biggest
   practical reason to use it, beyond a clean OS for the review-code fan-out or
-  implementation.
+  implementation. **Scope note:** this removes prompts for the *phase's own tool
+  calls* — `run-issue`'s **checkpoints** (publish, PR, merge) are host-enforced
+  operator confirmations and stay that way regardless of dispatch mode. "Out of
+  the approval loop" means the *busywork* approvals, not the deliberate human
+  gates.
 
 **Choosing a mode (#545).** **Lean toward `container`** for phases that do many
 tool calls (implement / address-findings / the review-code fan-out) or whenever
@@ -66,8 +70,13 @@ keeping the operator **out of the approval loop** matters — combined with the
 background-dispatch guidance below, that gives a fully hands-off, prompt-free
 phase. Use **`in-process`** for quick/cheap phases where the prompt cost is
 already low and the lower overhead wins, or when container auth isn't set up
-(`dispatch_subagent.sh --check`, #532) — container needs the long-lived auth
-token and pays a launch cost, so it isn't free.
+(`dispatch_subagent.sh --check`, #532). Container isn't free: it pays a launch
+cost, and the prompt elimination is itself a **safety tradeoff** — the
+dispatched agent runs with broad tool access under a long-lived token, so the
+**sandbox boundary (not per-call approval) is what contains it**. That's an
+acceptable trade for trusted first-party phases, but it *is* the safeguard you're
+relying on — keep it in mind before dispatching anything that processes
+untrusted input.
 
 **Dispatch container phases in the *background* so the host stays available.**
 A synchronous (foreground) container dispatch blocks the host's turn for the
