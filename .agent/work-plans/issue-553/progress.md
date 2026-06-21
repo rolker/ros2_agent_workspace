@@ -101,3 +101,21 @@ Collateral-change check passed: `git diff` shows only a 33-line insertion within
 the Checkpoints section — the decision table, the 4-item checkpoint list, the
 Publish step, and all other sections are untouched. Pre-commit passed (no
 `--no-verify`). Committed as `c2973e1`. Per task scope: no push, no PR.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-06-21 16:15 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-553 at `5ec640c`
+**Mode**: pre-push
+**Depth**: Standard (reason: `.claude/skills/*/SKILL.md` is a Governance override-trigger file)
+**Must-fix**: 0 | **Suggestions**: 4
+**Round**: 1 | **Ship**: recommended — no must-fix; only adapt-on-read guidance suggestions
+
+### Findings
+- [ ] (suggestion) "both apply to all four checkpoints" vs conditional finding-embedding — resolved by inline wording, could add parenthetical — `.claude/skills/run-issue/SKILL.md:258`
+- [ ] (suggestion) `## Local Review (Pre-Push)` trigger maps to publish checkpoint implicitly; add a one-clause note — `.claude/skills/run-issue/SKILL.md:267`
+- [ ] (suggestion) "phase X of Y" numbering undefined; worked example "phase 6 of 7" denominator is fuzzy — `.claude/skills/run-issue/SKILL.md:261`
+- [ ] (suggestion) finding-embedding trigger list omits `## Issue Review` (checkpoint 1 open-questions) — `.claude/skills/run-issue/SKILL.md:267`
