@@ -203,6 +203,12 @@ esac
 if [ -z "$ISSUE" ]; then
     echo "ERROR: --issue <N> is required." >&2; exit 1
 fi
+if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --issue must be a number (got '$ISSUE')." >&2; exit 1
+fi
+# Sanitize --repo-slug to match how worktree_create.sh names dirs (non
+# [A-Za-z0-9_] -> _), so a hyphenated slug still resolves (#526).
+[ -n "$REPO_SLUG" ] && REPO_SLUG="${REPO_SLUG//[^A-Za-z0-9_]/_}"
 if [ -n "$SKILL" ] && [ -n "$PROMPT_FILE" ]; then
     echo "ERROR: pass exactly one of --skill or --prompt-file, not both." >&2; exit 1
 fi

@@ -23,8 +23,11 @@ N=999990
 WTBASE="$ROOT_DIR/layers/worktrees"
 A="$WTBASE/issue-zzztesta-$N"
 B="$WTBASE/issue-zzztestb-$N"
-mkdir -p "$A/.agent/work-plans/issue-$N" "$B/.agent/work-plans/issue-$N"
-cleanup() { rm -rf "$A" "$B"; }
+# Underscore dir name, as worktree_create.sh would produce from a hyphenated slug.
+C="$WTBASE/issue-zzz_test_c-$N"
+mkdir -p "$A/.agent/work-plans/issue-$N" "$B/.agent/work-plans/issue-$N" \
+         "$C/.agent/work-plans/issue-$N"
+cleanup() { rm -rf "$A" "$B" "$C"; }
 trap cleanup EXIT
 
 TEST_PASS=0
@@ -57,6 +60,22 @@ if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "no worktree found"; then
     pass "--repo-slug with no match errors cleanly"
 else
     fail "--repo-slug with no match errors cleanly (rc=$rc; out=$out)"
+fi
+
+# 4. Hyphenated --repo-slug is sanitized (- -> _) to match the dir name.
+out=$("$DISPATCH" --mode in-process --issue "$N" --repo-slug zzz-test-c --skill review-code 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -qE "refusing to guess|no worktree found"; then
+    pass "hyphenated --repo-slug is sanitized and resolves"
+else
+    fail "hyphenated --repo-slug is sanitized and resolves (rc=$rc; out=$out)"
+fi
+
+# 5. Non-numeric --issue is rejected.
+out=$("$DISPATCH" --mode in-process --issue "../etc" --skill review-code 2>&1); rc=$?
+if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "must be a number"; then
+    pass "non-numeric --issue rejected"
+else
+    fail "non-numeric --issue rejected (rc=$rc; out=$out)"
 fi
 
 echo

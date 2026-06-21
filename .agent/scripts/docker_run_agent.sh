@@ -161,6 +161,13 @@ if [ -z "$ISSUE" ]; then
     show_usage >&2
     exit 1
 fi
+if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --issue must be a number (got '$ISSUE')." >&2
+    exit 1
+fi
+# Sanitize --repo-slug to match worktree_create.sh dir naming (non [A-Za-z0-9_]
+# -> _), so a hyphenated slug still resolves (#526).
+[ -n "$REPO_SLUG" ] && REPO_SLUG="${REPO_SLUG//[^A-Za-z0-9_]/_}"
 
 # Dispatch mode is active when a prompt source was explicitly provided. Gate on
 # PROMPT_SET (the intent), not [ -n "$PROMPT" ] (the value): an empty prompt is
