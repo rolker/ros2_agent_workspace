@@ -432,11 +432,17 @@ Use the injected context above **instead of** \`gh issue view\` / \`gh pr view\`
 EOF
 )"
     # Transparency (#552, human-control principle): log WHAT went into the handoff
-    # — byte size + first non-empty line — never the raw contents (which could
-    # carry tokens/secrets in pathological inputs).
+    # — never the raw contents (which could carry tokens/secrets in pathological
+    # inputs). Beyond byte size + first line, surface the line count and a count of
+    # structural tokens (markdown ATX headings or `---` break/setext lines) the
+    # body could use to forge a section/boundary: a body trying to look like
+    # contract structure shows up as a non-zero count even though the first line
+    # alone wouldn't reveal it.
     ctx_bytes="$(wc -c < "$CONTEXT_FILE" | tr -d ' ')"
+    ctx_lines="$(wc -l < "$CONTEXT_FILE" | tr -d ' ')"
+    ctx_struct="$(grep -cE '^[[:space:]]*(#{1,6}[[:space:]]|-{3,}[[:space:]]*$)' "$CONTEXT_FILE" 2>/dev/null || true)"
     ctx_heading="$(grep -m1 '[^[:space:]]' "$CONTEXT_FILE" 2>/dev/null || true)"
-    echo "Injected host-side context from $CONTEXT_FILE (${ctx_bytes} bytes; first line: ${ctx_heading:-<empty>})" >&2
+    echo "Injected host-side context from $CONTEXT_FILE (${ctx_bytes} bytes, ${ctx_lines} lines, ${ctx_struct:-0} heading/--- lines; first line: ${ctx_heading:-<empty>})" >&2
 fi
 
 HANDOFF="$(cat <<EOF
