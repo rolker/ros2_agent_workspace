@@ -236,9 +236,21 @@ So before running it, ask: **"Look for an existing deployment issue? (y/n)"**
       `<log_dir>/<YYYY>/<date>_<label>_logs.md` on this host; if none, **ask
       the operator**) — the multi-day convention keeps the original date.
       *Other situation?* → ask, then proceed once the start date is settled.
-  - Then go straight to the log-init + urgency-contract steps (4b's field
-    branch), **skipping every `gh` / `issue_sync` call**. A dev host
-    reconciles the `pending` link later — it finds the log by date.
+  - Then go straight to the **log-init** (the per-host-log creation in 4b)
+    and the **urgency contract** — *not* 4b's issue read / title / body /
+    `## Logs` steps, which all require an issue that doesn't exist. Skip
+    every `gh` / `issue_sync` call.
+
+**Dev-side backfill of issue-less starts (#533) — the reconciliation mechanism.**
+On the **dev side**, after the issue lookup, **also scan `<log_dir>/<YYYY>/`
+for per-host logs whose header reads `issue: pending`** (an issue-less field
+start with no link yet). For each, **offer to create + link its deployment
+issue**: derive the scope from the log's first entries, `gh issue create` it
+(dated from the log's filename — the multi-day anchor), stamp the number / URL
+back into the log header (clearing `pending`), then `dev_push`. Without this
+step an issue-less deployment is *never* tracked or closed — `/wrap-up-deployment`
+discovers deployments via `gh issue list`, so the issue must exist by then. (If
+the operator declines, leave the marker for a later run, and note it.)
 
 #### 4a. Create new
 
@@ -402,7 +414,9 @@ not a producer). On failure, print `issue_sync.failure_hint`.
 `bridge pull` + `push gitcloud`) is the slow, window-eating step on the dev
 side. When the operator is starting a *live* deployment, **run it in the
 background** (so logging + the urgency contract are active in seconds) and
-report when it finishes — **unless the operator asks to run it now** (e.g.
+report when it finishes — and on a **background failure, surface
+`issue_sync.failure_hint`** (don't let a deferred push fail silently) —
+**unless the operator asks to run it now** (e.g.
 a field host is waiting on it this minute). The choice is situational; offer
 it: "Propagate the issue to gitcloud now, or in the background?" Default
 background. The deployment is fully usable before it completes — the issue

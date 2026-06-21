@@ -225,9 +225,17 @@ on-disk artifacts that already exist:
 
 | State | Evidence | Skill action |
 |---|---|---|
-| **Create new** | No open `deployment`-labeled issue (per `issue_sync`) | Offer to create; operator approves scope; templated issue body. |
-| **Activate first time** | Open issue exists, but no local worktree (dev) / no host log (field) | Rename issue title to `Deployment YYYY-MM-DD: <scope>` if not already in that format; ensure `## Logs` section present in body; create worktree (dev) or prepare main-tree (field); initialize host log; run `issue_sync.dev_push` so field hosts see the changes. |
+| **Create new** | No usable open issue (none found, or the operator declined the offered one) | Dev: offer scope + `gh issue create` + templated body. Field: take the **issue-less start** (#533) instead — no `gh`. |
+| **Activate first time** | Open issue exists, but no local worktree (dev) / no host log (field) | **Offer the found issue for confirmation first** (#533 — never silent-attach); then rename title to `Deployment YYYY-MM-DD: <scope>` if needed; ensure `## Logs`; create worktree (dev) or prepare main-tree (field); initialize host log; `issue_sync.dev_push` (**background-by-default**, #533) so field hosts see the changes. |
 | **Resume ongoing** | Open issue + worktree+log (dev) / log file (field) | Re-attach: load the urgency contract into context, summarize state from the deployment issue body and the last ~20 entries of the current host's log. No artifacts created. |
+
+**Issue-less field start + reconciliation (#533).** Where the git-bug *lookup*
+is the slow, window-eating step, the **field side** can start **issue-less** —
+anchored to the per-host log's date (`issue: pending` header), skipping all
+`gh` / `issue_sync` calls. The **dev side** then **backfills**: on a later
+`/start-deployment`, scan `<log_dir>` for logs marked `pending`, create + link
+their issues (dated from the log filename), and clear the marker — so
+`/wrap-up-deployment` (which discovers via `gh issue list`) can find them.
 
 "Ensure essentials" on the deployment issue body is limited to:
 
