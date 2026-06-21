@@ -41,6 +41,18 @@ guarantee holds only when a read token is present. A read-only token (the
 common container case) satisfies the read path while still tripping the
 write-path 403 the post handles above.
 
+**Host-injected read context (zero container auth, [#552](https://github.com/rolker/ros2_agent_workspace/issues/552)).**
+The read dependency disappears entirely when the *host* fetches the issue body
+and passes it to the dispatcher via
+[`dispatch_subagent.sh --context-file <path>`](../../../AGENTS.md). The
+dispatcher splices the body into the handoff under an
+`## Injected GitHub context` heading; this phase then reads that injected section
+**instead of** running `gh issue view`, satisfying the read path with no GitHub
+auth inside the container. `--context-file` is composable with `--skill`, so the
+auto entry-type and model still apply. When the injected section is present,
+prefer it over step 1's `gh issue view` — the host has already fetched the
+canonical body.
+
 **Precondition: invoke from the owning repo's cwd.** Issue numbers are
 scoped per-repo (`rolker/ros2_agent_workspace#42` and
 `rolker/unh_marine_autonomy#42` are different issues). Steps 1 and 8
@@ -65,6 +77,11 @@ until that lands, the precondition is load-bearing.
 ```bash
 gh issue view <N> --json title,body,labels,assignees,milestone,comments,url
 ```
+
+**If the handoff carries an `## Injected GitHub context` section** (the host
+passed `dispatch_subagent.sh --context-file`, [#552](https://github.com/rolker/ros2_agent_workspace/issues/552)),
+read that section instead — it is the host-fetched issue body, and this dispatch
+has no GitHub read auth to run `gh issue view`.
 
 Identify:
 - What is being proposed?
