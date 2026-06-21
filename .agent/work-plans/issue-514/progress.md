@@ -57,3 +57,15 @@ Fits in a single PR. The issue lives in the workspace repo (infra script).
 - [ ] Scope both `find` calls in `merge_pr.sh` to `*/src/*` and/or verify result is a git repo root.
 - [ ] Include a regression test: build a layer package, then assert `merge_pr.sh` resolves `src/<pkg>` (not `install/<pkg>`).
 - [ ] Verify the `--pr <N> --repo-slug <slug>` escape-hatch `REPO_PATH` derivation also uses the scoped `find`.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-21 10:30 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-514/plan.md` at `5f4a41c`
+**Branch**: feature/issue-514 at `5f4a41c`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
