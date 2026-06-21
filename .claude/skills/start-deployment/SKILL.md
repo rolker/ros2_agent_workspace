@@ -216,17 +216,59 @@ Then branch on state:
 | **Activate first time** | Issue exists, no local worktree (dev) / no host log (field) | Step 4b |
 | **Resume ongoing** | Issue exists + worktree+log (dev) / log file (field) | Step 4c |
 
-If multiple open deployment issues are found, list them and ask the
-operator which one this session is joining.
+**Offer, don't assume (#533).** Whether one *or* several open deployment
+issues are found, **present them and have the operator confirm** before
+first-activating — "Use #N — <title>? (y/n)" (or "which one?" for several).
+On **no / none suitable**, fall through to *Create new* (4a, dev) or the
+*issue-less field start* (below). Never silently attach to a found issue.
+
+**Field-side issue-less start (#533).** On the **field side** the git-bug
+*lookup* (`field_pull` + `field_list_open`) is the slow, window-eating step.
+So before running it, ask: **"Look for an existing deployment issue? (y/n)"**
+
+- **y** → run the lookup as above; offer-and-confirm any match.
+- **n** → start **issue-less**, anchored to the per-host log's date:
+  - Ask **"Is this deployment for the current day? (y/n)."**
+    - **y** → use **today's date** for the log filename (step 3) and seed the
+      **canonical marker** (one exact, grep-safe string — see the log-header
+      note in 4b): `Deployment issue: pending (backfill from a dev host)`.
+    - **n** → **clarify**: *continuing a prior deployment?* → use that
+      deployment's **start date** (read it from an existing local
+      `<log_dir>/<YYYY>/<date>_<label>_logs.md` on this host; if none, **ask
+      the operator**) — the multi-day convention keeps the original date.
+      **But if that local log already exists, this is the Resume state (4c)
+      — re-attach to it, don't start a duplicate.** *Other situation?* → ask,
+      then proceed once the start date is settled.
+  - Then go straight to the **log-init** (the per-host-log creation in 4b)
+    and the **urgency contract** — *not* 4b's issue read / title / body /
+    `## Logs` steps, which all require an issue that doesn't exist. Skip
+    every `gh` / `issue_sync` call.
+
+**Dev-side backfill of issue-less starts (#533) — the reconciliation mechanism.**
+On the **dev side**, after the issue lookup, **also scan `<log_dir>/<YYYY>/`
+for per-host logs whose header line is the canonical marker
+`Deployment issue: pending`** (`grep -l '^Deployment issue: pending'`; the
+exact string the issue-less seed writes) — an issue-less field start with no
+link yet. For each, **offer to create + link its deployment
+issue**: derive the scope from the log's first entries, `gh issue create` it
+(dated from the log's filename — the multi-day anchor), stamp the number / URL
+back into the log header (clearing `pending`), then `dev_push`. Without this
+step an issue-less deployment is *never* tracked or closed — `/wrap-up-deployment`
+discovers deployments via `gh issue list`, so the issue must exist by then. (If
+the operator declines, leave the marker for a later run, and note it.)
 
 #### 4a. Create new
 
-**Field side**: cannot create the issue (no GitHub access). Stop with:
+**Field side**: cannot create the issue (no GitHub access). Two paths (#533):
 
-> No open deployment issue found via `issue_sync`. Start the deployment
-> from a dev host first (where `gh` can create the issue and configure
-> labels), then run `issue_sync.dev_push` so this field host sees it on
-> the next `issue_sync.field_pull`.
+- If the operator wants the deployment **tracked from the start**, stop with:
+  > No deployment issue yet. Create it from a dev host first (where `gh` can
+  > create + label it), then `issue_sync.dev_push` so this field host sees it
+  > on the next `field_pull`.
+- Otherwise take the **issue-less field start** (step 4's field-side branch):
+  start logging against the date *now*, header `Deployment issue: pending`; a dev host
+  backfills the issue link later. This is the fast path when there's no time
+  to prep an issue before launch.
 
 **Dev side**: ask the operator for the scope of this deployment (one or
 two sentences; this becomes the issue title's `<scope>` portion and the
@@ -287,12 +329,20 @@ next) exists by the time any warnings need to land in it.
 
 ```markdown
 # <YYYY-MM-DD> — <label> log (<platform> deployment #<N>)
+<!-- issue-less field start (#533): no #<N> / URL yet — use the variant below -->
 
 Deployment issue: <issue URL>
 Host: <hostname>
 Side: <dev|field>
 Started: <YYYY-MM-DD HH:MM ±HH:MM>
 ```
+
+For an **issue-less field start (#533)** there is no `#<N>` or URL yet:
+title the log `… (<platform> deployment — issue pending)` and seed the
+**canonical marker** — one exact, grep-safe string the dev-side backfill scans
+for: `Deployment issue: pending (backfill from a dev host)`. The date in the
+filename + header is the reconciliation anchor; a dev host fills in the
+number/URL later (it finds this log by date) and clears the marker.
 
 Any title / body / log-stamp warnings emitted below append to this
 file. It is the canonical sink for field-side drift warnings; dev side
@@ -366,6 +416,19 @@ branch on side:
 propagate the title / body changes to the field-visible source. Skip
 silently on field side (the field host is the consumer of the share,
 not a producer). On failure, print `issue_sync.failure_hint`.
+
+**Background-by-default for a live start (#533).** `dev_push` (git-bug
+`bridge pull` + `push gitcloud`) is the slow, window-eating step on the dev
+side. When the operator is starting a *live* deployment, **run it in the
+background** (so logging + the urgency contract are active in seconds) and
+report when it finishes — and on a **background failure, surface
+`issue_sync.failure_hint`** (don't let a deferred push fail silently) —
+**unless the operator asks to run it now** (e.g.
+a field host is waiting on it this minute). The choice is situational; offer
+it: "Propagate the issue to gitcloud now, or in the background?" Default
+background. The deployment is fully usable before it completes — the issue
+already exists for the worktree; propagation only affects when *other* hosts
+see it.
 
 Proceed to step 5 (dev pre-flight) if dev side; otherwise the skill is
 done.
