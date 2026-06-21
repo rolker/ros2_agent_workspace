@@ -264,12 +264,14 @@ apply to all four checkpoints above**:
   **`question` field, not the `header` field** — the `header` chip is capped at
   ~12 chars and cannot hold it. This reloads the operator's context the moment
   attention returns.
-- **Finding-embedding** — when a checkpoint is triggered by a review finding
-  (from `## Plan Review`, `## Local Review (Pre-Push)`, or
-  `## Integrated Review`), the finding's **severity and condensed text must
-  appear verbatim** in the `question` field or an option `description` — not
-  only in the prose above the dialog. Keep option **labels** short (the action);
-  the *why* rides in the `description`.
+- **Finding-embedding** — when a checkpoint is triggered by a review entry's
+  findings or open questions (`## Issue Review` open-question actions → checkpoint
+  1; `## Plan Review` → checkpoint 2; `## Integrated Review` → checkpoint 3; and
+  `## Local Review (Pre-Push)`, whose `approved` verdict drives the checkpoint-4
+  publish gate), the finding's **severity and condensed text must appear
+  verbatim** in the `question` field or an option `description` — not only in the
+  prose above the dialog. Keep option **labels** short (the action); the *why*
+  rides in the `description`.
 
 Worked example — checkpoint 3, triggered by an `## Integrated Review` must-fix:
 
