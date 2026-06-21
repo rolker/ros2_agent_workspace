@@ -45,3 +45,15 @@ issue: 553
 
 ### Actions
 - [ ] No actions — issue is plan-task-ready.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-21 17:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-553/plan.md` at `78f4c63`
+**Branch**: feature/issue-553 at `78f4c63`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
