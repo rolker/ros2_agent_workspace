@@ -19,16 +19,20 @@ no changes to the decision table or the set of checkpoints.
 
 ## Approach
 
-1. **Read the current Checkpoints section** — confirm exact line range (lines 244-253
-   in run-issue/SKILL.md).
+1. **Read the current Checkpoints section** — confirm exact line range (~lines
+   242-256 in run-issue/SKILL.md; the Publish step begins ~258). Verify against
+   the live file since #552 shifted line numbers; do not trust a stale number.
 
 2. **Update the Checkpoints section** — replace the existing section with an expanded
    version that adds, after the introductory line and checkpoint list:
 
    - **Re-orientation header requirement**: every `AskUserQuestion` call must begin
-     with a one-line header in the question text:
+     with a one-line header **in the `question` field text** (NOT the `header`
+     field — that chip is capped at ~12 chars and can't hold this):
      `Issue #N: <title> — phase X of Y; <one-line state>`
      This reloads the operator's context when attention returns without scrollback.
+     The SKILL.md guidance must state the `question`-field-not-`header`-chip
+     placement explicitly so agents don't try to cram it into the chip.
 
    - **Finding-embedding requirement**: when a checkpoint is triggered by a review
      finding (`## Plan Review` / `## Local Review (Pre-Push)` / `## Integrated Review`),
@@ -76,7 +80,9 @@ no changes to the decision table or the set of checkpoints.
 
 ## Open Questions
 
-- [ ] No open questions — plan is review-plan-ready.
+- [x] None. Review-plan's 2 suggestions folded in: corrected the line ref
+  (~242-256, verify live post-#552); the re-orientation header goes in the
+  `question` field, not the 12-char `header` chip.
 
 ## Estimated Scope
 
