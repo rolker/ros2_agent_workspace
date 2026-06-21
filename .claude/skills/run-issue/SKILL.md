@@ -43,16 +43,40 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
 .agent/scripts/dispatch_subagent.sh --mode <in-process|container> --issue <N> --skill <phase>
 ```
 
-- **in-process** (default) for reviews and short phases — fast, same context
-  root. In-process dispatch spawns the phase via Claude Code's **`Agent` tool**,
-  which exists in the **host** session but **not** inside a headless container.
-  This is precisely why `run-issue` is a *host* orchestrator (see Scope E): run
-  it on the host, where it can fan phases out in-process; it is never itself
-  dispatched into a container. (Non-Claude host runtimes lack the `Agent` tool
-  too — there, drive the phases manually or use `--mode container`.)
-- **container** when isolation is wanted (e.g. running the full review-code
-  specialist fan-out, or implementation that benefits from a clean OS). Container
-  mode is headless and self-contained, so it needs no host `Agent` tool.
+- **in-process** for **quick / cheap phases** — fast, same context root. It
+  spawns the phase via Claude Code's **`Agent` tool**, which exists in the
+  **host** session but **not** inside a headless container. This is precisely
+  why `run-issue` is a *host* orchestrator (see Scope E): run it on the host,
+  where it can fan phases out in-process; it is never itself dispatched into a
+  container. (Non-Claude host runtimes lack the `Agent` tool too — there, drive
+  the phases manually or use `--mode container`.) **Caveat:** an in-process
+  `Agent` phase runs *in the host session*, so its tool calls (edits, commits,
+  `gh`, shell) are subject to the **host's permission policy and can prompt the
+  operator** — phase after phase, edit after edit.
+- **container** for **isolation *and* prompt-free dispatch**. It is headless and
+  self-contained (needs no host `Agent` tool), so its tool calls execute *inside
+  the sandbox* and **never reach the operator's permission prompt** — zero
+  approvals for the dispatched work. That prompt elimination is the biggest
+  practical reason to use it, beyond a clean OS for the review-code fan-out or
+  implementation. **Scope note:** this removes prompts for the *phase's own tool
+  calls* — `run-issue`'s **checkpoints** (publish, PR, merge) are host-enforced
+  operator confirmations and stay that way regardless of dispatch mode. "Out of
+  the approval loop" means the *busywork* approvals, not the deliberate human
+  gates.
+
+**Choosing a mode (#545).** **Lean toward `container`** for phases that do many
+tool calls (implement / address-findings / the review-code fan-out) or whenever
+keeping the operator **out of the approval loop** matters — combined with the
+background-dispatch guidance below, that gives a fully hands-off, prompt-free
+phase. Use **`in-process`** for quick/cheap phases where the prompt cost is
+already low and the lower overhead wins, or when container auth isn't set up
+(`dispatch_subagent.sh --check`, #532). Container isn't free: it pays a launch
+cost, and the prompt elimination is itself a **safety tradeoff** — the
+dispatched agent runs with broad tool access under a long-lived token, so the
+**sandbox boundary (not per-call approval) is what contains it**. That's an
+acceptable trade for trusted first-party phases, but it *is* the safeguard you're
+relying on — keep it in mind before dispatching anything that processes
+untrusted input.
 
 **Dispatch container phases in the *background* so the host stays available.**
 A synchronous (foreground) container dispatch blocks the host's turn for the
