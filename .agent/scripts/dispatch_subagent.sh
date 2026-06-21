@@ -445,9 +445,15 @@ EOF
     echo "Injected host-side context from $CONTEXT_FILE (${ctx_bytes} bytes, ${ctx_lines} lines, ${ctx_struct:-0} heading/--- lines; first line: ${ctx_heading:-<empty>})" >&2
 fi
 
+# The blank line before `---` is load-bearing (#552): without it, a non-empty
+# CONTEXT_SECTION ends on a text line and the following `---` parses as a
+# setext-H2 underline rather than a thematic break, blurring the boundary with
+# the handoff contract. (When CONTEXT_SECTION is empty it expands to one blank
+# line; the explicit blank then just yields two — harmless.)
 HANDOFF="$(cat <<EOF
 $TASK_BODY
 $CONTEXT_SECTION
+
 ---
 ## Sub-agent handoff contract (#490)
 
