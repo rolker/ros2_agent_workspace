@@ -64,3 +64,16 @@ Both fixes land in the same script area and belong in one PR. No splitting neede
 - [ ] Update `review-issue` SKILL.md step 1 / posting-behavior section to reflect the host-injection bypass of the read-path auth dependency
 - [ ] Update AGENTS.md script reference table for `dispatch_subagent.sh`
 - [ ] Record the "host-injects-context" dispatch contract decision (ADR addendum or new ADR)
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-06-21 06:38 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-552/plan.md` at `11f0853`
+**Branch**: feature/issue-552 at `11f0853`
+**Phases**: single (one PR; both gaps + docs + ADR)
+
+### Open questions
+- [ ] KEY DESIGN CHOICE — ADR placement: recommend a **new ADR-0015** over an ADR-0013 addendum (0013's subject is the progress.md entry-type vocabulary, not the dispatch auth boundary; ADR-0012 excludes substantive new decisions from its addendum carve-out). Confirm at review-plan before writing 0015.
+- [ ] Gap-2 freshness fingerprint: confirm `when`+`status` alone suffices, or keep `by` for robustness against same-minute same-status re-dispatches.
