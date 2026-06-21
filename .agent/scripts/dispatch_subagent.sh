@@ -125,6 +125,10 @@ model_display() {
 # the root path so a PRE count reads "absent -> 0". Callers MUST re-resolve per
 # invocation: on the first phase the file is absent pre-dispatch, so only a
 # fresh post-dispatch resolve discovers the freshly-written nested file.
+# Assumes a single progress.md per issue per worktree (one issue == one project
+# repo); -print -quit returns the first hit, whose order is filesystem-dependent,
+# so a second match would make resolution nondeterministic. That invariant holds
+# for the worktrees worktree_create.sh produces.
 resolve_progress_file() {
     local wt="$1" issue="$2" f
     f="$(find "$wt" -maxdepth 7 -type f \
