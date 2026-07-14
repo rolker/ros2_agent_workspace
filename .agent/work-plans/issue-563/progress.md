@@ -109,5 +109,6 @@ recorded as independent, not self-review. -->
 - [ ] (must-fix) `onboard-project` fix step looks up `{WORKSPACE_REPO_URL}` via `gh repo view --json url` from the project-repo cwd, yielding the project URL not the workspace URL; add "on the workspace repo" qualifier (template line 53 has it) — `.claude/skills/onboard-project/SKILL.md:188-190`
 - [ ] (suggestion) New root-`AGENTS.md` template not added to the project-guides index (footer asks to keep current) — `.agent/knowledge/README.md:29-33`
 - [ ] (suggestion) "Project-Level Guidance" section could cross-link the new template (Ask First — instruction-file edit) — `AGENTS.md:409-417`
+  - Note (host, 2026-07-14): operator APPROVED this instruction-file edit at the round-1 checkpoint — apply it; keep the edit to a one-sentence cross-link in § Project-Level Guidance.
 - [ ] (suggestion) Pin the template's standalone `## Quality Standard` excerpt to its workspace source to bound the drift ADR-0017 acknowledges — `.agent/templates/project_agents_md.md:15-24`
 - [ ] (suggestion) Currency-check snippet references undefined `$REPO_DIR`; define it or use the skill's `<repo-name>` convention — `.claude/skills/audit-project/SKILL.md:62`
