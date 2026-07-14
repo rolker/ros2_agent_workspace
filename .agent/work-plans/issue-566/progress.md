@@ -107,3 +107,19 @@ The issue was observed concurrently with the #559 heal rebuild.
 - [x] (suggestion) mkdir -p failure handling in docker_run_agent.sh (`7b1fc58`)
 - [x] (suggestion) Check 4 numeric-UID comparison (`7b1fc58`)
 - [x] (suggestion) softened over-claiming comment (`7b1fc58`)
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-14 14:14 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #568 at `2e00096`
+**Sources**: 3 (Copilot R1 @ `2e00096`, Local Review (Pre-Push) R1 @ `b96b37a`, CI rollup)
+**Cross-source confirmations**: 0
+**CI**: all-pass (lint, commit identity, script tests, docs validation)
+
+### Findings
+- [x] (minor, Copilot) bare GNU `stat -c` in Check 4 silently false-passes on BSD/macOS via `|| continue` — fixed with the discover_governance.sh GNU→BSD fallback pattern (`18d10ac`) — `.agent/scripts/test_layer_sourcing.sh`
+
+### False positives
+(none)
