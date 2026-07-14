@@ -130,3 +130,24 @@ recorded as independent, not self-review. -->
 - [x] (suggestion) Replace undefined `$REPO_DIR` with the skill's `layers/main/*/src/<repo-name>` convention in the currency-check snippet — `.claude/skills/audit-project/SKILL.md:62` (`b0d1781`)
 
 No deferrals — all five findings were actionable and fixed. Changes are docs/skill-template only; pre-commit hooks ran clean on every commit.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-14 15:55 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-563 at `3c97342`
+**Mode**: pre-push
+**Depth**: Deep (reason: new ADR-0017 — ADR-add Deep-promotion trigger; docs/skill-template only; guidance-doc calibration #537 applied)
+**Must-fix**: 0 | **Suggestions**: 2
+**Round**: 2 | **Ship**: recommended — no must-fix; all 5 Round-1 findings verified addressed; 2 optional ~1-min polish suggestions remain
+
+<!-- Independence: $AGENT_NAME "Claude Code Agent" is shared across workspace agents, so the
+name-match heuristic misfires. This is a fresh-context, separately-dispatched Deep review
+with two disjoint-lens adversarial subagents; recorded as independent. gh unavailable in
+container — issue title from progress.md frontmatter; diffed vs local origin/main (fetch failed). -->
+
+### Findings
+- [ ] (suggestion) Currency-check `grep … || echo STALE` conflates Missing and Stale (absent file prints STALE, contradicting line 65 + the Present/Missing/Stale table); guard existence first — `.claude/skills/audit-project/SKILL.md:62`
+- [ ] (suggestion) ADR-0017 §Consequences overstates the currency check as full mitigation; it is presence-only, not content-currency — soften wording — `docs/decisions/0017-extend-agents-md-to-project-repos.md:49`
