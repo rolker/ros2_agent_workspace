@@ -59,7 +59,7 @@ contain the template's stable `## Quality Standard` heading (the marker
 `.agent/templates/project_agents_md.md` instructs repos to keep verbatim):
 
 ```bash
-grep -q '^## Quality Standard' "$REPO_DIR/AGENTS.md" || echo "STALE: Quality Standard section missing"
+grep -q '^## Quality Standard' layers/main/*/src/<repo-name>/AGENTS.md || echo "STALE: Quality Standard section missing"
 ```
 
 Report `Stale` when the file exists but the marker is absent — it predates
