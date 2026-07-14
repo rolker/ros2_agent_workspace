@@ -32,5 +32,9 @@ Project repositories may contain a `.agents/README.md` at their root with repo-s
 guidance for agents. To create one, use the template at
 [`../templates/project_agents_guide.md`](../templates/project_agents_guide.md).
 
+Project repositories should also carry a thin root `AGENTS.md` that references the
+workspace rules (read by GitHub Copilot code review). To create one, use the template at
+[`../templates/project_agents_md.md`](../templates/project_agents_md.md) (see ADR-0017).
+
 ---
 *Note: This index is manually maintained. Update it when adding new knowledge files.*

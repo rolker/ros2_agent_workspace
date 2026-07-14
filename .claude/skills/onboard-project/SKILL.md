@@ -68,6 +68,7 @@ whether it's already done, missing, or partially done.
 | **Pre-commit config** | `.pre-commit-config.yaml` exists at repo root | Copy from `.agent/templates/pre-commit-config.yaml`, adjust protected branches to match repo's default branch |
 | **CI workflow** | `.github/workflows/*.yml` exists with colcon build/test | Copy from `.agent/templates/ci_workflow.yml`, fill in default branch and package list |
 | **Agent guide** | `.agents/README.md` exists at repo root | Generate from `.agent/templates/project_agents_guide.md` by reading repo code (packages, launch files, nodes, topics) |
+| **Root `AGENTS.md`** | `AGENTS.md` exists at repo root | Copy from `.agent/templates/project_agents_md.md`; fill `{REPO_NAME}` / `{WORKSPACE_REPO_URL}` and the Review Context slot (ADR-0017: reference workspace rules, never fork them) |
 | **Branch protection** | GitHub branch ruleset requires PRs on default branch | Configure via `gh api` — requires admin access |
 | **Copilot auto-review** | Copilot is configured to review PRs | Check via `gh api` — requires admin access |
 | **Package labels** | `pkg:` labels exist (multi-package repos only) | Create via `gh label create` for each package |
@@ -89,7 +90,8 @@ Present items in this order (quick wins first):
 4. git-bug bridge (if git-bug is installed)
 5. Branch protection / Copilot auto-review
 6. Agent guide (`.agents/README.md`)
-7. License headers (always suggest "open issue" — too invasive for batch fix)
+7. Root `AGENTS.md` (steers Copilot code review + closest-file-wins agents)
+8. License headers (always suggest "open issue" — too invasive for batch fix)
 
 Skip items that are already in place. If everything is already done, report
 that and exit.
@@ -182,6 +184,13 @@ cd <layer>_ws/src/<repo-name>
   fill in sections: package inventory (from `package.xml`), layout (from
   directory structure), key files, dependencies. Follow the documentation
   verification workflow — every claim must be verified against source.
+
+- **Root `AGENTS.md`**: Copy `.agent/templates/project_agents_md.md`, replace
+  `{REPO_NAME}` and `{WORKSPACE_REPO_URL}` (look the URL up with `gh repo view
+  --json url` **on the workspace repo** — never guess), fill the Review Context section with
+  repo-specific reviewer guidance, delete the "Instructions for Use" section.
+  Keep the `## Quality Standard` heading verbatim (audit-project's currency
+  marker) and never restate workspace rules — reference them (ADR-0017).
 
 - **Package labels**: Create via `gh label create` (done in step 4, no
   file changes needed).

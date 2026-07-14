@@ -418,6 +418,10 @@ If no `.agents/README.md` exists, note this gap. To create one, use the template
 and follow the [documentation verification workflow](.agent/knowledge/documentation_verification.md).
 This should be a dedicated task with its own issue, not a side-effect of unrelated work.
 
+Project repos should also carry a thin root `AGENTS.md` (read by GitHub Copilot code
+review) that references — never forks — these workspace rules; create it from
+[`.agent/templates/project_agents_md.md`](.agent/templates/project_agents_md.md) (see [ADR-0017](docs/decisions/0017-extend-agents-md-to-project-repos.md)).
+
 ## Workspace Cleanliness
 
 - Keep repo root and `layers/*/src/` clean — no temp files, build artifacts, or logs.

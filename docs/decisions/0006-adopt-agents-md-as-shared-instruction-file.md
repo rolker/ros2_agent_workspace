@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. [ADR-0017](0017-extend-agents-md-to-project-repos.md) extends the
+pattern to project-repo level.
 
 ## Context
 
@@ -96,4 +97,5 @@ both over-cautious behavior and unauthorized actions.
 - ADR-0003: Workspace infrastructure is project-agnostic
 - ADR-0004: Enforcement hierarchy for agent compliance
 - ADR-0005: Layered enforcement — framework-agnostic backbone
+- [ADR-0017](0017-extend-agents-md-to-project-repos.md): Extends this pattern to project repos
 - [AGENTS.md convention](https://github.com/agentsmd/agents.md)
