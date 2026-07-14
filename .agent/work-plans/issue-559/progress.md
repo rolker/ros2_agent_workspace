@@ -203,3 +203,21 @@ Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand of
 - [x] (suggestion) fallback LAYERS lists include site, synced build.sh + setup.bash (`9073b0e`)
 - [x] (suggestion) guard Check 1 recursive over .agent/scripts + .agent/hooks (`9073b0e`)
 - [x] (suggestion) guard Check 2 first-occurrence dedup replaces adjacent-only uniq (`9073b0e`)
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-14 11:05 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #565 at `d19d3eb`
+**Sources**: 3 (Copilot R1 @ `d19d3eb`, Local Review (Pre-Push) R1 @ `080bd75` + R2 @ `7902bf3`, CI rollup)
+**Cross-source confirmations**: 0
+**CI**: all-pass (commit identity, script tests, docs validation, lint)
+
+### Findings
+(none — Copilot reviewed 13/13 files, generated no comments; both local
+pre-push rounds' findings were addressed pre-publish and verified at
+`d19d3eb`)
+
+### False positives
+(none)
