@@ -47,6 +47,13 @@ point to `layers/main/`) are skipped to avoid polluting the shared workspace.
 | `<target_layer>_ws/test.sh` | Sources lower layers, runs `colcon test` + `colcon test-result --verbose` |
 | `<target_layer>_ws/colcon/defaults.yaml` | Default colcon flags (`--symlink-install`, compile commands); auto-discovered by colcon from `$PWD/colcon/defaults.yaml` |
 
+All generated layer sourcing uses each layer's `install/local_setup.bash`
+(runtime chaining in `layers.txt` order), **not** the baked chained
+`install/setup.bash` — see
+[ADR-0016](../docs/decisions/0016-runtime-vs-baked-layer-chaining.md).
+Worktrees created before that change keep their old (slower) generated
+scripts; recreate the worktree to pick up the fast versions.
+
 ### Usage
 
 ```bash
