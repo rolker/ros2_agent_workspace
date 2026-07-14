@@ -80,3 +80,15 @@ worktree_create.sh) requires:
 - [ ] Sweep `.agent/` for all direct `install/setup.bash` sourcing; document findings in PR description.
 - [ ] Update `.agent/WORKTREE_GUIDE.md` if generated worktree script preambles change.
 - [ ] Consider adding an automated timing/correctness check (e.g., timed `source` assertion in CI or a Makefile validate target) to prevent O(N²) regression.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-14 00:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-559/plan.md` at `057f99a`
+**Branch**: feature/issue-559 at `057f99a`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
