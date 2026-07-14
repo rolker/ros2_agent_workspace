@@ -47,14 +47,27 @@ as reference, check what exists:
 
 | Item | Status | Path |
 |---|---|---|
+| `AGENTS.md` (root) | Present / Missing / Stale | ... |
 | `.agents/README.md` | Present / Missing | ... |
 | `PRINCIPLES.md` | Present / Missing | ... |
 | `ARCHITECTURE.md` | Present / Missing | ... |
 | `docs/decisions/` | Present / Missing (N ADRs) | ... |
 | `.agents/workspace-context/` | Present / Missing | ... |
 
+For the root `AGENTS.md`, also run the **currency check**: the file must
+contain the template's stable `## Quality Standard` heading (the marker
+`.agent/templates/project_agents_md.md` instructs repos to keep verbatim):
+
+```bash
+grep -q '^## Quality Standard' "$REPO_DIR/AGENTS.md" || echo "STALE: Quality Standard section missing"
+```
+
+Report `Stale` when the file exists but the marker is absent — it predates
+the template or lost its standalone review context (ADR-0017).
+
 This is a **coverage report**, not a mandate — not every repo needs full
-governance. But missing items should be noted.
+governance. But missing items should be noted, and a missing root
+`AGENTS.md` means Copilot code review runs uninstructed on that repo.
 
 ### 3. Check agent guide quality
 
@@ -116,6 +129,7 @@ Report test existence and pass/fail, not test quality.
 
 | Item | Status |
 |---|---|
+| `AGENTS.md` (root) | Present / Missing / Stale |
 | `.agents/README.md` | Present / Missing |
 | `PRINCIPLES.md` | Present / Missing |
 | ... | ... |
@@ -150,6 +164,11 @@ creating one with the project_agents_guide.md template">
 
 - [ ] <specific action items>
 ```
+
+When the root `AGENTS.md` is Missing or Stale, list it as a distinct
+recommended action (fix = instantiate/refresh from
+`.agent/templates/project_agents_md.md`, e.g. via `onboard-project`) —
+don't fold it into a generic "improve governance" item.
 
 ## Guidelines
 
