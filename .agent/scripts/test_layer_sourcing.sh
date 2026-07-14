@@ -27,7 +27,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-LAYERS_BASE="$ROOT_DIR/layers/main"
+# LAYERS_BASE is resolved (worktree-aware) alongside LAYERS_CONFIG below.
 
 FAILURES=0
 
@@ -58,15 +58,23 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# --- Resolve layer list (worktree-aware, same fallback as setup.bash) ---
-LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
-if [ ! -f "$LAYERS_CONFIG" ]; then
+# --- Resolve layer list + built-layer base (worktree-aware) ---
+# LAYERS_CONFIG and LAYERS_BASE must resolve to the SAME workspace root. In a
+# worktree, configs/ (gitignored) is absent and built layers live under the
+# MAIN root's layers/main (a workspace worktree symlinks it; a layer worktree
+# does not). Derive one MAIN_ROOT and use it for both, so Checks 2-3 run
+# against the real built layers instead of silently skipping in a layer
+# worktree (and so the /layers/main/ sed below stays correct — see Check 2).
+MAIN_ROOT="$ROOT_DIR"
+if [ ! -f "$ROOT_DIR/configs/manifest/layers.txt" ]; then
     if [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
-        LAYERS_CONFIG="$(dirname "$(dirname "$ROOT_DIR")")/configs/manifest/layers.txt"
+        MAIN_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
     elif [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
-        LAYERS_CONFIG="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")/configs/manifest/layers.txt"
+        MAIN_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
     fi
 fi
+LAYERS_CONFIG="$MAIN_ROOT/configs/manifest/layers.txt"
+LAYERS_BASE="$MAIN_ROOT/layers/main"
 if [ ! -f "$LAYERS_CONFIG" ]; then
     echo "⏭️  Checks 2-3 skipped: no layers.txt at $LAYERS_CONFIG"
     exit "$((FAILURES > 0 ? 1 : 0))"
@@ -85,7 +93,13 @@ fi
 # --- Check 2: runtime precedence order ---
 # Source in a scrubbed shell so a pre-sourced caller environment can't skew
 # the order, then print first-occurrence layer names from AMENT_PREFIX_PATH.
+# Pass ROS2_LAYERS_BASE so setup.bash sources the SAME layers we detected as
+# BUILT: in a layer worktree it would otherwise default LAYERS_BASE to the
+# worktree path and its AMENT entries wouldn't be under /layers/main/ (the
+# path the sed below keys on). setup.bash honors this override and won't
+# clobber it (see setup.bash's ROS2_LAYERS_BASE guard).
 ACTUAL_ORDER=$(env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin" TERM=dumb \
+    ROS2_LAYERS_BASE="$LAYERS_BASE" \
     bash --noprofile --norc -c \
     "source '$SCRIPT_DIR/setup.bash' > /dev/null 2>&1
      echo \"\$AMENT_PREFIX_PATH\" | tr ':' '\n' \
