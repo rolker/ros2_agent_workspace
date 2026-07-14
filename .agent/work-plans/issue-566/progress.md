@@ -93,3 +93,17 @@ The issue was observed concurrently with the #559 heal rebuild.
 - [ ] (suggestion) `mkdir -p` has no failure handling; a silent failure would let Docker recreate the mountpoint root-owned, defeating the fix — `.agent/scripts/docker_run_agent.sh:347`
 - [ ] (suggestion) Compare numeric UIDs (`stat -c %u` vs `id -u`) instead of `%U`/`id -un` to avoid false-positive warnings on orphaned UIDs — `.agent/scripts/test_layer_sourcing.sh:93`
 - [ ] (suggestion) Comment "removes the hazard" overclaims vs residual concurrent-`rm` window; soften to "prevents in normal use" — `.agent/scripts/docker_run_agent.sh:342`
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-14 13:42 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**Branch**: feature/issue-566 at `7b1fc58`
+**Addressed**: Local Review (Pre-Push) — Round 1, approved / Ship: recommended; 3 suggestions host-applied pre-publish
+**Commits**: `7b1fc58`
+
+### Actions
+- [x] (suggestion) mkdir -p failure handling in docker_run_agent.sh (`7b1fc58`)
+- [x] (suggestion) Check 4 numeric-UID comparison (`7b1fc58`)
+- [x] (suggestion) softened over-claiming comment (`7b1fc58`)
