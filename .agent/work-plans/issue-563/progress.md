@@ -60,3 +60,15 @@ Per the consequences map (template in `.agent/templates/` → docs that referenc
 - [ ] Ensure plan-task includes `make generate-skills` if any `.claude/skills/` SKILL.md files are modified
 - [ ] Consider whether `udp_bridge` (28 FPs) and `marine_tools` (19 FPs) — both above some pilot-list repos — warrant inclusion in the first pilot wave; issue currently stops at 5 repos
 - [ ] Template should include standalone context about workspace-in-context vs. standalone use (same as `.agent/templates/project_agents_guide.md` does) so Copilot reviewers on project repos get useful context even without workspace access
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-14 12:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-563/plan.md` at `0216e2a`
+**Branch**: feature/issue-563 at `0216e2a`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
