@@ -72,3 +72,23 @@ Per the consequences map (template in `.agent/templates/` → docs that referenc
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-14 14:47 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-563/plan.md` at `0216e2a`
+**PR**: PR-less (reviewed from `feature/issue-563` worktree)
+**Verdict**: changes-requested
+
+<!-- Independence: name-match heuristic misfires here — $AGENT_NAME "Claude Code Agent"
+is shared across all workspace agents, so it always matches the plan author. This is a
+fresh-context, separately-dispatched, different-model (Opus vs the Sonnet author) review;
+recorded as independent, not self-review. -->
+
+### Findings
+- [ ] (must-fix) ADR-0006 addendum records a *new* "reference, never fork" invariant in Status — exceeds ADR-0012's navigational scope; the project-repo extension is a substantive decision that belongs in a new thin ADR with a genuine cross-reference addendum on ADR-0006. Under-captures per "Capture decisions" (review-issue "Action needed") — `plan.md:34-36`
+- [ ] (must-fix) Step 5 `make generate-skills` is a no-op: it regenerates gitignored `/make_*` slash commands from the Makefile `.PHONY` line, not from hand-crafted SKILL.md content. Remove step 5 and the "(generated)" Files-to-Change row — `plan.md:48,59`
+- [ ] (suggestion) Adding a root `AGENTS.md` row to `audit-project`'s coverage table should also add it to the reference template `.agent/templates/project_governance.md` so skill and template stay in sync — `plan.md:44-46`
+- [ ] (suggestion) Currency check via string-search for "nits" is brittle; have the template emit a stable marker (e.g. a `## Quality Standard` heading) and grep for that — `plan.md:46`
