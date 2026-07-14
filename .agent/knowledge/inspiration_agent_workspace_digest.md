@@ -1,41 +1,33 @@
 # Inspiration Digest: agent_workspace
 
 Type: fork
-Last checked: 2026-05-15
+Last checked: 2026-07-14
 Repo: rolker/agent_workspace @ 837c24ee64d76a4906140fd262ae9413bc262636
 
 ## Activity Snapshot
 
-- 5 open issues touch the review/skills surface (notably #190 — progress.md
-  convention rework + new `/implement` skill); 0 open PRs.
-- 113 commits since previous snapshot (`c02887e`, 2026-04-26); 3 files in
-  the review-skill area changed.
-- Notable since last refresh: `/review-code` gains an explicit `--branch`
-  mode with `--skip-static`, `--no-progress`, and `--issue <N>` flags
-  (PR #185), plus a `_resolve_default_branch.sh` helper. Cross-model script
-  extended to `--branch` mode (#185) — not applicable here, see "Not
-  adopted".
+- **No code changes since the 2026-05-15 check** — HEAD is unchanged
+  (`837c24e`, last commit 2026-05-12). No merged PRs, no closed issues.
+  File-level diff skipped this run (would be identical to last run's).
+- Upstream has been quiet since 2026-05-18. Late-May activity was all
+  planning: 21 open issues, 3 open (stale) PRs.
+- Workspace redesign push: #172 umbrella (multi-tenant + project-type
+  adapters + per-project manifests) refined into #210 (10-verb adapter
+  contract + single_project adapter) with plan PR #211 — open, unmerged
+  since 2026-05-17.
+- Reverse porting: upstream filed #208/#209 to port **this workspace's**
+  field mode (ADR-0011, `field_mode.sh`, hotfix workflow + non-GitHub
+  remote reconciliation) — confirmation of the pattern's value, nothing
+  to pull back.
+- #207 "Documentation enforcement: from aspiration to mechanism" — idea
+  worth watching, no implementation yet.
+- #206 + #212 continue the cross_model_review.sh thread (tmux-default
+  reconsidered; Copilot invocation likely broken) — that script remains
+  unadopted here, see "Partially adopted".
 
 ## Pending Review
 
-Stacked on PR #453 (issue #452) — the items below are upstream refinements
-to the dual-mode `/review-code` we already ported in #453. All four are
-small and additive on top of our existing implementation.
-
-- **`--skip-static` flag** (both modes) — suppress the static-analysis
-  specialist when pre-commit was already clean. Source: upstream
-  `.claude/skills/review-code/SKILL.md` step 5a. (2026-05-15)
-- **`--no-progress` flag** (branch mode) — explicit opt-out for
-  progress.md persistence on skill worktrees / one-off branches that
-  don't have an issue to track against. Source: upstream review-code
-  SKILL steps 1b + 8. (2026-05-15)
-- **`--issue <N>` override** (branch mode) — fallback when the branch
-  name doesn't carry the issue number. Source: upstream review-code
-  SKILL step 1b. (2026-05-15)
-- **Distinct `## Local Review (Pre-Push)` vs `## Local Review`
-  progress.md headers** — allows pre-push and post-PR entries for the
-  same issue to coexist on the timeline. Source: upstream review-code
-  SKILL step 8. (2026-05-15)
+_None outstanding._
 
 ## Roadmapped
 
@@ -46,6 +38,14 @@ _None outstanding._
 _None outstanding._
 
 ## Ported
+
+- **`/review-code` flag refinements** (pending since 2026-05-15) — all
+  four items landed locally in the subsequent review-skill work and are
+  live in `.claude/skills/review-code/SKILL.md` as of 2026-07-14:
+  `--skip-static` (both modes), `--no-progress` (pre-push), `--issue <N>`
+  override, and the distinct `## Local Review (Pre-Push)` progress.md
+  header (also in `address-findings` and `progress_read.py`).
+  (verified 2026-07-14)
 
 Pieces imported into this workspace via PR #453 (issue #452). All adapted
 for the layered/multi-repo workspace and for Claude-only operation. The
@@ -112,6 +112,9 @@ of the surrounding tooling.
 _None outstanding._
 
 ## Deferred
+
+All items below re-deferred 2026-07-14 (upstream unchanged since they
+were filed; nothing new to weigh).
 
 - `setup_project.sh` — generic project bootstrapping script, upstream-only (2026-03-23)
 - `document-project` skill — generic documentation skill (upstream equivalent of document-package) (2026-03-23)
