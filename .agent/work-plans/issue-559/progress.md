@@ -164,3 +164,27 @@ worktree_create.sh) requires:
 Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
 
     .agent/scripts/dispatch_subagent.sh --mode in-process --issue 559 --skill review-code
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-14 14:43 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-559 at `e41b4b6`
+**Mode**: pre-push
+**Depth**: Deep (reason: new ADR + cross-cutting environment-sourcing change across 6 scripts)
+**Must-fix**: 1 | **Suggestions**: 3
+**Round**: 2 | **Ship**: recommended — one mechanical one-line env scrub (not rising, obvious correction); a full re-review round isn't warranted for it
+
+### Findings
+- [ ] (must-fix) `build.sh` doesn't scrub an inherited `COLCON_PREFIX_PATH`; sourcing jazzy doesn't clear it and `make build` passes it through, so `source setup.bash; make build` (and the ADR's own heal command in a sourced shell) re-bakes higher layers into lower chains — reintroducing ADR problem #3. Add `unset COLCON_PREFIX_PATH AMENT_PREFIX_PATH CMAKE_PREFIX_PATH AMENT_CURRENT_PREFIX` before sourcing jazzy — `.agent/scripts/build.sh:76-90`
+- [ ] (suggestion) Fallback `LAYERS` array omits `site` (present in real layers.txt); introduces a second stale copy alongside `setup.bash:82` — sync both — `.agent/scripts/build.sh:110`
+- [ ] (suggestion) Check 1 comment says "repo-wide glob" but scan is top-level `.agent/scripts/*.sh` only (misses `tests/`, `.agent/hooks/`); make recursive or narrow the comment — `.agent/scripts/test_layer_sourcing.sh:37-43`
+- [ ] (suggestion) Check 2 `uniq` collapses only adjacent duplicates; fragile if a layer ever contributes non-adjacent AMENT prefixes — note or first-occurrence dedup — `.agent/scripts/test_layer_sourcing.sh:105-107`
+
+### Notes on verified strengths
+- shellcheck `--severity=warning` clean on all 6 changed shell scripts; guard runs green here (Check 1 pass, Checks 2-3 skip — no built layers).
+- All 4 round-1 findings confirmed addressed in the branch diff.
+- Two independent adversarial passes (Lens A logic, Lens B systemic) both confirmed runtime-chaining equivalence to a clean baked chain and the real-world pollution it fixes; empirically verified jazzy does not clear `COLCON_PREFIX_PATH` and `make build` inherits it.
+- Full plan adherence; `verify_change.sh` deviation documented and correct. Consequences map (AGENTS.md table, WORKTREE_GUIDE, ros2_development_patterns) all addressed. Sweep complete (`ci_workflow.yml:76` out of scope; `dashboard.sh:197` existence check only).
