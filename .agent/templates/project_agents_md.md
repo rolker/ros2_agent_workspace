@@ -15,6 +15,11 @@ never restate or fork them.
 
 ## Quality Standard
 
+<!-- Standalone excerpt of the workspace AGENTS.md § Quality Standard. It is
+     intentionally condensed for repos reviewed without workspace context; when
+     the workspace § Quality Standard changes materially, re-sync this excerpt
+     (the drift ADR-0017 acknowledges). -->
+
 This is software for autonomous robot boats operating on open water.
 Robustness is not optional.
 
