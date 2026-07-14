@@ -64,3 +64,15 @@ The issue was observed concurrently with the #559 heal rebuild.
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-14 16:49 +00:00
+**By**: Claude Code Agent (Claude Opus) (in-context — author self-review)
+
+**Plan**: `.agent/work-plans/issue-566/plan.md` at `e1b2182`
+**PR**: PR-less
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) Check 4 skip condition: gate on `[ -d "$LAYERS_BASE" ]`, not the Checks 2–3 "no built layers" early-exit (`test_layer_sourcing.sh:87-88`) — the #559 failure state has empty root-owned dirs that blocked the build, so `BUILT` is empty and the script would `exit` before Check 4 runs, skipping the exact state it targets — `plan.md:41`
