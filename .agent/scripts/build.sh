@@ -102,7 +102,9 @@ if [ ! -f "$LAYERS_CONFIG" ] && [ -n "$WORKTREE_INFO" ]; then
     fi
 fi
 if [ -f "$LAYERS_CONFIG" ]; then
-    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#')
+    # Strip trailing whitespace so a stray space in layers.txt can't produce a
+    # bad "<layer> _ws" path (matches setup.bash + test_layer_sourcing.sh).
+    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#' | sed 's/[[:space:]]*$//')
 else
     echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
     LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")

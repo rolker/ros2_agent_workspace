@@ -72,8 +72,10 @@ if [ ! -f "$LAYERS_CONFIG" ] && [ -n "$WORKTREE_CONTEXT" ]; then
 fi
 
 if [ -f "$LAYERS_CONFIG" ]; then
-    # Read non-empty lines into array
-    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#')
+    # Read non-empty lines into array (strip trailing whitespace so a stray
+    # space in layers.txt can't produce a bad "<layer> _ws" path; matches the
+    # regression guard in test_layer_sourcing.sh)
+    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#' | sed 's/[[:space:]]*$//')
 else
     # Fallback/Bootstrap layers
     echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
