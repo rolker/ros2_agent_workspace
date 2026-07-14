@@ -16,6 +16,13 @@
 #      built with higher layers sourced (the pre-#559 build.sh bug) and needs
 #      the one-time bottom-up clean rebuild to heal. Warning-only because
 #      pre-existing installs are expected to be polluted until healed.
+#   4. MOUNTPOINT OWNERSHIP (warning only): layer build/install/log dirs must
+#      be owned by the invoking user. Docker creates missing anonymous-volume
+#      mountpoints as root:root (pre-#566 docker_run_agent.sh), which blocks
+#      host-side builds with EACCES. Runs whenever layers/main exists — NOT
+#      behind the Checks 2-3 built-layer early-exit, because the failure state
+#      (empty root-owned dirs, nothing built) is exactly the one with no built
+#      layers. Reported as Check 4 even though it prints before Checks 2-3.
 #
 # Exit codes: 0 = pass (or skipped), 1 = check failed.
 
@@ -73,6 +80,35 @@ if [ ! -f "$ROOT_DIR/configs/manifest/layers.txt" ]; then
 fi
 LAYERS_CONFIG="$MAIN_ROOT/configs/manifest/layers.txt"
 LAYERS_BASE="$MAIN_ROOT/layers/main"
+
+# --- Check 4: mountpoint ownership (warning only) ---
+# Deliberately placed BEFORE the Checks 2-3 early-exits: the root-owned
+# failure state (#566) is typically one where nothing is built, so gating
+# this on built layers would skip it exactly when it matters.
+if [ -d "$LAYERS_BASE" ]; then
+    NOT_OWNED=()
+    CURRENT_UID="$(id -u)"
+    # Numeric UID compare: %U prints "UNKNOWN"-style names for orphaned UIDs,
+    # which would false-positive against id -un. GNU stat first, BSD stat -f
+    # fallback (same pattern as discover_governance.sh).
+    for d in "$LAYERS_BASE"/*_ws/build "$LAYERS_BASE"/*_ws/install "$LAYERS_BASE"/*_ws/log; do
+        [ -d "$d" ] || continue
+        owner_uid=$(stat -c %u "$d" 2>/dev/null || stat -f %u "$d" 2>/dev/null) || continue
+        [ "$owner_uid" != "$CURRENT_UID" ] && NOT_OWNED+=("$d (owner uid: $owner_uid)")
+    done
+    if [ ${#NOT_OWNED[@]} -eq 0 ]; then
+        echo "✅ Check 4: layer build/install/log dirs are user-owned"
+    else
+        echo "⚠️  Check 4 (warning): non-user-owned layer artifact dirs:"
+        printf '     %s\n' "${NOT_OWNED[@]}"
+        echo "   Docker creates missing anonymous-volume mountpoints as root when"
+        echo "   an agent container starts (#566; fixed in docker_run_agent.sh)."
+        echo "   Fix: remove the dirs (empty root-owned dirs rmdir fine as the"
+        echo "   user since the parent is user-owned), recreate with mkdir, and"
+        echo "   re-run the build."
+    fi
+fi
+
 if [ ! -f "$LAYERS_CONFIG" ]; then
     echo "⏭️  Checks 2-3 skipped: no layers.txt at $LAYERS_CONFIG"
     exit "$((FAILURES > 0 ? 1 : 0))"

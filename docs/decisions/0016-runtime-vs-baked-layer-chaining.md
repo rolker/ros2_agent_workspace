@@ -71,6 +71,15 @@ chains themselves.
   (or the worktree's generated `setup.bash`), which is now cheap.
 - Existing worktrees keep their old generated scripts (slow but functional)
   and age out as worktrees are removed.
+- **Concurrent container dispatch can race the clean rebuild**
+  ([#566](https://github.com/rolker/ros2_agent_workspace/issues/566)): agent
+  containers declare anonymous volumes at every layer's `build/install/log`
+  path, and docker creates missing mountpoints **root-owned** — during the
+  first #559 heal attempt, a concurrently dispatched container re-created the
+  deleted dirs as root and the rebuild failed with `EACCES`.
+  `docker_run_agent.sh` now pre-creates the mountpoints user-owned before
+  `docker run`, and `test_layer_sourcing.sh` Check 4 (run by `make validate`)
+  detects any surviving root-owned artifact dirs with remediation steps.
 
 ## References
 
