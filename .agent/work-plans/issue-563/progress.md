@@ -151,3 +151,32 @@ container — issue title from progress.md frontmatter; diffed vs local origin/m
 ### Findings
 - [x] (suggestion) Currency-check `grep … || echo STALE` conflates Missing and Stale (absent file prints STALE, contradicting line 65 + the Present/Missing/Stale table); guard existence first — `.claude/skills/audit-project/SKILL.md:62`
 - [x] (suggestion) ADR-0017 §Consequences overstates the currency check as full mitigation; it is presence-only, not content-currency — soften wording — `docs/decisions/0017-extend-agents-md-to-project-repos.md:49`
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-14 12:16 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #567 at `6e79af6`
+**Sources**: 3 (Copilot R1 @ `67a4239`, Local Review Pre-Push @ `e8ffa8e`, Local Review Pre-Push @ `3c97342`)
+**Cross-source confirmations**: 0
+**CI**: all-pass (8 checks green; one duplicate "Validate commit identity" run skipped, non-blocking)
+
+Copilot's review (commit `67a4239`) predates the current head `6e79af6`; both of its
+inline comments were re-evaluated against current code. The prior two local Pre-Push
+review rounds (7 findings total) are all checked off and disjoint from Copilot's two
+comments — no cross-source overlap.
+
+### Findings
+- [ ] (low, Copilot) Line-count guidance is self-contradictory: template advises "≤60 lines"
+  but the template file is 65 lines until the *Instructions for Use* section (lines 53–65) is
+  deleted; the ≤60 target applies to the instantiated file after that section is removed.
+  Clarify instruction #4 to say so — `.agent/templates/project_agents_md.md:62`
+
+### False positives
+- (Copilot) "`layers/main/*/src/...` won't match the actual layer workspace layout; add the
+  `*_ws` component" — the stated failure mode cannot occur: the `*` wildcard already matches
+  every `<layer>_ws` directory (`core_ws`, `platforms_ws`, …), verified against the live
+  `layers/main/` tree — `layers/main/*/src/unh_marine_autonomy` resolves correctly. Narrowing
+  to `*_ws` would be marginally more specific but is not required; the glob is functional as
+  written, at both `.claude/skills/audit-project/SKILL.md:40` (step 1) and `:62` (currency check).
