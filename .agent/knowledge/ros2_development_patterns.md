@@ -150,11 +150,16 @@ This repository uses a layered workspace approach:
 
 ### Environment Sourcing Order
 ```bash
-source /opt/ros/<distro>/setup.bash  # ROS2 base
-source layers/main/underlay_ws/install/setup.bash
-source layers/main/core_ws/install/setup.bash
-# ... additional layers
+source /opt/ros/<distro>/setup.bash  # ROS2 base, once
+source layers/main/underlay_ws/install/local_setup.bash
+source layers/main/core_ws/install/local_setup.bash
+# ... additional layers, ascending layers.txt order (last sourced = highest precedence)
 ```
+
+Use each layer's `local_setup.bash` (this layer only), **not** the baked
+chained `setup.bash` — the chain re-sources every parent recorded at build
+time, which is O(N²) across layers and trusts stale build-time state. See
+[ADR-0016](../../docs/decisions/0016-runtime-vs-baked-layer-chaining.md).
 
 The `.agent/scripts/setup.bash` script handles this automatically.
 

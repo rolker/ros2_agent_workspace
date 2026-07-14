@@ -59,10 +59,13 @@ if [ -n "$FOUND_LAYER" ]; then
     echo "Located package in: $FOUND_LAYER"
     cd "$FOUND_LAYER" || exit 1
 
-    # Source install if available to ensure environment is ready
-    if [ -f "install/setup.bash" ]; then
-        source "install/setup.bash"
-    fi
+    # Source the full workspace environment (jazzy + all layers in order).
+    # This script has no other environment setup — it previously leaned on the
+    # layer's baked chained install/setup.bash to pull in jazzy and lower
+    # layers, but baked chains go stale/polluted (#559); the workspace
+    # setup.bash is now cheap (~0.5s) and always current.
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/setup.bash" > /dev/null
 else
     echo "❌ Error: Could not locate layer for '$PKG'."
     echo "Search locations checked:"
