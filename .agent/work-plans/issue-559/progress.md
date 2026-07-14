@@ -92,3 +92,25 @@ worktree_create.sh) requires:
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-14 13:02 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-559/plan.md` at `057f99a`
+**PR**: PR-less (`--issue 559`, host-dispatched sub-agent, no GitHub auth)
+**Verdict**: changes-requested
+
+### Findings
+- [ ] (must-fix) `build.sh` step 2 must retain the ROS 2 base source. Line 78's `source "$SCRIPT_DIR/setup.bash"` currently supplies both the `LAYERS` array *and* `/opt/ros/jazzy/setup.bash`. The plan replaces it with "a targeted parse of `layers.txt` to populate the `LAYERS` array" only — a literal implementation drops the jazzy base, so the first `colcon build` (underlay) has no ROS environment and `make build` breaks. The replacement must still source `/opt/ros/jazzy/setup.bash` (the base only, NOT the layer overlays — sourcing overlays pre-build is the pollution bug being fixed). — `plan.md:33-37`
+- [ ] (suggestion) Sweep-completeness claim is overstated. Step 10 says the grep "finds all remaining `install/setup.bash` references in `.agent/`" and "No other callers need updating," but the sweep also hits `.agent/templates/ci_workflow.yml:76` and `.agent/knowledge/ros2_development_patterns.md:154-155`. Both are legitimately out of scope (ci_workflow sources a single built `ws`, not layered chaining; the knowledge doc is illustrative), but the plan should explicitly triage-and-exclude them with a reason rather than assert they don't exist. — `plan.md:66-69`
+- [ ] (suggestion) `ros2_development_patterns.md:154-155` documents sourcing each layer's `install/setup.bash` in ascending order — the exact O(N²)/inverted-precedence anti-pattern being fixed. Consider updating it to `local_setup.bash` (with an explicit `source /opt/ros/jazzy/setup.bash` first) or noting it's illustrative-only. Minor; acceptable as a follow-up.
+- [ ] (suggestion) review-issue Action #4 (automated timing/correctness regression check) is unaddressed. The plan's "Test what breaks" row lists only manual verification. Adopt a lightweight check (timed `source` assertion or a `validate` target) or explicitly defer it with a reason — right now it is silently dropped.
+
+### Notes on verified strengths
+- All plan line numbers confirmed against source: `setup.bash:86`, `build.sh:78`/`126-127`, `worktree_create.sh:130`/`132`/`279-281`, `test.sh:97-98`, `verify_change.sh:63-64`.
+- ADR-0016 is the correct next number; ADR-0001 trigger is valid.
+- Generated worktree `setup.bash` (worktree_create.sh:91) and the per-layer build preamble (worktree_create.sh:269) already source the jazzy base explicitly, so switching *their* layer sourcing to `local_setup.bash` is safe — no ROS-base regression there.
+- `dashboard.sh:197` correctly excluded (existence check only).
+- review-issue Actions #1 (ADR → step 7) and #3 (WORKTREE_GUIDE → step 8) are addressed.
