@@ -87,11 +87,13 @@ LAYERS_BASE="$MAIN_ROOT/layers/main"
 # this on built layers would skip it exactly when it matters.
 if [ -d "$LAYERS_BASE" ]; then
     NOT_OWNED=()
-    CURRENT_USER="$(id -un)"
+    CURRENT_UID="$(id -u)"
+    # Numeric UID compare: %U prints "UNKNOWN"-style names for orphaned UIDs,
+    # which would false-positive against id -un.
     for d in "$LAYERS_BASE"/*_ws/build "$LAYERS_BASE"/*_ws/install "$LAYERS_BASE"/*_ws/log; do
         [ -d "$d" ] || continue
-        owner=$(stat -c %U "$d" 2>/dev/null) || continue
-        [ "$owner" != "$CURRENT_USER" ] && NOT_OWNED+=("$d (owner: $owner)")
+        owner_uid=$(stat -c %u "$d" 2>/dev/null) || continue
+        [ "$owner_uid" != "$CURRENT_UID" ] && NOT_OWNED+=("$d (owner uid: $owner_uid)")
     done
     if [ ${#NOT_OWNED[@]} -eq 0 ]; then
         echo "✅ Check 4: layer build/install/log dirs are user-owned"
