@@ -92,3 +92,22 @@ recorded as independent, not self-review. -->
 - [ ] (must-fix) Step 5 `make generate-skills` is a no-op: it regenerates gitignored `/make_*` slash commands from the Makefile `.PHONY` line, not from hand-crafted SKILL.md content. Remove step 5 and the "(generated)" Files-to-Change row — `plan.md:48,59`
 - [ ] (suggestion) Adding a root `AGENTS.md` row to `audit-project`'s coverage table should also add it to the reference template `.agent/templates/project_governance.md` so skill and template stay in sync — `plan.md:44-46`
 - [ ] (suggestion) Currency check via string-search for "nits" is brittle; have the template emit a stable marker (e.g. a `## Quality Standard` heading) and grep for that — `plan.md:46`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-14 15:38 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-563 at `e8ffa8e`
+**Mode**: pre-push
+**Depth**: Deep (reason: new ADR-0017 — Deep promotion trigger; 369 lines / governance-trigger files; guidance-doc calibration #537 applied)
+**Must-fix**: 1 | **Suggestions**: 4
+**Round**: 1 | **Ship**: continue — one mechanical must-fix (wrong-cwd URL lookup); near-shippable once fixed
+
+### Findings
+- [ ] (must-fix) `onboard-project` fix step looks up `{WORKSPACE_REPO_URL}` via `gh repo view --json url` from the project-repo cwd, yielding the project URL not the workspace URL; add "on the workspace repo" qualifier (template line 53 has it) — `.claude/skills/onboard-project/SKILL.md:188-190`
+- [ ] (suggestion) New root-`AGENTS.md` template not added to the project-guides index (footer asks to keep current) — `.agent/knowledge/README.md:29-33`
+- [ ] (suggestion) "Project-Level Guidance" section could cross-link the new template (Ask First — instruction-file edit) — `AGENTS.md:409-417`
+- [ ] (suggestion) Pin the template's standalone `## Quality Standard` excerpt to its workspace source to bound the drift ADR-0017 acknowledges — `.agent/templates/project_agents_md.md:15-24`
+- [ ] (suggestion) Currency-check snippet references undefined `$REPO_DIR`; define it or use the skill's `<repo-name>` convention — `.claude/skills/audit-project/SKILL.md:62`
