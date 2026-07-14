@@ -27,24 +27,7 @@ Repo: rolker/agent_workspace @ 837c24ee64d76a4906140fd262ae9413bc262636
 
 ## Pending Review
 
-Stacked on PR #453 (issue #452) — the items below are upstream refinements
-to the dual-mode `/review-code` we already ported in #453. All four are
-small and additive on top of our existing implementation.
-
-- **`--skip-static` flag** (both modes) — suppress the static-analysis
-  specialist when pre-commit was already clean. Source: upstream
-  `.claude/skills/review-code/SKILL.md` step 5a. (2026-05-15)
-- **`--no-progress` flag** (branch mode) — explicit opt-out for
-  progress.md persistence on skill worktrees / one-off branches that
-  don't have an issue to track against. Source: upstream review-code
-  SKILL steps 1b + 8. (2026-05-15)
-- **`--issue <N>` override** (branch mode) — fallback when the branch
-  name doesn't carry the issue number. Source: upstream review-code
-  SKILL step 1b. (2026-05-15)
-- **Distinct `## Local Review (Pre-Push)` vs `## Local Review`
-  progress.md headers** — allows pre-push and post-PR entries for the
-  same issue to coexist on the timeline. Source: upstream review-code
-  SKILL step 8. (2026-05-15)
+_None outstanding._
 
 ## Roadmapped
 
@@ -55,6 +38,14 @@ _None outstanding._
 _None outstanding._
 
 ## Ported
+
+- **`/review-code` flag refinements** (pending since 2026-05-15) — all
+  four items landed locally in the subsequent review-skill work and are
+  live in `.claude/skills/review-code/SKILL.md` as of 2026-07-14:
+  `--skip-static` (both modes), `--no-progress` (pre-push), `--issue <N>`
+  override, and the distinct `## Local Review (Pre-Push)` progress.md
+  header (also in `address-findings` and `progress_read.py`).
+  (verified 2026-07-14)
 
 Pieces imported into this workspace via PR #453 (issue #452). All adapted
 for the layered/multi-repo workspace and for Claude-only operation. The
@@ -121,6 +112,9 @@ of the surrounding tooling.
 _None outstanding._
 
 ## Deferred
+
+All items below re-deferred 2026-07-14 (upstream unchanged since they
+were filed; nothing new to weigh).
 
 - `setup_project.sh` — generic project bootstrapping script, upstream-only (2026-03-23)
 - `document-project` skill — generic documentation skill (upstream equivalent of document-package) (2026-03-23)
