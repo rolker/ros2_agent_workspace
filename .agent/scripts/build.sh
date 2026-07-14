@@ -74,8 +74,47 @@ fi
     echo "|---|---|---|---|"
 } > "$REPORT_FILE"
 
-# Load Layer Definitions (this also sets LAYERS array)
-source "$SCRIPT_DIR/setup.bash" > /dev/null
+# Source ONLY the ROS 2 base before building. Sourcing the full workspace
+# environment here (the old `source setup.bash`) put every already-built layer
+# on COLCON_PREFIX_PATH before the first colcon build, so colcon baked ALL
+# other layers into each layer's parent chain — including layers ABOVE it
+# (e.g. underlay_ws recording ui_ws as a parent), inverting overlay precedence
+# for anyone sourcing the chained install/setup.bash. Layers below the one
+# being built are sourced progressively after each successful build, which is
+# the only pre-build environment a layer should see. See ADR-0016 / #559.
+#
+# Scrub any inherited prefix paths first: the caller may run `make build` from
+# a shell that already sourced setup.bash, and sourcing jazzy PREPENDS rather
+# than resets — an inherited COLCON_PREFIX_PATH would re-bake higher layers
+# into lower chains (the exact pollution this section exists to prevent).
+unset COLCON_PREFIX_PATH AMENT_PREFIX_PATH CMAKE_PREFIX_PATH AMENT_CURRENT_PREFIX
+if [ -f "/opt/ros/jazzy/setup.bash" ]; then
+    source /opt/ros/jazzy/setup.bash
+else
+    echo "❌ Error: /opt/ros/jazzy/setup.bash not found. Please install ROS 2 Jazzy."
+    exit 1
+fi
+
+# Load Layer Definitions from layers.txt (same resolution as setup.bash,
+# without sourcing the layer overlays)
+LAYERS_CONFIG="$ROOT_DIR/configs/manifest/layers.txt"
+if [ ! -f "$LAYERS_CONFIG" ] && [ -n "$WORKTREE_INFO" ]; then
+    if [ "$WORKTREE_INFO" = "workspace worktree" ]; then
+        # .workspace-worktrees/issue-N -> main root is two levels up
+        LAYERS_CONFIG="$(dirname "$(dirname "$ROOT_DIR")")/configs/manifest/layers.txt"
+    else
+        # layers/worktrees/issue-N -> main root is three levels up
+        LAYERS_CONFIG="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")/configs/manifest/layers.txt"
+    fi
+fi
+if [ -f "$LAYERS_CONFIG" ]; then
+    # Strip trailing whitespace so a stray space in layers.txt can't produce a
+    # bad "<layer> _ws" path (matches setup.bash + test_layer_sourcing.sh).
+    mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#' | sed 's/[[:space:]]*$//')
+else
+    echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
+    LAYERS=("underlay" "core" "platforms" "site" "sensors" "simulation" "ui")
+fi
 
 echo "========================================"
 echo "Starting Build Sequence"
@@ -122,9 +161,10 @@ for layer in "${LAYERS[@]}"; do
 
     # Check result
     if [ $BUILD_RC -eq 0 ]; then
-        # Sourcing ensures the next layer can see this one
-        if [ -f "install/setup.bash" ]; then
-            source "install/setup.bash"
+        # Sourcing ensures the next layer can see this one. local_setup.bash
+        # adds only this layer (jazzy + lower layers are already in the env).
+        if [ -f "install/local_setup.bash" ]; then
+            source "install/local_setup.bash"
         fi
     else
         echo "!! Build Failed for layer: $layer"
