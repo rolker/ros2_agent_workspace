@@ -128,10 +128,10 @@ worktree_create.sh) requires:
 **Round**: 1 | **Ship**: continue — one mechanical consequence fix (AGENTS.md table); all else are low-impact robustness suggestions
 
 ### Findings
-- [ ] (must-fix) New script `test_layer_sourcing.sh` not added to AGENTS.md Script Reference table — consequences map mandates it (`principles_review_guide.md:45`); precedent at `AGENTS.md:489` — `AGENTS.md`
-- [ ] (suggestion) Guard `LAYERS_BASE` not worktree-aware (asymmetric with worktree-aware `LAYERS_CONFIG`); Checks 2-3 silently skip in a layer worktree; sed at :92 is `layers/main`-specific — `.agent/scripts/test_layer_sourcing.sh:30,92` [cross-confirmed: Lens A + Lens B]
-- [ ] (suggestion) Trailing-whitespace strip diverges: guard strips, `setup.bash`/`build.sh` don't — align all three — `.agent/scripts/setup.bash:76`, `.agent/scripts/build.sh:105`, `.agent/scripts/test_layer_sourcing.sh:74` [cross-confirmed: Lens A + Lens B]
-- [ ] (suggestion) Check 1 static allowlist is a hardcoded 5-file list; a future baked-chain source escapes the guard — prefer a repo-wide `.agent/scripts/*.sh` glob — `.agent/scripts/test_layer_sourcing.sh:37`
+- [x] (must-fix) New script `test_layer_sourcing.sh` not added to AGENTS.md Script Reference table — consequences map mandates it (`principles_review_guide.md:45`); precedent at `AGENTS.md:489` — `AGENTS.md`
+- [x] (suggestion) Guard `LAYERS_BASE` not worktree-aware (asymmetric with worktree-aware `LAYERS_CONFIG`); Checks 2-3 silently skip in a layer worktree; sed at :92 is `layers/main`-specific — `.agent/scripts/test_layer_sourcing.sh:30,92` [cross-confirmed: Lens A + Lens B]
+- [x] (suggestion) Trailing-whitespace strip diverges: guard strips, `setup.bash`/`build.sh` don't — align all three — `.agent/scripts/setup.bash:76`, `.agent/scripts/build.sh:105`, `.agent/scripts/test_layer_sourcing.sh:74` [cross-confirmed: Lens A + Lens B]
+- [x] (suggestion) Check 1 static allowlist is a hardcoded 5-file list; a future baked-chain source escapes the guard — prefer a repo-wide `.agent/scripts/*.sh` glob — `.agent/scripts/test_layer_sourcing.sh:37`
 
 ### Notes on verified strengths
 - shellcheck `--severity=warning` clean on all 6 changed shell scripts.
@@ -140,3 +140,27 @@ worktree_create.sh) requires:
 - Full plan adherence: every planned file changed, no scope creep; `verify_change.sh` deviation (source workspace `setup.bash`, not a naive `local_setup.bash` swap) transparently documented and correct.
 - `build.sh` retains the jazzy base pre-build (plan-review must-fix addressed) and sources lower layers progressively post-build; no chain pollution.
 - Sweep complete: only other baked-chain source is `ci_workflow.yml:76` (flat project CI template, out of scope); `dashboard.sh:197` is `-f` existence check only.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-14 14:33 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-559 at `7902bf3`
+**Addressed**: Local Review (Pre-Push) — 2026-07-14 14:21 +00:00, branch at `080bd75`
+**Commits**: `d7d0376`, `5eb17f4`, `fb7ebd0`, `7902bf3`
+
+### Actions
+- [x] (must-fix) Added `test_layer_sourcing.sh` row to the AGENTS.md Script Reference table (next to the other regression-test scripts) — `AGENTS.md:490` (`d7d0376`)
+- [x] (suggestion) Trailing-whitespace strip aligned across all three layers.txt readers: added `sed 's/[[:space:]]*$//'` to `setup.bash` and `build.sh` so a stray trailing space can't yield a bad `<layer> _ws` path — `.agent/scripts/setup.bash:78`, `.agent/scripts/build.sh:105` (`5eb17f4`)
+- [x] (suggestion) Made the guard's `LAYERS_BASE` worktree-aware: derive one `MAIN_ROOT` and set both `LAYERS_CONFIG` and `LAYERS_BASE` from it, and pass `ROS2_LAYERS_BASE` into Check 2's scrubbed env so `setup.bash` sources the same built layers (keeps the `/layers/main/` sed correct from a layer worktree instead of silently skipping) — `.agent/scripts/test_layer_sourcing.sh:28-30,61-83,85-100` (`fb7ebd0`)
+- [x] (suggestion) Replaced Check 1's hardcoded 5-file allowlist with a repo-wide `.agent/scripts/*.sh`/`*.bash` glob (self-excluded via `-ef`, loose pattern kept so heredoc-generated regressions are still caught) — `.agent/scripts/test_layer_sourcing.sh:36-53` (`7902bf3`)
+
+### Verification
+- `shellcheck --severity=warning` clean on `setup.bash`, `build.sh`, `test_layer_sourcing.sh`.
+- Guard runs green here (Check 1 passes, Checks 2-3 skip — no built layers, expected in CI); positive-tested that a fresh script with a direct *and* a heredoc-builder baked-chain `source` is flagged (exit 1), confirming self-exclusion doesn't blind the glob.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
+
+    .agent/scripts/dispatch_subagent.sh --mode in-process --issue 559 --skill review-code
