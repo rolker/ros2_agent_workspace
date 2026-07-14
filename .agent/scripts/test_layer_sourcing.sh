@@ -89,10 +89,11 @@ if [ -d "$LAYERS_BASE" ]; then
     NOT_OWNED=()
     CURRENT_UID="$(id -u)"
     # Numeric UID compare: %U prints "UNKNOWN"-style names for orphaned UIDs,
-    # which would false-positive against id -un.
+    # which would false-positive against id -un. GNU stat first, BSD stat -f
+    # fallback (same pattern as discover_governance.sh).
     for d in "$LAYERS_BASE"/*_ws/build "$LAYERS_BASE"/*_ws/install "$LAYERS_BASE"/*_ws/log; do
         [ -d "$d" ] || continue
-        owner_uid=$(stat -c %u "$d" 2>/dev/null) || continue
+        owner_uid=$(stat -c %u "$d" 2>/dev/null || stat -f %u "$d" 2>/dev/null) || continue
         [ "$owner_uid" != "$CURRENT_UID" ] && NOT_OWNED+=("$d (owner uid: $owner_uid)")
     done
     if [ ${#NOT_OWNED[@]} -eq 0 ]; then
