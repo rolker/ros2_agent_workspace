@@ -36,12 +36,16 @@ mountpoints and never chowns existing ones.
 
 3. **`test_layer_sourcing.sh` Check 4 — root-ownership detection** — add a
    warning-level check that scans `layers/main/*_ws/{build,install,log}` for
-   directories owned by root. Warning-only (not a hard fail): the core fix prevents
-   new occurrences, but the check surfaces the state if a root-owned dir survives from
-   before the fix or enters via another path. Run only when `LAYERS_BASE` is visible
-   (same skip condition as Checks 2–3). Add a one-line entry to the
-   `## Consequences` section of ADR-0016 noting that `make validate` now detects the
-   stale-root-owned state.
+   directories not owned by the invoking user. Warning-only (not a hard fail): the
+   core fix prevents new occurrences, but the check surfaces the state if a
+   root-owned dir survives from before the fix or enters via another path.
+   *Per plan review (operator-approved)*: gate on `[ -d "$LAYERS_BASE" ]` and run
+   **before** the Checks 2–3 early-exits — the #566 failure state (empty
+   root-owned dirs, build blocked) is exactly one with no built layers, so the
+   Checks 2–3 skip condition would suppress the check precisely when needed.
+   Add a one-line entry to the `## Consequences` section of ADR-0016 noting that
+   `make validate` now detects the stale-root-owned state. Also refresh the
+   AGENTS.md script-table row for the guard (it enumerates the checks).
 
 ## Files to Change
 
