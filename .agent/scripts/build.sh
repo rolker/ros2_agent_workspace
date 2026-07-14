@@ -82,6 +82,12 @@ fi
 # for anyone sourcing the chained install/setup.bash. Layers below the one
 # being built are sourced progressively after each successful build, which is
 # the only pre-build environment a layer should see. See ADR-0016 / #559.
+#
+# Scrub any inherited prefix paths first: the caller may run `make build` from
+# a shell that already sourced setup.bash, and sourcing jazzy PREPENDS rather
+# than resets — an inherited COLCON_PREFIX_PATH would re-bake higher layers
+# into lower chains (the exact pollution this section exists to prevent).
+unset COLCON_PREFIX_PATH AMENT_PREFIX_PATH CMAKE_PREFIX_PATH AMENT_CURRENT_PREFIX
 if [ -f "/opt/ros/jazzy/setup.bash" ]; then
     source /opt/ros/jazzy/setup.bash
 else
@@ -107,7 +113,7 @@ if [ -f "$LAYERS_CONFIG" ]; then
     mapfile -t LAYERS < <(grep -v '^[[:space:]]*$' "$LAYERS_CONFIG" | grep -v '^#' | sed 's/[[:space:]]*$//')
 else
     echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
-    LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+    LAYERS=("underlay" "core" "platforms" "site" "sensors" "simulation" "ui")
 fi
 
 echo "========================================"

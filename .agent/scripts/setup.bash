@@ -79,7 +79,7 @@ if [ -f "$LAYERS_CONFIG" ]; then
 else
     # Fallback/Bootstrap layers
     echo "  ! Warning: Layer config not found at $LAYERS_CONFIG. Using defaults."
-    LAYERS=("underlay" "core" "platforms" "sensors" "simulation" "ui")
+    LAYERS=("underlay" "core" "platforms" "site" "sensors" "simulation" "ui")
 fi
 
 echo "Sourcing ROS2 Agent Workspace layers..."

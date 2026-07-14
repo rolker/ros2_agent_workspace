@@ -34,14 +34,12 @@ FAILURES=0
 echo "=== Layer sourcing regression guard (ADR-0016 / #559) ==="
 
 # --- Check 1: static — no chained install/setup.bash sourcing in scripts ---
-# Scan every workspace shell script (repo-wide glob, not a hardcoded allowlist)
-# so a future baked-chain source anywhere under .agent/scripts/ can't escape the
-# guard. Skip this script itself: its diagnostics necessarily name the
-# anti-pattern in echo strings, which are not real source statements.
+# Scan every workspace shell script recursively under .agent/scripts/ and
+# .agent/hooks/ (not a hardcoded allowlist) so a future baked-chain source
+# can't escape the guard. Skip this script itself: its diagnostics necessarily
+# name the anti-pattern in echo strings, which are not real source statements.
 STATIC_BAD=0
-shopt -s nullglob
-for f in "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR"/*.bash; do
-    [ -f "$f" ] || continue
+while IFS= read -r f; do
     [ "$f" -ef "${BASH_SOURCE[0]}" ] && continue
     # Match actual source statements (incl. heredoc-generated ones), not comments.
     if grep -nE '^[^#]*source[^#]*install/setup\.bash' "$f" > /dev/null; then
@@ -49,8 +47,8 @@ for f in "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR"/*.bash; do
         grep -nE '^[^#]*source[^#]*install/setup\.bash' "$f" | sed 's/^/     /'
         STATIC_BAD=1
     fi
-done
-shopt -u nullglob
+done < <(find "$SCRIPT_DIR" "$ROOT_DIR/.agent/hooks" \
+              \( -name '*.sh' -o -name '*.bash' \) -type f 2>/dev/null | sort)
 if [ "$STATIC_BAD" -eq 0 ]; then
     echo "✅ Check 1: no baked-chain sourcing in workspace scripts"
 else
@@ -104,7 +102,7 @@ ACTUAL_ORDER=$(env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin" TERM=dumb
     "source '$SCRIPT_DIR/setup.bash' > /dev/null 2>&1
      echo \"\$AMENT_PREFIX_PATH\" | tr ':' '\n' \
        | sed -E 's|.*/layers/main/([a-z0-9_]+)_ws/.*|\1|; s|^/opt/ros/[a-z]+.*|ROS_BASE|' \
-       | uniq | tr '\n' ' '")
+       | awk '!seen[\$0]++' | tr '\n' ' '")
 ACTUAL_ORDER="${ACTUAL_ORDER% }"
 
 EXPECTED_ORDER=""
