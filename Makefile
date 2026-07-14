@@ -140,6 +140,7 @@ test-scripts:
 
 validate:
 	@python3 ./.agent/scripts/validate_workspace.py
+	@./.agent/scripts/test_layer_sourcing.sh
 
 # =============================================================================
 # Tier 1 — Setup chain (stamp-based dependencies)
