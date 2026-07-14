@@ -336,9 +336,15 @@ MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 
 # 4. Anonymous volumes for build/install/log in each layer workspace
 #    (container gets its own build artifacts, doesn't pollute host)
+#    Pre-create each mountpoint as the invoking user: docker creates missing
+#    mountpoint sources as root:root, which breaks subsequent host-side builds
+#    (EACCES) — e.g. a container start racing the #559 clean-rebuild heal.
+#    Docker never chowns an existing dir, so mkdir -p here removes the hazard
+#    and is a no-op when the dirs already exist (#566).
 for ws_dir in "$ROOT_DIR"/layers/main/*_ws; do
     [ -d "$ws_dir" ] || continue
     for subdir in build install log; do
+        mkdir -p "$ws_dir/$subdir"
         MOUNT_ARGS+=(-v "$ws_dir/$subdir")
     done
 done
