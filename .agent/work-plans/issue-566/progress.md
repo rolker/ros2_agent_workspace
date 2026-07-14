@@ -76,3 +76,20 @@ The issue was observed concurrently with the #559 heal rebuild.
 
 ### Findings
 - [ ] (suggestion) Check 4 skip condition: gate on `[ -d "$LAYERS_BASE" ]`, not the Checks 2–3 "no built layers" early-exit (`test_layer_sourcing.sh:87-88`) — the #559 failure state has empty root-owned dirs that blocked the build, so `BUILT` is empty and the script would `exit` before Check 4 runs, skipping the exact state it targets — `plan.md:41`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-14 17:06 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-566 at `b96b37a`
+**Mode**: pre-push
+**Depth**: Deep (reason: non-status-bump edit to existing ADR-0016 + governance-touching AGENTS.md)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 1 | **Ship**: recommended — no must-fix; static clean, both Deep adversarial passes returned suggestions only
+
+### Findings
+- [ ] (suggestion) `mkdir -p` has no failure handling; a silent failure would let Docker recreate the mountpoint root-owned, defeating the fix — `.agent/scripts/docker_run_agent.sh:347`
+- [ ] (suggestion) Compare numeric UIDs (`stat -c %u` vs `id -u`) instead of `%U`/`id -un` to avoid false-positive warnings on orphaned UIDs — `.agent/scripts/test_layer_sourcing.sh:93`
+- [ ] (suggestion) Comment "removes the hazard" overclaims vs residual concurrent-`rm` window; soften to "prevents in normal use" — `.agent/scripts/docker_run_agent.sh:342`
