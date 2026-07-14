@@ -149,5 +149,5 @@ with two disjoint-lens adversarial subagents; recorded as independent. gh unavai
 container — issue title from progress.md frontmatter; diffed vs local origin/main (fetch failed). -->
 
 ### Findings
-- [ ] (suggestion) Currency-check `grep … || echo STALE` conflates Missing and Stale (absent file prints STALE, contradicting line 65 + the Present/Missing/Stale table); guard existence first — `.claude/skills/audit-project/SKILL.md:62`
-- [ ] (suggestion) ADR-0017 §Consequences overstates the currency check as full mitigation; it is presence-only, not content-currency — soften wording — `docs/decisions/0017-extend-agents-md-to-project-repos.md:49`
+- [x] (suggestion) Currency-check `grep … || echo STALE` conflates Missing and Stale (absent file prints STALE, contradicting line 65 + the Present/Missing/Stale table); guard existence first — `.claude/skills/audit-project/SKILL.md:62`
+- [x] (suggestion) ADR-0017 §Consequences overstates the currency check as full mitigation; it is presence-only, not content-currency — soften wording — `docs/decisions/0017-extend-agents-md-to-project-repos.md:49`
