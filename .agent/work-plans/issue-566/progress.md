@@ -52,3 +52,15 @@ The issue was observed concurrently with the #559 heal rebuild.
 - [ ] Add `mkdir -p "$ws_dir/$subdir"` before the anonymous-volume line in `docker_run_agent.sh` (the core fix)
 - [ ] Evaluate including an ADR-0016 heal-instructions note about concurrent-container-dispatch collision (low cost, preserves context from the #559 incident)
 - [ ] Evaluate whether root-ownership detection in `test_layer_sourcing.sh` (or `make build`) belongs in this PR or a separate follow-up issue
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-14 00:00 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-566/plan.md` at `e1b2182`
+**Branch**: feature/issue-566 at `e1b2182`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
