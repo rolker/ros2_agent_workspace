@@ -188,3 +188,18 @@ Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand of
 - All 4 round-1 findings confirmed addressed in the branch diff.
 - Two independent adversarial passes (Lens A logic, Lens B systemic) both confirmed runtime-chaining equivalence to a clean baked chain and the real-world pollution it fixes; empirically verified jazzy does not clear `COLCON_PREFIX_PATH` and `make build` inherits it.
 - Full plan adherence; `verify_change.sh` deviation documented and correct. Consequences map (AGENTS.md table, WORKTREE_GUIDE, ros2_development_patterns) all addressed. Sweep complete (`ci_workflow.yml:76` out of scope; `dashboard.sh:197` existence check only).
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-14 10:49 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**Branch**: feature/issue-559 at `9073b0e`
+**Addressed**: Local Review (Pre-Push) — 2026-07-14 14:43 +00:00, Round 2 (Ship: recommended — remaining findings host-applied instead of a full round 3)
+**Commits**: `9073b0e`
+
+### Actions
+- [x] (must-fix) build.sh scrubs inherited COLCON/AMENT/CMAKE prefix paths before sourcing jazzy; verified scrub reproduces pristine-shell env (`9073b0e`)
+- [x] (suggestion) fallback LAYERS lists include site, synced build.sh + setup.bash (`9073b0e`)
+- [x] (suggestion) guard Check 1 recursive over .agent/scripts + .agent/hooks (`9073b0e`)
+- [x] (suggestion) guard Check 2 first-occurrence dedup replaces adjacent-only uniq (`9073b0e`)
