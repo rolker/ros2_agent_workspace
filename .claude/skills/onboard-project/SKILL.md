@@ -187,7 +187,7 @@ cd <layer>_ws/src/<repo-name>
 
 - **Root `AGENTS.md`**: Copy `.agent/templates/project_agents_md.md`, replace
   `{REPO_NAME}` and `{WORKSPACE_REPO_URL}` (look the URL up with `gh repo view
-  --json url` — never guess), fill the Review Context section with
+  --json url` **on the workspace repo** — never guess), fill the Review Context section with
   repo-specific reviewer guidance, delete the "Instructions for Use" section.
   Keep the `## Quality Standard` heading verbatim (audit-project's currency
   marker) and never restate workspace rules — reference them (ADR-0017).
