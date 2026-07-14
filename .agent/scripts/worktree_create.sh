@@ -119,17 +119,19 @@ export ROS2_LAYERS_BASE="$WORKTREE_DIR"
 SETUP_VARS2
     printf 'export ROS2_WORKSPACE_ROOT=%q\n\n' "$main_root" >> "$wt_dir/setup.bash"
 
-    # Source each layer's install/setup.bash
+    # Source each layer's install/local_setup.bash (current layer only, not
+    # the baked chained setup.bash) — runtime chaining in layers.txt order is
+    # O(N) and immune to stale/polluted build-time parent chains (ADR-0016).
     cat >> "$wt_dir/setup.bash" << 'SETUP_LAYERS_HEADER'
-# 2. Source workspace layers
+# 2. Source workspace layers (runtime chaining, see ADR-0016)
 echo "Sourcing ROS2 Agent Workspace layers..."
 SETUP_LAYERS_HEADER
 
     for layer in "${layers[@]}"; do
         cat >> "$wt_dir/setup.bash" << SETUP_LAYER
-if [ -f "\$WORKTREE_DIR/${layer}_ws/install/setup.bash" ]; then
+if [ -f "\$WORKTREE_DIR/${layer}_ws/install/local_setup.bash" ]; then
     echo "  - Sourcing ${layer}..."
-    source "\$WORKTREE_DIR/${layer}_ws/install/setup.bash"
+    source "\$WORKTREE_DIR/${layer}_ws/install/local_setup.bash"
 elif [ -d "\$WORKTREE_DIR/${layer}_ws/src" ]; then
     echo "  ! Warning: ${layer} exists but is not built."
 fi
@@ -272,12 +274,14 @@ COLCON_DEFAULTS
         preamble+="    echo \"ERROR: /opt/ros/jazzy/setup.bash not found. Please install ROS 2 Jazzy.\" 1>&2"$'\n'
         preamble+="    exit 1"$'\n'
         preamble+="fi"$'\n'
+        # Lower layers via local_setup.bash (jazzy base is sourced above;
+        # runtime chaining avoids stale baked parent chains — ADR-0016)
         for prev_layer in "${layers[@]}"; do
             if [ "$prev_layer" == "$layer" ]; then
                 break
             fi
-            preamble+="if [ -f \"$wt_dir/${prev_layer}_ws/install/setup.bash\" ]; then"$'\n'
-            preamble+="    source \"$wt_dir/${prev_layer}_ws/install/setup.bash\""$'\n'
+            preamble+="if [ -f \"$wt_dir/${prev_layer}_ws/install/local_setup.bash\" ]; then"$'\n'
+            preamble+="    source \"$wt_dir/${prev_layer}_ws/install/local_setup.bash\""$'\n'
             preamble+="fi"$'\n'
         done
 
