@@ -34,16 +34,15 @@ FAILURES=0
 echo "=== Layer sourcing regression guard (ADR-0016 / #559) ==="
 
 # --- Check 1: static — no chained install/setup.bash sourcing in scripts ---
-STATIC_TARGETS=(
-    "$SCRIPT_DIR/setup.bash"
-    "$SCRIPT_DIR/build.sh"
-    "$SCRIPT_DIR/test.sh"
-    "$SCRIPT_DIR/verify_change.sh"
-    "$SCRIPT_DIR/worktree_create.sh"
-)
+# Scan every workspace shell script (repo-wide glob, not a hardcoded allowlist)
+# so a future baked-chain source anywhere under .agent/scripts/ can't escape the
+# guard. Skip this script itself: its diagnostics necessarily name the
+# anti-pattern in echo strings, which are not real source statements.
 STATIC_BAD=0
-for f in "${STATIC_TARGETS[@]}"; do
+shopt -s nullglob
+for f in "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR"/*.bash; do
     [ -f "$f" ] || continue
+    [ "$f" -ef "${BASH_SOURCE[0]}" ] && continue
     # Match actual source statements (incl. heredoc-generated ones), not comments.
     if grep -nE '^[^#]*source[^#]*install/setup\.bash' "$f" > /dev/null; then
         echo "❌ Check 1: $f sources a baked chained install/setup.bash:"
@@ -51,6 +50,7 @@ for f in "${STATIC_TARGETS[@]}"; do
         STATIC_BAD=1
     fi
 done
+shopt -u nullglob
 if [ "$STATIC_BAD" -eq 0 ]; then
     echo "✅ Check 1: no baked-chain sourcing in workspace scripts"
 else
