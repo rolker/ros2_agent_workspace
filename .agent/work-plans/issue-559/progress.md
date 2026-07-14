@@ -114,3 +114,29 @@ worktree_create.sh) requires:
 - Generated worktree `setup.bash` (worktree_create.sh:91) and the per-layer build preamble (worktree_create.sh:269) already source the jazzy base explicitly, so switching *their* layer sourcing to `local_setup.bash` is safe — no ROS-base regression there.
 - `dashboard.sh:197` correctly excluded (existence check only).
 - review-issue Actions #1 (ADR → step 7) and #3 (WORKTREE_GUIDE → step 8) are addressed.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-14 14:21 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-559 at `080bd75`
+**Mode**: pre-push
+**Depth**: Deep (reason: ADR addition + 585 lines >200 + 12 files >10)
+**Must-fix**: 1 | **Suggestions**: 3
+**Round**: 1 | **Ship**: continue — one mechanical consequence fix (AGENTS.md table); all else are low-impact robustness suggestions
+
+### Findings
+- [ ] (must-fix) New script `test_layer_sourcing.sh` not added to AGENTS.md Script Reference table — consequences map mandates it (`principles_review_guide.md:45`); precedent at `AGENTS.md:489` — `AGENTS.md`
+- [ ] (suggestion) Guard `LAYERS_BASE` not worktree-aware (asymmetric with worktree-aware `LAYERS_CONFIG`); Checks 2-3 silently skip in a layer worktree; sed at :92 is `layers/main`-specific — `.agent/scripts/test_layer_sourcing.sh:30,92` [cross-confirmed: Lens A + Lens B]
+- [ ] (suggestion) Trailing-whitespace strip diverges: guard strips, `setup.bash`/`build.sh` don't — align all three — `.agent/scripts/setup.bash:76`, `.agent/scripts/build.sh:105`, `.agent/scripts/test_layer_sourcing.sh:74` [cross-confirmed: Lens A + Lens B]
+- [ ] (suggestion) Check 1 static allowlist is a hardcoded 5-file list; a future baked-chain source escapes the guard — prefer a repo-wide `.agent/scripts/*.sh` glob — `.agent/scripts/test_layer_sourcing.sh:37`
+
+### Notes on verified strengths
+- shellcheck `--severity=warning` clean on all 6 changed shell scripts.
+- Guard runs in CI: `run_script_tests.sh` auto-discovers `test_*.sh` (glob) → `make test-scripts` (validate.yml:71) runs Check 1; Checks 2-3 skip cleanly with no built layers. Also wired into `make validate`.
+- Overlay precedence logic verified against colcon `local_setup` prepend semantics — ADR-0016 claim, Check 2 `EXPECTED_ORDER`, and actual behavior agree.
+- Full plan adherence: every planned file changed, no scope creep; `verify_change.sh` deviation (source workspace `setup.bash`, not a naive `local_setup.bash` swap) transparently documented and correct.
+- `build.sh` retains the jazzy base pre-build (plan-review must-fix addressed) and sources lower layers progressively post-build; no chain pollution.
+- Sweep complete: only other baked-chain source is `ci_workflow.yml:76` (flat project CI template, out of scope); `dashboard.sh:197` is `-f` existence check only.
