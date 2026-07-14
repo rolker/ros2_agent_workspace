@@ -10,6 +10,7 @@ recommended structure.
 
 ```
 <project-repo>/
+├── AGENTS.md                   # Root agent/review instructions (see project_agents_md.md template)
 ├── .agents/
 │   ├── README.md               # Agent guide (see project_agents_guide.md template)
 │   ├── work-plans/             # Task plans for this repo
@@ -25,6 +26,7 @@ recommended structure.
 
 | File | Purpose | When to Add |
 |------|---------|-------------|
+| `AGENTS.md` | Root instructions for coding agents AND Copilot code review (reference, never fork, workspace rules — ADR-0017) | Always for repos receiving Copilot PR reviews |
 | `.agents/README.md` | Agent onboarding: packages, layout, build, pitfalls | Always — first file agents read |
 | `PRINCIPLES.md` | Project-specific guiding principles | When the project has domain rules beyond workspace principles |
 | `ARCHITECTURE.md` | Design overview, data flows, component relationships | When the project has multiple packages or non-obvious structure |
@@ -36,7 +38,8 @@ recommended structure.
 
 Not every project needs full governance. Start minimal and add as needed:
 
-1. **Minimal**: `.agents/README.md` only — enough for agents to navigate the repo
+1. **Minimal**: root `AGENTS.md` + `.agents/README.md` — review instructions plus enough
+   for agents to navigate the repo
 2. **Standard**: Add `ARCHITECTURE.md` when structure isn't self-evident
 3. **Full**: Add `PRINCIPLES.md` and `docs/decisions/` for projects with domain-specific
    rules or significant design choices
@@ -50,6 +53,7 @@ Not every project needs full governance. Start minimal and add as needed:
 
 ## Related Templates
 
+- [`project_agents_md.md`](project_agents_md.md) — Template for the root `AGENTS.md`
 - [`project_agents_guide.md`](project_agents_guide.md) — Template for `.agents/README.md`
 
 ## Instructions for Use
