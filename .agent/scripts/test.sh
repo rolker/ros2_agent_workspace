@@ -93,9 +93,11 @@ for layer in "${LAYERS[@]}"; do
 
         cd "$LAYER_DIR" || continue
 
-        # Source existing install if available
-        if [ -f "install/setup.bash" ]; then
-            source "install/setup.bash"
+        # Source existing install if available. local_setup.bash (this layer
+        # only) suffices: the full workspace environment was already sourced
+        # via setup.bash above, so the baked chain would only redo that work.
+        if [ -f "install/local_setup.bash" ]; then
+            source "install/local_setup.bash"
         fi
 
         # Run Tests

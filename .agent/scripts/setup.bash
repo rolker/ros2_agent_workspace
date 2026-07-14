@@ -82,15 +82,21 @@ fi
 
 echo "Sourcing ROS2 Agent Workspace layers..."
 
+# Source each layer's local_setup.bash (current layer only), NOT the baked
+# chained setup.bash: the chained file re-sources its entire parent chain
+# (O(N²) across N layers, ~4.5s vs ~0.5s) and trusts parent lists recorded at
+# build time, which go stale/polluted. Runtime chaining in layers.txt order
+# gives the last-sourced (topmost) layer highest precedence — canonical colcon
+# overlay semantics. See ADR-0016 and issue #559.
 for layer in "${LAYERS[@]}"; do
-    SETUP_FILE="$LAYERS_BASE/${layer}_ws/install/setup.bash"
+    SETUP_FILE="$LAYERS_BASE/${layer}_ws/install/local_setup.bash"
     if [ -f "$SETUP_FILE" ]; then
         echo "  - Sourcing $layer..."
         # shellcheck disable=SC1090
         source "$SETUP_FILE"
     else
         if [ -d "$LAYERS_BASE/${layer}_ws/src" ]; then
-             echo "  ! Warning: $layer exists but is not built (setup.bash not found)."
+             echo "  ! Warning: $layer exists but is not built (local_setup.bash not found)."
         fi
     fi
 done
