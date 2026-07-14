@@ -53,8 +53,10 @@ eliminated.
 
 ### Negative
 
-- One more per-repo file to keep current; mitigated by the `audit-project`
-  currency check rather than manual vigilance.
+- One more per-repo file to keep current; partially mitigated by the
+  `audit-project` currency check — a marker-presence check only, which
+  detects a missing/pre-template file but not a drifted excerpt. Content
+  currency still relies on the re-sync instruction in the template.
 
 ### Neutral
 
