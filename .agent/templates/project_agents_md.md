@@ -59,7 +59,8 @@ Robustness is not optional.
    --json url` on the workspace repo — never guess URLs).
 3. Fill in **Review Context** with repo-specific guidance; delete the
    placeholder comment.
-4. Keep it short (≤60 lines). Detail belongs in `.agents/README.md`; shared
-   rules belong in the workspace `AGENTS.md`. Reference, never fork.
+4. Keep the instantiated file short — ≤60 lines *after this section is
+   deleted*. Detail belongs in `.agents/README.md`; shared rules belong in
+   the workspace `AGENTS.md`. Reference, never fork.
 5. Keep the `## Quality Standard` heading verbatim — `audit-project` uses it
    as the currency marker.

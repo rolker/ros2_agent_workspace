@@ -168,10 +168,12 @@ review rounds (7 findings total) are all checked off and disjoint from Copilot's
 comments — no cross-source overlap.
 
 ### Findings
-- [ ] (low, Copilot) Line-count guidance is self-contradictory: template advises "≤60 lines"
+- [x] (low, Copilot) Line-count guidance is self-contradictory: template advises "≤60 lines"
   but the template file is 65 lines until the *Instructions for Use* section (lines 53–65) is
   deleted; the ≤60 target applies to the instantiated file after that section is removed.
   Clarify instruction #4 to say so — `.agent/templates/project_agents_md.md:62`
+  - Addressed host-inline (trivial docs clarity): instruction #4 now reads "≤60 lines *after
+    this section is deleted*".
 
 ### False positives
 - (Copilot) "`layers/main/*/src/...` won't match the actual layer workspace layout; add the
