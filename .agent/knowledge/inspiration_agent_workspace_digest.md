@@ -1,20 +1,29 @@
 # Inspiration Digest: agent_workspace
 
 Type: fork
-Last checked: 2026-05-15
+Last checked: 2026-07-14
 Repo: rolker/agent_workspace @ 837c24ee64d76a4906140fd262ae9413bc262636
 
 ## Activity Snapshot
 
-- 5 open issues touch the review/skills surface (notably #190 — progress.md
-  convention rework + new `/implement` skill); 0 open PRs.
-- 113 commits since previous snapshot (`c02887e`, 2026-04-26); 3 files in
-  the review-skill area changed.
-- Notable since last refresh: `/review-code` gains an explicit `--branch`
-  mode with `--skip-static`, `--no-progress`, and `--issue <N>` flags
-  (PR #185), plus a `_resolve_default_branch.sh` helper. Cross-model script
-  extended to `--branch` mode (#185) — not applicable here, see "Not
-  adopted".
+- **No code changes since the 2026-05-15 check** — HEAD is unchanged
+  (`837c24e`, last commit 2026-05-12). No merged PRs, no closed issues.
+  File-level diff skipped this run (would be identical to last run's).
+- Upstream has been quiet since 2026-05-18. Late-May activity was all
+  planning: 21 open issues, 3 open (stale) PRs.
+- Workspace redesign push: #172 umbrella (multi-tenant + project-type
+  adapters + per-project manifests) refined into #210 (10-verb adapter
+  contract + single_project adapter) with plan PR #211 — open, unmerged
+  since 2026-05-17.
+- Reverse porting: upstream filed #208/#209 to port **this workspace's**
+  field mode (ADR-0011, `field_mode.sh`, hotfix workflow + non-GitHub
+  remote reconciliation) — confirmation of the pattern's value, nothing
+  to pull back.
+- #207 "Documentation enforcement: from aspiration to mechanism" — idea
+  worth watching, no implementation yet.
+- #206 + #212 continue the cross_model_review.sh thread (tmux-default
+  reconsidered; Copilot invocation likely broken) — that script remains
+  unadopted here, see "Partially adopted".
 
 ## Pending Review
 
