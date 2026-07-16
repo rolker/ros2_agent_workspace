@@ -742,22 +742,36 @@ workstation):
 ```bash
 CTX_FILE=$(mktemp /tmp/local_review_ctx.XXXXXX)
 LOCAL_FINDINGS=$(mktemp /tmp/local_review_out.XXXXXX)
-trap 'rm -f "$CTX_FILE" "$LOCAL_FINDINGS"' EXIT
+LOCAL_ERR=$(mktemp /tmp/local_review_err.XXXXXX)
+trap 'rm -f "$CTX_FILE" "$LOCAL_FINDINGS" "$LOCAL_ERR"' EXIT
 echo "<one-line summary: issue #N — what the change does>" > "$CTX_FILE"
 
-git diff --merge-base "$BASE_BRANCH" HEAD \
-    | "$REPO_ROOT/.agent/scripts/local_review.sh" --context "$CTX_FILE" \
-    > "$LOCAL_FINDINGS" 2>/tmp/local_review_err.txt
-LOCAL_EXIT=$?
-# Exit 2 = unavailable (no server / model not pulled): skip with the
-#          one-line reason from stderr — not a failure.
-# Exit 1 = invocation error (timeout, HTTP error, empty answer): skip
-#          with notice; never let a local-model hiccup block the review.
+# Same diff the other specialists reviewed (step 1): origin/$BASE in
+# pre-push mode, the PR diff in post-PR mode — never the local base
+# branch, which may be stale in a worktree.
+LOCAL_EXIT=0
+if [[ "$MODE" == "post-PR" ]]; then
+    gh pr diff "$PR" \
+        | "$REPO_ROOT/.agent/scripts/local_review.sh" --context "$CTX_FILE" \
+        > "$LOCAL_FINDINGS" 2>"$LOCAL_ERR" || LOCAL_EXIT=$?
+else
+    git diff "origin/$BASE...HEAD" \
+        | "$REPO_ROOT/.agent/scripts/local_review.sh" --context "$CTX_FILE" \
+        > "$LOCAL_FINDINGS" 2>"$LOCAL_ERR" || LOCAL_EXIT=$?
+fi
+# The `|| LOCAL_EXIT=$?` form keeps the assignment reachable under an
+# errexit shell — a bare `LOCAL_EXIT=$?` on the next line would never
+# run when the pipeline fails and `set -e` is active.
+# Exit 2 = unavailable (no server / model not pulled / no jq): skip
+#          with the one-line reason from $LOCAL_ERR — not a failure.
+# Exit 1 (or anything else non-zero) = invocation error: skip with
+#          notice; never let a local-model hiccup block the review.
 # Exit 0 = findings in $LOCAL_FINDINGS.
 ```
 
 The helper handles the availability probes, the bounded timeout
-(`LOCAL_REVIEW_TIMEOUT`, default 600 s), and reasoning-model plumbing
+(`LOCAL_REVIEW_TIMEOUT`, default 900 s — raise it for large diffs;
+reasoning time grows with diff size), and reasoning-model plumbing
 (HTTP API with `think: true` — the `ollama run` CLI path can swallow
 the entire answer after a full reasoning pass; see the script header).
 Model and endpoint are overridable via `LOCAL_REVIEW_MODEL` /
@@ -858,6 +872,7 @@ review indefinitely:
 **Static analysis**: <run | skipped (--skip-static)>
 **Claude Adversarial**: <1 pass (Lens A) | 2 passes (Lens A + Lens B)>
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
+**Local Adversarial**: <run (<model>) | skipped (<reason>) | off (--no-local)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
@@ -915,6 +930,7 @@ Existing Review Comments sections. Use:
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Claude Adversarial**: 1 pass (Lens A)
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
+**Local Adversarial**: <run (<model>) | skipped (<reason>) | off (--no-local)>
 
 ### Static Analysis
 

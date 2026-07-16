@@ -13,14 +13,28 @@
 # Environment:
 #   LOCAL_REVIEW_MODEL    model tag (default: qwen3.5:35b)
 #   LOCAL_REVIEW_URL      Ollama base URL (default: http://localhost:11434)
-#   LOCAL_REVIEW_TIMEOUT  request timeout seconds (default: 600)
-#   LOCAL_REVIEW_NUM_CTX  context window tokens (default: 16384)
+#   LOCAL_REVIEW_TIMEOUT  request timeout seconds (default: 900; scale
+#                         up for large diffs — reasoning time grows
+#                         with diff size, and a ~500-line diff can
+#                         exceed 600s on 8GB-VRAM-class hardware)
+#   LOCAL_REVIEW_NUM_CTX  context window tokens (default: 16384; the
+#                         script fails loud, with the size it needed,
+#                         when the prompt would overflow this — Ollama
+#                         would otherwise truncate silently)
 #
 # Exit codes:
 #   0  review produced (findings on stdout)
-#   1  invocation error (timeout, HTTP error, empty answer)
-#   2  unavailable (server down or model not pulled) — callers should
-#      treat this as skip-with-notice, not failure
+#   1  invocation error (timeout, HTTP error, empty answer, oversized
+#      prompt, bad configuration)
+#   2  unavailable (server down, model not pulled, or jq missing) —
+#      callers should treat this as skip-with-notice, not failure
+#   Callers must treat any other exit status as 1 (defensive: an
+#   unhandled tool failure under `set -e` can surface its own code).
+#
+# Reasoning models: requests are sent with think:true so the model can
+# reason before answering; if the server rejects that for a
+# non-reasoning LOCAL_REVIEW_MODEL, the request is retried once with
+# think:false, so non-reasoning models work without configuration.
 #
 # Uses the HTTP API rather than `ollama run`: with reasoning models the
 # CLI's thinking handling can swallow the entire answer (observed with
@@ -37,7 +51,7 @@ set -euo pipefail
 
 MODEL="${LOCAL_REVIEW_MODEL:-qwen3.5:35b}"
 BASE_URL="${LOCAL_REVIEW_URL:-http://localhost:11434}"
-TIMEOUT="${LOCAL_REVIEW_TIMEOUT:-600}"
+TIMEOUT="${LOCAL_REVIEW_TIMEOUT:-900}"
 NUM_CTX="${LOCAL_REVIEW_NUM_CTX:-16384}"
 
 BASE_BRANCH=""
@@ -70,7 +84,10 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+            # Print the header comment block (everything from line 2 to
+            # the first non-comment line) so the help text cannot drift
+            # from the documentation above as lines are added/removed.
+            awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"
             exit 0
             ;;
         *)
@@ -80,10 +97,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]] || ! [[ "$NUM_CTX" =~ ^[0-9]+$ ]]; then
+    echo "Error: LOCAL_REVIEW_TIMEOUT and LOCAL_REVIEW_NUM_CTX must be plain integers (got '$TIMEOUT' / '$NUM_CTX')" >&2
+    exit 1
+fi
+
 # --- Gather the diff ---
 
 if [[ -n "$BASE_BRANCH" ]]; then
-    DIFF=$(git diff --merge-base "$BASE_BRANCH" HEAD)
+    DIFF=$(git diff --merge-base "$BASE_BRANCH" HEAD) || {
+        echo "Error: git diff failed for base '$BASE_BRANCH' (not a ref?)" >&2
+        exit 1
+    }
 elif [[ ! -t 0 ]]; then
     DIFF=$(cat)
 else
@@ -98,13 +123,21 @@ fi
 
 # --- Availability probes (exit 2 = skip-with-notice) ---
 
+if ! command -v jq >/dev/null 2>&1; then
+    echo "local review unavailable: jq not installed" >&2
+    exit 2
+fi
+
 if ! curl -sf --max-time 5 "$BASE_URL/api/version" >/dev/null 2>&1; then
     echo "local review unavailable: no Ollama server at $BASE_URL" >&2
     exit 2
 fi
 
+# Accept both fully-tagged names and the bare form users pass to
+# `ollama run` (Ollama registers untagged pulls as "<name>:latest").
 if ! curl -sf --max-time 10 "$BASE_URL/api/tags" 2>/dev/null \
-        | jq -e --arg m "$MODEL" '.models[] | select(.name == $m)' >/dev/null; then
+        | jq -e --arg m "$MODEL" \
+            '.models[] | select(.name == $m or .name == ($m + ":latest"))' >/dev/null; then
     echo "local review unavailable: model '$MODEL' not pulled (ollama pull $MODEL)" >&2
     exit 2
 fi
@@ -142,36 +175,81 @@ $DIFF
 EOF
 )
 
+# Fail loud on context overflow — Ollama silently truncates oversized
+# prompts (dropping the instructions and the head of the diff), which
+# would produce a confident review of a tail fragment. ~3 bytes/token
+# is conservative for diff text; reserve headroom for the answer.
+EST_TOKENS=$(( ${#PROMPT} / 3 + 2048 ))
+if (( EST_TOKENS > NUM_CTX )); then
+    echo "Error: prompt (~$EST_TOKENS tokens incl. answer headroom) exceeds num_ctx=$NUM_CTX;" >&2
+    echo "  re-run with LOCAL_REVIEW_NUM_CTX=$EST_TOKENS (needs RAM) or review a smaller diff" >&2
+    exit 1
+fi
+
 # --- Invoke ---
 
-RESPONSE_FILE=$(mktemp /tmp/local_review.XXXXXX.json)
-trap 'rm -f "$RESPONSE_FILE"' EXIT
+PROMPT_FILE=$(mktemp /tmp/local_review_prompt.XXXXXX)
+BODY_FILE=$(mktemp /tmp/local_review_body.XXXXXX)
+RESPONSE_FILE=$(mktemp /tmp/local_review_resp.XXXXXX)
+trap 'rm -f "$PROMPT_FILE" "$BODY_FILE" "$RESPONSE_FILE"' EXIT
 
-HTTP_CODE=$(jq -n \
+# Prompt travels via file + --rawfile: as an --arg it would be a single
+# execve argument, capped at ~128 KB on Linux (MAX_ARG_STRLEN) — large
+# diffs would fail before ever reaching the model.
+printf '%s' "$PROMPT" > "$PROMPT_FILE"
+
+build_body() {  # $1 = "true" | "false" (think flag)
+    jq -n \
         --arg model "$MODEL" \
-        --arg prompt "$PROMPT" \
+        --rawfile prompt "$PROMPT_FILE" \
         --argjson num_ctx "$NUM_CTX" \
+        --argjson think "$1" \
         '{model: $model,
           messages: [{role: "user", content: $prompt}],
-          stream: false, think: true,
-          options: {num_ctx: $num_ctx}}' \
-    | curl -s --max-time "$TIMEOUT" \
+          stream: false, think: $think,
+          options: {num_ctx: $num_ctx}}' > "$BODY_FILE"
+}
+
+send_request() {
+    # curl runs alone here (jq already wrote $BODY_FILE) so a failure
+    # is attributable: exit 28 = timeout, anything else = transport.
+    CURL_EXIT=0
+    HTTP_CODE=$(curl -s --max-time "$TIMEOUT" \
         -o "$RESPONSE_FILE" -w '%{http_code}' \
         -H 'Content-Type: application/json' \
-        -d @- "$BASE_URL/api/chat") || {
-    echo "local review failed: request timed out or connection lost (${TIMEOUT}s limit)" >&2
-    exit 1
+        -d @"$BODY_FILE" "$BASE_URL/api/chat") || CURL_EXIT=$?
+    if [[ "$CURL_EXIT" == "28" ]]; then
+        echo "local review failed: request timed out (${TIMEOUT}s limit; LOCAL_REVIEW_TIMEOUT to raise)" >&2
+        exit 1
+    elif [[ "$CURL_EXIT" != "0" ]]; then
+        echo "local review failed: connection to $BASE_URL failed (curl exit $CURL_EXIT)" >&2
+        exit 1
+    fi
 }
+
+build_body true
+send_request
+
+# Non-reasoning models reject think:true with a 400; retry once without.
+if [[ "$HTTP_CODE" == "400" ]] \
+        && grep -qi "does not support thinking" "$RESPONSE_FILE"; then
+    build_body false
+    send_request
+fi
 
 if [[ "$HTTP_CODE" != "200" ]]; then
     echo "local review failed: HTTP $HTTP_CODE: $(head -c 200 "$RESPONSE_FILE")" >&2
     exit 1
 fi
 
-CONTENT=$(jq -r '.message.content // empty' "$RESPONSE_FILE")
+CONTENT=$(jq -r '.message.content // empty' "$RESPONSE_FILE" 2>/dev/null) || {
+    echo "local review failed: non-JSON response from $BASE_URL (proxy in the way?)" >&2
+    exit 1
+}
 
 if [[ -z "$CONTENT" ]]; then
-    echo "local review failed: model returned an empty answer (done_reason: $(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE"))" >&2
+    DONE_REASON=$(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unparseable")
+    echo "local review failed: model returned an empty answer (done_reason: $DONE_REASON)" >&2
     exit 1
 fi
 
