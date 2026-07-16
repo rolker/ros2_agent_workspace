@@ -17,10 +17,14 @@
 #                         up for large diffs — reasoning time grows
 #                         with diff size, and a ~500-line diff can
 #                         exceed 600s on 8GB-VRAM-class hardware)
-#   LOCAL_REVIEW_NUM_CTX  context window tokens (default: 16384; the
+#   LOCAL_REVIEW_NUM_CTX  context window tokens (default: 32768; the
 #                         script fails loud, with the size it needed,
 #                         when the prompt would overflow this — Ollama
-#                         would otherwise truncate silently)
+#                         would otherwise truncate silently. The
+#                         window must also fit the model's reasoning:
+#                         qwen3.5:35b thinks for ~7k tokens on even a
+#                         100-line diff, hence the large default and
+#                         the 12k-token answer/reasoning headroom)
 #
 # Exit codes:
 #   0  review produced (findings on stdout)
@@ -52,7 +56,7 @@ set -euo pipefail
 MODEL="${LOCAL_REVIEW_MODEL:-qwen3.5:35b}"
 BASE_URL="${LOCAL_REVIEW_URL:-http://localhost:11434}"
 TIMEOUT="${LOCAL_REVIEW_TIMEOUT:-900}"
-NUM_CTX="${LOCAL_REVIEW_NUM_CTX:-16384}"
+NUM_CTX="${LOCAL_REVIEW_NUM_CTX:-32768}"
 
 BASE_BRANCH=""
 CONTEXT_FILE=""
@@ -178,8 +182,11 @@ EOF
 # Fail loud on context overflow — Ollama silently truncates oversized
 # prompts (dropping the instructions and the head of the diff), which
 # would produce a confident review of a tail fragment. ~3 bytes/token
-# is conservative for diff text; reserve headroom for the answer.
-EST_TOKENS=$(( ${#PROMPT} / 3 + 2048 ))
+# is conservative for diff text. The headroom must cover reasoning +
+# answer: a thinking model that runs out of window mid-reasoning
+# returns an empty answer with done_reason=length (observed at 2048
+# headroom on a ~500-line diff).
+EST_TOKENS=$(( ${#PROMPT} / 3 + 12288 ))
 if (( EST_TOKENS > NUM_CTX )); then
     echo "Error: prompt (~$EST_TOKENS tokens incl. answer headroom) exceeds num_ctx=$NUM_CTX;" >&2
     echo "  re-run with LOCAL_REVIEW_NUM_CTX=$EST_TOKENS (needs RAM) or review a smaller diff" >&2
@@ -249,7 +256,11 @@ CONTENT=$(jq -r '.message.content // empty' "$RESPONSE_FILE" 2>/dev/null) || {
 
 if [[ -z "$CONTENT" ]]; then
     DONE_REASON=$(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unparseable")
-    echo "local review failed: model returned an empty answer (done_reason: $DONE_REASON)" >&2
+    if [[ "$DONE_REASON" == "length" ]]; then
+        echo "local review failed: reasoning consumed the context window before an answer was produced (done_reason: length); raise LOCAL_REVIEW_NUM_CTX (current: $NUM_CTX)" >&2
+    else
+        echo "local review failed: model returned an empty answer (done_reason: $DONE_REASON)" >&2
+    fi
     exit 1
 fi
 
