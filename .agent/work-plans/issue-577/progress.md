@@ -153,3 +153,20 @@ Strong, source-verified plan that addresses every review-issue finding and both 
 - [ ] During implementation, resolve step-4/step-5 so upstream.repos is read from the pristine snapshot and resolved-SHA capture preserves attestation integrity (log marker preferred over rw mount).
 - [ ] Commit to the underlay layout (plan's own recommendation) before writing the inner-script changes.
 - [ ] Add the `--clean-room`-preferred-for-upstream.repos note to the ADR-0018 update.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-22 17:22 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-577 at `1345aec`
+**Mode**: pre-push
+**Depth**: Deep (reason: command-injection surface parsing upstream.repos + shelling out to a generated container script; substantive ADR-0018 edit)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 1 | **Ship**: recommended — no must-fix; static analysis clean, 75/75 tests pass, attestation-integrity design sound
+
+### Findings
+- [ ] (suggestion) Re-validate the `git ls-remote`-resolved SHA against `^[0-9a-f]{40}$` before interpolating into the container `git checkout` and the `upstream-repo:` note line (defense-in-depth; also handles annotated-tag object-vs-peeled-commit) — `.agent/scripts/ci_local.sh:299-301`
+- [ ] (suggestion) Record `ci_local_rosdep_skip_keys.txt` usage in the persistent `steps:` note field (only dry-run surfaces it today), so a skip-keys-pruned rosdep resolution is reflected in the merge evidence — `.agent/scripts/ci_local.sh:248-263`
+- [ ] (suggestion) Header doc comment frames skip-keys as upstream-only pruning, but the code applies it unconditionally (unlike the UPSTREAM_PRESENT-gated hook); reconcile comment vs. gating — `.agent/scripts/ci_local.sh:44-46,248`
