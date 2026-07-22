@@ -117,3 +117,39 @@ being exempted as "only exercised against real cube_bathymetry."
 ### Open questions
 - [ ] Upstream/target workspace layout inside the container: separate underlay build (recommended, mirrors industrial_ci) vs. single merged src/ tree.
 - [ ] Whether to cache the built upstream workspace across repeated runs (recommend deferring to a follow-up issue; this PR lands correctness first).
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-22 17:04 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-577/plan.md` at `1dc9627`
+**PR**: PR-less (--issue mode; feature/issue-577)
+**Verdict**: approve-with-suggestions
+
+### Evaluation
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | 4 files (ci_local.sh + its help text, test_ci_local.sh, ADR-0018, AGENTS.md); additive and backward-compatible. Well under split threshold. |
+| Issue alignment | Good | Implements vcs-import strategy (settled), pruning via hooks, and resolved-SHA note extension (settled in-scope). Both operator checkpoint decisions honored. |
+| review-issue alignment | Good | All six review-issue action items addressed: strategy choice, pruning-hook design, note-format extension, stub tests, vcstool availability, AGENTS.md line. |
+| File targeting | Good | Correct files. cube_bathymetry confirmed the only repo with `upstream.repos`; no cube-specific change bundled (correct — follow-up). Verified against source: single-repo mount + `ci_local_extra.sh` hook precedent both exist as the plan describes. |
+| Consequences | Good | Consequences table covers ADR-0018 doc, AGENTS.md, tests, cube follow-up, and wall-clock tradeoff. Nothing material missing. |
+| Principle alignment | Good | Filename-keyed generic mechanism (ADR-0003), enforcement-over-docs, tests included, incremental. Two-hook design justified by demonstrated industrial_ci parity (not speculative). |
+| ADR compliance | Good | 0003, 0018, 0009 all triggered and addressed. Note-format change framed as an extension, not a redefinition — preserves ADR-0018 Decision 1 merge-evidence guarantee. |
+| ROS conventions | N/A | Workspace-infra plan (shell + docker + vcstool); no ROS package code. |
+
+### Findings
+- [ ] (suggestion) Attestation integrity — make explicit that for attestable runs the `vcs import` consumes `upstream.repos` **from the pristine snapshot** (it is committed content, already in the `git archive HEAD` tree), not a host-rewritten copy. Host-side parse stays validation/dry-run only. The plan floats both options and the step-4→step-7 cross-reference is muddled (`plan.md:68-69` points at "step 7" which is dry-run output, not the snapshot boundary). Reading from the snapshot keeps the "tests exactly the commit content" guarantee intact. — `plan.md:65-79`
+- [ ] (suggestion) Consider capturing resolved upstream SHAs via a parseable stdout marker in the inner script (extracted by the host from the tee'd `$LOG`) instead of a new read-write bind mount. This preserves the current all-mounts-read-only invariant, and the SHAs then fall under the existing `log-sha256` integrity hash for free. If the rw mount is kept, the plan's hard-fail-on-missing handling is the right call. — `plan.md:81-89`
+- [ ] (suggestion) The underlay-vs-merged-src layout open question is the highest-impact implementation decision (it determines whether `--packages-up-to` target semantics stay unchanged). Recommend committing to the plan's own recommended underlay approach before implementation rather than deferring, since it shapes the rosdep/build/source wiring in steps 4. — `plan.md:204-211`
+- [ ] (suggestion) Per ADR-0018 Decision 6, `--clean-room` is the recommended image when a change touches dependency declarations/build environment — which `upstream.repos` repos inherently do, and clean-room's `ros-dev-tools` install guarantees `vcstool`. Worth a one-line note in the ADR-0018 doc update (step 8) that clean-room is preferred for `upstream.repos` repos, resolving the ADR-0009 vcstool-availability watch in the same stroke. — `plan.md:190`
+- [ ] (nit) Files-to-Change table lists `.agent/scripts/ci_local.sh` twice (logic row + help-text row). Intentional (separates the header-comment doc change) but reads as a duplicate; fold or annotate. — `plan.md:160,164`
+
+### Summary
+Strong, source-verified plan that addresses every review-issue finding and both settled operator decisions. It is ready for implementation. The suggestions are refinements — two of them (read `upstream.repos` from the snapshot; capture SHAs via a log marker rather than a rw mount) touch the ADR-0018 attestation-integrity guarantee and are worth resolving as the implementer wires up steps 4–5, but none block starting.
+
+### Recommended Actions
+- [ ] During implementation, resolve step-4/step-5 so upstream.repos is read from the pristine snapshot and resolved-SHA capture preserves attestation integrity (log marker preferred over rw mount).
+- [ ] Commit to the underlay layout (plan's own recommendation) before writing the inner-script changes.
+- [ ] Add the `--clean-room`-preferred-for-upstream.repos note to the ADR-0018 update.
