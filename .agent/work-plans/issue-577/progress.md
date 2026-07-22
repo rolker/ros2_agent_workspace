@@ -1,0 +1,106 @@
+---
+issue: 577
+---
+
+# Issue #577 — ci_local.sh: support upstream.repos source dependencies (blocks ADR-0018 attestation for repos like cube_bathymetry)
+
+## Issue Review
+**Status**: complete
+**When**: 2026-07-22 18:57 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Issue**: #577
+**Comment**: (best-effort post follows this entry; not recorded inline)
+**Scope verdict**: needs-more-detail
+
+### Findings
+
+**Confirmed against source.** Read `.agent/scripts/ci_local.sh` (295 lines):
+it mounts only the target repo into `/ci/src/<repo_name>`, runs
+`rosdep install --from-paths src` and `colcon build --packages-up-to` against
+that single-repo source tree, with zero handling of `<repo>/upstream.repos`.
+The issue's reproduction (rosdep-key resolution failure on
+`marine_mbes_backscatter_store`, then a CMake `find_package(marine_autonomy)`
+failure) is exactly the failure mode the current script's single-repo mount
+would produce. Confirmed `layers/main/sensors_ws/src/cube_bathymetry/upstream.repos`
+exists and lists `unh_marine_autonomy`, `mru_transform`, `geographic_info` as
+floating-branch (`version: jazzy`) git deps. A repo-wide search of currently
+checked-out project repos found no other `upstream.repos` file — cube_bathymetry
+is the only affected repo today, but the mechanism is correctly scoped as
+generic workspace infra (ADR-0003), not a cube-specific patch.
+
+**cube_bathymetry's actual hosted CI is industrial_ci, not the workspace's
+generic `ci_workflow.yml` template.** `.github/workflows/ci.yml` uses
+`ros-industrial/industrial_ci@master` with `UPSTREAM_WORKSPACE`,
+`ROSDEP_SKIP_KEYS` (prunes `marine_nav_interfaces`/`marine_nav_tasks` from
+rosdep resolution even though the packages are never built), and
+`AFTER_SETUP_UPSTREAM_WORKSPACE` (touches `COLCON_IGNORE` in three upstream
+subpackages to scope the monorepo build to what cube actually needs). This
+means the issue's option 2 ("delegate to the repo's own industrial_ci
+config") is not a thin wrapper — it requires either parsing/replicating these
+env vars generically, or cube_bathymetry-specific logic that would violate
+the project-agnostic-workspace principle (ADR-0003). Option 1 (`vcs import`
++ generic build) is simpler and stays generic, but as written would not
+reproduce the pruning behavior — an unpruned build may fail or diverge from
+what hosted CI actually verifies. The issue text already flags this
+("honoring per-repo pruning hooks if feasible") but doesn't resolve it; the
+script already has a generic per-repo hook precedent
+(`<repo>/.agents/ci_local_extra.sh`) that plan-task should consider extending
+to an equivalent upstream-side hook, rather than inventing industrial_ci-env
+parsing.
+
+**Attestation semantics gap (ADR-0018).** The `upstream.repos` entries here
+pin to floating branches (`version: jazzy`), not SHAs. The current
+`ci-local: pass` note format records `repo`/`commit`/`image`/`packages`/`scope`
+but nothing about resolved dependency state. An attestation built by cloning
+a floating upstream branch is not reproducible from the note alone — a repeat
+run on the same target-repo commit could silently build against a different
+`unh_marine_autonomy` state. ADR-0018 decision 1 treats a `scope: full`
+`ci-local: pass` record as sufficient standalone merge evidence; that
+guarantee weakens once "full" build state includes an unpinned external input
+the note doesn't capture. Recommend the plan record resolved upstream SHAs in
+the note (e.g. an `upstream:` field per repo/commit) so the attestation stays
+self-describing, and treat this as a note-format extension under ADR-0018
+rather than a silent behavior change to what "scope: full" already means to
+existing consumers (`merge_pr.sh` future wiring, human readers of
+`git notes --ref=ci-local show`).
+
+**Test coverage precedent exists.** `.agent/scripts/tests/test_ci_local.sh`
+already stubs `docker`/`vcs`-adjacent calls and drives the script through
+dry-run, package-discovery, and injection-safety cases. The upstream.repos
+path should get equivalent stub-based coverage (dry-run plan showing the
+upstream clone step; injection-safety on repo names/URLs/versions parsed from
+`upstream.repos`, mirroring the existing package-name validation) rather than
+being exempted as "only exercised against real cube_bathymetry."
+
+### Principle Alignment
+
+| Principle | Status | Notes |
+|---|---|---|
+| Workspace vs. project separation | OK | Fix belongs in `.agent/scripts/ci_local.sh` (workspace infra); mechanism (`vcs import` on a well-known filename) is generic, not cube-specific |
+| Enforcement over documentation | OK | Extends the existing enforced tool (ci_local.sh + attestation), not a docs-only fix |
+| A change includes its consequences | Action needed | ADR-0018's attestation note format (and its "scope: full" guarantee) needs an explicit extension for upstream dependency state — see Findings above |
+| Test what breaks | Action needed | New `upstream.repos` code path needs stub-based tests in `test_ci_local.sh` (dry-run + injection-safety), mirroring existing coverage patterns |
+| Only what's needed / Improve incrementally | Watch | Issue proposes two alternative implementation strategies (vcs-import vs. industrial_ci delegation) and leaves the full-scope/caching question open by design — plan-task should pick the minimal option (vcs-import, reusing the `ci_local_extra.sh` hook precedent for pruning) rather than replicating industrial_ci's env-var surface |
+
+### ADR Applicability
+
+| ADR | Triggered | Notes |
+|---|---|---|
+| 0003 — Project-agnostic workspace | Yes | Fix must stay generic (any repo with `upstream.repos`); option 2 (industrial_ci delegation) risks cube-specific logic leaking into workspace infra unless generalized |
+| 0018 — Local-first CI verification | Yes | This closes a real gap in ADR-0018's stated Phase-1 tool; attestation note format likely needs a documented extension (see Findings) — plan-task should decide whether that's a note change under this ADR or needs a superseding addendum |
+| 0009 — Python package management | Watch | `vcs import` may need `vcs`/`vcstool` available in the container image; confirm it's already present in the agent sandbox / rosdep-baked image rather than requiring an ad hoc pip install |
+
+### Consequences
+
+- ADR-0018 doc itself may need a Consequences-section note once the note format is extended (per Findings).
+- `AGENTS.md`'s `ci_local.sh` script-reference line (currently silent on upstream.repos) should be updated to mention the new capability once implemented.
+- `test_ci_local.sh` needs new cases (see Findings).
+
+### Actions
+- [ ] Decide implementation strategy: vcs-import (generic, reuses `ci_local_extra.sh`-style hook precedent) vs. delegating to per-repo industrial_ci config (risks project-specific logic in workspace infra) — recommend vcs-import as the minimal, ADR-0003-aligned choice.
+- [ ] Design how per-repo pruning (cube's `ROSDEP_SKIP_KEYS`/`AFTER_SETUP_UPSTREAM_WORKSPACE`-equivalent) is expressed generically, likely via an upstream-side hook analogous to `ci_local_extra.sh`.
+- [ ] Extend the `ci-local` git-note format to record resolved upstream dependency state (repo/commit per `upstream.repos` entry) so `scope: full` attestations stay self-describing per ADR-0018's merge-evidence guarantee.
+- [ ] Add stub-based tests to `test_ci_local.sh` for the new upstream.repos path (dry-run plan output, injection-safety on parsed repo name/URL/version fields).
+- [ ] Confirm `vcs`/`vcstool` availability in the agent sandbox / clean-room images (ADR-0009 dev-tool provisioning, not bare pip).
+- [ ] Update `AGENTS.md`'s ci_local.sh reference line once the capability lands.
