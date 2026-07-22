@@ -104,3 +104,16 @@ being exempted as "only exercised against real cube_bathymetry."
 - [ ] Add stub-based tests to `test_ci_local.sh` for the new upstream.repos path (dry-run plan output, injection-safety on parsed repo name/URL/version fields).
 - [ ] Confirm `vcs`/`vcstool` availability in the agent sandbox / clean-room images (ADR-0009 dev-tool provisioning, not bare pip).
 - [ ] Update `AGENTS.md`'s ci_local.sh reference line once the capability lands.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-22 20:15 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-577/plan.md` at `1dc9627`
+**Branch**: feature/issue-577 at `1dc9627`
+**Phases**: single
+
+### Open questions
+- [ ] Upstream/target workspace layout inside the container: separate underlay build (recommended, mirrors industrial_ci) vs. single merged src/ tree.
+- [ ] Whether to cache the built upstream workspace across repeated runs (recommend deferring to a follow-up issue; this PR lands correctness first).
