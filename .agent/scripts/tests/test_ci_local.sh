@@ -43,6 +43,13 @@ chmod +x "$TMP/bin/docker"
 export PATH="$TMP/bin:$PATH"
 export CI_LOCAL_LOG_DIR="$TMP/logs"
 
+# Run the whole harness with NO ambient git identity, exactly like a CI
+# runner or fresh host — the attestation path must not depend on it
+# (regression: the #574 Script-tests CI failure). Fixture commits below
+# pass identity per-invocation with -c.
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_SYSTEM=/dev/null
+
 # ---- fixture repo -----------------------------------------------------------
 REPO="$TMP/demo_repo"
 mkdir -p "$REPO/demo_pkg" "$REPO/fixtures/ignored_pkg"
@@ -100,17 +107,17 @@ check "log hash matches"           bash -c "[ \"\$(sha256sum '$log_file' | cut -
 echo "== re-run appends a second record (no overwrite) =="
 out=$(bash "$SUT" "$REPO" 2>&1); rc=$?
 check "exits 0"                    [ "$rc" -eq 0 ]
-check "two pass records"           bash -c "[ \"\$(note_sha() { :; }; git -C '$REPO' notes --ref=ci-local show '$HEAD_SHA' | grep -cF 'ci-local: pass')\" -eq 2 ]"
+check "two pass records"           bash -c "[ \"\$(git -C '$REPO' notes --ref=ci-local show '$HEAD_SHA' | grep -cF 'ci-local: pass')\" -eq 2 ]"
 check "still one note object"      bash -c "[ \"\$(git -C '$REPO' notes --ref=ci-local list | wc -l)\" -eq 1 ]"
 
 echo "== partial run recorded as partial =="
-git -C "$REPO" notes --ref=ci-local remove "$HEAD_SHA" >/dev/null 2>&1
+git -C "$REPO" -c user.name=t -c user.email=t@t notes --ref=ci-local remove "$HEAD_SHA" >/dev/null 2>&1
 out=$(bash "$SUT" "$REPO" --packages "demo_pkg other_pkg" 2>&1); rc=$?
 check "exits 0"                    [ "$rc" -eq 0 ]
 note=$(note_of "$HEAD_SHA")
 check "note marked partial"        contains "$note" "ci-local: pass (partial)"
 check "note scope partial"         contains "$note" "scope: partial"
-git -C "$REPO" notes --ref=ci-local remove "$HEAD_SHA" >/dev/null 2>&1
+git -C "$REPO" -c user.name=t -c user.email=t@t notes --ref=ci-local remove "$HEAD_SHA" >/dev/null 2>&1
 
 echo "== dirty tree passes but does not attest, uses live tree =="
 : > "$DOCKER_STUB_CALLS"
@@ -157,6 +164,14 @@ check "subdirectory rejected"      [ "$rc" -ne 0 ]
 check "explains repo root"         contains "$out" "pass the repo root"
 out=$(bash "$SUT" "$REPO" --frobnicate 2>&1); rc=$?
 check "unknown option rejected"    [ "$rc" -ne 0 ]
+out=$(bash "$SUT" "$REPO" --dry-run --image "evil
+ci-local: pass" 2>&1); rc=$?
+check "whitespace image rejected"  [ "$rc" -ne 0 ]
+mkdir -p "$TMP/bad dir/space_repo"
+git -C "$TMP/bad dir/space_repo" init -q
+out=$(bash "$SUT" "$TMP/bad dir/space_repo" --dry-run 2>&1); rc=$?
+check "whitespace repo path rejected" [ "$rc" -ne 0 ]
+check "explains mount hazard"      contains "$out" "unsupported for container mounts"
 mkdir -p "$TMP/no_pkgs" && git -C "$TMP/no_pkgs" init -q
 out=$(bash "$SUT" "$TMP/no_pkgs" --dry-run 2>&1); rc=$?
 check "package-less repo rejected" [ "$rc" -ne 0 ]

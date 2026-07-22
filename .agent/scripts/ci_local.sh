@@ -89,6 +89,12 @@ done
 [[ -d "$REPO" ]] || { err "repo path not found: $REPO"; exit 1; }
 REPO="$(cd "$REPO" && pwd)"
 REPO_NAME="$(basename "$REPO")"
+# The path is embedded in a docker -v spec (colon/comma-delimited) and the name
+# in the attestation record — whitespace/control chars or mount metacharacters
+# would produce ambiguous mounts or malformed note records.
+if [[ "$REPO" =~ [[:space:]:,] ]]; then
+  err "repo path contains whitespace, ':' or ',' — unsupported for container mounts: $REPO"; exit 1
+fi
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || { err "$REPO is not a git repository"; exit 1; }
 # Refuse subdirectories: HEAD/attestation belong to the whole repo — attesting
 # the repo's commit while mounting only a subtree would forge full-repo CI.
@@ -106,6 +112,12 @@ if [[ -z "$IMAGE" ]]; then
     warn "agent image $AGENT_IMAGE not found — falling back to clean room ($CLEAN_IMAGE)"
     IMAGE="$CLEAN_IMAGE"
   fi
+fi
+# The image string is written verbatim into the attestation record; embedded
+# whitespace/newlines could inject a spurious 'ci-local: pass' line and fool
+# note consumers.
+if [[ "$IMAGE" =~ [[:space:]] ]]; then
+  err "--image must not contain whitespace: '$IMAGE'"; exit 1
 fi
 
 # ---- package discovery ------------------------------------------------------
@@ -269,12 +281,15 @@ date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 host: $(hostname)
 log-sha256: $LOG_HASH"
 # Append, never overwrite: a clean-room record must survive later fast-path
-# re-runs on the same commit.
+# re-runs on the same commit. Explicit tool identity: notes need a committer,
+# and fresh hosts/containers/CI runners have no ambient git config — the tool
+# is the attester (the host is already recorded in the note body).
+NOTES_ID=(-c user.name=ci_local -c user.email=ci-local@localhost)
 if git -C "$REPO" notes --ref="$NOTES_REF" show "$HEAD_SHA" >/dev/null 2>&1; then
-  git -C "$REPO" notes --ref="$NOTES_REF" append -m "
+  git -C "$REPO" "${NOTES_ID[@]}" notes --ref="$NOTES_REF" append -m "
 ---
 $NOTE" "$HEAD_SHA"
 else
-  git -C "$REPO" notes --ref="$NOTES_REF" add -m "$NOTE" "$HEAD_SHA"
+  git -C "$REPO" "${NOTES_ID[@]}" notes --ref="$NOTES_REF" add -m "$NOTE" "$HEAD_SHA"
 fi
 echo "=== ci_local: PASS — attested on $HEAD_SHA (refs/notes/$NOTES_REF, scope: $( [[ $PARTIAL -eq 1 ]] && echo partial || echo full )) ==="
