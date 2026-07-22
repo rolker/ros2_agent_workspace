@@ -4,7 +4,11 @@
 # handling, package discovery (COLCON_IGNORE, name validation), dry-run
 # planning, pass/fail exit codes, snapshot-vs-live mount selection, and
 # attestation-note semantics (clean vs dirty tree, append-not-overwrite,
-# partial scope, --no-attest, failure).
+# partial scope, --no-attest, failure). The upstream.repos path (#577) is
+# exercised against a local fixture upstream git repo (file-path URL, so the
+# host-side ls-remote resolution runs for real with no network), covering
+# dry-run planning, hook/skip-keys detection, injection rejection, the
+# upstream-repo: note lines, and the no-upstream byte-compat regression.
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -175,6 +179,111 @@ check "explains mount hazard"      contains "$out" "unsupported for container mo
 mkdir -p "$TMP/no_pkgs" && git -C "$TMP/no_pkgs" init -q
 out=$(bash "$SUT" "$TMP/no_pkgs" --dry-run 2>&1); rc=$?
 check "package-less repo rejected" [ "$rc" -ne 0 ]
+
+# ---- upstream.repos fixtures (#577) -----------------------------------------
+# A local git repo serves as the upstream source: its path is the url, so the
+# host-side ls-remote branch->SHA resolution runs for real without network.
+UPDEP_SRC="$TMP/updep_src"
+mkdir -p "$UPDEP_SRC"
+echo upstream > "$UPDEP_SRC/marker.txt"
+git -C "$UPDEP_SRC" init -q -b jazzy
+git -C "$UPDEP_SRC" -c user.name=t -c user.email=t@t add -A
+git -C "$UPDEP_SRC" -c user.name=t -c user.email=t@t commit -qm upstream
+UPDEP_SHA="$(git -C "$UPDEP_SRC" rev-parse HEAD)"
+
+UPREPO="$TMP/up_repo"
+mkdir -p "$UPREPO/up_pkg" "$UPREPO/.agents"
+sed 's/demo_pkg/up_pkg/' "$REPO/demo_pkg/package.xml" > "$UPREPO/up_pkg/package.xml"
+cat > "$UPREPO/upstream.repos" <<EOF
+repositories:
+  updep:
+    type: git
+    url: $UPDEP_SRC
+    version: jazzy
+EOF
+cat > "$UPREPO/.agents/ci_local_upstream_extra.sh" <<'EOF'
+#!/bin/bash
+touch some_subpkg/COLCON_IGNORE 2>/dev/null || true
+EOF
+chmod +x "$UPREPO/.agents/ci_local_upstream_extra.sh"
+cat > "$UPREPO/.agents/ci_local_rosdep_skip_keys.txt" <<'EOF'
+# keys the combined rosdep install must skip
+skip_key_a
+skip_key_b  # trailing comment
+EOF
+git -C "$UPREPO" init -q
+git -C "$UPREPO" -c user.name=t -c user.email=t@t add -A
+git -C "$UPREPO" -c user.name=t -c user.email=t@t commit -qm upfixture
+UPREPO_SHA="$(git -C "$UPREPO" rev-parse HEAD)"
+
+echo "== upstream.repos dry run =="
+: > "$DOCKER_STUB_CALLS"
+out=$(bash "$SUT" "$UPREPO" --dry-run 2>&1); rc=$?
+check "exits 0"                       [ "$rc" -eq 0 ]
+check "shows parsed upstream entry"   contains "$out" "upstream : updep@jazzy $UPDEP_SRC"
+check "steps gains upstream tokens"   contains "$out" "steps    : template+upstream+upstream-hook"
+check "upstream hook detected"        contains "$out" "upstream-hook : yes"
+check "skip keys parsed"              contains "$out" "rosdep-skip-keys: skip_key_a skip_key_b"
+check "no container run"              bash -c "! grep -qs docker-run '$DOCKER_STUB_CALLS'"
+
+echo "== upstream.repos successful run attests with resolved SHAs =="
+out=$(bash "$SUT" "$UPREPO" 2>&1); rc=$?
+check "exits 0"                       [ "$rc" -eq 0 ]
+unote=$(git -C "$UPREPO" notes --ref=ci-local show "$UPREPO_SHA" 2>/dev/null)
+check "note says pass"                contains "$unote" "ci-local: pass"
+check "note scope full"               contains "$unote" "scope: full"
+check "note records resolved SHA"     contains "$unote" "upstream-repo: updep@$UPDEP_SHA"
+check "note steps include upstream"   contains "$unote" "steps: template+upstream+upstream-hook"
+
+echo "== upstream.repos injection / validation rejection =="
+# Live-tree reads (untracked upstream.repos => dirty tree) let each bad case
+# run without committing; every rejection must happen before any container run.
+BADUP="$TMP/up_bad"
+mkdir -p "$BADUP/p"
+sed 's/demo_pkg/badup_pkg/' "$REPO/demo_pkg/package.xml" > "$BADUP/p/package.xml"
+git -C "$BADUP" init -q
+git -C "$BADUP" -c user.name=t -c user.email=t@t add -A
+git -C "$BADUP" -c user.name=t -c user.email=t@t commit -qm badup
+: > "$DOCKER_STUB_CALLS"
+printf 'repositories:\n  "evil; touch pwned":\n    type: git\n    url: %s\n    version: jazzy\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "metachar dir name rejected"    [ "$rc" -ne 0 ]
+check "names the bad dir"             contains "$out" "invalid repo dir name"
+printf 'repositories:\n  updep:\n    type: git\n    url: %s\n    version: "jazzy; rm -rf /"\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "metachar version rejected"     [ "$rc" -ne 0 ]
+check "names the bad version"         contains "$out" "invalid version"
+printf 'repositories:\n  updep:\n    type: git\n    url: "%s evil"\n    version: jazzy\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "whitespace url rejected"       [ "$rc" -ne 0 ]
+check "names the bad url"             contains "$out" "invalid url"
+printf 'repositories:\n  updep:\n    type: git\n    url: %s\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "missing version rejected"      [ "$rc" -ne 0 ]
+check "explains version requirement"  contains "$out" "has no version"
+rm "$BADUP/upstream.repos"
+mkdir -p "$BADUP/.agents"
+printf 'good_key\nbad key; rm -rf /\n' > "$BADUP/.agents/ci_local_rosdep_skip_keys.txt"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "bad skip-key rejected"         [ "$rc" -ne 0 ]
+check "names the bad key"             contains "$out" "invalid rosdep key"
+check "no container run for any bad case" bash -c "! grep -qs docker-run '$DOCKER_STUB_CALLS'"
+
+echo "== unresolvable upstream version fails before the container runs =="
+: > "$DOCKER_STUB_CALLS"
+printf 'repositories:\n  updep:\n    type: git\n    url: %s\n    version: no_such_branch\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+rm "$BADUP/.agents/ci_local_rosdep_skip_keys.txt"
+out=$(bash "$SUT" "$BADUP" --no-attest 2>&1); rc=$?
+check "unresolvable ref rejected"     [ "$rc" -ne 0 ]
+check "names the unresolvable ref"    contains "$out" "cannot resolve 'no_such_branch'"
+check "no container run"              bash -c "! grep -qs docker-run '$DOCKER_STUB_CALLS'"
+
+echo "== no upstream.repos stays byte-compatible (regression) =="
+out=$(bash "$SUT" "$REPO" 2>&1); rc=$?
+check "exits 0"                       [ "$rc" -eq 0 ]
+note=$(note_of "$HEAD_SHA")
+check "no upstream-repo lines"        not_contains "$note" "upstream-repo:"
+check "steps unchanged"               contains "$note" "steps: template"
 
 echo
 echo "$PASS passed, $FAIL failed"

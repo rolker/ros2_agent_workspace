@@ -28,13 +28,18 @@ to prune the upstream monorepo down to what's actually needed.
 
 ## Approach
 
-1. **Detect `upstream.repos`.** After repo-root/mount validation, check for
-   `$REPO/upstream.repos`. If absent, behavior is unchanged (today's
-   single-repo path). If present, parse it with `python3 -c` + `yaml` (already
-   a rosdep/vcstool runtime dependency, avoids a new hand-rolled YAML parser)
-   into a list of `(local_dir, url, version)` tuples — this happens on the
-   **host**, before the container runs, so injection-unsafe values are caught
-   before they reach any shell.
+1. **Detect `upstream.repos`.** After attestation eligibility is computed,
+   check for `upstream.repos` — read from the **pristine HEAD commit content**
+   (`git show HEAD:...`) for attestable runs, from the live tree for
+   dirty/`--no-attest` runs, so an attested run can never consume inputs that
+   differ from the recorded commit (same rule for the two hook files in step
+   3). If absent, behavior is unchanged (today's single-repo path). If
+   present, parse it with `python3 -c` + `yaml` (already a rosdep runtime
+   dependency, avoids a new hand-rolled YAML parser) into a list of
+   `(local_dir, url, version)` tuples — on the **host**, before the container
+   runs, so injection-unsafe values are caught before they reach any shell.
+   Entries must be `type: git` and carry an explicit `version` (attestation
+   must resolve a concrete ref).
 
 2. **Validate parsed fields before interpolation.** Mirror the existing
    package-name validation: each `local_dir` must match
@@ -62,31 +67,33 @@ to prune the upstream monorepo down to what's actually needed.
    `rosdep install --from-paths src --ignore-src -r -y --skip-keys "..."`
    call that covers both the upstream and target workspaces.
 
-4. **Extend the inner container script.** When upstream is present:
-   - `vcs import upstream_ws/src < upstream.repos` (host writes the validated
-     repos file into the snapshot/live tree copy that's mounted, or the
-     parsed+re-validated tuples are passed as env/args — see step 7 on the
-     snapshot boundary).
-   - run `ci_local_upstream_extra.sh` if present.
-   - `rosdep install --from-paths src --ignore-src -r -y` across
-     `/ci/upstream_ws/src` and `/ci/src` together (single call, matching
-     industrial_ci's combined resolution and avoiding order-dependent
-     partial installs), with `--skip-keys` from step 3.
-   - `colcon build` the upstream workspace first (`--base-paths upstream_ws`
-     or a merged workspace layout — pick whichever keeps target-repo
-     `--packages-up-to` semantics intact; see Open Questions), `source
-     upstream_ws/install/local_setup.bash`, then proceed with the existing
-     target-repo build/test steps unchanged.
+4. **Resolve upstream refs host-side, then extend the inner container
+   script.** Before the container runs, the host resolves each entry's
+   floating `version` to a commit SHA via `git ls-remote <url>
+   refs/heads/<v> refs/tags/<v>` (a 40-hex `version` is used as-is);
+   resolution failure is fatal. The inner script then, when upstream is
+   present:
+   - `git clone` each validated url into `/ci/upstream_ws/src/<dir>` and
+     `git checkout --detach <resolved-sha>` — generated from the validated
+     tuples, so no repos file and no `vcs`/vcstool are needed in the
+     container at all (see Implementation Notes).
+   - run `ci_local_upstream_extra.sh` (via bash, cwd `/ci/upstream_ws`) if
+     present.
+   - `rosdep install --from-paths src upstream_ws/src --ignore-src -r -y`
+     (single combined call, matching industrial_ci's resolution and avoiding
+     order-dependent partial installs), with `--skip-keys` from step 3.
+   - `colcon build` the upstream workspace as a **separate underlay**
+     (`--base-paths upstream_ws/src`, its own build/install bases — the
+     resolved Open Question), `source upstream_ws/install/local_setup.bash`,
+     then run the existing target-repo build/test steps pinned with
+     `--base-paths src` so cwd discovery never re-includes the underlay.
 
-5. **Capture resolved upstream SHAs for the attestation.** After `vcs
-   import`, the inner script writes one line per upstream repo (`<local_dir>
-   <resolved-sha>`) to a small file in a directory the host bind-mounts
-   read-write for this purpose only (e.g. `$LOG_DIR/.upstream-<ts>/`,
-   cleaned up after the run) — the rest of the container's mounts stay
-   read-only, unchanged. The host reads this file after a successful run and
-   folds it into the note (step 6). If the file is missing/malformed after a
-   run that used `upstream.repos`, treat it as a hard failure (never attest
-   silently-unresolved upstream state).
+5. **Attestation carries the host-resolved SHAs.** Because resolution happens
+   on the host before the run (step 4), the note is written from values the
+   host chose and the container was *told* to check out — no container
+   output is trusted for attestation content, and every mount stays
+   read-only, unchanged. Unresolvable upstream state fails the run before
+   the container starts (never attest silently-unresolved upstream state).
 
 6. **Extend the attestation note format.** Add one `upstream-repo:` line per
    entry, appended after `packages:`:
@@ -118,14 +125,15 @@ to prune the upstream monorepo down to what's actually needed.
    `ci_local_rosdep_skip_keys.txt` were found, and the `steps` value —
    mirroring the existing dry-run detail level for packages/image/scope.
 
-8. **ADR-0018 doc update.** Add a Consequences-section note (or a short
-   "Decision 1a" style addendum — whichever reads better once drafted)
-   stating that `scope: full` attestations on repos with `upstream.repos`
-   also require `upstream-repo:` lines resolving every entry, and that a
-   note lacking them for a repo that has `upstream.repos` is not valid merge
-   evidence even if it says `ci-local: pass`/`scope: full`. This is a note
-   **format extension**, not a redefinition of what already-recorded notes
-   (repos without `upstream.repos`) mean.
+8. **ADR-0018 doc update.** Add a Consequences-section note stating that
+   `scope: full` attestations on repos with `upstream.repos` also require
+   `upstream-repo:` lines resolving every entry, and that a note lacking
+   them for a repo that has `upstream.repos` is not valid merge evidence
+   even if it says `ci-local: pass`/`scope: full`. This is a note **format
+   extension**, not a redefinition of what already-recorded notes (repos
+   without `upstream.repos`) mean. Also note `--clean-room` as the natural
+   mode for `upstream.repos` repos (clones need network anyway; agent-image
+   deps for upstream sources aren't baked).
 
 9. **AGENTS.md reference-line update.** Extend the `ci_local.sh` row in the
    Script Reference table to mention `upstream.repos` support in one clause.
@@ -145,10 +153,12 @@ to prune the upstream monorepo down to what's actually needed.
       `upstream.repos` case stays byte-identical — regression guard).
     - `ci_local_rosdep_skip_keys.txt` parsing: valid file accepted; a line
       failing the key-name charset is rejected.
-    - Note-format case: docker stub is extended to fake-write the
-      resolved-upstream-SHA output file (mirroring how it already fakes
-      `docker image inspect`), so the full success path can assert the note
-      gains the expected `upstream-repo:` lines and `steps: ...+upstream`.
+    - Note-format case: the fixture's `upstream.repos` points at a **local
+      fixture git repo** (file-path url), so the host-side `ls-remote`
+      resolution runs for real with no network and no docker-stub changes;
+      the full success path asserts the note gains the expected
+      `upstream-repo: <dir>@<real-sha>` line and `steps: ...+upstream`.
+      An unresolvable-version case asserts failure before any container run.
     - Regression case: a repo *without* `upstream.repos` produces a note
       with no `upstream-repo:` lines and unchanged `steps` value — pins
       backward compatibility.
@@ -157,11 +167,10 @@ to prune the upstream monorepo down to what's actually needed.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/ci_local.sh` | Detect/parse/validate `upstream.repos`; extend inner container script (vcs import, upstream hook, combined rosdep with skip-keys, upstream build+source); capture resolved upstream SHAs; extend dry-run output and the attestation note format |
-| `.agent/scripts/tests/test_ci_local.sh` | New fixture + cases per Approach step 10 |
-| `docs/decisions/0018-local-first-ci-verification.md` | Consequences note: `upstream-repo:` lines required for `scope: full` validity on repos carrying `upstream.repos` |
+| `.agent/scripts/ci_local.sh` | Detect/parse/validate `upstream.repos` (pristine-at-HEAD for attestable runs); host-side ref→SHA resolution; extend inner container script (generated clones, upstream hook, combined rosdep with skip-keys, underlay build+source, `--base-paths src` pinning); extend dry-run output, the attestation note format, and the header doc comment (hook files) |
+| `.agent/scripts/tests/test_ci_local.sh` | New fixtures + cases per Approach step 10 |
+| `docs/decisions/0018-local-first-ci-verification.md` | Consequences note: `upstream-repo:` lines required for `scope: full` validity on repos carrying `upstream.repos`; `--clean-room` preference |
 | `AGENTS.md` | Extend the `ci_local.sh` Script Reference row to mention upstream.repos support |
-| `.agent/scripts/ci_local.sh` (help text / header comment) | Document the new `<repo>/.agents/ci_local_upstream_extra.sh` and `<repo>/.agents/ci_local_rosdep_skip_keys.txt` hook files, same style as the existing `ci_local_extra.sh` doc comment |
 
 No changes needed in `cube_bathymetry` itself for this PR — adopting the new
 hooks there (splitting its industrial_ci `ROSDEP_SKIP_KEYS`/
@@ -187,7 +196,7 @@ support `upstream.repos`, verified against the test fixtures).
 |---|---|---|
 | 0003 — Project-agnostic workspace | Yes | Generic filename-keyed detection; per-repo specifics (pruning, skip-keys) live in the project repo's own `.agents/` files, never in workspace script logic |
 | 0018 — Local-first CI verification | Yes | Closes the Phase-1 tool gap for `upstream.repos` repos; note format extended (step 6) with a doc addendum (step 8) so the `scope: full` merge-evidence guarantee (Decision 1) is preserved rather than silently weakened |
-| 0009 — Python package management | Watch | `vcs` (python3-vcstool) confirmed present on this dev host via `ros-dev-tools`; before implementation, confirm it's baked into `ros2-agent-workspace-agent:latest` (fast path) — if missing, the inner script's existing `ros-dev-tools` apt-install fallback (already present for `colcon`) covers `ros:jazzy-ros-core`, so no new dependency-provisioning step is needed either way |
+| 0009 — Python package management | Resolved | The implementation generates plain `git clone`/`git checkout` commands from host-validated tuples, so `vcs`/vcstool is **not needed at all** (host or container); the inner script gains only a `git` apt fallback beside the existing `ros-dev-tools` one |
 
 ## Consequences
 
@@ -201,23 +210,35 @@ support `upstream.repos`, verified against the test fixtures).
 
 ## Open Questions
 
-- [ ] Upstream + target workspace layout inside the container: build upstream
-      as a separate underlay sourced before the target build (simpler,
-      mirrors industrial_ci's two-workspace model), vs. a single merged
-      `src/` tree built together (lets one `colcon build --packages-up-to`
-      call cover both, but changes what "target repo only" build output
-      means). Recommend the underlay approach — closer to industrial_ci
-      semantics the hosted CI already validates, and keeps the existing
-      target-repo build/test invocation unchanged.
+- [x] Upstream + target workspace layout: **resolved — separate underlay**
+      (`upstream_ws` with its own build/install bases, sourced before the
+      target build; target build/test pinned to `--base-paths src`). Mirrors
+      industrial_ci's two-workspace model the hosted CI already validates.
 - [ ] Whether to cache the built upstream workspace across repeated
       `ci_local.sh` runs on the same `upstream.repos` content (the issue
       flags this as dominating wall-clock, mirroring hosted CI's ccache
-      use). Recommend deferring to a follow-up issue — this PR should land
-      the correctness fix (attestable runs succeed at all) before optimizing
-      repeat-run latency.
+      use). Deferred to a follow-up issue — this PR lands the correctness
+      fix (attestable runs succeed at all) before optimizing repeat-run
+      latency.
 
 ## Estimated Scope
 
 Single PR. The change is additive and backward-compatible (no
 `upstream.repos` → identical behavior/note format to today), concentrated in
 one script plus its test file and two doc updates.
+
+## Implementation Notes
+
+- **`vcs import` replaced by generated `git clone` + `checkout --detach`**:
+  since every `(dir, url, version)` tuple is already host-validated, emitting
+  explicit git commands removes the vcstool dependency entirely (host and
+  container) and shrinks the container's parsing surface to zero — the
+  container never reads `upstream.repos` at all. Same strategy (the
+  workspace imports the upstream workspace itself), simpler mechanism.
+- **Container log-marker SHA capture replaced by host-side pre-run
+  `ls-remote` resolution**: the plan-review suggestion (parseable log marker,
+  no RW mount) still left the note's upstream SHAs derived from container
+  *output*, which the repo-under-test's own build/tests could forge. Resolving
+  on the host *before* the run and telling the container which SHA to check
+  out makes the note tamper-proof, keeps every mount read-only, and turns
+  "unresolvable upstream" into a pre-container hard failure.
