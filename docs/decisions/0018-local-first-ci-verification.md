@@ -56,7 +56,7 @@ zero; it is environment diversity.
    records (a `--packages`-narrowed run), dirty-tree runs, and `--no-attest`
    runs are iteration aids, not merge evidence.
 
-3. **Hosted Actions on project repos remains configured, as a mirror and
+3. **Hosted CI on project repos remains configured, as a mirror and
    backstop — never a blocker.** Post-merge hosted failures are triaged:
    infrastructure failures (e.g. mirror outages) are noted and re-run at
    convenience; genuine code failures are treated as any post-merge

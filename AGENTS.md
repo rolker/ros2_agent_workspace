@@ -400,7 +400,7 @@ bootstrap confirmation). `CI` is also recognized for CI environments.
 ### Merge verification (ADR-0018)
 
 Project-repo PRs may merge on a **full-scope local CI attestation** instead of
-waiting for hosted Actions: run `.agent/scripts/ci_local.sh <repo>` on the PR
+waiting for hosted Actions: run `.agent/scripts/ci_local.sh <project_repo_path>` on the PR
 head, verify `git notes --ref=ci-local show <head-sha>` reports `ci-local: pass`
 with `scope: full`, and push `refs/notes/ci-local` to origin at merge time.
 Partial/dirty/`--no-attest` runs don't satisfy the gate. Hosted CI on project
