@@ -42,8 +42,11 @@
 #       COLCON_IGNORE` in upstream subpackages the target doesn't need
 #       (the AFTER_SETUP_UPSTREAM_WORKSPACE analog)
 #   <repo>/.agents/ci_local_rosdep_skip_keys.txt one rosdep key per line
-#       (#-comments allowed) excluded from the combined rosdep install
-#       (the ROSDEP_SKIP_KEYS analog)
+#       (#-comments allowed) excluded from the single rosdep install, which
+#       covers target and upstream deps alike (the ROSDEP_SKIP_KEYS analog).
+#       Honored whether or not upstream.repos is present; applied keys are
+#       recorded in the attestation note (`rosdep-skip-keys:` line and a
+#       `+rosdep-skip-keys` steps token)
 #
 # Attestation: on success of an attestable run, a record is added to a git note
 # on the tested commit under refs/notes/ci-local (repo-local; never perturbs
@@ -261,6 +264,7 @@ STEPS="template"
 [[ $UPSTREAM_PRESENT -eq 1 ]] && STEPS+="+upstream"
 [[ -n "$UPSTREAM_HOOK" ]] && STEPS+="+upstream-hook"
 [[ -n "$EXTRA_HOOK" ]] && STEPS+="+extra-hook"
+[[ -n "$SKIP_KEYS" ]] && STEPS+="+rosdep-skip-keys"
 PASS_LABEL="ci-local: pass"
 [[ $PARTIAL -eq 1 ]] && PASS_LABEL="ci-local: pass (partial)"
 
@@ -275,8 +279,10 @@ if [[ $DRY_RUN -eq 1 ]]; then
     for i in "${!UP_DIRS[@]}"; do
       echo "upstream : ${UP_DIRS[$i]}@${UP_VERS[$i]} ${UP_URLS[$i]} (SHA resolved at run time)"
     done
-    echo "upstream-hook : $( [[ -n "$UPSTREAM_HOOK" ]] && echo yes || echo no ); rosdep-skip-keys: ${SKIP_KEYS:-none}"
+    echo "upstream-hook : $( [[ -n "$UPSTREAM_HOOK" ]] && echo yes || echo no )"
   fi
+  # skip-keys apply to the single combined rosdep install, upstream or not
+  [[ -n "$SKIP_KEYS" ]] && echo "rosdep-skip-keys: $SKIP_KEYS"
   echo "source   : $( [[ $ATTEST -eq 1 ]] && echo "pristine snapshot of $HEAD_SHA" || echo 'live working tree (read-only)' )"
   echo "attest   : $( [[ $ATTEST -eq 1 ]] && echo "append '$PASS_LABEL' record, refs/notes/$NOTES_REF on $HEAD_SHA" || echo no )"
   echo "log dir  : $LOG_DIR"
@@ -288,16 +294,27 @@ fi
 # container runs: the container then checks out exactly the recorded SHA, so
 # the attestation note cannot be desynchronized from what was built (and no
 # container output needs to be trusted for attestation content). A version
-# that is already a full SHA is used as-is. Resolution failure is fatal —
-# never build (or attest) silently-unresolved upstream state.
+# that is already a full SHA is used as-is. A branch match wins; for annotated
+# tags the peeled ^{} line is preferred over the tag object so the note records
+# the commit that actually gets checked out. Resolution failure — including
+# ls-remote output that is not a 40-hex SHA — is fatal: never build (or attest)
+# silently-unresolved upstream state.
 if [[ $UPSTREAM_PRESENT -eq 1 ]]; then
   for i in "${!UP_DIRS[@]}"; do
     if [[ "${UP_VERS[$i]}" =~ ^[0-9a-f]{40}$ ]]; then
       UP_SHAS+=("${UP_VERS[$i]}")
       continue
     fi
-    sha="$(git ls-remote "${UP_URLS[$i]}" "refs/heads/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}" 2>/dev/null | head -1 | cut -f1)"
+    sha=""
+    while IFS=$'\t' read -r cand ref; do
+      case "$ref" in
+        "refs/heads/${UP_VERS[$i]}")   sha="$cand"; break ;;
+        "refs/tags/${UP_VERS[$i]}^{}") sha="$cand" ;;
+        "refs/tags/${UP_VERS[$i]}")    [[ -z "$sha" ]] && sha="$cand" ;;
+      esac
+    done < <(git ls-remote "${UP_URLS[$i]}" "refs/heads/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}^{}" 2>/dev/null)
     [[ -n "$sha" ]] || { err "upstream.repos: cannot resolve '${UP_VERS[$i]}' for ${UP_DIRS[$i]} at ${UP_URLS[$i]}"; exit 1; }
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { err "upstream.repos: '${UP_VERS[$i]}' for ${UP_DIRS[$i]} resolved to non-SHA output '$sha' — refusing"; exit 1; }
     UP_SHAS+=("$sha")
   done
 fi
@@ -430,19 +447,21 @@ fi
 LOG_HASH="$(sha256sum "$LOG" | cut -d' ' -f1)"
 # upstream-repo lines record the host-resolved SHAs the container was told to
 # check out — required for scope: full validity on upstream.repos repos
-# (ADR-0018); absent entirely for repos without upstream.repos (byte-identical
-# note format to pre-#577).
-UPSTREAM_NOTE=""
+# (ADR-0018); a rosdep-skip-keys line records deps the verified environment
+# deliberately did not install. Both absent for repos without the respective
+# files (byte-identical note format to pre-#577).
+NOTE_EXTRA=""
 for i in "${!UP_DIRS[@]}"; do
-  UPSTREAM_NOTE+=$'\n'"upstream-repo: ${UP_DIRS[$i]}@${UP_SHAS[$i]}"
+  NOTE_EXTRA+=$'\n'"upstream-repo: ${UP_DIRS[$i]}@${UP_SHAS[$i]}"
 done
+[[ -n "$SKIP_KEYS" ]] && NOTE_EXTRA+=$'\n'"rosdep-skip-keys: $SKIP_KEYS"
 NOTE="$PASS_LABEL
 repo: $REPO_NAME
 commit: $HEAD_SHA
 image: $IMAGE
 image-id: $IMAGE_ID
 packages: $PACKAGES
-scope: $( [[ $PARTIAL -eq 1 ]] && echo partial || echo full )$UPSTREAM_NOTE
+scope: $( [[ $PARTIAL -eq 1 ]] && echo partial || echo full )$NOTE_EXTRA
 steps: $STEPS
 date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 host: $(hostname)

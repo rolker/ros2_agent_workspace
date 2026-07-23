@@ -104,7 +104,10 @@ zero; it is environment diversity.
 - **Repos with `upstream.repos` source dependencies (#577)**: `ci_local.sh`
   builds the upstream sources as an underlay (entries parsed, validated, and
   resolved to commit SHAs host-side before the container runs) and records one
-  `upstream-repo: <dir>@<sha>` line per entry in the note. For such repos a
+  `upstream-repo: <dir>@<sha>` line per entry in the note; rosdep keys skipped
+  via `.agents/ci_local_rosdep_skip_keys.txt` are likewise recorded
+  (`rosdep-skip-keys:` line) so the note shows deps the verified environment
+  deliberately did not install. For such repos a
   note lacking `upstream-repo:` lines that resolve every `upstream.repos`
   entry is **not valid merge evidence**, even if it says `ci-local: pass` /
   `scope: full` — the upstream state that was built would be unrecorded. This

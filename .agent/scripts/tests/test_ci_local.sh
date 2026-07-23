@@ -221,7 +221,7 @@ echo "== upstream.repos dry run =="
 out=$(bash "$SUT" "$UPREPO" --dry-run 2>&1); rc=$?
 check "exits 0"                       [ "$rc" -eq 0 ]
 check "shows parsed upstream entry"   contains "$out" "upstream : updep@jazzy $UPDEP_SRC"
-check "steps gains upstream tokens"   contains "$out" "steps    : template+upstream+upstream-hook"
+check "steps gains upstream tokens"   contains "$out" "steps    : template+upstream+upstream-hook+rosdep-skip-keys"
 check "upstream hook detected"        contains "$out" "upstream-hook : yes"
 check "skip keys parsed"              contains "$out" "rosdep-skip-keys: skip_key_a skip_key_b"
 check "no container run"              bash -c "! grep -qs docker-run '$DOCKER_STUB_CALLS'"
@@ -233,7 +233,22 @@ unote=$(git -C "$UPREPO" notes --ref=ci-local show "$UPREPO_SHA" 2>/dev/null)
 check "note says pass"                contains "$unote" "ci-local: pass"
 check "note scope full"               contains "$unote" "scope: full"
 check "note records resolved SHA"     contains "$unote" "upstream-repo: updep@$UPDEP_SHA"
-check "note steps include upstream"   contains "$unote" "steps: template+upstream+upstream-hook"
+check "note steps include upstream"   contains "$unote" "steps: template+upstream+upstream-hook+rosdep-skip-keys"
+check "note records skip keys"        contains "$unote" "rosdep-skip-keys: skip_key_a skip_key_b"
+
+echo "== annotated tag resolves to the peeled commit SHA =="
+# The note must record the commit that gets checked out, not the tag object.
+git -C "$UPDEP_SRC" -c user.name=t -c user.email=t@t tag -a v_test -m "annotated"
+TAG_OBJ="$(git -C "$UPDEP_SRC" rev-parse v_test)"
+check "fixture tag is annotated"      bash -c "[ '$TAG_OBJ' != '$UPDEP_SHA' ]"
+sed -i 's/version: jazzy/version: v_test/' "$UPREPO/upstream.repos"
+git -C "$UPREPO" -c user.name=t -c user.email=t@t commit -qam "pin annotated tag"
+TAGPIN_SHA="$(git -C "$UPREPO" rev-parse HEAD)"
+out=$(bash "$SUT" "$UPREPO" 2>&1); rc=$?
+check "exits 0"                       [ "$rc" -eq 0 ]
+tnote=$(git -C "$UPREPO" notes --ref=ci-local show "$TAGPIN_SHA" 2>/dev/null)
+check "note records peeled commit"    contains "$tnote" "upstream-repo: updep@$UPDEP_SHA"
+check "tag object sha not recorded"   not_contains "$tnote" "$TAG_OBJ"
 
 echo "== upstream.repos injection / validation rejection =="
 # Live-tree reads (untracked upstream.repos => dirty tree) let each bad case
@@ -283,6 +298,7 @@ out=$(bash "$SUT" "$REPO" 2>&1); rc=$?
 check "exits 0"                       [ "$rc" -eq 0 ]
 note=$(note_of "$HEAD_SHA")
 check "no upstream-repo lines"        not_contains "$note" "upstream-repo:"
+check "no rosdep-skip-keys line"      not_contains "$note" "rosdep-skip-keys:"
 check "steps unchanged"               contains "$note" "steps: template"
 
 echo

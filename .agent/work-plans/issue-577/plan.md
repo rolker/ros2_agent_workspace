@@ -242,3 +242,12 @@ one script plus its test file and two doc updates.
   on the host *before* the run and telling the container which SHA to check
   out makes the note tamper-proof, keeps every mount read-only, and turns
   "unresolvable upstream" into a pre-container hard failure.
+- **Pre-push review round hardening** (0 must-fix, 3 suggestions — all
+  applied): resolved SHAs are re-validated against `^[0-9a-f]{40}$` before
+  interpolation, and the ls-remote patterns now include `refs/tags/<v>^{}`
+  with the peeled commit preferred over the annotated-tag object (the note
+  records the commit that is checked out, never a tag object); applied
+  rosdep skip-keys are recorded persistently (`rosdep-skip-keys:` note line
+  plus a `+rosdep-skip-keys` steps token, dry-run display made unconditional);
+  the header comment no longer frames skip-keys as upstream-only — they apply
+  to the single combined rosdep install regardless.
