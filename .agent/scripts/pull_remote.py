@@ -31,6 +31,7 @@ from remote_utils import (  # noqa: E402
     remote_exists,
     resolve_repo_path,
     run_git,
+    run_git_network,
     run_script,
 )
 
@@ -95,7 +96,7 @@ def _compare_branches(repo_path, branch, remote_ref):
 
 def _fetch_and_report(repo_path, remote_name, version, dry_run):
     """Fetch from remote and report new commits. Returns (status, message)."""
-    success, _, err = run_git(repo_path, ["fetch", remote_name], dry_run)
+    success, _, err = run_git_network(repo_path, ["fetch", remote_name], dry_run)
     if not success:
         return "error", f"fetch failed: {err}"
     if dry_run:
@@ -127,7 +128,7 @@ def _fetch_and_pull(repo_path, remote_name, version, dry_run):
         return "skip", skip_reason
 
     # Fetch
-    success, _, err = run_git(repo_path, ["fetch", remote_name], dry_run)
+    success, _, err = run_git_network(repo_path, ["fetch", remote_name], dry_run)
     if not success:
         return "error", f"fetch failed: {err}"
 
@@ -156,7 +157,7 @@ def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
     branch = get_default_branch(repo_path, version)
 
     # Fetch
-    success, _, err = run_git(repo_path, ["fetch", remote_name], dry_run)
+    success, _, err = run_git_network(repo_path, ["fetch", remote_name], dry_run)
     if not success:
         return "error", f"fetch failed: {err}"
 
@@ -269,7 +270,7 @@ def main():
         errors = []
 
         # Workspace repo
-        success, _, err = run_git(root_dir, ["fetch", args.remote], args.dry_run)
+        success, _, err = run_git_network(root_dir, ["fetch", args.remote], args.dry_run)
         if not success:
             errors.append(f"ros2_agent_workspace: fetch failed: {err}")
         else:
@@ -284,7 +285,7 @@ def main():
                 continue
             if not remote_exists(repo_path, args.remote):
                 continue
-            success, _, err = run_git(repo_path, ["fetch", args.remote], args.dry_run)
+            success, _, err = run_git_network(repo_path, ["fetch", args.remote], args.dry_run)
             if not success:
                 errors.append(f"{repo['name']}: fetch failed: {err}")
                 continue

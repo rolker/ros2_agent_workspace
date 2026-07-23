@@ -1,0 +1,158 @@
+"""Tests for the transient-network retry logic (issue #579 field import).
+
+Covers lib/remote_utils.py (TRANSIENT_ERRORS, retry_transient, run_git_network)
+and sync_repos.py's delegation (run_network_cmd, sync_gitbug routing). All
+subprocess/network activity is stubbed; time.sleep is patched out.
+"""
+
+import sys
+from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(0, str(SCRIPTS_DIR / "lib"))
+
+import remote_utils  # noqa: E402
+import sync_repos  # noqa: E402
+
+
+def make_run_stub(results):
+    """Callable standing in for run_git / run_git_cmd; returns queued results
+    and records every call on the returned function's .calls attribute."""
+    queue = list(results)
+    calls = []
+
+    def stub(*args):
+        calls.append(args)
+        return queue.pop(0)
+
+    stub.calls = calls
+    return stub
+
+
+class TestIsTransientError:
+    def test_matches_every_signature(self):
+        for fragment in remote_utils.TRANSIENT_ERRORS:
+            assert remote_utils.is_transient_error(f"blah: {fragment}: blah")
+
+    def test_rejects_ordinary_errors(self):
+        assert not remote_utils.is_transient_error("fatal: not a git repository")
+        assert not remote_utils.is_transient_error("")
+
+
+class TestRetryTransient:
+    def test_success_first_try_no_retry(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr(remote_utils.time, "sleep", sleeps.append)
+        stub = make_run_stub([(True, "ok")])
+        assert remote_utils.retry_transient(stub, "arg") == (True, "ok")
+        assert len(stub.calls) == 1
+        assert not sleeps
+
+    def test_transient_failure_retries_once_after_backoff(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr(remote_utils.time, "sleep", sleeps.append)
+        stub = make_run_stub(
+            [
+                (False, "kex_exchange_identification: read: Connection reset by peer"),
+                (True, "recovered"),
+            ]
+        )
+        assert remote_utils.retry_transient(stub, "arg") == (True, "recovered")
+        assert len(stub.calls) == 2
+        assert stub.calls[0] == stub.calls[1] == ("arg",)
+        assert sleeps == [remote_utils.RETRY_BACKOFF]
+
+    def test_transient_failure_retries_only_once(self, monkeypatch):
+        monkeypatch.setattr(remote_utils.time, "sleep", lambda _s: None)
+        drop = (False, "Connection closed by remote host")
+        stub = make_run_stub([drop, drop])
+        assert remote_utils.retry_transient(stub, "arg") == drop
+        assert len(stub.calls) == 2
+
+    def test_non_transient_failure_no_retry(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr(remote_utils.time, "sleep", sleeps.append)
+        stub = make_run_stub([(False, "fatal: repository not found")])
+        success, output = remote_utils.retry_transient(stub, "arg")
+        assert not success and output == "fatal: repository not found"
+        assert len(stub.calls) == 1
+        assert not sleeps
+
+    def test_three_tuple_runner_uses_stderr(self, monkeypatch):
+        """run_git returns (success, stdout, stderr) — the LAST element is the
+        error text the transient check must read."""
+        monkeypatch.setattr(remote_utils.time, "sleep", lambda _s: None)
+        stub = make_run_stub(
+            [
+                (False, "some stdout", "ssh: Connection timed out"),
+                (True, "out", ""),
+            ]
+        )
+        assert remote_utils.retry_transient(stub, "repo", ["fetch"]) == (True, "out", "")
+        assert len(stub.calls) == 2
+
+
+def test_run_git_network_delegates_to_run_git_with_retry(monkeypatch):
+    monkeypatch.setattr(remote_utils.time, "sleep", lambda _s: None)
+    stub = make_run_stub(
+        [
+            (False, "", "kex_exchange_identification: Connection reset"),
+            (True, "fetched", ""),
+        ]
+    )
+    monkeypatch.setattr(remote_utils, "run_git", stub)
+    result = remote_utils.run_git_network("repo", ["fetch", "gitcloud"], False)
+    assert result == (True, "fetched", "")
+    assert stub.calls == [("repo", ["fetch", "gitcloud"], False)] * 2
+
+
+class TestSyncReposDelegation:
+    def test_run_network_cmd_retries_via_shared_helper(self, monkeypatch):
+        monkeypatch.setattr(remote_utils.time, "sleep", lambda _s: None)
+        stub = make_run_stub(
+            [
+                (False, "Connection reset by peer"),
+                (True, "Already up to date."),
+            ]
+        )
+        monkeypatch.setattr(sync_repos, "run_git_cmd", stub)
+        success, output = sync_repos.run_network_cmd("repo", ["pull", "--rebase"])
+        assert success and output == "Already up to date."
+        assert len(stub.calls) == 2
+
+    def test_sync_gitbug_routes_through_retry_wrapper(self, monkeypatch, tmp_path):
+        """git-bug pull/push must go through run_network_cmd (issue #579
+        pre-review finding: they previously bypassed the retry path)."""
+        monkeypatch.setattr(sync_repos.shutil, "which", lambda _cmd: "/usr/bin/git-bug")
+        monkeypatch.setattr(
+            sync_repos.subprocess,
+            "run",
+            lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "bridge", "stderr": ""})(),
+        )
+        network_calls = []
+
+        def fake_network_cmd(repo_path, cmd_args, dry_run=False):
+            network_calls.append(cmd_args)
+            return True, ""
+
+        monkeypatch.setattr(sync_repos, "run_network_cmd", fake_network_cmd)
+        sync_repos.sync_gitbug(tmp_path)
+        assert network_calls == [["bug", "pull"], ["bug", "push"]]
+
+    def test_sync_gitbug_stops_after_failed_pull(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sync_repos.shutil, "which", lambda _cmd: "/usr/bin/git-bug")
+        monkeypatch.setattr(
+            sync_repos.subprocess,
+            "run",
+            lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "bridge", "stderr": ""})(),
+        )
+        network_calls = []
+
+        def fake_network_cmd(repo_path, cmd_args, dry_run=False):
+            network_calls.append(cmd_args)
+            return False, "permission denied"
+
+        monkeypatch.setattr(sync_repos, "run_network_cmd", fake_network_cmd)
+        sync_repos.sync_gitbug(tmp_path)
+        assert network_calls == [["bug", "pull"]]

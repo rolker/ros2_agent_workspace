@@ -34,6 +34,7 @@ from remote_utils import (
     get_default_branch,
     remote_exists,
     run_git,
+    run_git_network,
     run_script,
 )
 
@@ -129,7 +130,7 @@ def process_repo(repo_path, repo_name, version, args):
     branch = get_default_branch(repo_path, version)
 
     if args.all_branches:
-        success, _, err = run_git(repo_path, ["push", args.remote, "--all"], args.dry_run)
+        success, _, err = run_git_network(repo_path, ["push", args.remote, "--all"], args.dry_run)
         if not success:
             errors.append(f"push --all failed: {err}")
     else:
@@ -140,12 +141,12 @@ def process_repo(repo_path, repo_name, version, args):
             refspec = branch
         else:
             refspec = f"origin/{branch}:{branch}"
-        success, _, err = run_git(repo_path, ["push", args.remote, refspec], args.dry_run)
+        success, _, err = run_git_network(repo_path, ["push", args.remote, refspec], args.dry_run)
         if not success:
             errors.append(f"push {branch} failed: {err}")
 
     # Always push tags
-    success, _, err = run_git(repo_path, ["push", args.remote, "--tags"], args.dry_run)
+    success, _, err = run_git_network(repo_path, ["push", args.remote, "--tags"], args.dry_run)
     if not success:
         errors.append(f"push --tags failed: {err}")
 
