@@ -223,7 +223,9 @@ if not isinstance(repos, dict) or not repos:
 for name, ent in repos.items():
     if not isinstance(ent, dict):
         sys.exit(f"upstream.repos: entry {name!r} is not a mapping")
-    rtype = ent.get("type", "git")
+    rtype = ent.get("type")
+    if rtype is None:
+        sys.exit(f"upstream.repos: entry {name!r} has no type (required: type: git)")
     if rtype != "git":
         sys.exit(f"upstream.repos: entry {name!r} has unsupported type {rtype!r} (only git)")
     url, ver = ent.get("url"), ent.get("version")
@@ -312,7 +314,7 @@ if [[ $UPSTREAM_PRESENT -eq 1 ]]; then
         "refs/tags/${UP_VERS[$i]}^{}") sha="$cand" ;;
         "refs/tags/${UP_VERS[$i]}")    [[ -z "$sha" ]] && sha="$cand" ;;
       esac
-    done < <(git ls-remote "${UP_URLS[$i]}" "refs/heads/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}^{}" 2>/dev/null)
+    done < <(git ls-remote -- "${UP_URLS[$i]}" "refs/heads/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}" "refs/tags/${UP_VERS[$i]}^{}" 2>/dev/null)
     [[ -n "$sha" ]] || { err "upstream.repos: cannot resolve '${UP_VERS[$i]}' for ${UP_DIRS[$i]} at ${UP_URLS[$i]}"; exit 1; }
     [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { err "upstream.repos: '${UP_VERS[$i]}' for ${UP_DIRS[$i]} resolved to non-SHA output '$sha' — refusing"; exit 1; }
     UP_SHAS+=("$sha")

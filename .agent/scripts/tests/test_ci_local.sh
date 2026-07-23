@@ -276,6 +276,10 @@ printf 'repositories:\n  updep:\n    type: git\n    url: %s\n' "$UPDEP_SRC" > "$
 out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
 check "missing version rejected"      [ "$rc" -ne 0 ]
 check "explains version requirement"  contains "$out" "has no version"
+printf 'repositories:\n  updep:\n    url: %s\n    version: jazzy\n' "$UPDEP_SRC" > "$BADUP/upstream.repos"
+out=$(bash "$SUT" "$BADUP" --dry-run 2>&1); rc=$?
+check "missing type rejected"         [ "$rc" -ne 0 ]
+check "explains type requirement"     contains "$out" "has no type"
 rm "$BADUP/upstream.repos"
 mkdir -p "$BADUP/.agents"
 printf 'good_key\nbad key; rm -rf /\n' > "$BADUP/.agents/ci_local_rosdep_skip_keys.txt"

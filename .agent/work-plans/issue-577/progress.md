@@ -182,8 +182,8 @@ Strong, source-verified plan that addresses every review-issue finding and both 
 **CI**: all-pass (after `6f747b6` added pyyaml to the script-tests job — setup-python lacks the yaml module the upstream.repos parser imports)
 
 ### Findings
-- [ ] (minor, Copilot R1) `upstream.repos` parser defaults a missing `type` to `git` (`ent.get("type", "git")`), contradicting the documented "requires `type: git`" contract and weakening fail-loud validation — require an explicit `type: git`, error when absent; add a rejection test — `.agent/scripts/ci_local.sh:226`
-- [ ] (minor, Copilot R2) host-side `git ls-remote` lacks the `--` separator, so a charset-valid URL beginning with `-` would parse as an option; the generated container-side `git clone --` is already guarded — add `--` for consistency of the injection-hardening model — `.agent/scripts/ci_local.sh:315`
+- [x] (minor, Copilot R1) `upstream.repos` parser defaults a missing `type` to `git` (`ent.get("type", "git")`), contradicting the documented "requires `type: git`" contract and weakening fail-loud validation — require an explicit `type: git`, error when absent; add a rejection test — `.agent/scripts/ci_local.sh:226`
+- [x] (minor, Copilot R2) host-side `git ls-remote` lacks the `--` separator, so a charset-valid URL beginning with `-` would parse as an option; the generated container-side `git clone --` is already guarded — add `--` for consistency of the injection-hardening model — `.agent/scripts/ci_local.sh:315`
 
 ### False positives
 - none — both bot comments verified valid against current head
