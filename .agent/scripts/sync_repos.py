@@ -26,12 +26,15 @@ from pathlib import Path
 # Add script directory to path to import list_overlay_repos
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.append(str(SCRIPT_DIR))
+sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 try:
     import list_overlay_repos
 except ImportError:
     print(f"Error: Could not import list_overlay_repos from {SCRIPT_DIR}", file=sys.stderr)
     sys.exit(1)
+
+from remote_utils import retry_transient  # noqa: E402
 
 
 def run_git_cmd(repo_path, cmd_args, dry_run=False):
@@ -50,27 +53,11 @@ def run_git_cmd(repo_path, cmd_args, dry_run=False):
         return False, e.stderr.strip()
 
 
-# Error fragments that indicate the remote dropped the connection (typically
-# an upstream firewall rate-limiting rapid successive SSH connections).
-TRANSIENT_ERRORS = (
-    "kex_exchange_identification",
-    "Connection reset",
-    "Connection closed by remote host",
-    "Connection timed out",
-)
-
-RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
-
-
 def run_network_cmd(repo_path, cmd_args, dry_run=False):
     """Run a git network command, retrying once after a backoff if the
-    connection was dropped (rate-limit style failures)."""
-    success, output = run_git_cmd(repo_path, cmd_args, dry_run)
-    if not success and any(err in output for err in TRANSIENT_ERRORS):
-        print(f"     ⚠️  Connection dropped; retrying in {RETRY_BACKOFF}s...")
-        time.sleep(RETRY_BACKOFF)
-        success, output = run_git_cmd(repo_path, cmd_args, dry_run)
-    return success, output
+    connection was dropped (rate-limit style failures — signatures and
+    backoff live in lib/remote_utils.py, shared with push/pull_remote)."""
+    return retry_transient(run_git_cmd, repo_path, cmd_args, dry_run)
 
 
 def is_dirty(repo_path, dry_run=False):
@@ -175,13 +162,13 @@ def sync_gitbug(repo_path, dry_run=False):
         return
 
     print(f"  Syncing git-bug issues for {repo_name}...")
-    for cmd in [["git", "bug", "pull"], ["git", "bug", "push"]]:
-        result = subprocess.run(
-            cmd, cwd=str(repo_path), capture_output=True, text=True, check=False
-        )
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            print(f"     ⚠️  {' '.join(cmd)} failed: {stderr}")
+    # git-bug pull/push are network operations against the same remote —
+    # route them through the retry wrapper so a rate-limited SSH connection
+    # gets the same second chance as the plain git pulls.
+    for cmd_args in (["bug", "pull"], ["bug", "push"]):
+        success, output = run_network_cmd(repo_path, cmd_args)
+        if not success:
+            print(f"     ⚠️  git {' '.join(cmd_args)} failed: {output}")
             return
     print("     ✅ git-bug synced.")
 
