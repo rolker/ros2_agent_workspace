@@ -170,3 +170,23 @@ Strong, source-verified plan that addresses every review-issue finding and both 
 - [ ] (suggestion) Re-validate the `git ls-remote`-resolved SHA against `^[0-9a-f]{40}$` before interpolating into the container `git checkout` and the `upstream-repo:` note line (defense-in-depth; also handles annotated-tag object-vs-peeled-commit) — `.agent/scripts/ci_local.sh:299-301`
 - [ ] (suggestion) Record `ci_local_rosdep_skip_keys.txt` usage in the persistent `steps:` note field (only dry-run surfaces it today), so a skip-keys-pruned rosdep resolution is reflected in the merge evidence — `.agent/scripts/ci_local.sh:248-263`
 - [ ] (suggestion) Header doc comment frames skip-keys as upstream-only pruning, but the code applies it unconditionally (unlike the UPSTREAM_PRESENT-gated hook); reconcile comment vs. gating — `.agent/scripts/ci_local.sh:44-46,248`
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-23 08:46 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #578 at `6f747b6`
+**Sources**: 3 (Copilot R1 @ `2c7d53b`, Copilot R2 @ `6f747b6`, Local Review (Pre-Push) @ `1345aec`, CI rollup)
+**Cross-source confirmations**: 0
+**CI**: all-pass (after `6f747b6` added pyyaml to the script-tests job — setup-python lacks the yaml module the upstream.repos parser imports)
+
+### Findings
+- [ ] (minor, Copilot R1) `upstream.repos` parser defaults a missing `type` to `git` (`ent.get("type", "git")`), contradicting the documented "requires `type: git`" contract and weakening fail-loud validation — require an explicit `type: git`, error when absent; add a rejection test — `.agent/scripts/ci_local.sh:226`
+- [ ] (minor, Copilot R2) host-side `git ls-remote` lacks the `--` separator, so a charset-valid URL beginning with `-` would parse as an option; the generated container-side `git clone --` is already guarded — add `--` for consistency of the injection-hardening model — `.agent/scripts/ci_local.sh:315`
+
+### False positives
+- none — both bot comments verified valid against current head
+
+### Notes
+- The 3 Local Review (Pre-Push) suggestions @ `1345aec` were all applied in `2c7d53b` (SHA re-validation + peeled-tag preference; persistent rosdep-skip-keys note line + steps token; header comment reconciliation) — closed, not re-raised by any GitHub-side source.
