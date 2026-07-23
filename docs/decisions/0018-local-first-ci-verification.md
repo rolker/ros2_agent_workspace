@@ -101,6 +101,22 @@ zero; it is environment diversity.
 - `merge_pr.sh` does not yet check for the attestation before merging;
   wiring that check in (warn or refuse when the head lacks a full-scope
   record) is a natural hardening follow-up under #572.
+- **Repos with `upstream.repos` source dependencies (#577)**: `ci_local.sh`
+  builds the upstream sources as an underlay (entries parsed, validated, and
+  resolved to commit SHAs host-side before the container runs) and records one
+  `upstream-repo: <dir>@<sha>` line per entry in the note; rosdep keys skipped
+  via `.agents/ci_local_rosdep_skip_keys.txt` are likewise recorded
+  (`rosdep-skip-keys:` line) so the note shows deps the verified environment
+  deliberately did not install. For such repos a
+  note lacking `upstream-repo:` lines that resolve every `upstream.repos`
+  entry is **not valid merge evidence**, even if it says `ci-local: pass` /
+  `scope: full` — the upstream state that was built would be unrecorded. This
+  is a format extension only: notes on repos without `upstream.repos` are
+  byte-identical to before and their meaning is unchanged. Since upstream
+  clones need network anyway, `--clean-room` is the natural mode for these
+  repos — it replicates hosted CI exactly and avoids relying on the agent
+  image having the upstream sources' rosdep deps baked (the #520 bake covers
+  layer manifests, not upstream workspaces).
 - The hosted-CI speed fix (prebuilt/GHCR image, cube-style) remains worth
   doing independently — a faster, less fragile mirror is a better mirror.
 
