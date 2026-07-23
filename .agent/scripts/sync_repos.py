@@ -7,13 +7,17 @@ default branches (main/jazzy) and fetching on feature branches. It respects
 dirty working directories and detached HEAD states.
 
 Usage:
-    python3 sync_repos.py [--dry-run]
+    python3 sync_repos.py [--dry-run] [--throttle SECONDS]
 
 Options:
     --dry-run    Simulate actions without executing
+    --throttle   Pause between per-repo network operations (default: 2.0s).
+                 Upstream firewalls rate-limit rapid successive SSH
+                 connections; pacing the pulls avoids tripping them.
 """
 
 import sys
+import time
 import shutil
 import subprocess
 import argparse
@@ -44,6 +48,29 @@ def run_git_cmd(repo_path, cmd_args, dry_run=False):
         return True, result.stdout.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stderr.strip()
+
+
+# Error fragments that indicate the remote dropped the connection (typically
+# an upstream firewall rate-limiting rapid successive SSH connections).
+TRANSIENT_ERRORS = (
+    "kex_exchange_identification",
+    "Connection reset",
+    "Connection closed by remote host",
+    "Connection timed out",
+)
+
+RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
+
+
+def run_network_cmd(repo_path, cmd_args, dry_run=False):
+    """Run a git network command, retrying once after a backoff if the
+    connection was dropped (rate-limit style failures)."""
+    success, output = run_git_cmd(repo_path, cmd_args, dry_run)
+    if not success and any(err in output for err in TRANSIENT_ERRORS):
+        print(f"     ⚠️  Connection dropped; retrying in {RETRY_BACKOFF}s...")
+        time.sleep(RETRY_BACKOFF)
+        success, output = run_git_cmd(repo_path, cmd_args, dry_run)
+    return success, output
 
 
 def is_dirty(repo_path, dry_run=False):
@@ -87,7 +114,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
     # 2. Sync Logic
     if branch in ["main", "jazzy", "rolling"]:
         print(f"  On default branch '{branch}'. Pulling updates...")
-        success, output = run_git_cmd(repo_path, ["pull", "--rebase"], dry_run)
+        success, output = run_network_cmd(repo_path, ["pull", "--rebase"], dry_run)
         if success:
             if dry_run:
                 print("     (Dry run successful)")
@@ -100,7 +127,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
 
     else:
         print(f"  On feature branch '{branch}'. Fetching only...")
-        success, output = run_git_cmd(repo_path, ["fetch"], dry_run)
+        success, output = run_network_cmd(repo_path, ["fetch"], dry_run)
 
         if success:
             if dry_run:
@@ -164,6 +191,12 @@ def main():
     parser.add_argument(
         "--dry-run", action="store_true", help="Simulate actions without executing."
     )
+    parser.add_argument(
+        "--throttle",
+        type=float,
+        default=2.0,
+        help="Seconds to pause between per-repo network operations (default: 2.0).",
+    )
     args = parser.parse_args()
 
     root_dir = SCRIPT_DIR.parent.parent
@@ -171,11 +204,16 @@ def main():
     # Get repos list using the existing tool
     repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
 
+    def throttle():
+        if not args.dry_run and args.throttle > 0:
+            time.sleep(args.throttle)
+
     # Also include the root repo itself
     if sync_repo(root_dir, "ros2_agent_workspace", args.dry_run):
         sync_gitbug(root_dir, args.dry_run)
 
     for repo in repos:
+        throttle()
         # Determine workspace directory from source file (e.g. core.repos -> core_ws)
         ws_name = repo["source_file"].replace(".repos", "_ws")
         candidate_path = root_dir / "layers" / "main" / ws_name / "src" / repo["name"]
