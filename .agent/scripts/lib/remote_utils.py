@@ -21,10 +21,25 @@ TRANSIENT_ERRORS = (
 
 RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
 
+# Set once any network operation in this process hits a dropped-connection
+# signature. Callers use this to enable pacing only when the remote is
+# actually rate-limiting (see sync_repos.py's adaptive throttle).
+_TRANSIENT_STATE = {"seen": False}
+
 
 def is_transient_error(error_text):
     """True if the git error text matches a dropped-connection signature."""
     return any(err in error_text for err in TRANSIENT_ERRORS)
+
+
+def transient_error_seen():
+    """True if any retry_transient call in this process saw a dropped connection."""
+    return _TRANSIENT_STATE["seen"]
+
+
+def reset_transient_error_seen():
+    """Clear the dropped-connection flag (test isolation / long-lived callers)."""
+    _TRANSIENT_STATE["seen"] = False
 
 
 def retry_transient(run_fn, *fn_args):
@@ -36,6 +51,7 @@ def retry_transient(run_fn, *fn_args):
     """
     result = run_fn(*fn_args)
     if not result[0] and is_transient_error(result[-1]):
+        _TRANSIENT_STATE["seen"] = True
         print(f"     ⚠️  Connection dropped; retrying in {RETRY_BACKOFF}s...")
         time.sleep(RETRY_BACKOFF)
         result = run_fn(*fn_args)
