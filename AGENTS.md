@@ -397,6 +397,17 @@ sourcing lower layers automatically.
 Set `NONINTERACTIVE=1` to suppress all interactive prompts (e.g., the first-run
 bootstrap confirmation). `CI` is also recognized for CI environments.
 
+### Merge verification (ADR-0018)
+
+Project-repo PRs may merge on a **full-scope local CI attestation** instead of
+waiting for hosted Actions: run `.agent/scripts/ci_local.sh <project_repo_path>` on the PR
+head, verify `git notes --ref=ci-local show <head-sha>` reports `ci-local: pass`
+with `scope: full`, and push `refs/notes/ci-local` to origin at merge time.
+Partial/dirty/`--no-attest` runs don't satisfy the gate. Hosted CI on project
+repos remains a mirror/backstop — triage its post-merge failures. The
+**workspace repo is exempt**: its hosted checks stay required. See
+[ADR-0018](docs/decisions/0018-local-first-ci-verification.md).
+
 ## Documentation Accuracy
 
 - **Never document from assumptions** — every claim about parameters, topics, services,
@@ -476,6 +487,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/stage_rosdep_manifests.sh` | Gather layer `package.xml` manifests (recursive) into the agent-image build context for the rosdep bake (#520); shared by `docker_run_agent.sh --build` and `make agent-build` |
 | `.agent/scripts/dashboard.sh` | Unified workspace status (supports `--quick`) |
 | `.agent/scripts/build.sh` | Build all layers in order |
+| `.agent/scripts/ci_local.sh` | Containerized local CI for a project repo with git-note attestation (`refs/notes/ci-local`); full-scope pass = accepted merge verification (ADR-0018). Builds `upstream.repos` source deps as an underlay with host-resolved SHAs recorded as `upstream-repo:` note lines (#577; per-repo pruning via `.agents/ci_local_upstream_extra.sh` + `.agents/ci_local_rosdep_skip_keys.txt`). `--clean-room` mirrors hosted CI exactly (preferred for `upstream.repos` repos); `-n` dry-run |
 | `.agent/scripts/check_branch_updates.sh` | Check if branch is behind default |
 | `.agent/scripts/gh_create_issue.sh` | Create issue with label validation (`GITBUG_CREATE=1` for offline) |
 | `.agent/scripts/git_bug_setup.sh` | Configure git-bug identity + GitHub bridge |

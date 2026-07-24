@@ -6,8 +6,56 @@ Used by add_remote.py, push_remote.py, and pull_remote.py.
 
 import subprocess
 import sys
+import time
 
 from workspace import get_overlay_repos
+
+# Error fragments that indicate the remote dropped the connection (typically
+# an upstream firewall rate-limiting rapid successive SSH connections).
+TRANSIENT_ERRORS = (
+    "kex_exchange_identification",
+    "Connection reset",
+    "Connection closed by remote host",
+    "Connection timed out",
+)
+
+RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
+
+# Set once any network operation in this process hits a dropped-connection
+# signature. Callers use this to enable pacing only when the remote is
+# actually rate-limiting (see sync_repos.py's adaptive throttle).
+_TRANSIENT_STATE = {"seen": False}
+
+
+def is_transient_error(error_text):
+    """True if the git error text matches a dropped-connection signature."""
+    return any(err in error_text for err in TRANSIENT_ERRORS)
+
+
+def transient_error_seen():
+    """True if any retry_transient call in this process saw a dropped connection."""
+    return _TRANSIENT_STATE["seen"]
+
+
+def reset_transient_error_seen():
+    """Clear the dropped-connection flag (test isolation / long-lived callers)."""
+    _TRANSIENT_STATE["seen"] = False
+
+
+def retry_transient(run_fn, *fn_args):
+    """Call run_fn(*fn_args) -> (success, ..., error_text) and retry once
+    after a backoff if the failure looks like a dropped connection.
+
+    Works for any runner whose result tuple starts with a success flag and
+    ends with the error text (run_git's 3-tuple, sync_repos' 2-tuple).
+    """
+    result = run_fn(*fn_args)
+    if not result[0] and is_transient_error(result[-1]):
+        _TRANSIENT_STATE["seen"] = True
+        print(f"     ⚠️  Connection dropped; retrying in {RETRY_BACKOFF}s...")
+        time.sleep(RETRY_BACKOFF)
+        result = run_fn(*fn_args)
+    return result
 
 
 def run_git(repo_path, args, dry_run=False):
@@ -21,6 +69,12 @@ def run_git(repo_path, args, dry_run=False):
         return True, result.stdout.strip(), result.stderr.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip(), e.stderr.strip()
+
+
+def run_git_network(repo_path, args, dry_run=False):
+    """run_git for network operations (push/pull/fetch): retries once after a
+    backoff when the connection was dropped (rate-limit style failures)."""
+    return retry_transient(run_git, repo_path, args, dry_run)
 
 
 def remote_exists(repo_path, remote_name):
