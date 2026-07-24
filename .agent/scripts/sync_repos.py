@@ -20,6 +20,7 @@ Options:
 """
 
 import sys
+import math
 import time
 import shutil
 import subprocess
@@ -229,8 +230,8 @@ def main():
         f"Pass 0 to disable pacing entirely.",
     )
     args = parser.parse_args()
-    if args.throttle is not None and args.throttle < 0:
-        parser.error("--throttle must be >= 0")
+    if args.throttle is not None and not (math.isfinite(args.throttle) and args.throttle >= 0):
+        parser.error("--throttle must be a finite value >= 0")
 
     # Each run adapts from a clean slate — matters only for in-process
     # callers, but makes the fresh-process assumption explicit.
