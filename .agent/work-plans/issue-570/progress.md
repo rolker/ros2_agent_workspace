@@ -102,3 +102,25 @@ claims at different heads, so not a formal cross-confirmation)
   (mock server reporting ceiling ingestion → exit 1 with actionable
   message) and the happy path (normal ingestion → review printed,
   exit 0) — `.agent/scripts/local_review.sh:189`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-24 13:01 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-570 at `c7d6354`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance files — SKILL.md, knowledge docs, AGENTS.md — plus a new workspace script)
+**Must-fix**: 1 | **Suggestions**: 0
+**Round**: 2 | **Ship**: recommended — single low, mechanical must-fix; count not rising vs. round 1's 5; address and ship
+
+**Specialists**: Static Analysis (shellcheck --severity=warning: clean);
+Governance/consequence pass (script→AGENTS.md row, 5f→roster docs,
+--no-local→templates all present and consistent); Claude Adversarial
+(2 disjoint-lens fresh-context passes — Lens A logic, Lens B
+systemic/safety); Local Adversarial skipped (no Ollama server at
+localhost:11434); Copilot off (default). Plan Drift skipped (no plan.md).
+
+### Findings
+- [ ] (must-fix) mid-answer truncation silently accepted as complete — `done_reason == "length"` is only checked when `$CONTENT` is empty, so a non-empty answer truncated mid-stream (content + `done_reason: length`) prints as a clean review and exits 0; guard it independent of content emptiness — `.agent/scripts/local_review.sh:282`
