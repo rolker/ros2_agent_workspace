@@ -197,6 +197,9 @@ class TestMakeThrottler:
     connection, fixed when --throttle is given explicitly."""
 
     def _sleeps(self, monkeypatch):
+        """Record throttle pauses. Must be installed AFTER trip_transient_flag —
+        sync_repos.time and remote_utils.time are the same module, so the trip
+        helper's sleep patch would otherwise replace the recorder."""
         sleeps = []
         monkeypatch.setattr(sync_repos.time, "sleep", sleeps.append)
         return sleeps
@@ -209,10 +212,9 @@ class TestMakeThrottler:
         assert not sleeps
 
     def test_default_paces_after_transient_error(self, monkeypatch):
-        sleeps = self._sleeps(monkeypatch)
         pause = sync_repos.make_throttler(None, dry_run=False)
-        pause()
         trip_transient_flag(monkeypatch)
+        sleeps = self._sleeps(monkeypatch)
         pause()
         pause()
         assert sleeps == [sync_repos.ADAPTIVE_THROTTLE] * 2
@@ -225,15 +227,15 @@ class TestMakeThrottler:
         assert sleeps == [5.0, 5.0]
 
     def test_explicit_zero_disables_pacing_even_after_transient(self, monkeypatch):
-        sleeps = self._sleeps(monkeypatch)
         trip_transient_flag(monkeypatch)
+        sleeps = self._sleeps(monkeypatch)
         pause = sync_repos.make_throttler(0.0, dry_run=False)
         pause()
         assert not sleeps
 
     def test_dry_run_never_pauses(self, monkeypatch):
-        sleeps = self._sleeps(monkeypatch)
         trip_transient_flag(monkeypatch)
+        sleeps = self._sleeps(monkeypatch)
         for explicit in (None, 5.0):
             pause = sync_repos.make_throttler(explicit, dry_run=True)
             pause()
