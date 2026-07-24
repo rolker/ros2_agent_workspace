@@ -37,7 +37,11 @@ except ImportError:
     print(f"Error: Could not import list_overlay_repos from {SCRIPT_DIR}", file=sys.stderr)
     sys.exit(1)
 
-from remote_utils import retry_transient, transient_error_seen  # noqa: E402
+from remote_utils import (  # noqa: E402
+    reset_transient_error_seen,
+    retry_transient,
+    transient_error_seen,
+)
 
 # Pace applied to the rest of the run once the remote starts dropping
 # connections (only when --throttle was not given explicitly).
@@ -225,6 +229,12 @@ def main():
         f"Pass 0 to disable pacing entirely.",
     )
     args = parser.parse_args()
+    if args.throttle is not None and args.throttle < 0:
+        parser.error("--throttle must be >= 0")
+
+    # Each run adapts from a clean slate — matters only for in-process
+    # callers, but makes the fresh-process assumption explicit.
+    reset_transient_error_seen()
 
     root_dir = SCRIPT_DIR.parent.parent
 

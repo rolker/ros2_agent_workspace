@@ -233,6 +233,14 @@ class TestMakeThrottler:
         pause()
         assert not sleeps
 
+    def test_negative_throttle_rejected(self, monkeypatch, capsys):
+        """A fat-fingered negative would otherwise silently disable even the
+        adaptive safety net — argparse must reject it."""
+        monkeypatch.setattr(sys, "argv", ["sync_repos.py", "--throttle", "-5"])
+        with pytest.raises(SystemExit):
+            sync_repos.main()
+        assert "--throttle must be >= 0" in capsys.readouterr().err
+
     def test_dry_run_never_pauses(self, monkeypatch):
         trip_transient_flag(monkeypatch)
         sleeps = self._sleeps(monkeypatch)
