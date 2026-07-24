@@ -122,3 +122,20 @@ checkpoints between them. A skill's `### Next step` block is a prompt for
 the operator or orchestrator to act on — not an instruction for the skill to
 execute autonomously. This keeps each step's entry independently attributed and
 prevents a single runaway sub-agent from racing through the whole lifecycle.
+
+## Dispatch Practices
+
+Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
+`docker_run_agent.sh`):
+
+- **Fan-out goes to containers, not in-process agents.** Review/exploration
+  fan-out via in-process Agent-tool sub-agents floods the operator with
+  permission prompts; container dispatch runs sandboxed and prompt-free.
+- **Run container dispatches in the background** so the host session stays
+  responsive to the operator; check results on completion.
+- **Never give a sub-agent filesystem-wide search scope** — scope prompts to
+  the workspace/worktree. Broad-access agents wander into cloud/bucket
+  mounts and burn minutes (and money) on filesystem walks.
+- **Container OOM (exit 137) gates on *free* RAM** — below roughly 3 GiB
+  free on the dev host, dispatches get killed. Check `free -g` before heavy
+  fan-out; stagger dispatches when memory is tight.

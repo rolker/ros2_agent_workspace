@@ -106,3 +106,9 @@ This guide outlines how to use the `ros2` command-line interface (CLI) effective
 1.  **Discovery**: `ros2 topic list -t` -> find `/battery_state` [sensor_msgs/msg/BatteryState].
 2.  **Introspection**: `ros2 interface show sensor_msgs/msg/BatteryState` -> see `float32 percentage`.
 3.  **Action**: `ros2 topic echo /battery_state --field percentage --once` -> get `0.85`.
+
+## Parameter File Gotchas
+
+*   **Empty YAML arrays load as `PARAMETER_NOT_SET`**: a param file line
+    `foo: []` does not produce an empty array — omit the line entirely and
+    handle the unset default in code/launch.
