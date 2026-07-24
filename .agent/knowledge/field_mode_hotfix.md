@@ -191,6 +191,6 @@ boat/operator networks are unaffected.
 
 - [`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host) — canonical rule
 - [`.agent/scripts/field_mode.sh`](../scripts/field_mode.sh) — mode detection helper
-- [`.claude/skills/import-field-changes/content.md`](../../.claude/skills/import-field-changes/content.md) — the import skill
+- [`.claude/skills/import-field-changes/SKILL.md`](../../.claude/skills/import-field-changes/SKILL.md) — the import skill
 - Issue [#445](https://github.com/rolker/ros2_agent_workspace/issues/445) — field-mode design and decisions
 - Issue [#247](https://github.com/rolker/ros2_agent_workspace/issues/247) — dev-mode worktree hardening
