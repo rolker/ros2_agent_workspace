@@ -20,7 +20,11 @@
 #   LOCAL_REVIEW_NUM_CTX  context window tokens (default: 32768; the
 #                         script fails loud, with the size it needed,
 #                         when the prompt would overflow this — Ollama
-#                         would otherwise truncate silently. The
+#                         would otherwise truncate silently. A
+#                         post-response check on the server's measured
+#                         prompt_eval_count backstops the byte-based
+#                         estimate: a run whose ingested tokens reach
+#                         the window ceiling fails loud too. The
 #                         window must also fit the model's reasoning:
 #                         qwen3.5:35b thinks for ~7k tokens on even a
 #                         100-line diff, hence the large default and
@@ -182,7 +186,10 @@ EOF
 # Fail loud on context overflow — Ollama silently truncates oversized
 # prompts (dropping the instructions and the head of the diff), which
 # would produce a confident review of a tail fragment. ~3 bytes/token
-# is conservative for diff text. The headroom must cover reasoning +
+# is a typical ratio for diff text, not a guaranteed bound — dense
+# tokenization (byte-level BPE fallback on unusual bytes) can beat it,
+# so a post-response check on the server's measured prompt_eval_count
+# backstops this estimate. The headroom must cover reasoning +
 # answer: a thinking model that runs out of window mid-reasoning
 # returns an empty answer with done_reason=length (observed at 2048
 # headroom on a ~500-line diff).
@@ -253,6 +260,24 @@ CONTENT=$(jq -r '.message.content // empty' "$RESPONSE_FILE" 2>/dev/null) || {
     echo "local review failed: non-JSON response from $BASE_URL (proxy in the way?)" >&2
     exit 1
 }
+
+# Silent-truncation guard: the pre-flight size check estimates tokens
+# from bytes, and dense tokenization can beat the estimate — the server
+# then silently drops the head of the prompt (the instructions) and the
+# model confidently reviews a tail fragment. Truncation is detectable
+# post-hoc from the tokens the server actually ingested: the pre-check
+# guarantees an untruncated prompt leaves >= 12288 tokens of window
+# free, so an ingested count at the ceiling can only mean the prompt
+# was cut down to fit (or the estimate undershot so badly the answer
+# is untrustworthy anyway). Caveat: server-side prompt caching may
+# report fewer ingested tokens than the full prompt, so this check can
+# miss — it is a backstop for the pre-check, not a replacement.
+PROMPT_EVAL=$(jq -r '.prompt_eval_count // 0' "$RESPONSE_FILE" 2>/dev/null || echo 0)
+if (( PROMPT_EVAL >= NUM_CTX - 1024 )); then
+    echo "local review failed: prompt filled the context window (server ingested $PROMPT_EVAL of num_ctx=$NUM_CTX tokens) — input was likely silently truncated;" >&2
+    echo "  raise LOCAL_REVIEW_NUM_CTX (needs RAM) or review a smaller diff" >&2
+    exit 1
+fi
 
 if [[ -z "$CONTENT" ]]; then
     DONE_REASON=$(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unparseable")

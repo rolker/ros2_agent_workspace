@@ -65,7 +65,7 @@ claims at different heads, so not a formal cross-confirmation)
 **CI**: all-pass
 
 ### Findings
-- [ ] (medium, Copilot) Context-overflow guard's `~3 bytes/token` estimate is
+- [x] (medium, Copilot) Context-overflow guard's `~3 bytes/token` estimate is
   not conservative for dense tokenization; silent *input* truncation (model
   confidently reviews a tail fragment) can slip past both the pre-check and
   the `done_reason=length` post-check — `.agent/scripts/local_review.sh:189`.
