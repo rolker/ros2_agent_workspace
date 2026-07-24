@@ -54,10 +54,13 @@ setup (environment, identity, features), see your framework's adapter file:
 - Modify or delete raw survey data (bags, `~/data/logs` — data-of-record)
   without explicit per-action approval. Describing a plan is not consent;
   state the exact operation and stop for a yes.
-- Change system state on remote/field hosts (salmon, gabby, boats): no
-  package installs, service changes, or config edits — surface the need
-  instead. SSH access for one purpose does not authorize running commands
-  on other hosts; ask first.
+- Administer remote/field hosts (salmon, gabby, boats): no package
+  installs, systemd/service changes, or host-level (`/etc`) config edits —
+  surface the need instead. This governs host *system administration*, not
+  in-session ROS operations: deployment mode's urgency contract still
+  authorizes its in-session mitigations (restart a node, tune a rate).
+  SSH access for one purpose does not authorize running commands on other
+  hosts; ask first.
 - Start unrequested background monitoring/polling loops.
 - Disable lint rules, skip tests, or suppress warnings to make a check
   pass — fix the cause; discuss before changing test or lint config.
@@ -440,9 +443,13 @@ bootstrap confirmation). `CI` is also recognized for CI environments.
 - **Merge commits, never squash** — preserve the atomic-commit history.
 - Merge via `merge_pr.sh --issue <N>` (not `--pr <N>` — the PR-keyed form
   skips worktree cleanup).
-- **Gate on green CI**: never merge while checks are red or pending. A
-  poll loop that breaks on failure must not fall through to the merge
-  command.
+- **Gate on the applicable CI verification**: for the **workspace repo**,
+  never merge while hosted checks are red or pending. For **project
+  repos**, a full-scope `ci-local` attestation satisfies the gate without
+  waiting for hosted Actions (see Merge verification below / ADR-0018) —
+  but never merge past a *red* signal from whichever verification applies.
+  Either way, a poll loop that breaks on failure must not fall through to
+  the merge command.
 - **Green CI is not review**: never merge a PR the user hasn't
   content-reviewed — doubly so for strategic documents (roadmaps, ADRs,
   instruction files).
