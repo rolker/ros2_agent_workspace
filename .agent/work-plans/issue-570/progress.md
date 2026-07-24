@@ -123,4 +123,4 @@ systemic/safety); Local Adversarial skipped (no Ollama server at
 localhost:11434); Copilot off (default). Plan Drift skipped (no plan.md).
 
 ### Findings
-- [ ] (must-fix) mid-answer truncation silently accepted as complete — `done_reason == "length"` is only checked when `$CONTENT` is empty, so a non-empty answer truncated mid-stream (content + `done_reason: length`) prints as a clean review and exits 0; guard it independent of content emptiness — `.agent/scripts/local_review.sh:282`
+- [x] (must-fix) mid-answer truncation silently accepted as complete — `done_reason == "length"` is only checked when `$CONTENT` is empty, so a non-empty answer truncated mid-stream (content + `done_reason: length`) prints as a clean review and exits 0; guard it independent of content emptiness — `.agent/scripts/local_review.sh:282`

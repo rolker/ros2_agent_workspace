@@ -279,13 +279,22 @@ if (( PROMPT_EVAL >= NUM_CTX - 1024 )); then
     exit 1
 fi
 
-if [[ -z "$CONTENT" ]]; then
-    DONE_REASON=$(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unparseable")
-    if [[ "$DONE_REASON" == "length" ]]; then
+# done_reason must be checked independent of content emptiness: a
+# window exhausted mid-answer yields non-empty content that reads as a
+# complete review but is a truncated findings list — as untrustworthy
+# as an empty one.
+DONE_REASON=$(jq -r '.done_reason // "unknown"' "$RESPONSE_FILE" 2>/dev/null || echo "unparseable")
+if [[ "$DONE_REASON" == "length" ]]; then
+    if [[ -z "$CONTENT" ]]; then
         echo "local review failed: reasoning consumed the context window before an answer was produced (done_reason: length); raise LOCAL_REVIEW_NUM_CTX (current: $NUM_CTX)" >&2
     else
-        echo "local review failed: model returned an empty answer (done_reason: $DONE_REASON)" >&2
+        echo "local review failed: answer was cut off mid-stream by the context window (done_reason: length) — a partial findings list is not trustworthy; raise LOCAL_REVIEW_NUM_CTX (current: $NUM_CTX)" >&2
     fi
+    exit 1
+fi
+
+if [[ -z "$CONTENT" ]]; then
+    echo "local review failed: model returned an empty answer (done_reason: $DONE_REASON)" >&2
     exit 1
 fi
 
