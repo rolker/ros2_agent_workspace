@@ -33,8 +33,8 @@ issue: 582
 **CI**: all-pass
 
 ### Findings
-- [ ] (cross-confirmed: Local Review negative-check + Copilot non-finite) `--throttle nan` silently disables all pacing and `inf` hangs time.sleep — extend guard to reject non-finite values — `.agent/scripts/sync_repos.py:233`
-- [ ] (suggestion, Copilot) update rejection test to cover nan/inf and the new error text — `.agent/scripts/tests/test_net_retry.py:242`
+- [x] (cross-confirmed: Local Review negative-check + Copilot non-finite) `--throttle nan` silently disables all pacing and `inf` hangs time.sleep — extend guard to reject non-finite values — `.agent/scripts/sync_repos.py:233`
+- [x] (suggestion, Copilot) update rejection test to cover nan/inf and the new error text — `.agent/scripts/tests/test_net_retry.py:242`
 - [ ] (suggestion, Local Review, deferred-by-design) sync failures still exit 0 — pre-existing, documented in PR body
 - [ ] (suggestion, Local Review, deferred-by-design) push_remote/pull_remote set but don't read the adaptive flag — documented in PR body
 
