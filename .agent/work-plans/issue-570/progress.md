@@ -51,3 +51,35 @@ interrupted by a host shutdown; rerun with:
 `git diff --merge-base main HEAD | .agent/scripts/local_review.sh --context <ctx>`
 The specialist's mechanics are verified end-to-end regardless (small-diff
 run produced findings; llama3.2:1b fallback run produced findings).
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-24 08:38 -0400
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #571 at `86f26e1`
+**Sources**: 3 (Copilot R1 @ `86f26e1`, Local Review (Pre-Push) @ `a7c7038`, CI rollup)
+**Cross-source confirmations**: 0 (Copilot's finding refines the guard the
+pre-push review's suggestion #10 introduced — related lineage, different
+claims at different heads, so not a formal cross-confirmation)
+**CI**: all-pass
+
+### Findings
+- [ ] (medium, Copilot) Context-overflow guard's `~3 bytes/token` estimate is
+  not conservative for dense tokenization; silent *input* truncation (model
+  confidently reviews a tail fragment) can slip past both the pre-check and
+  the `done_reason=length` post-check — `.agent/scripts/local_review.sh:189`.
+  Scope verified: at default 32k ctx the slip requires <~1.9 bytes/token
+  (pathological but possible — byte-BPE fallback on unusual bytes), and the
+  guard *weakens as `LOCAL_REVIEW_NUM_CTX` grows* because the 12288-token
+  headroom is fixed while the byte budget scales — and the overflow error
+  message itself steers users to raise num_ctx. Root-cause fix: post-response
+  check on the API's `prompt_eval_count` — fail loud when it reaches the
+  num_ctx ceiling (actual measured tokens, no bytes/token guessing);
+  optionally soften the "conservative" claim in the comment.
+
+### False positives
+- (Copilot, partial) "may ... still hit `done_reason=length` behavior" — the
+  empty-answer/`done_reason=length` case is already caught loud post-hoc
+  (`local_review.sh:257-264`, exit 1 with a raise-num_ctx message); only the
+  silent-input-truncation half of the claim stands (tracked above).
