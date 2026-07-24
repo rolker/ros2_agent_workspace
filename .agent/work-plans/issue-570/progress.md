@@ -124,3 +124,22 @@ localhost:11434); Copilot off (default). Plan Drift skipped (no plan.md).
 
 ### Findings
 - [x] (must-fix) mid-answer truncation silently accepted as complete — `done_reason == "length"` is only checked when `$CONTENT` is empty, so a non-empty answer truncated mid-stream (content + `done_reason: length`) prints as a clean review and exits 0; guard it independent of content emptiness — `.agent/scripts/local_review.sh:282`
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-24 09:55 -0400
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #571 at `67b8ea5`
+**Addressed**: Local Review (Pre-Push) @ 2026-07-24 13:01 +00:00 (round 2, `c7d6354`)
+**Commits**: `67b8ea5`
+
+### Actions
+- [x] Mid-answer truncation silently accepted as complete — `done_reason`
+  is now checked independent of content emptiness: `length` with
+  non-empty content fails loud ("answer was cut off mid-stream ... a
+  partial findings list is not trustworthy"), `length` with empty
+  content keeps the reasoning-exhaustion message, and the plain
+  empty-answer check follows. Verified all three response shapes
+  against mock servers (mid-truncation → exit 1, empty+length →
+  exit 1, normal → exit 0) — `.agent/scripts/local_review.sh`
