@@ -83,3 +83,22 @@ claims at different heads, so not a formal cross-confirmation)
   empty-answer/`done_reason=length` case is already caught loud post-hoc
   (`local_review.sh:257-264`, exit 1 with a raise-num_ctx message); only the
   silent-input-truncation half of the claim stands (tracked above).
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-24 08:46 -0400
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #571 at `947465d`
+**Addressed**: Integrated Review @ 2026-07-24 08:38 -0400 (PR #571 at `86f26e1`)
+**Commits**: `947465d`
+
+### Actions
+- [x] Silent-input-truncation gap in the context-overflow guard — added a
+  post-response check on the server's measured `prompt_eval_count` (fail
+  loud, exit 1, when ingested tokens reach the num_ctx ceiling), softened
+  the "conservative" claim in the pre-check comment, and documented the
+  backstop in the header/--help block. Verified both the guard path
+  (mock server reporting ceiling ingestion → exit 1 with actionable
+  message) and the happy path (normal ingestion → review printed,
+  exit 0) — `.agent/scripts/local_review.sh:189`
