@@ -214,3 +214,54 @@ make test
 3. **Build incrementally** - test packages individually before full builds
 4. **Keep package.xml updated** - ensure all dependencies are listed
 5. **Follow ROS2 coding standards** - use rclcpp/rclpy idioms
+
+## Workspace-Wide Change Discipline
+
+- **Public API changes**: before changing a message field, service
+  signature, or exported class, grep the **entire workspace** (all layers)
+  for consumers — the owning package's callers are a subset. Fix all sites
+  in the same change.
+- **Renames**: an as-you-go rename must be completed workspace-wide in the
+  same commit series — a half-applied rename is worse than none.
+
+## Sensor Driver Conventions
+
+- **Read the `.msg` spec and existing precedents** before populating
+  fields — don't invent conventions a consumer can't predict (units,
+  half- vs full-angles, axis assignments). Document any producer
+  convention the message type can't express.
+- **Orientation belongs in TF (URDF), not driver parameters** — mounting,
+  including non-traditional installs, lives entirely in the TF tree.
+- **No trademarked product names in identifiers** — package/topic/type
+  names outlive the specific hardware.
+- **Marine platform rates default to ~10 Hz** — nav/sensor/controller
+  loops here run at marine-vessel rates, not Nav2's small-indoor-robot
+  20+ Hz defaults. Don't "fix" a 10 Hz loop to match upstream examples.
+
+## Runtime Gotchas (field-earned)
+
+- **Symlink-install means `install/` files ARE the source** — editing an
+  installed config through the symlink edits the tracked file in the main
+  tree. Use `ros2 param set` for experiments, or a worktree for real
+  changes.
+- **FastDDS late-join hazard**: create publishers at node
+  configure/startup, not lazily on first use — late-created publishers
+  can miss discovery with already-running subscribers.
+- **rmw_zenoh `SubscriberCallback` type errors** usually trace to a ROS 1
+  → ROS 2 port using a one-shot timer idiom; check timer callback
+  signatures first.
+- **Slow shutdown under rmw_zenoh**: a supervisor escalating to SIGKILL on
+  shutdown is commonly zenoh's close-hang, not a hung node — see
+  [diagnosis_discipline.md](diagnosis_discipline.md).
+
+## Lint Environment Notes
+
+- **Local uncrustify 0.78.1 mass-fails colcon test** — that wall of
+  formatting errors is environment noise, not your change. For a
+  CI-accurate check, run bare-jazzy `ament_uncrustify` on just the files
+  you touched.
+- **Ubuntu 24.04+ blocks `unshare -Urn`** (AppArmor
+  `apparmor_restrict_unprivileged_userns`). Netns-based test harnesses
+  need the one-time host knob
+  `sysctl kernel.apparmor_restrict_unprivileged_userns=0` — a host
+  setting; get approval before changing it on shared machines.

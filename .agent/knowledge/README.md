@@ -13,8 +13,12 @@ checked out in `layers/`.
 ## IDE Setup
 - **[VS Code Setup Guide](vscode_setup.md)**: Multi-root workspace configuration, Makefile tasks, C++/Python IntelliSense, and Claude Code extension integration.
 
+## Analysis & Diagnosis
+- **[Bag & Deployment Data Analysis](bag_analysis.md)**: Standard bag-analysis pipeline, time discipline, unit gotchas, and deployment-review conventions.
+- **[Diagnosis Discipline](diagnosis_discipline.md)**: Verification rules for root-causing field failures without plausible-but-wrong narratives.
+
 ## Agent Workflows
-- **[Skill Workflows](skill_workflows.md)**: Per-issue lifecycle sequence, governance skill index, and utility skill catalog.
+- **[Skill Workflows](skill_workflows.md)**: Per-issue lifecycle sequence, governance skill index, utility skill catalog, and sub-agent dispatch practices.
 - **[Principles Review Guide](principles_review_guide.md)**: Evaluation criteria for workspace principles and ADRs. Used by lifecycle skills (triage, planning, review) and as a manual checklist.
 - **[Documentation Verification](documentation_verification.md)**: Mandatory verification workflow for writing accurate ROS 2 package documentation. Includes command cookbook and hallucination anti-patterns.
 - **[Field Mode Hotfix Walkthrough](field_mode_hotfix.md)**: Step-by-step flow for making a hotfix on a field machine (non-GitHub origin) and reconciling back to GitHub via the import skill.

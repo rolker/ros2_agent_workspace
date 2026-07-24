@@ -51,6 +51,22 @@ setup (environment, identity, features), see your framework's adapter file:
 - Document from assumptions — verify against source code
 - Construct GitHub URLs from directory names — use `gh` CLI to look them up
 - Run bare `pip install` or use `--break-system-packages` — use `.venv` for dev tools (see ADR-0009)
+- Modify or delete raw survey data (bags, `~/data/logs` — data-of-record)
+  without explicit per-action approval. Describing a plan is not consent;
+  state the exact operation and stop for a yes.
+- Administer remote/field hosts (salmon, gabby, boats): no package
+  installs, systemd/service changes, or host-level (`/etc`) config edits —
+  surface the need instead. This governs host *system administration*, not
+  in-session ROS operations: deployment mode's urgency contract still
+  authorizes its in-session mitigations (restart a node, tune a rate).
+  SSH access for one purpose does not authorize running commands on other
+  hosts; ask first.
+- Start unrequested background monitoring/polling loops.
+- Disable lint rules, skip tests, or suppress warnings to make a check
+  pass — fix the cause; discuss before changing test or lint config.
+- Put `close`/`fixes`/`resolves #N` in a PR body or commit message unless
+  that PR really should close the issue — see
+  [Issue-closing keywords](#issue-closing-keywords).
 
 ## Quality Standard
 
@@ -196,6 +212,14 @@ repo, not just the workspace repo.
 
 **Trivial fixes** (typos, minor doc corrections) don't need a dedicated issue — use the
 current task's worktree or create a quick issue for a new one.
+
+**Filing discipline**: don't file an issue for every backlog thought — a
+dev-log backlog line is enough for on-radar items; file when work is about to
+start or the item needs cross-referencing. For consolidation/cleanup work,
+default to bundling related changes into one PR (atomic commits inside)
+rather than fanning out many small issues. When creating an issue of a
+recurring type (deployment, RCA, onboarding), read a recent closed one and
+match its structure.
 
 **Sub-tasks**: When creating a new issue as a sub-task of existing work, reference
 the parent issue in the issue body (e.g., "Part of #NNN"). Use full
@@ -354,6 +378,23 @@ gh repo view --json url --jq '.url'
 When referencing any GitHub issue, PR, commit, or repository in summaries or reports,
 include a clickable markdown link on every mention.
 
+### Issue-Closing Keywords
+
+GitHub's parser auto-closes issues on `close`/`fixes`/`resolves #N` tokens in
+PR bodies and commit messages — including **negated** mentions ("does not
+close #5") and mentions describing a **sibling** PR. This has closed wrong
+issues twice. Rules:
+
+- Use the keyword only for the one issue this PR should actually close.
+- For every other mention, write "Part of #N" / "addresses #N" or link the
+  URL.
+- Work plans pasted into PR bodies inherit this hazard — scrub keyword
+  phrases from plan text before pasting.
+
+### Docs-Only PRs
+
+Docs-only PRs omit the Test plan section of the PR body.
+
 ## Build & Test
 
 `make build` handles the core setup chain automatically — on a fresh clone it
@@ -397,6 +438,25 @@ sourcing lower layers automatically.
 Set `NONINTERACTIVE=1` to suppress all interactive prompts (e.g., the first-run
 bootstrap confirmation). `CI` is also recognized for CI environments.
 
+### Merging
+
+- **Merge commits, never squash** — preserve the atomic-commit history.
+- Merge via `merge_pr.sh --issue <N>` (not `--pr <N>` — the PR-keyed form
+  skips worktree cleanup).
+- **Gate on the applicable CI verification**: for the **workspace repo**,
+  never merge while hosted checks are red or pending. For **project
+  repos**, a full-scope `ci-local` attestation satisfies the gate without
+  waiting for hosted Actions (see Merge verification below / ADR-0018) —
+  but never merge past a *red* signal from whichever verification applies.
+  Either way, a poll loop that breaks on failure must not fall through to
+  the merge command.
+- **Green CI is not review**: never merge a PR the user hasn't
+  content-reviewed — doubly so for strategic documents (roadmaps, ADRs,
+  instruction files).
+- Before merging, fetch and read PR review comments (human and bot) —
+  `fetch_pr_reviews.sh` — and triage them; don't merge past unread
+  feedback.
+
 ### Merge verification (ADR-0018)
 
 Project-repo PRs may merge on a **full-scope local CI attestation** instead of
@@ -416,6 +476,17 @@ repos remains a mirror/backstop — triage its post-merge failures. The
   that declare parameters/publishers/subscribers, and any `.msg`/`.srv`/`.action` files.
 - Use the verification workflow in [`.agent/knowledge/documentation_verification.md`](.agent/knowledge/documentation_verification.md).
 - Use the documentation template in [`.agent/templates/package_documentation.md`](.agent/templates/package_documentation.md).
+- **Never hand-type timestamps or measured values** into durable artifacts
+  (logs, reports, docs) — generate timestamps with
+  `date '+%Y-%m-%d %H:%M %:z'`; mark human-reported times as
+  `~HH:MM (operator-reported)`; look measured quantities up (URDF,
+  `/tf_static`, configs) instead of estimating them.
+- **Never attribute decisions or rationale to a person who didn't state
+  them** — record what was actually said; a plausible justification you
+  inferred is fabrication, not documentation.
+- **Never reference private agent-memory filenames** from repo-tracked
+  files (progress.md, plans, READMEs) — inline the relevant content
+  instead; other agents and humans can't resolve those references.
 
 ## Project-Level Guidance
 
@@ -438,6 +509,9 @@ review) that references — never forks — these workspace rules; create it fro
 - Keep repo root and `layers/*/src/` clean — no temp files, build artifacts, or logs.
 - Use `.agent/scratchpad/` for persistent temp files (unique names via `mktemp`).
 - Use `/tmp` for ephemeral files cleaned up in the same command.
+- **Scope filesystem searches to project paths** (the workspace, `~/data`) —
+  never grep/find from `$HOME`: it descends into cloud/network FUSE mounts
+  and hangs or floods results.
 
 ## Post-Task Verification
 

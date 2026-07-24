@@ -170,10 +170,27 @@ field mode otherwise permits it. Check the repo's
 branch, remove that entry or drop the hook entirely for field-mode
 repos. Don't bypass with `--no-verify` — fix the config.
 
+**gitcloud may be unreachable from the UNH/CCOM campus network** (its
+private ZeroTier address gets "No route to host"; observed 2026-07-22). The
+same Forgejo server is reachable as `gitcloudap` (public address; both names
+are in `/etc/hosts`). Redirect a single git invocation without touching repo
+remotes or `~/.ssh/config`:
+
+```bash
+GIT_SSH_COMMAND="ssh -o HostName=gitcloudap -o HostKeyAlias=gitcloud" \
+  python3 .agent/scripts/pull_remote.py --remote gitcloud --json
+```
+
+`HostKeyAlias=gitcloud` keeps `known_hosts` matching. Caveat: the override
+redirects **every** ssh connection in that invocation — only use it on
+commands that talk exclusively to gitcloud (`pull_remote.py` /
+`push_remote.py --remote gitcloud` are safe). Field-side hosts on the
+boat/operator networks are unaffected.
+
 ## Related
 
 - [`AGENTS.md § Field Mode`](../../AGENTS.md#field-mode-origin-not-on-a-github-host) — canonical rule
 - [`.agent/scripts/field_mode.sh`](../scripts/field_mode.sh) — mode detection helper
-- [`.claude/skills/import-field-changes/content.md`](../../.claude/skills/import-field-changes/content.md) — the import skill
+- [`.claude/skills/import-field-changes/SKILL.md`](../../.claude/skills/import-field-changes/SKILL.md) — the import skill
 - Issue [#445](https://github.com/rolker/ros2_agent_workspace/issues/445) — field-mode design and decisions
 - Issue [#247](https://github.com/rolker/ros2_agent_workspace/issues/247) — dev-mode worktree hardening

@@ -74,6 +74,10 @@ GitHub Issues are the **Source of Truth** for what is being worked on.
 *   **Before Starting**:
     *   Search for open issues or projects.
     *   **Check for draft PRs** - they indicate active work
+    *   **Check for an existing worktree** on the issue — a **dirty worktree
+        means in-flight work by another session: hands off** unless the user
+        explicitly hands it over. Don't infer "abandoned" from stale file
+        mtimes; sessions idle for long stretches.
     *   **Verify the issue number**: Run `gh issue view <N> --json title --jq '.title'` and confirm the title matches your task. If it doesn't, stop — you may have inherited the wrong issue copied from a plan or status report.
     *   **Do not** pick up an issue assigned to another user/agent unless explicitly instructed to "Join" or "Collaborate".
 *   **During Work**:
@@ -102,3 +106,30 @@ If you discover you are modifying a file that has uncommitted changes from anoth
 1.  **Stop**.
 2.  **Diff** the changes.
 3.  **Notify User**: "I see uncommitted changes in `foo.cpp`. Should I include them, revert them, or stash them?"
+
+In a **handed-over worktree**, re-check `git status` / `git log` immediately
+before committing — another agent may have advanced the branch since you
+last looked; don't clobber or double-commit.
+
+## 7. Shared-Host Etiquette
+
+Multiple agents (and the user) share dev hosts. Rules:
+
+*   **Never kill containers or processes you didn't launch** — another
+    agent's dispatch or the user's run may be behind them. If a resource is
+    contended, surface it.
+*   **Don't churn the user's GUI during hands-on testing** — no
+    kill/relaunch of an interactive app the user is testing, and no
+    disruptive headless launches beside it.
+*   **Set a unique `ROS_DOMAIN_ID`** whenever another agent or the user may
+    run ROS nodes/sim on the same machine — cross-talk between two agents'
+    node graphs produces baffling test failures.
+
+## 8. Decision Fidelity Across Agent Chains
+
+Multi-agent handoffs accumulate misinterpretation:
+
+*   When a plan or progress entry records a user decision, **verify it
+    against the user's original words**, not a prior agent's paraphrase.
+*   When driving a remote agent session (tmux/container), **show the user
+    the prompt text before sending it**.

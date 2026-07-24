@@ -143,3 +143,13 @@ ros2 launch --help | grep -q '\-g'
 
 If either check fails, add the missing package to the project's
 `underlay.repos` file.
+
+## Launch Argument Gotchas
+
+- **Argument case is load-bearing in `PythonExpression`**: a boolean launch
+  arg spelled `True`/`true` inconsistently evaluates differently once it
+  reaches a `PythonExpression`. Prefer `IfCondition`/`UnlessCondition`
+  (case-tolerant) over hand-built expressions.
+- **Debug from the launch/config files first** — trace the argument and
+  parameter flow by reading the launch tree before burning iterations on
+  exploratory sim relaunches; most "mystery behavior" is visible statically.
