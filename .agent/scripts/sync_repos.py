@@ -11,9 +11,12 @@ Usage:
 
 Options:
     --dry-run    Simulate actions without executing
-    --throttle   Pause between per-repo network operations (default: 2.0s).
-                 Upstream firewalls rate-limit rapid successive SSH
-                 connections; pacing the pulls avoids tripping them.
+    --throttle   Pause between per-repo network operations. Off by default;
+                 if a dropped connection is detected mid-run (an upstream
+                 firewall rate-limiting rapid successive SSH connections),
+                 the remaining repos are automatically paced at 2.0s.
+                 Pass a value to force a fixed pace from the start
+                 (0 disables pacing entirely, including the adaptive one).
 """
 
 import sys
@@ -34,7 +37,41 @@ except ImportError:
     print(f"Error: Could not import list_overlay_repos from {SCRIPT_DIR}", file=sys.stderr)
     sys.exit(1)
 
-from remote_utils import retry_transient  # noqa: E402
+from remote_utils import retry_transient, transient_error_seen  # noqa: E402
+
+# Pace applied to the rest of the run once the remote starts dropping
+# connections (only when --throttle was not given explicitly).
+ADAPTIVE_THROTTLE = 2.0
+
+
+def make_throttler(explicit_throttle, dry_run):
+    """Return a pause() callable implementing the pacing policy.
+
+    explicit_throttle is the --throttle value or None if not given:
+      None -> adaptive: no pause until a dropped connection has been seen,
+              then ADAPTIVE_THROTTLE for the rest of the run.
+      N    -> fixed pace of N seconds (0 disables pacing entirely).
+    Dry runs never pause.
+    """
+    noticed = [False]
+
+    def pause():
+        if dry_run:
+            return
+        if explicit_throttle is not None:
+            if explicit_throttle > 0:
+                time.sleep(explicit_throttle)
+            return
+        if transient_error_seen():
+            if not noticed[0]:
+                noticed[0] = True
+                print(
+                    f"ℹ️  Remote dropped a connection — pacing remaining repos "
+                    f"by {ADAPTIVE_THROTTLE}s."
+                )
+            time.sleep(ADAPTIVE_THROTTLE)
+
+    return pause
 
 
 def run_git_cmd(repo_path, cmd_args, dry_run=False):
@@ -181,8 +218,11 @@ def main():
     parser.add_argument(
         "--throttle",
         type=float,
-        default=2.0,
-        help="Seconds to pause between per-repo network operations (default: 2.0).",
+        default=None,
+        help=f"Seconds to pause between per-repo network operations. "
+        f"Default: none, auto-enabling a {ADAPTIVE_THROTTLE}s pace for the rest "
+        f"of the run if the remote drops a connection. "
+        f"Pass 0 to disable pacing entirely.",
     )
     args = parser.parse_args()
 
@@ -191,9 +231,7 @@ def main():
     # Get repos list using the existing tool
     repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
 
-    def throttle():
-        if not args.dry_run and args.throttle > 0:
-            time.sleep(args.throttle)
+    throttle = make_throttler(args.throttle, args.dry_run)
 
     # Also include the root repo itself
     if sync_repo(root_dir, "ros2_agent_workspace", args.dry_run):
