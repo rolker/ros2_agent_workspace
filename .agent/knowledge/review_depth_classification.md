@@ -70,11 +70,14 @@ source path differs:
 - Claude Adversarial — one pass (Lens A: logic & correctness)
 - Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
   skipped with notice if opted in but the CLI is unavailable
+- Local Model Adversarial — **default-on** (`--no-local` to opt out);
+  skipped with notice if the Ollama server/model is unavailable
 
 **Report format**: Condensed — static analysis findings, Claude
 Adversarial findings, plus a one-line governance note ("No governance
 concerns for a change of this scope"). A Copilot Adversarial section
-appears only when `--copilot` was passed.
+appears only when `--copilot` was passed; a Local Adversarial section
+(or its skip notice) appears unless `--no-local` was passed.
 
 #### Standard
 
@@ -92,6 +95,8 @@ appears only when `--copilot` was passed.
   cross-cutting), each a separate fresh-context dispatch
 - Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
   skipped with notice if opted in but the CLI is unavailable
+- Local Model Adversarial — **default-on** (`--no-local` to opt out);
+  skipped with notice if the Ollama server/model is unavailable
 
 **Report format**: Full report with all sections.
 
@@ -106,7 +111,8 @@ appears only when `--copilot` was passed.
 
 **Specialists dispatched**:
 - Same as Standard (two disjoint-lens Claude Adversarial passes;
-  Copilot opt-in via `--copilot`). Deep runs both Claude passes at a
+  Copilot opt-in via `--copilot`; Local Model Adversarial default-on,
+  not tier-differentiated). Deep runs both Claude passes at a
   longer file horizon with an explicit security/concurrency/lifecycle
   checklist, using the same fresh-context dispatch mechanism. The
   Standard→Deep difference is horizon and rigor, not which lenses run.
@@ -122,7 +128,12 @@ appears only when `--copilot` was passed.
 > "Partially adopted" entry in `inspiration_agent_workspace_digest.md`.
 > The Gemini/Codex tmux dispatch from upstream `cross_model_review.sh`
 > remains unadopted. When you want a third or fourth model's read on a
-> Deep PR, run that agent's review-code skill manually.
+> Deep PR, run that agent's review-code skill manually. A quota-free
+> local-model read (Ollama, default `qwen3.5:35b`) is wired in as
+> step 5f (`.agent/scripts/local_review.sh`, default-on, `--no-local`
+> to opt out — see
+> [#570](https://github.com/rolker/ros2_agent_workspace/issues/570));
+> its findings carry low-trust weighting in the silence filter.
 
 ## Override-Trigger Files
 

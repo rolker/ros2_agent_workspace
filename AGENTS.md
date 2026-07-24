@@ -501,6 +501,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/validate_workspace.py` | Validate repos match .repos config |
 | `.agent/scripts/detect_agent_identity.sh` | Auto-detect agent framework + model |
 | `.agent/scripts/fetch_pr_reviews.sh` | Fetch all PR reviews and CI status |
+| `.agent/scripts/local_review.sh` | Cross-model review of a diff via a local Ollama model (default `qwen3.5:35b`); used by review-code specialist 5f, standalone-capable offline/field (#570) |
 | `.agent/scripts/progress_read.py` | Extract `progress.md` entries by type + correlation key as JSON (consumed by `triage-reviews` integrator) |
 | `.agent/scripts/test_check_commit_identity.sh` | Regression test for `check-commit-identity.py` branch+env gate |
 | `.agent/scripts/test_layer_sourcing.sh` | Regression guard for runtime layer chaining (ADR-0016 / #559, #566): static no-baked-chain-source check + built-layer overlay precedence + baked-chain purity + mountpoint ownership; run by `make test-scripts` / `make validate` |
