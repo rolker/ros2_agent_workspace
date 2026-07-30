@@ -990,7 +990,7 @@ since Claude Adversarial is now unconditional at Light.)
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Copilot Adversarial**: <run (--copilot) | skipped (<reason>, --copilot)>  <!-- include only when COPILOT=1; shows that an opted-in cross-model pass ran-clean vs. was skipped -->
-**Local Adversarial**: <run (<model>) | skipped (<reason>)>  <!-- include only when LOCAL=1; shows that an opted-in local pass ran-clean vs. was skipped -->
+**Local Adversarial**: <run (<model>, --local) | skipped (<reason>, --local)>  <!-- include only when LOCAL=1; shows that an opted-in local pass ran-clean vs. was skipped -->
 No issues found. LGTM.
 ```
 
