@@ -111,3 +111,24 @@ References to the default-on behavior found in knowledge files (all need updatin
 - Straggler grep over `.claude/` + `.agent/` for `no-local` / `NO_LOCAL` / `default-on`: remaining hits are all intentional — SKILL.md:56,155 document `--no-local` as a deprecated no-op; SKILL.md:536 is the Copilot specialist's own rationale; `inspiration_agent_workspace_digest.md:82,96` are historical notes; other hits are prior-issue work plans/progress files.
 - `review_depth_classification.md` confirmed at 5 flipped references (lines 73, 80–81, 99, 116–117, 134–136).
 - CI: 9 checks, 8 success + 1 `skipped` (duplicate "Validate commit identity" job on a second workflow run); no failures.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-30 16:10 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #591 at `f7b5214`
+**Addressed**: `## Integrated Review` @ 2026-07-30 15:52 -04:00 (PR #591 at `8060ea0`)
+**Commits**: `8d40aff`, `f7b5214`
+
+### Actions
+- [x] (cross-confirmed) Files-to-Change table row corrected `4` → `5` occurrences for `review_depth_classification.md`; verified against the diff, which flips 5 references (Light bullet, Light report-format note, Standard bullet, Deep bullet, closing note) — `.agent/work-plans/issue-590/plan.md:71` (`8d40aff`)
+- [x] (suggestion, Copilot) "No findings format" template's `**Local Adversarial**` line now carries the flag token in both branches — `run (<model>, --local) | skipped (<reason>, --local)` — matching the adjacent Copilot line and the standard/Light templates — `.claude/skills/review-code/SKILL.md:993` (`f7b5214`)
+
+### Notes
+- Pre-commit hooks ran clean on both commits (no `--no-verify`).
+- No deferred findings; both were single-line textual fixes verified against current source before editing.
+- Not pushed — host performs pushes.
+
+### Next step
+- `review-code` re-review: `.agent/scripts/dispatch_subagent.sh --mode in-process --issue 590 --skill review-code`
