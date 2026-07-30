@@ -89,3 +89,25 @@ References to the default-on behavior found in knowledge files (all need updatin
 
 ### Findings
 - [ ] No issues found. LGTM.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-30 15:52 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #591 at `8060ea0`
+**Sources**: 3 (Copilot R1 @ `8060ea0`, Local Review (Pre-Push) @ `e630177`, Plan Review @ `f782fdf`, CI rollup)
+**Cross-source confirmations**: 1
+**CI**: all-pass
+
+### Findings
+- [ ] (cross-confirmed) Plan's Files-to-Change table still says `review_depth_classification.md` — "4 occurrences flipped", while step 2 (and the implementation) covers 5. Raised by Copilot @ `8060ea0` and, earlier, by Plan Review must-fix @ `f782fdf` (body enumeration was fixed; the table row was missed). Implementation itself is correct — all 5 references flipped. Fix: change `4` → `5` in the table row — `.agent/work-plans/issue-590/plan.md:71`
+- [ ] (suggestion, Copilot) "No findings format" template's `**Local Adversarial**` line omits the `--local` token, unlike the adjacent Copilot line and unlike the standard/Light templates which use `run (<model>, --local) | skipped (<reason>, --local)`. Fix: add the flag token to both branches — `.claude/skills/review-code/SKILL.md:993`
+
+### False positives
+- (none) Both Copilot comments were verified against local code and hold.
+
+### Verification notes
+- Straggler grep over `.claude/` + `.agent/` for `no-local` / `NO_LOCAL` / `default-on`: remaining hits are all intentional — SKILL.md:56,155 document `--no-local` as a deprecated no-op; SKILL.md:536 is the Copilot specialist's own rationale; `inspiration_agent_workspace_digest.md:82,96` are historical notes; other hits are prior-issue work plans/progress files.
+- `review_depth_classification.md` confirmed at 5 flipped references (lines 73, 80–81, 99, 116–117, 134–136).
+- CI: 9 checks, 8 success + 1 `skipped` (duplicate "Validate commit identity" job on a second workflow run); no failures.
