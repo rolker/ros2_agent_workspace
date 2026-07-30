@@ -74,3 +74,18 @@ References to the default-on behavior found in knowledge files (all need updatin
 - [ ] (must-fix) `SKILL.md:799` rationale paragraph ("The specialist is default-on despite the noise…") not enumerated; bare `default-on` — step-5 `--no-local`-only grep won't catch it — `.claude/skills/review-code/SKILL.md:799`
 - [ ] (must-fix) `review_depth_classification.md:114` Deep-tier bullet ("Local Model Adversarial default-on") missing from the file's enumerated locations — file has 5 refs, not 4 — `.agent/knowledge/review_depth_classification.md:114`
 - [ ] (suggestion) Broaden step-5 straggler grep to also match `default-on`/`default on` (not just `--no-local`); also covers `SKILL.md:958` bare-wording comment — `.agent/work-plans/issue-590/plan.md:55`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-30 19:01 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-590 at `e630177`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance/workflow-defining files — SKILL.md + .agent/knowledge/)
+**Must-fix**: 0 | **Suggestions**: 0
+**Round**: 1 | **Ship**: recommended — docs-only flip, fully consistent, no must-fix
+
+### Findings
+- [ ] No issues found. LGTM.
