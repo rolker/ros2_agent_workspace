@@ -48,3 +48,15 @@ References to the default-on behavior found in knowledge files (all need updatin
 - [ ] Update `.agent/knowledge/skill_workflows.md`: 2 references
 - [ ] Update `.agent/knowledge/inspiration_agent_workspace_digest.md`: 1 reference
 - [ ] Verify no other files reference `--no-local` in a durable artifact (grep `.claude/` `.agent/` for `no-local`)
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-30 18:20 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-590/plan.md` at `f782fdf`
+**Branch**: feature/issue-590 at `f782fdf`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
