@@ -32,14 +32,20 @@ remains standalone-capable and is the offline/field-mode review path.
      (--no-local)` to `only if LOCAL=1 (--local)`
    - Deep tier paragraph (line 366–368): flip default-on language
    - Section 5f header + opening paragraph (lines 724–726): flip to default-off
+   - Section 5f closing rationale paragraph (line 799, "default-on despite the
+     noise"): flip to opt-in wording, keeping the keep-it-exercised-for-field
+     rationale (review-plan must-fix — bare `default-on`, no flag token)
    - Report templates: replace `off (--no-local)` with `off (default)` in the
      standard/deep template (line 875, 933); in the Light template (line 959) flip
      the comment about omitting when opted-out and the "default-on" note (line 978)
 
-2. **Update `.agent/knowledge/review_depth_classification.md`** — 4 references:
+2. **Update `.agent/knowledge/review_depth_classification.md`** — 5 references
+   (review-plan must-fix: the Deep-tier bullet was missing from the original
+   enumeration):
    - Lines 73–74: flip Light tier specialist bullet
    - Lines 80: flip Light "unless `--no-local`" report-format note
    - Lines 98–99: flip Standard tier specialist bullet
+   - Line 114: flip Deep tier "Local Model Adversarial default-on" bullet
    - Lines 132–134: flip the note's default-on/`--no-local` description
 
 3. **Update `.agent/knowledge/skill_workflows.md`** — 2 references (lines 40–41):
@@ -52,8 +58,10 @@ remains standalone-capable and is the offline/field-mode review path.
    (also originally default-on) lives in this file implicitly; add a note parallel
    to the Copilot entry documenting the flip for #590.
 
-5. **Grep for any remaining `--no-local` in `.claude/` and `.agent/`** to catch
-   stragglers not covered above.
+5. **Grep for any remaining stale references in `.claude/` and `.agent/`** to
+   catch stragglers not covered above — match `no-local`, `NO_LOCAL`, and the
+   bare wordings `default-on` / `default on` (review-plan suggestion: the
+   flag-only grep would miss prose references like the 5f rationale paragraph).
 
 ## Files to Change
 

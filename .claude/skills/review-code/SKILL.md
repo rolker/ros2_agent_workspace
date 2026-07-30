@@ -8,9 +8,9 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--copilot] [--no-local] [light|standard|deep]
+/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--copilot] [--local] [light|standard|deep]
                                             # pre-push: diff vs default branch
-/review-code <pr-number-or-url> [--skip-static] [--copilot] [--allow-untrusted-copilot] [--no-local] [light|standard|deep]
+/review-code <pr-number-or-url> [--skip-static] [--copilot] [--allow-untrusted-copilot] [--local] [light|standard|deep]
                                             # post-PR: diff vs PR base
 ```
 
@@ -42,15 +42,20 @@ Flags:
   in-house Claude adversarial passes (5d) provide the adversarial
   coverage. (`--no-copilot` is accepted as a deprecated no-op, since
   Copilot is already off by default.)
-- **`--no-local`** (both modes) opts out of the Local Model Adversarial
-  Specialist (5f). Local review is **on by default** — it costs no API
-  quota (local Ollama inference), but on current hardware it is the
-  long-pole specialist (~7 min per run; see
-  [#570](https://github.com/rolker/ros2_agent_workspace/issues/570)).
-  Pass `--no-local` for fast iteration loops or when the machine is
-  busy with inference-heavy work. When the Ollama server or the model
-  is unavailable, the specialist skips itself with a one-line notice —
-  no flag needed.
+- **`--local`** (both modes) opts in to the Local Model Adversarial
+  Specialist (5f). Local review is **off by default**: it costs no API
+  quota (local Ollama inference), but on current hardware it is by far
+  the long-pole specialist (~7 min per run, and a ~500-line diff can
+  exceed 10 min on 8GB-VRAM-class hardware — see
+  [#570](https://github.com/rolker/ros2_agent_workspace/issues/570) /
+  [#590](https://github.com/rolker/ros2_agent_workspace/issues/590)),
+  so the wall-clock cost is paid only when chosen. Pass `--local` when
+  a quota-free cross-model read is worth the wait — e.g. a high-stakes
+  diff, or to keep the offline field-mode reviewer exercised. When
+  opted in but the Ollama server or the model is unavailable, the
+  specialist skips itself with a one-line notice. (`--no-local` is
+  accepted as a deprecated no-op, since local review is already off by
+  default.)
 - **`--allow-untrusted-copilot`** (post-PR only) overrides the
   external-PR safety gate that suppresses Copilot Adversarial when the
   PR head is from a fork or a non-collaborator author. Only meaningful
@@ -95,9 +100,10 @@ post comments or modify the PR unless the user asks.
 
 Copilot Adversarial is **opt-in at every tier** via `--copilot` — when
 passed, it runs as an additional cross-model read on top of the
-in-house Claude passes. Local Model Adversarial is the inverse:
-**on by default at every tier** (local inference is quota-free) and
-opted out with `--no-local`.
+in-house Claude passes. Local Model Adversarial is likewise
+**opt-in at every tier** via `--local` — quota-free local inference,
+but the wall-clock long pole on current hardware
+([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)).
 
 **Specialists**:
 - **Static Analysis** — runs linters with ament-aligned configs on
@@ -116,13 +122,15 @@ opted out with `--no-local`.
   second-vendor read. Off by default to avoid the per-run Premium
   request; skipped with a one-line notice when `copilot` is unavailable
   even if opted in.
-- **Local Model Adversarial** — **default-on** (`--no-local` to opt
-  out) cross-model read by a locally served Ollama model (default
-  `qwen3.5:35b`) via `.agent/scripts/local_review.sh`. Quota-free but
-  low-trust: validated at ~50% precision, so its findings need
-  corroboration or spot-checking before they reach must-fix (see 5f).
-  Skips itself with a one-line notice when the server or model is
-  unavailable.
+- **Local Model Adversarial** — **opt-in** (`--local`) cross-model
+  read by a locally served Ollama model (default `qwen3.5:35b`) via
+  `.agent/scripts/local_review.sh`. Quota-free but low-trust:
+  validated at ~50% precision, so its findings need corroboration or
+  spot-checking before they reach must-fix (see 5f). Off by default —
+  the run is the review's wall-clock long pole on current hardware
+  ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)).
+  Skips itself with a one-line notice when opted in but the server or
+  model is unavailable.
 
 ## Steps
 
@@ -142,9 +150,12 @@ classification step below as a stray argument),
 post-PR only — emit an error if passed in pre-push mode, where the
 gate doesn't apply; with `COPILOT` unset it has no effect, so emit a
 one-line note "`--allow-untrusted-copilot` ignored: no effect without
-`--copilot`" rather than silently dropping it), `--no-local` (sets
-`NO_LOCAL=1`, opts out of the Local Model Adversarial Specialist in
-step 5f — on by default), `--base <branch>`
+`--copilot`" rather than silently dropping it), `--local` (sets
+`LOCAL=1`, opts in to the Local Model Adversarial Specialist in
+step 5f — off by default), `--no-local` (**recognized and
+discarded**: a deprecated no-op since local review is already off by
+default — consume the token here so it never falls through to the
+classification step below as a stray argument), `--base <branch>`
 (sets `USER_BASE`), then the optional depth keyword (`light` /
 `standard` / `deep` — positional). Classify what remains:
 
@@ -165,7 +176,7 @@ syntax applies in both modes. Examples:
 /review-code --no-progress                  # pre-push, don't write progress.md
 /review-code --issue 460                    # pre-push, override branch-name issue extraction
 /review-code --copilot                      # pre-push, opt in to Copilot Adversarial
-/review-code --no-local                     # pre-push, opt out of Local Model Adversarial
+/review-code --local                        # pre-push, opt in to Local Model Adversarial
 /review-code 42                             # post-PR, auto-classify
 /review-code 42 standard                    # post-PR, force Standard
 /review-code 42 --skip-static               # post-PR, skip static analysis
@@ -341,8 +352,8 @@ Run:
 - **5d. Claude Adversarial Specialist** — **one pass** (Lens A only)
 - **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
   (`--copilot`); skipped with notice if `copilot` unavailable
-- **5f. Local Model Adversarial Specialist** — unless `NO_LOCAL=1`
-  (`--no-local`); skipped with notice if Ollama/model unavailable
+- **5f. Local Model Adversarial Specialist** — only if `LOCAL=1`
+  (`--local`); skipped with notice if Ollama/model unavailable
 
 #### Standard tier
 
@@ -354,8 +365,8 @@ Run all of:
   lenses (Lens A + Lens B; Standard prompt)
 - **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
   (`--copilot`); skipped with notice if `copilot` unavailable
-- **5f. Local Model Adversarial Specialist** — unless `NO_LOCAL=1`
-  (`--no-local`); skipped with notice if Ollama/model unavailable
+- **5f. Local Model Adversarial Specialist** — only if `LOCAL=1`
+  (`--local`); skipped with notice if Ollama/model unavailable
 
 #### Deep tier
 
@@ -363,9 +374,10 @@ Same as Standard, but the two **5d. Claude Adversarial** passes run with
 the Deep prompt (broader file horizon plus an explicit security /
 concurrency / lifecycle checklist). If opted in with `--copilot`,
 **5e. Copilot Adversarial** also runs with the Deep prompt as a third,
-cross-model read. **5f. Local Model Adversarial** runs as at other
-tiers (its prompt is not tier-differentiated — the diff is the whole
-horizon a local model can reliably handle).
+cross-model read. If opted in with `--local`, **5f. Local Model
+Adversarial** runs as at other tiers (its prompt is not
+tier-differentiated — the diff is the whole horizon a local model can
+reliably handle).
 
 ---
 
@@ -721,10 +733,10 @@ specialists.
 
 #### 5f. Local Model Adversarial Specialist
 
-**Activates by default at every tier**; opted out with `--no-local`
-(`NO_LOCAL=1`). When `NO_LOCAL=1`, skip the entire specialist and omit
-it from the report (like un-opted-in Copilot, absence is the requested
-state).
+**Opt-in at every tier** via `--local` (`LOCAL=1`); off by default
+([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)).
+When `LOCAL` is unset, skip the entire specialist and omit it from the
+report (like un-opted-in Copilot, absence is the default state).
 
 A quota-free cross-model pass served by a **local Ollama model**
 (default `qwen3.5:35b`), dispatched through
@@ -796,10 +808,13 @@ speculative. Treat this source accordingly in step 6:
   or environments the code visibly does not target — those are its
   documented failure modes.
 
-The specialist is default-on despite the noise because the two real
-catches came at zero quota cost, and the same helper is the offline
-field-mode reviewer — keeping it exercised on every dev review keeps
-it trustworthy in the field.
+The specialist is opt-in
+([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)):
+the real catches come at zero quota cost, but on current hardware the
+run is the review's wall-clock long pole, so that cost is paid only
+when a reviewer chooses it. The same helper remains the offline
+field-mode reviewer — opt in on a dev review periodically to keep it
+exercised and trustworthy in the field.
 
 ### 6. Apply silence filter
 
@@ -872,7 +887,7 @@ review indefinitely:
 **Static analysis**: <run | skipped (--skip-static)>
 **Claude Adversarial**: <1 pass (Lens A) | 2 passes (Lens A + Lens B)>
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
-**Local Adversarial**: <run (<model>) | skipped (<reason>) | off (--no-local)>
+**Local Adversarial**: <off (default) | run (<model>, --local) | skipped (<reason>, --local)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
 ### Must-Fix
@@ -930,7 +945,7 @@ Existing Review Comments sections. Use:
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Claude Adversarial**: 1 pass (Lens A)
 **Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
-**Local Adversarial**: <run (<model>) | skipped (<reason>) | off (--no-local)>
+**Local Adversarial**: <off (default) | run (<model>, --local) | skipped (<reason>, --local)>
 
 ### Static Analysis
 
@@ -955,8 +970,8 @@ Existing Review Comments sections. Use:
 |---|------|------|---------|
 | 1 | `path` | 23 | Description (cross-model confirmed by <specialist> / uncorroborated — spot-checked) |
 
-<!-- Local Adversarial skipped: <reason>   (when default-on but Ollama/model unavailable or errored) -->
-<!-- Omitted entirely when opted out with --no-local. -->
+<!-- Local Adversarial skipped: <reason>   (when opted in but Ollama/model unavailable or errored) -->
+<!-- Omitted entirely by default, when --local was not passed. -->
 
 No governance concerns for a change of this scope.
 ```
@@ -975,7 +990,7 @@ since Claude Adversarial is now unconditional at Light.)
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Copilot Adversarial**: <run (--copilot) | skipped (<reason>, --copilot)>  <!-- include only when COPILOT=1; shows that an opted-in cross-model pass ran-clean vs. was skipped -->
-**Local Adversarial**: <run (<model>) | skipped (<reason>)>  <!-- omit only when --no-local; shows the default-on local pass ran-clean vs. was skipped -->
+**Local Adversarial**: <run (<model>) | skipped (<reason>)>  <!-- include only when LOCAL=1; shows that an opted-in local pass ran-clean vs. was skipped -->
 No issues found. LGTM.
 ```
 
