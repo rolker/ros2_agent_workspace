@@ -68,7 +68,7 @@ remains standalone-capable and is the offline/field-mode review path.
 | File | Change |
 |------|--------|
 | `.claude/skills/review-code/SKILL.md` | Flip ~12 occurrences from `--no-local`/default-on to `--local`/default-off; add `--no-local` deprecated no-op; carry hardware-speed rationale in flag description |
-| `.agent/knowledge/review_depth_classification.md` | 4 occurrences flipped |
+| `.agent/knowledge/review_depth_classification.md` | 5 occurrences flipped |
 | `.agent/knowledge/skill_workflows.md` | 2 occurrences flipped |
 | `.agent/knowledge/inspiration_agent_workspace_digest.md` | 1 historical note updated |
 

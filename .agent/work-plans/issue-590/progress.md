@@ -101,7 +101,7 @@ References to the default-on behavior found in knowledge files (all need updatin
 **CI**: all-pass
 
 ### Findings
-- [ ] (cross-confirmed) Plan's Files-to-Change table still says `review_depth_classification.md` — "4 occurrences flipped", while step 2 (and the implementation) covers 5. Raised by Copilot @ `8060ea0` and, earlier, by Plan Review must-fix @ `f782fdf` (body enumeration was fixed; the table row was missed). Implementation itself is correct — all 5 references flipped. Fix: change `4` → `5` in the table row — `.agent/work-plans/issue-590/plan.md:71`
+- [x] (cross-confirmed) Plan's Files-to-Change table still says `review_depth_classification.md` — "4 occurrences flipped", while step 2 (and the implementation) covers 5. Raised by Copilot @ `8060ea0` and, earlier, by Plan Review must-fix @ `f782fdf` (body enumeration was fixed; the table row was missed). Implementation itself is correct — all 5 references flipped. Fix: change `4` → `5` in the table row — `.agent/work-plans/issue-590/plan.md:71`
 - [ ] (suggestion, Copilot) "No findings format" template's `**Local Adversarial**` line omits the `--local` token, unlike the adjacent Copilot line and unlike the standard/Light templates which use `run (<model>, --local) | skipped (<reason>, --local)`. Fix: add the flag token to both branches — `.claude/skills/review-code/SKILL.md:993`
 
 ### False positives
