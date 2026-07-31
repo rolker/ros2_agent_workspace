@@ -90,7 +90,7 @@ Per the Consequences Map:
 
 ### What landed
 
-Six atomic commits on `feature/issue-596` (plan-sync + four seams):
+Five atomic commits on `feature/issue-596` (plan-sync + four seams):
 
 1. `9c949cb` — **plan-sync**: folded the three operator-approved amendments
    into `plan.md` and checked off the three Plan Review findings in this file:
@@ -171,8 +171,8 @@ Note: --no-local (standing decision #590); Copilot off (default). Local + Copilo
 **CI**: all-pass
 
 ### Findings
-- [ ] (minor, Copilot) plan.md:51 hard-coded refs `plan-task/SKILL.md:412`/`:423` stale again — the R1 fix commit `2f85576` updated the numbers and re-staled them in the same commit (6 lines inserted above Guidelines; now 418/429). Recurrence of Local Review R1 finding 1 (different head SHA, so not a formal cross-confirmation) — numeric refs are fragile; replace with a by-name reference to the Guidelines section — `.agent/work-plans/issue-596/plan.md:51`
-- [ ] (minor, Copilot) Implementation entry says "Six atomic commits … (plan-sync + four seams)" but five are listed and five exist on the branch — write-time counting typo; change "Six" to "Five" — `.agent/work-plans/issue-596/progress.md:93`
+- [x] (minor, Copilot) plan.md:51 hard-coded refs `plan-task/SKILL.md:412`/`:423` stale again — the R1 fix commit `2f85576` updated the numbers and re-staled them in the same commit (6 lines inserted above Guidelines; now 418/429). Recurrence of Local Review R1 finding 1 (different head SHA, so not a formal cross-confirmation) — numeric refs are fragile; replace with a by-name reference to the Guidelines section — `.agent/work-plans/issue-596/plan.md:51`
+- [x] (minor, Copilot) Implementation entry says "Six atomic commits … (plan-sync + four seams)" but five are listed and five exist on the branch — write-time counting typo; change "Six" to "Five" — `.agent/work-plans/issue-596/progress.md:93`
 
 ### False positives
 - (Copilot) progress.md:158 Local Review entry cites "self-stale" line numbers (412/423) — verified via `git show 816c09d` that both were accurate at the entry's correlation key (branch head `816c09d`, ADR-0013 review-entry semantics); timeline entries are point-in-time historical records and the finding is closed, so retro-editing to track later drift would falsify the review record.

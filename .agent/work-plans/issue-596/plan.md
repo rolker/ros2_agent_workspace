@@ -48,7 +48,7 @@ ADR required.
 
 | File | Change |
 |------|--------|
-| `.claude/skills/plan-task/SKILL.md` | Add `## Documentation & Instruction Impact` section to plan template in step 5. The plan line-count guidance that a companion note would touch lives in the **Guidelines** section (`plan-task/SKILL.md:412`, the 30–80-line bullet at :423), not "step 6" — one small required section keeps plans within the 30-80 line target, so no companion note is needed. |
+| `.claude/skills/plan-task/SKILL.md` | Add `## Documentation & Instruction Impact` section to plan template in step 5. The plan line-count guidance that a companion note would touch lives in the **Guidelines** section of `plan-task/SKILL.md` (the 30–80-line bullet; cited by name — numeric line refs went stale twice in this PR alone), not "step 6" — one small required section keeps plans within the 30-80 line target, so no companion note is needed. |
 | `.agent/knowledge/principles_review_guide.md` | Add two rows to Consequences Map: interface changes → package README; pattern surfaced → knowledge/README candidate |
 | `.claude/skills/review-code/SKILL.md` | Extend 5b consequence check prose with explicit doc-impact and instruction-candidate instructions |
 | `.claude/skills/review-plan/SKILL.md` | Add "Documentation & instruction impact" evaluation dimension to step 4 |
