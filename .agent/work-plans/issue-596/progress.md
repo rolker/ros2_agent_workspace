@@ -140,3 +140,22 @@ Six atomic commits on `feature/issue-596` (plan-sync + four seams):
 Lifecycle: **Implementation** → **review-code** (pre-push). Hand off to a
 fresh-context `review-code` sub-agent, then push / open the PR
 (`Closes #596`).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 19:21 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-596 at `816c09d`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching files — .claude/skills/**, principles_review_guide.md)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 1 | **Ship**: recommended — no Must-fix; cross-references verified consistent across all four docs, only low-severity suggestions remain
+
+### Findings
+- [ ] (suggestion) plan.md:51 cites `plan-task/SKILL.md:409` for line-count guidance; `## Guidelines` is at 412, the 30-80-lines bullet at 423 — stale line ref — `.agent/work-plans/issue-596/plan.md:51`
+- [ ] (suggestion) doc-impact check lives in 5b Governance Specialist, which Light tier skips; param/topic/service doc check silently unenforced on the Light path — note it's Standard+ only or fold into 5a — `.claude/skills/review-code/SKILL.md:425`
+- [ ] (suggestion) `.agent/knowledge/` and `.agents/README.md` appear on both sides of the plan-task template split (stale-docs same-PR vs operator-decided candidates); a plan editing a knowledge doc directly could trip a spurious candidate finding — disambiguate — `.claude/skills/plan-task/SKILL.md:148-153`
+
+Note: --no-local (standing decision #590); Copilot off (default). Local + Copilot adversarial specialists omitted. Guidance-doc calibration (#537) applied — all findings are Suggestions; none would actively mislead.
