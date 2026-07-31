@@ -29,13 +29,25 @@ with three required additions.
 
 3. **Evaluate mechanical enforcement (PreToolUse hook)** — ADR-0004/0005 require a
    documented conclusion, not another "backlog note":
-   - **`AskUserQuestion` hook**: technically feasible — hook reads the `question` field
-     from the tool-call JSON, checks for `<repo>#<N>` prefix, gates on `$WORKTREE_ISSUE`
-     to limit to lifecycle sessions. Implement in `.claude/settings.json` `hooks` section.
+   - **`AskUserQuestion` hook**: implemented as **warn-only and always-on**
+     (operator decision, plan checkpoint 2026-07-31). The hook logic lives in a
+     versioned script `.agent/hooks/check_question_context.py` (matching
+     `check-commit-identity.py` conventions; `.claude/settings.json` only wires it
+     as a `PreToolUse` matcher for `AskUserQuestion`). It reads the tool-call JSON
+     from stdin and, when **no** `questions[].question` opens with a `<repo>#<N>`
+     token, emits a non-blocking nudge to add the re-orientation header. It
+     **never blocks or denies** — a false positive costs a nudge, nothing else —
+     and **fails SAFE**: any parse error, unexpected schema, or internal exception
+     exits 0 silently so the tool call is never broken. The `$WORKTREE_ISSUE` gate
+     from the original plan is **dropped** (Plan Review finding: it fires in *any*
+     worktree session, not only run-issue orchestration — the same
+     can't-distinguish failure mode used to reject the Bash-`description` hook).
+     Warn-only + always-on sidesteps that: over-firing costs only a nudge.
    - **Bash `description` hook**: not feasible to scope without pervasive false positives —
      all Bash calls would need the format, including non-orchestration commands; the hook
-     cannot reliably distinguish. Record infeasibility in a code comment and in the issue
-     comment before closing.
+     cannot reliably distinguish. Record infeasibility in a **comment block in the hook
+     script header** (`check_question_context.py`); the matching **issue comment is posted
+     by the host at close time** (no `gh` in this container dispatch — do not attempt it).
 
 4. **Check adapter files** — verify `.github/copilot-instructions.md` and
    `.agent/instructions/gemini-cli.instructions.md` for references to the Checkpoints
@@ -49,9 +61,12 @@ with three required additions.
 | File | Change |
 |------|--------|
 | `.claude/skills/run-issue/SKILL.md` | Add Bash-description + transition rules to § Checkpoints; extend prompt-free section with `/tmp` read-tool note |
-| `.claude/settings.json` | Add `PreToolUse` hook for `AskUserQuestion` prefix check |
-| `.github/copilot-instructions.md` | Verify/update if references to Checkpoints are stale |
-| `.agent/instructions/gemini-cli.instructions.md` | Same check |
+| `.agent/hooks/check_question_context.py` | **New** — warn-only, always-on hook logic (reads tool-call JSON, checks `<repo>#<N>` token, fails safe); Bash-description infeasibility recorded in header comment |
+| `.claude/settings.json` | Wire the `PreToolUse` `AskUserQuestion` matcher to the script (no inline logic) |
+| `.agent/scripts/tests/test_check_question_context.sh` | **New** — smoke test (conforming → silent; non-conforming → warn + exit 0; malformed/empty → silent exit 0); runs via `run_script_tests.sh` glob |
+| `AGENTS.md` | Add `check_question_context.py` row to the script-reference hooks table |
+| `.github/copilot-instructions.md` | **Verify-only** — reviewer confirmed no Checkpoints/AskUserQuestion references; re-verify, expect no change |
+| `.agent/instructions/gemini-cli.instructions.md` | **Verify-only** — same |
 
 ## Principles Self-Check
 
@@ -74,8 +89,9 @@ with three required additions.
 
 | If we change... | Also update... | Included? |
 |---|---|---|
-| `run-issue/SKILL.md` § Checkpoints | adapter files (copilot, gemini) | Yes — step 4 |
+| `run-issue/SKILL.md` § Checkpoints | adapter files (copilot, gemini) | Yes — step 4 (verify-only; no refs found) |
 | PreToolUse hook | `.claude/settings.json` hooks section | Yes — step 3 |
+| Add `.agent/hooks/*.py` hook | AGENTS.md script-reference table | Yes — step 3 (Plan Review consequence gap) |
 
 ## Documentation & Instruction Impact
 
@@ -86,10 +102,13 @@ with three required additions.
 
 ## Open Questions
 
-- [ ] Does the Claude Code hook mechanism reliably receive `AskUserQuestion` parameters
-  in the format assumed (JSON with `question` key)? Verify before implementing the hook,
-  or stub the hook + document if verification fails.
+- [x] Does the Claude Code hook mechanism reliably receive `AskUserQuestion` parameters
+  in the format assumed (JSON with `question` key)? **Resolved by design:** the hook
+  fails SAFE — if the stdin JSON is absent, malformed, or shaped differently than
+  assumed, it exits 0 silently and the tool call proceeds. Warn-only + fail-safe means
+  a wrong schema assumption degrades to "no nudge," never a broken checkpoint.
 
 ## Estimated Scope
 
-Single PR — docs-only unless the hook is feasible, in which case one small `.claude/settings.json` edit.
+Single PR — skill-prose edits plus a small hook script (`check_question_context.py`),
+its `.claude/settings.json` wiring, a smoke test, and the AGENTS.md table row.
