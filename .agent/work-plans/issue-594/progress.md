@@ -209,3 +209,5 @@ Round-2 Ship was "recommended" (must-fix 2→1, mechanical), so a full round-3 r
 
 ### False positives
 - none — both Copilot comments verified valid against local code; prior local-review findings all addressed at earlier SHAs (no cross-source repeats)
+
+**Host note for address-findings**: source the canonical writable set from `progress_read.py`'s `CANONICAL_TYPES` (mirror the list with a keep-in-sync comment pointing there — do not import python from bash); include the `Local Review (Pre-Push)` parenthetical variant; exclude read-only `External Review`. Validation failure = exit 2 listing the accepted types.
