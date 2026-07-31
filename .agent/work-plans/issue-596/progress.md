@@ -159,3 +159,23 @@ fresh-context `review-code` sub-agent, then push / open the PR
 - [x] (suggestion) `.agent/knowledge/` and `.agents/README.md` appear on both sides of the plan-task template split (stale-docs same-PR vs operator-decided candidates); a plan editing a knowledge doc directly could trip a spurious candidate finding — disambiguate — `.claude/skills/plan-task/SKILL.md:148-153`
 
 Note: --no-local (standing decision #590); Copilot off (default). Local + Copilot adversarial specialists omitted. Guidance-doc calibration (#537) applied — all findings are Suggestions; none would actively mislead.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-31 15:34 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #597 at `2f85576`
+**Sources**: 2 (Copilot R1 @ `2f85576`, Local Review (Pre-Push) @ `816c09d`) + CI rollup
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (minor, Copilot) plan.md:51 hard-coded refs `plan-task/SKILL.md:412`/`:423` stale again — the R1 fix commit `2f85576` updated the numbers and re-staled them in the same commit (6 lines inserted above Guidelines; now 418/429). Recurrence of Local Review R1 finding 1 (different head SHA, so not a formal cross-confirmation) — numeric refs are fragile; replace with a by-name reference to the Guidelines section — `.agent/work-plans/issue-596/plan.md:51`
+- [ ] (minor, Copilot) Implementation entry says "Six atomic commits … (plan-sync + four seams)" but five are listed and five exist on the branch — write-time counting typo; change "Six" to "Five" — `.agent/work-plans/issue-596/progress.md:93`
+
+### False positives
+- (Copilot) progress.md:158 Local Review entry cites "self-stale" line numbers (412/423) — verified via `git show 816c09d` that both were accurate at the entry's correlation key (branch head `816c09d`, ADR-0013 review-entry semantics); timeline entries are point-in-time historical records and the finding is closed, so retro-editing to track later drift would falsify the review record.
+
+### Next step
+No must-fix or cross-confirmed findings; CI green. Two minor valid one-liners remain — apply via address-findings (or by hand) then merge, or merge as-is at operator discretion.
