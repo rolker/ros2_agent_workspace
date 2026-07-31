@@ -52,3 +52,15 @@ Per the Consequences Map:
 - [ ] During implementation, check framework adapter files (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`) for any references to plan-task or review-code behavior that would become stale.
 - [ ] Verify `.claude/skills/review-plan/SKILL.md` against source — confirm whether it enumerates expected plan sections, and if so add the new "Documentation & instruction impact" section to its checklist.
 - [ ] Confirm the plan explicitly states "none" in the documentation impact section (or equivalent) to validate the required-explicit-acknowledgment design goal — the template wording should make silence a conspicuous omission.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-31 19:02 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-596/plan.md` at `1c6ab2a`
+**Branch**: feature/issue-596 at `1c6ab2a`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
