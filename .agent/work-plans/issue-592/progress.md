@@ -223,3 +223,30 @@ From the consequences map:
 
 ### Next step
 - Lifecycle: **Implementation → review-code** (re-review the three fixes). Dispatch a fresh-context sub-agent per the skill's Next-step contract; no auto-chaining — the host orchestrator drives.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 21:22 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-592 at `55a180a`
+**Mode**: pre-push
+**Depth**: Standard (reason: `.claude/skills/*/SKILL.md` + `.claude/settings.json` governance override; always-on hook fail-safe scrutiny)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 2 | **Ship**: recommended — no must-fix; fail-safe contract verified airtight by 2 adversarial passes + 9/9 smoke suite + runtime trace; remaining items are optional refinements to a warn-only hook
+
+### Findings
+- [ ] (suggestion) Regex `.search()` is unanchored over the 120-char window, so a path/URL-like `…/…#N` in the first line (`foo/bar.py#12`, a URL fragment) matches and suppresses the nudge — safe direction (missed nudge, never a block); could anchor to the leading token — `.agent/hooks/check_question_context.py:54`
+- [ ] (suggestion) Smoke-test coverage gaps vs. the docstring's contract claim: no non-dict top-level JSON case (the `data.get`-raises fail-safe path), no non-dict/non-str question case, and stderr-empty / output-valid-JSON are never asserted — `.agent/scripts/tests/test_check_question_context.sh`
+- [ ] (suggestion) If `$CLAUDE_PROJECT_DIR` is unset the command resolves to `/.agent/hooks/…` and python3 exits 2 — non-blocking for a warn-only hook and the harness reliably sets the var; acceptable as-is, noted only for the guarantee's provenance — `.claude/settings.json:44`
+
+### Notes
+- Prior this-cycle Round-1 must-fix (hook path → `$CLAUDE_PROJECT_DIR`) confirmed fixed; regex tightening (repo-slug separator) and smoke cases 7+8 confirmed present. All Round-1 findings closed.
+- Static analysis clean under the enforced pre-commit profile (`flake8 --max-line-length=100 --extend-ignore=E203,W503,E402`; shellcheck warning-clean; settings.json valid JSON; py_compile OK). Local `Q000`/`D401`/`D103` are flake8-quotes/flake8-docstrings plugin noise not in the enforced config (black enforces double quotes); pylint hook scopes to `.agent/scripts/` only, not `.agent/hooks/`.
+- Security clean: no eval/exec/subprocess/file-writes/network; question text is regex-searched and echoed only via a fixed NUDGE string (never interpolated) — no injection surface. Fail-safe: every path exits 0 with only `systemMessage`/`hookSpecificOutput.additionalContext` — can never block/deny a checkpoint.
+- No plan drift: files changed match the plan; `triage-reviews/SKILL.md` correctly unchanged (verify-only). ADR-0004/0005 mechanical-enforcement requirement satisfied; Bash-description infeasibility recorded in the hook header (host posts the #592 issue comment at close — no `gh` auth in this dispatch).
+- Round count starts fresh this reopened cycle: the `## Local Review (Pre-Push)` at the file top (`718498a`, Fable 5) belongs to merged PR #593 and is excluded; this cycle's prior pre-push entry (`485f116`) is Round 1, so this is Round 2.
+
+### Next step
+- Lifecycle: **Local Review (approved) → push / open PR (`Closes #592`) → triage-reviews**. No auto-chaining — the host orchestrator drives and pauses at the publish checkpoint. Suggestions are optional; may be applied in-branch or tracked.
