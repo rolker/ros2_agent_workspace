@@ -168,3 +168,27 @@ Static analysis clean (shellcheck both scripts; settings.json valid JSON; test-f
 
 ### Next step
 Lifecycle: **Local Review** → address-findings (one mechanical must-fix) → re-review, then push / open PR. Verdict is changes-requested, so the host dispatches **address-findings** on the open finding above; Ship: recommended means a full round-3 re-review is optional once the mechanical fix + test assertion land.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 17:27 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-594 at `25fcc77`
+**Addressed**: `## Local Review (Pre-Push)` (2026-07-31 17:23 +00:00, branch `b4c01c5`, Round 2) — 1 must-fix + 1 suggestion, both actioned
+**Commits**: `25fcc77`
+
+### Actions
+- [x] (must-fix) Idempotency guard false-failure on the success path — after `git add`, exit 0 when nothing is staged for the file (the entry is already committed: a prior run appended AND committed it, so the append guard skipped the re-append). Previously fell through to an empty `git commit` that failed into exit 3, which the prompt-free host path reads as a real git failure. Verified empirically: identical re-run now exits 0. — `.agent/scripts/progress_append.sh:106-116` (`25fcc77`)
+- [x] (suggestion) Test case 12 now captures and asserts `rc == 0` on the identical re-run (in addition to the entry-count invariant), pinning the exit semantics the fix guarantees — without it the count-only check passed despite the spurious exit-3. — `.agent/scripts/tests/test_progress_append.sh:129-142` (`25fcc77`)
+
+### Verification
+- Repro: identical re-run against a fresh repo now exits 0 (was 3)
+- `bash .agent/scripts/tests/test_progress_append.sh` → 12 passed, 0 failed
+- `shellcheck .agent/scripts/progress_append.sh` clean
+- pre-commit hooks green on the fix commit (shellcheck, identity, no-commit-to-branch included)
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
+`.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
+Round-2 Ship was "recommended" (must-fix 2→1, mechanical), so a full round-3 re-review is optional once this mechanical fix + rc assertion land.
