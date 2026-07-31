@@ -233,3 +233,25 @@ Round-2 Ship was "recommended" (must-fix 2→1, mechanical), so a full round-3 r
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
 `.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 18:07 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-594 at `d697eb6`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant — first tracked permission allowlist + script that shells out to git commit)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 3 | **Ship**: recommended — 0 must-fix; must-fix trajectory 2→1→0 (converged), suggestions are defense-in-depth/consequence, none block ship
+
+Static analysis clean (shellcheck --severity=warning both scripts; settings.json valid JSON; 13/13 tests green, discovered by run_script_tests.sh). Both fresh-context Claude Adversarial lenses ran (A logic, B systemic); Copilot off (default), local off (--no-local, #590). Lens B raised the --name/--email identity-arg gap as must-fix; downgraded to suggestion after verifying check-commit-identity.py (strict-mode reject when $AGENT_NAME set, reads GIT_AUTHOR_EMAIL) + CI check_pr_authors.py both backstop it — the hole needs $AGENT_NAME unset AND deliberate human args. Plan adherence strong (7/7 files, no scope creep); all prior-round + Integrated-Review findings verified addressed. Dogfood: this entry written+committed by the shipped progress_append.sh.
+
+### Findings
+- [ ] (suggestion) `.claude/settings.local.json` not gitignored though this PR makes it the per-machine layer over tracked settings.json — accidental commit of machine-specific overrides — `.gitignore` / `AGENTS.md:558`
+- [ ] (suggestion) `--name`/`--email` validated only non-empty; on allowlisted prompt-free path with $AGENT_NAME unset + explicit human args a human-identity commit can land (backstopped by pre-commit strict-mode + CI) — validate --email against identity_patterns.ACCEPTED_AGENT_PATTERNS — `.agent/scripts/progress_append.sh:47-51`
+- [ ] (suggestion) `-C <dir>` unbounded — allowlisted script can append+commit into any git repo on host (by design, tiny blast radius); add a scope note to the header comment — `.agent/scripts/progress_append.sh:69-70`
+
+### Next step
+Lifecycle: **Local Review** → push / open PR → **triage-reviews**. Verdict approved, 0 must-fix, Ship: recommended — the 3 suggestions are optional/operator-decided and none block push. Host may proceed to push/PR; suggestion 1 (gitignore settings.local.json) is the most concrete follow-up if applied before push.
