@@ -41,10 +41,17 @@ import json
 import re
 import sys
 
-# A repo-qualified token: <repo>#<N>, e.g. "project11_navigation#466". The `#`
-# must be immediately preceded by non-whitespace, so a bare "PR #24" (space
-# before `#`) does NOT satisfy it — that is the ambiguous form we nudge against.
-REPO_ISSUE_TOKEN = re.compile(r"\S+#\d+")
+# A repo-qualified token: <repo>#<N>, e.g. "project11_navigation#466" or
+# "owner/repo#3". The repo portion must look like an actual slug — it has to
+# carry at least one repo-name separator (`/`, `_`, or `-`), which every real
+# slug here does (`ros2_agent_workspace`, `project11_navigation`, `owner/repo`,
+# `my-repo`). That mandatory separator is what rejects the ambiguous forms we
+# nudge against: a bare "PR #24" (space before `#`), and — the tightening this
+# regex adds — the no-space bare words "PR#24" / "issue#5", which a looser
+# `\S+#\d+` would have wrongly accepted as conforming. The trade-off is a
+# separator-less single-word repo (e.g. "manifest#5") also nudges; that is the
+# safe direction for a warn-only hook (an extra nudge, never a block).
+REPO_ISSUE_TOKEN = re.compile(r"[A-Za-z0-9._/-]*[/_-][A-Za-z0-9._/-]*#\d+")
 
 # How far into the question text the header token must appear. The re-orientation
 # header opens the question, so only the leading slice is inspected — a `#N`
