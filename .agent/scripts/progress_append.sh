@@ -91,7 +91,18 @@ fi
 { printf '\n'; printf '%s\n' "$ENTRY"; } >> "$FILE"
 
 git -C "$ROOT" add -- "$FILE_REL" || exit 3
-if ! git -C "$ROOT" -c user.name="$NAME" -c user.email="$EMAIL" \
+# Force the validated identity onto BOTH author and committer via the GIT_*
+# env vars: ambient GIT_AUTHOR_*/GIT_COMMITTER_* (exported by
+# set_git_identity_env.sh) outrank `-c user.name/email`, so `-c` alone can be
+# silently overridden by a stale/human identity — the very case
+# check_pr_authors.py trips on. Setting the four vars here makes the override
+# authoritative; the `-c` flags remain as a fallback when GIT_* are unset.
+# Note: `git commit -- <pathspec>` commits only that path; if a future
+# pre-commit hook mutated progress.md and exited 0, the hook's edit would stay
+# unstaged and the tree could desync from HEAD. No such hook exists today.
+if ! GIT_AUTHOR_NAME="$NAME" GIT_AUTHOR_EMAIL="$EMAIL" \
+     GIT_COMMITTER_NAME="$NAME" GIT_COMMITTER_EMAIL="$EMAIL" \
+     git -C "$ROOT" -c user.name="$NAME" -c user.email="$EMAIL" \
         commit -m "progress: $TYPE_MSG for #$ISSUE" -- "$FILE_REL"; then
     echo "error: commit failed (pre-commit hook?) — $FILE_REL is appended and staged; fix and re-commit" >&2
     exit 3
