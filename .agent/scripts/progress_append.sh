@@ -19,8 +19,10 @@
 #   - `git commit -- <file>` commits only that path; a dirty index is untouched
 #   - identity comes from $AGENT_NAME/$AGENT_EMAIL (set_git_identity_env.sh)
 #     or --name/--email, and the script FAILS LOUD when unset — it never falls
-#     back to human git config (which would trip check_pr_authors.py on
-#     agent-convention branches)
+#     back to human git config. Note: the values are not validated beyond
+#     non-empty (an arbitrary --email is possible); agent-pattern enforcement
+#     is the job of check-commit-identity.py (pre-commit strict mode) and
+#     check_pr_authors.py (CI) on agent-convention branches
 #
 # -C <dir> targets another worktree (the `git -C` pattern the skills use);
 # default is the repo containing the current directory. Scope note: -C is
