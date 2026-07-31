@@ -81,6 +81,24 @@ else
     fail "missing questions list (rc=$HOOK_RC, out=$HOOK_OUT)"
 fi
 
+# 7. No-space bare token ('PR#24', no repo-slug separator) → warn, exit 0. A
+#    looser \S+#\d+ would wrongly accept this; the tightened regex must nudge.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"How should we handle the findings on PR#24?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage' \
+    && printf '%s' "$HOOK_OUT" | grep -qi 're-orientation header'; then
+    pass "no-space bare token 'PR#24' → warn present, exit 0"
+else
+    fail "no-space bare token 'PR#24' (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 8. Empty question string → warn, exit 0 (no conforming token to find).
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":""}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "empty question string → warn present, exit 0"
+else
+    fail "empty question string (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
 echo
 echo "check_question_context.py tests: $TEST_PASS passed, $TEST_FAIL failed"
 [ "$TEST_FAIL" -eq 0 ]
