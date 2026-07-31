@@ -125,3 +125,57 @@ From the consequences map:
 - [x] (suggestion) If implemented, the hook check belongs in a versioned `.agent/hooks/*.py` script (matching `check-commit-identity.py` / `check_pr_authors.py`), not inline in settings.json; add that file to Files-to-Change — `plan.md:51` (done: logic in `.agent/hooks/check_question_context.py`; settings.json only wires it)
 - [x] (suggestion) Consequence gap: Issue Review requires documenting a new hook in the AGENTS.md script-reference table (existing `.agent/hooks/*.py` are listed there); plan's Consequences table lists only `.claude/settings.json` — `plan.md:75-78` (done: AGENTS.md row added to Files-to-Change + Consequences table)
 - [x] (suggestion) Verified — adapter files (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`) have no Checkpoints/AskUserQuestion references; step 4 resolves to "no change." Mark those rows verify-only in Files-to-Change — `plan.md:53-54` (done: rows marked verify-only; re-verified in implementation — still no references)
+
+## Implementation
+**Status**: complete
+**When**: (stamped by progress_append.sh)
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-592
+**Scope**: reopened #592 — generalize "stand on its own" to all operator-facing surfaces + warn-only enforcement hook
+
+### What was done (atomic commits)
+1. **Plan-sync** (`9b99aac`) — folded in the operator decision (AskUserQuestion
+   hook is **warn-only + always-on**; the `$WORKTREE_ISSUE` gate is **dropped**
+   because it over-fires on any worktree session — a false positive costs only a
+   nudge) and the four Plan Review amendments; checked off all four Plan Review
+   findings in progress.md.
+2. **Hook mechanism** (`4100d97`) — new `.agent/hooks/check_question_context.py`
+   (`PreToolUse`, matcher `AskUserQuestion`): nudges when no `questions[].question`
+   opens with a `\S+#\d+` repo-qualified token in its header window. **Warn-only**
+   (never a deny/block decision) and **fail-safe** (any parse error / unexpected
+   schema / exception → exit 0 silent). Nudge rides `hookSpecificOutput
+   .additionalContext` + `systemMessage`. `.claude/settings.json` only wires it.
+   7-case smoke test at `.agent/scripts/tests/test_check_question_context.sh`
+   (conforming silent / non-conforming warn+exit 0 / no deny-block / mixed /
+   malformed / empty / no-questions) — runs via `run_script_tests.sh` glob, all
+   pass. AGENTS.md hooks-table row added. Bash-description-hook **infeasibility**
+   recorded in the script header comment (no reliable orchestration signal in the
+   tool-call JSON to distinguish orchestration Bash from ordinary Bash).
+3. **run-issue prose** (`82aa7cc`) — § Checkpoints reframed around **three**
+   surfaces (AskUserQuestion dialogs; Bash `description` fields → open with
+   `<repo>#<N> <phase>: …`; transition/status reports → open with repo#issue +
+   plain-words work statement, never bare numbers; the between-checkpoints
+   narration sentence now requires the repo-qualified form). Prompt-free section
+   extended: task-output files under `/tmp` are read with the `Read` tool /
+   `progress_read.py`, never Bash grep (an out-of-project Bash read prompts).
+
+### Verified, no change needed
+- **triage-reviews/SKILL.md** — the Checkpoint-context paragraph (`:375-381`)
+  already names "the `/run-issue` host, or a hand-driven session" and points at
+  run-issue § Checkpoints as the single format source. Covers hand-driven runs;
+  no edit.
+- **Adapter files** — re-verified `.github/copilot-instructions.md` and
+  `.agent/instructions/gemini-cli.instructions.md`: no Checkpoints/AskUserQuestion
+  references (grep clean). Verify-only, as the Plan Review amendment expected.
+
+### Notes for the host / next step
+- **Bash-description infeasibility issue comment** is NOT posted here (this
+  container dispatch has no `gh` auth). The host should post the infeasibility
+  conclusion (mirrored from the hook header comment) on #592 at close time.
+- **Pre-existing, unrelated test failure**: `run_script_tests.sh` reports
+  `test_check_commit_identity.sh` failing ("strict: should have rejected on-disk
+  human email…"). It is **env-driven** (on-disk git config + `AGENT_NAME` set in
+  this worktree) and touches identity files this branch does **not** modify — not
+  introduced by this work. Flagging, not fixing (would need its own investigation).
+- Next: host review-code → publish checkpoint → push + open PR (`Closes #592`).
