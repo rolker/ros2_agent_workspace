@@ -98,3 +98,15 @@ From the consequences map:
 - [ ] Mechanical enforcement evaluation must reach a documented conclusion (hook or explicit infeasibility note) — not another "backlog note, not this PR"; the issue requires it before closing.
 - [ ] After implementing skill-file changes, check adapter files (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`) for stale references to the Checkpoints section or surfaces being generalized.
 - [ ] If a PreToolUse hook is created, add it to `.claude/settings.json` and document in AGENTS.md.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-31 20:45 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-592/plan.md` at `386a5eb`
+**Branch**: feature/issue-592 at `386a5eb`
+**Phases**: single
+
+### Open questions
+- [ ] Does the Claude Code hook mechanism reliably receive `AskUserQuestion` parameters in the format assumed (JSON with `question` key)? Verify before implementing the hook, or stub and document if verification fails.
