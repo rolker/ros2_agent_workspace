@@ -110,3 +110,18 @@ From the consequences map:
 
 ### Open questions
 - [ ] Does the Claude Code hook mechanism reliably receive `AskUserQuestion` parameters in the format assumed (JSON with `question` key)? Verify before implementing the hook, or stub and document if verification fails.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-31 20:48 +00:00
+**By**: Claude Code Agent (Claude Opus)  <!-- independent: fresh-context dispatch on a different model than the Sonnet plan author; shared workspace $AGENT_NAME is not self-review -->
+
+**Plan**: `.agent/work-plans/issue-592/plan.md` at `386a5eb`
+**PR**: PR-less (--issue / worktree mode; no GitHub auth in container)
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) AskUserQuestion PreToolUse hook over-fires: it gates on `$WORKTREE_ISSUE`, which is set in *any* worktree session, not only run-issue orchestration — the same "can't distinguish orchestration" failure mode the plan uses to reject the Bash-`description` hook. Reconcile: scope more tightly or document the accepted false-positive rate — `plan.md:33-37`
+- [ ] (suggestion) If implemented, the hook check belongs in a versioned `.agent/hooks/*.py` script (matching `check-commit-identity.py` / `check_pr_authors.py`), not inline in settings.json; add that file to Files-to-Change — `plan.md:51`
+- [ ] (suggestion) Consequence gap: Issue Review requires documenting a new hook in the AGENTS.md script-reference table (existing `.agent/hooks/*.py` are listed there); plan's Consequences table lists only `.claude/settings.json` — `plan.md:75-78`
+- [ ] (suggestion) Verified — adapter files (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`) have no Checkpoints/AskUserQuestion references; step 4 resolves to "no change." Mark those rows verify-only in Files-to-Change — `plan.md:53-54`
