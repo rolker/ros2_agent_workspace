@@ -146,13 +146,17 @@ fi
 PROG9="$REPO/.agent/work-plans/issue-9/progress.md"
 before=$(grep -c '^## Implementation$' "$PROG9")
 printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # first append+commit
-printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # identical re-run
+out=$(printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 2>/dev/null)  # identical re-run (stdout only)
 rc=$?
 after=$(grep -c '^## Implementation$' "$PROG9")
-if [ "$before" -eq 0 ] && [ "$after" -eq 1 ] && [ "$rc" -eq 0 ]; then
-    pass "identical entry as file tail is not re-appended, re-run exits 0 (idempotent replay)"
+# The re-run's stdout must be the distinct no-op message, not the misleading
+# "appended + committed ..." — the entry was neither appended nor committed.
+if [ "$before" -eq 0 ] && [ "$after" -eq 1 ] && [ "$rc" -eq 0 ] \
+    && printf '%s' "$out" | grep -qi 'no-op' \
+    && ! printf '%s' "$out" | grep -qi 'appended + committed'; then
+    pass "identical entry as file tail is not re-appended, re-run exits 0 + no-op stdout (idempotent replay)"
 else
-    fail "idempotent replay (before=$before after=$after rc=$rc)"
+    fail "idempotent replay (before=$before after=$after rc=$rc out=$out)"
 fi
 
 echo ""

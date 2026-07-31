@@ -138,7 +138,7 @@ git -C "$ROOT" add -- "$FILE_REL" || exit 3
 # (which the prompt-free host path reads as a real commit failure).
 if git -C "$ROOT" diff --cached --quiet -- "$FILE_REL"; then
     echo "note: '$ENTRY_TYPE' entry already committed for #$ISSUE (nothing to commit) — treating as success" >&2
-    echo "appended + committed '$ENTRY_TYPE' entry to $FILE_REL"
+    echo "no-op: '$ENTRY_TYPE' entry already committed to $FILE_REL (nothing appended or committed)"
     exit 0
 fi
 # Force the validated identity onto BOTH author and committer via the GIT_*
