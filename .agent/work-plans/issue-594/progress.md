@@ -101,14 +101,49 @@ The issue is a workspace infrastructure change (scripts, settings, skill guidanc
 Static analysis clean (shellcheck both scripts, settings.json valid JSON). Both fresh-context Claude Adversarial lenses (A logic, B systemic) independently flagged the same two must-fixes → cross-pass confirmed. Copilot off (default); local off (--no-local, #590). Plan adherence strong (7/7 files, no scope creep, all 3 plan-review suggestions applied).
 
 ### Findings
-- [ ] (must-fix) Identity guarantee defeated by env precedence: script commits via `git -c user.name/email`, but ambient `GIT_AUTHOR_*`/`GIT_COMMITTER_*` (exported by set_git_identity_env.sh) outrank `-c` — silently disables the `--name`/`--email` override and can commit under a stale/human identity (the check_pr_authors.py trip it claims to prevent). Fix: set the four GIT_* vars to the validated identity. — `.agent/scripts/progress_append.sh:100-101`
-- [ ] (must-fix) Shipped smoke test is non-hermetic — fails 2/10 (cases 1, 8) in the standard agent shell; picked up by run_script_tests.sh so `make test-scripts`/`make validate` go red. Same root cause as above; the deterministic-authorship fix turns it green without masking. — `.agent/scripts/tests/test_progress_append.sh` (cases 1, 8)
-- [ ] (suggestion) Machine-specific absolute paths (`/home/roland/project11/...`) baked into the now-shared tracked settings.json, redundant with the relative forms — drop the absolute duplicates. — `.claude/settings.json:5,6,30,32`
-- [ ] (suggestion) First tracked *shared* allowlist also shares git fetch/gh search/journalctl/etc.; confirm each entry is intentionally shareable + note settings.local.json still layers on top. — `.claude/settings.json:3-33`
-- [ ] (suggestion) CRLF/trailing-space heading leaks `\r`/double-space into the commit subject; trim trailing whitespace from ENTRY_TYPE. — `.agent/scripts/progress_append.sh:81`
-- [ ] (suggestion) Non-idempotent on commit failure: entry appended before commit, so a naive re-run after exit-3 double-appends. — `.agent/scripts/progress_append.sh:97-104`
-- [ ] (suggestion) `git commit -- <pathspec>` would desync tree vs HEAD if a hook mutates progress.md and exits 0 (latent — no such hook today); add a note. — `.agent/scripts/progress_append.sh:101`
+- [x] (must-fix) Identity guarantee defeated by env precedence: script commits via `git -c user.name/email`, but ambient `GIT_AUTHOR_*`/`GIT_COMMITTER_*` (exported by set_git_identity_env.sh) outrank `-c` — silently disables the `--name`/`--email` override and can commit under a stale/human identity (the check_pr_authors.py trip it claims to prevent). Fix: set the four GIT_* vars to the validated identity. — `.agent/scripts/progress_append.sh:100-101`
+- [x] (must-fix) Shipped smoke test is non-hermetic — fails 2/10 (cases 1, 8) in the standard agent shell; picked up by run_script_tests.sh so `make test-scripts`/`make validate` go red. Same root cause as above; the deterministic-authorship fix turns it green without masking. — `.agent/scripts/tests/test_progress_append.sh` (cases 1, 8)
+- [x] (suggestion) Machine-specific absolute paths (`/home/roland/project11/...`) baked into the now-shared tracked settings.json, redundant with the relative forms — drop the absolute duplicates. — `.claude/settings.json:5,6,30,32`
+- [x] (suggestion) First tracked *shared* allowlist also shares git fetch/gh search/journalctl/etc.; confirm each entry is intentionally shareable + note settings.local.json still layers on top. — `.claude/settings.json:3-33`
+- [x] (suggestion) CRLF/trailing-space heading leaks `\r`/double-space into the commit subject; trim trailing whitespace from ENTRY_TYPE. — `.agent/scripts/progress_append.sh:81`
+- [x] (suggestion) Non-idempotent on commit failure: entry appended before commit, so a naive re-run after exit-3 double-appends. — `.agent/scripts/progress_append.sh:97-104`
+- [x] (suggestion) `git commit -- <pathspec>` would desync tree vs HEAD if a hook mutates progress.md and exits 0 (latent — no such hook today); add a note. — `.agent/scripts/progress_append.sh:101`
 
 **Dogfood note**: this entry was written and committed by the shipped `progress_append.sh` — it worked (appended + scoped commit succeeded). Commit landed correctly under the agent identity here only because ambient `GIT_AUTHOR_*` equals the agent identity in this session — which is exactly why must-fix #1 stays latent on the happy path.
 
 **Host note for address-findings**: the shared-settings direction is an operator decision made at the plan checkpoint — do not revert it. For the shareability suggestion (#4 in the list): apply the mechanical half (drop the absolute-path duplicate entries, add a one-line layering comment/doc note); the entry-by-entry "intentionally shareable" confirmation is deferred to the operator at PR review — list the entries needing eyes in your Implementation entry instead of deciding for them. For the idempotency suggestion: a re-run guard (skip append if the file's last entry heading+When matches stdin, or check for an identical uncommitted tail) is in scope; full transactionality is not.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 17:15 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-594 at `7540f57`
+**Addressed**: `## Local Review (Pre-Push)` (2026-07-31 17:03 +00:00, branch `a460099`) — 2 must-fix + 5 suggestions, all 7 actioned
+**Commits**: `a4d59ee` `e603702` `09973b7` `de62a8a` `7540f57`
+
+### Actions
+- [x] (must-fix) Identity guarantee defeated by env precedence — pin author+committer via `GIT_AUTHOR_*`/`GIT_COMMITTER_*` in the commit invocation so ambient exports can't override the validated identity; `-c` kept as fallback — `.agent/scripts/progress_append.sh:94-107` (`a4d59ee`)
+- [x] (must-fix) Non-hermetic smoke test (cases 1, 8) — resolved by the identity fix above; suite now 10/10 → 12/12 green in the standard agent shell (ambient `GIT_*` set) — `.agent/scripts/tests/test_progress_append.sh` (`a4d59ee`)
+- [x] (suggestion) Machine-specific absolute-path allowlist duplicates — dropped the three `/home/roland/project11/...` entries redundant with their relative forms (progress_read.py, setup.bash, set_git_identity_env.sh); kept `/opt/ros/jazzy/setup.bash` (not machine-specific, no relative twin) — `.claude/settings.json` (`de62a8a`)
+- [x] (suggestion) Shared-allowlist shareability — mechanical half done: layering note added (see below) + absolute dupes dropped. Entry-by-entry "intentionally shareable" confirmation is **deferred to the operator at PR review** per the review host note (partial: operator confirmation pending) — `.claude/settings.json`, `AGENTS.md:558` (`de62a8a`, `7540f57`)
+- [x] (suggestion) CRLF/trailing-space heading leaking into the commit subject — trim the trailing whitespace run from `ENTRY_TYPE`; added regression case 11 — `.agent/scripts/progress_append.sh:75-78` (`e603702`)
+- [x] (suggestion) Non-idempotent on commit-failure replay — guard skips the re-append when the file tail already equals the entry (append-then-commit-failed replay); added regression case 12; full transactionality intentionally out of scope — `.agent/scripts/progress_append.sh:91-101` (`09973b7`)
+- [x] (suggestion) `git commit -- <pathspec>` tree/HEAD desync — added an in-code note documenting the latent hazard (no such hook today) alongside the identity fix — `.agent/scripts/progress_append.sh:100-102` (`a4d59ee`)
+
+### Deferred to operator (shareability confirmation — finding #4)
+The tracked `.claude/settings.json` is the first *shared* allowlist. These entries do more than run local scripts and warrant an operator eyeball before merge for "intentionally shareable across all machines/agents":
+- `Bash(git fetch:*)`
+- `Bash(gh run watch:*)`, `Bash(gh search:*)`, `Bash(gh label list:*)`
+- `Bash(journalctl:*)`
+- `Bash(source /opt/ros/jazzy/setup.bash)` (assumes ROS 2 Jazzy at the standard prefix)
+Per-machine `.claude/settings.local.json` still layers on top, so a machine can always add (not remove) beyond this baseline — noted in `AGENTS.md:558`.
+
+### Verification
+- `bash .agent/scripts/tests/test_progress_append.sh` → 12 passed, 0 failed
+- `shellcheck .agent/scripts/progress_append.sh` clean; `.claude/settings.json` valid JSON
+- pre-commit hooks green on every fix commit (identity, shellcheck included)
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
+`.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
