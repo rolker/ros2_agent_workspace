@@ -99,6 +99,33 @@ else
     fail "empty question string (rc=$HOOK_RC, out=$HOOK_OUT)"
 fi
 
+# 9. Non-dict top-level JSON (valid JSON, wrong shape → data.get raises) →
+#    silent allow, exit 0 (the except-everything fail-safe path).
+run_hook '["a","list","not","a","dict"]'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "non-dict top-level JSON → silent allow, exit 0"
+else
+    fail "non-dict top-level JSON (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 10. Non-dict question entry + non-str question value → fail-safe handling,
+#     exit 0, and never a crash-shaped empty rc≠0.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":["bare string", {"question": 42}]}}'
+if [ "$HOOK_RC" -eq 0 ]; then
+    pass "non-dict/non-str question entries → exit 0 (fail safe)"
+else
+    fail "non-dict/non-str question entries (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 11. Warn-path output contract: stderr empty, stdout parses as JSON.
+HOOK_ERR="$(printf '%s' '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"no token here"}]}}' | python3 "$HOOK" 2>&1 >/dev/null)"
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"no token here"}]}}'
+if [ -z "$HOOK_ERR" ] && printf '%s' "$HOOK_OUT" | python3 -m json.tool > /dev/null 2>&1; then
+    pass "warn path: stderr empty, stdout is valid JSON"
+else
+    fail "warn path output contract (err='$HOOK_ERR')"
+fi
+
 echo
 echo "check_question_context.py tests: $TEST_PASS passed, $TEST_FAIL failed"
 [ "$TEST_FAIL" -eq 0 ]

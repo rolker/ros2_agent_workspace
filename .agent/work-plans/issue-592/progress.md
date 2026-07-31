@@ -238,7 +238,7 @@ From the consequences map:
 
 ### Findings
 - [ ] (suggestion) Regex `.search()` is unanchored over the 120-char window, so a path/URL-like `…/…#N` in the first line (`foo/bar.py#12`, a URL fragment) matches and suppresses the nudge — safe direction (missed nudge, never a block); could anchor to the leading token — `.agent/hooks/check_question_context.py:54`
-- [ ] (suggestion) Smoke-test coverage gaps vs. the docstring's contract claim: no non-dict top-level JSON case (the `data.get`-raises fail-safe path), no non-dict/non-str question case, and stderr-empty / output-valid-JSON are never asserted — `.agent/scripts/tests/test_check_question_context.sh`
+- [x] (suggestion) Smoke-test coverage gaps vs. the docstring's contract claim: no non-dict top-level JSON case (the `data.get`-raises fail-safe path), no non-dict/non-str question case, and stderr-empty / output-valid-JSON are never asserted — `.agent/scripts/tests/test_check_question_context.sh`
 - [ ] (suggestion) If `$CLAUDE_PROJECT_DIR` is unset the command resolves to `/.agent/hooks/…` and python3 exits 2 — non-blocking for a warn-only hook and the harness reliably sets the var; acceptable as-is, noted only for the guarantee's provenance — `.claude/settings.json:44`
 
 ### Notes
