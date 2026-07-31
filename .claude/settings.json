@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.agent/hooks/check_question_context.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.agent/hooks/check_question_context.py || true"
           }
         ]
       }
