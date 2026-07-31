@@ -126,6 +126,41 @@ else
     fail "warn path output contract (err='$HOOK_ERR')"
 fi
 
+# 12. Degenerate fragment with empty leading slug segment ('-#1') → warn. The
+#     old `*`-both-sides regex accepted this; non-empty segments must reject it.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"-#1 what now?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "degenerate '-#1' fragment → warn present, exit 0"
+else
+    fail "degenerate '-#1' fragment (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 13. Degenerate fragment with empty trailing slug segment ('foo/#12') → warn.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"foo/#12 proceed?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "degenerate 'foo/#12' fragment → warn present, exit 0"
+else
+    fail "degenerate 'foo/#12' fragment (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 14. Well-formed token buried mid-line, not opening the question → warn. The
+#     anchored regex must not let a mid-window path/URL fragment suppress the nudge.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Regarding docs/#12, proceed?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "mid-line fragment (not opening) → warn present, exit 0"
+else
+    fail "mid-line fragment not opening (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 15. Still-conforming: 'owner/repo#3' opening the question → silent allow. Guards
+#     against the anchored+non-empty tightening over-rejecting a real slug.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"owner/repo#3 (PR #4): do the thing — phase 2 of 3; ok?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "conforming 'owner/repo#3' → silent allow, exit 0"
+else
+    fail "conforming 'owner/repo#3' (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
 echo
 echo "check_question_context.py tests: $TEST_PASS passed, $TEST_FAIL failed"
 [ "$TEST_FAIL" -eq 0 ]

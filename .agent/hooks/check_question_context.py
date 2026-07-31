@@ -46,12 +46,22 @@ import sys
 # carry at least one repo-name separator (`/`, `_`, or `-`), which every real
 # slug here does (`ros2_agent_workspace`, `project11_navigation`, `owner/repo`,
 # `my-repo`). That mandatory separator is what rejects the ambiguous forms we
-# nudge against: a bare "PR #24" (space before `#`), and — the tightening this
-# regex adds — the no-space bare words "PR#24" / "issue#5", which a looser
-# `\S+#\d+` would have wrongly accepted as conforming. The trade-off is a
-# separator-less single-word repo (e.g. "manifest#5") also nudges; that is the
-# safe direction for a warn-only hook (an extra nudge, never a block).
-REPO_ISSUE_TOKEN = re.compile(r"[A-Za-z0-9._/-]*[/_-][A-Za-z0-9._/-]*#\d+")
+# nudge against: a bare "PR #24" (space before `#`), and the no-space bare words
+# "PR#24" / "issue#5", which a looser `\S+#\d+` would have wrongly accepted.
+#
+# Two hardening properties over the earlier `[A-Za-z0-9._/-]*[/_-][A-Za-z0-9._/-]*#\d+`
+# (which had `*` on both slug sides and was unanchored):
+#   1. **Anchored** (`^\s*`): the token must *open* the question, matching the
+#      docstring's "opens with" contract. An unanchored search would let a
+#      path/URL fragment buried mid-line (e.g. "Regarding docs/#12, proceed?")
+#      suppress the nudge — a silenced warning, the hook's only failure mode.
+#   2. **Non-empty segments** on both sides of every separator (`[A-Za-z0-9._]+`,
+#      not `*`): degenerate fragments like "-#1", "foo/#12", "issue-#5" no longer
+#      conform, so they correctly nudge.
+# The trade-off is a separator-less single-word repo (e.g. "manifest#5") also
+# nudges; that is the safe direction for a warn-only hook (an extra nudge, never
+# a block).
+REPO_ISSUE_TOKEN = re.compile(r"^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+")
 
 # How far into the question text the header token must appear. The re-orientation
 # header opens the question, so only the leading slice is inspected — a `#N`
