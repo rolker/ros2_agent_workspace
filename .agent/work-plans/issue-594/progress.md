@@ -204,10 +204,32 @@ Round-2 Ship was "recommended" (must-fix 2→1, mechanical), so a full round-3 r
 **CI**: all-pass
 
 ### Findings
-- [ ] (must-fix, Copilot R1) Entry-type validation accepts any `## <letter>...` heading — ADR-0013 says writers MUST use the canonical set, and the script's allowlist-safety rationale ("commit message is fixed apart from the entry-type slot") is defeated by a free-text heading; a non-canonical entry is also invisible to `progress_read.py` filters, so the run-issue host would misread the phase outcome. Fix: validate ENTRY_TYPE against the writable ADR-0013 set (Issue Review, Plan Authored, Plan Review, Local Review, Local Review (Pre-Push), Integrated Review, Implementation — exclude read-only predecessor External Review), exit 2 with the allowed list on mismatch; switch tests 4/7/10 to canonical headings and add a rejection case. — `.agent/scripts/progress_append.sh:71-79`
-- [ ] (suggestion, Copilot R1) Already-committed idempotent-replay path prints "appended + committed ..." on stdout though nothing was appended or committed — print a distinct no-op success message instead (no caller greps stdout — verified across run-issue/review-code/triage-reviews SKILL.md); optionally assert it in test 12. — `.agent/scripts/progress_append.sh:114`
+- [x] (must-fix, Copilot R1) Entry-type validation accepts any `## <letter>...` heading — ADR-0013 says writers MUST use the canonical set, and the script's allowlist-safety rationale ("commit message is fixed apart from the entry-type slot") is defeated by a free-text heading; a non-canonical entry is also invisible to `progress_read.py` filters, so the run-issue host would misread the phase outcome. Fix: validate ENTRY_TYPE against the writable ADR-0013 set (Issue Review, Plan Authored, Plan Review, Local Review, Local Review (Pre-Push), Integrated Review, Implementation — exclude read-only predecessor External Review), exit 2 with the allowed list on mismatch; switch tests 4/7/10 to canonical headings and add a rejection case. — `.agent/scripts/progress_append.sh:71-79`
+- [x] (suggestion, Copilot R1) Already-committed idempotent-replay path prints "appended + committed ..." on stdout though nothing was appended or committed — print a distinct no-op success message instead (no caller greps stdout — verified across run-issue/review-code/triage-reviews SKILL.md); optionally assert it in test 12. — `.agent/scripts/progress_append.sh:114`
 
 ### False positives
 - none — both Copilot comments verified valid against local code; prior local-review findings all addressed at earlier SHAs (no cross-source repeats)
 
 **Host note for address-findings**: source the canonical writable set from `progress_read.py`'s `CANONICAL_TYPES` (mirror the list with a keep-in-sync comment pointing there — do not import python from bash); include the `Local Review (Pre-Push)` parenthetical variant; exclude read-only `External Review`. Validation failure = exit 2 listing the accepted types.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 17:50 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-594 at `93116e6`
+**Addressed**: `## Integrated Review` (2026-07-31 13:46 -04:00, PR #595 @ `e3a753d`) — 1 must-fix + 1 suggestion (both Copilot R1), both actioned
+**Commits**: `97fa5b8` `93116e6`
+
+### Actions
+- [x] (must-fix, Copilot R1) Entry-type validation accepts any `## <letter>...` heading — added a `WRITABLE_TYPES` allowlist check that rejects non-canonical headings with exit 2 and prints the allowed list. Mirrors `progress_read.py`'s `CANONICAL_TYPES` with a keep-in-sync comment (no python imported from bash) and deliberately **excludes** read-only predecessor `External Review` per the host note; includes the `Local Review (Pre-Push)` parenthetical variant. Switched tests 4/7/10 off the bogus `## X`/`## X Review` headings to canonical `## Implementation` (so they test their intended failure mode, not the new type gate), and added rejection case 10b (non-canonical heading → exit 2 listing allowed types, no commit). — `.agent/scripts/progress_append.sh:80-104`, `.agent/scripts/tests/test_progress_append.sh` (`97fa5b8`)
+- [x] (suggestion, Copilot R1) Already-committed replay path printed the misleading "appended + committed ..." on stdout though nothing was appended or committed — replaced with a distinct `no-op: '<type>' entry already committed ... (nothing appended or committed)` message. Test 12 now captures the replay stdout and asserts it contains `no-op` and does **not** contain `appended + committed`. — `.agent/scripts/progress_append.sh:114`, `.agent/scripts/tests/test_progress_append.sh:129-146` (`93116e6`)
+
+### Verification
+- `bash .agent/scripts/tests/test_progress_append.sh` → 13 passed, 0 failed (was 12; +1 rejection case)
+- `shellcheck --severity=warning .agent/scripts/progress_append.sh .agent/scripts/tests/test_progress_append.sh` clean (the 4 test-file SC2015 are info-level, below the pre-commit `--severity=warning` profile — pre-existing)
+- pre-commit hooks green on both fix commits (shellcheck, identity, no-commit-to-branch included)
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
+`.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
