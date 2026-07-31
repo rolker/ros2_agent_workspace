@@ -4,7 +4,6 @@
       "Bash(.agent/scripts/dispatch_subagent.sh:*)",
       "Bash(mktemp:*)",
       "Bash(python3 .agent/scripts/progress_read.py:*)",
-      "Bash(python3 /home/roland/project11/.agent/scripts/progress_read.py:*)",
       "Bash(./ui_ws/build.sh:*)",
       "Bash(./ui_ws/test.sh:*)",
       "Bash(./core_ws/build.sh:*)",
@@ -28,10 +27,8 @@
       "Bash(shellcheck:*)",
       "Bash(flake8:*)",
       "Bash(source .agent/scripts/setup.bash)",
-      "Bash(source /home/roland/project11/.agent/scripts/setup.bash)",
       "Bash(source setup.bash)",
       "Bash(source .agent/scripts/set_git_identity_env.sh:*)",
-      "Bash(source /home/roland/project11/.agent/scripts/set_git_identity_env.sh:*)",
       "Bash(source /opt/ros/jazzy/setup.bash)",
       "Bash(git fetch:*)",
       "Bash(.agent/scripts/progress_append.sh:*)"
