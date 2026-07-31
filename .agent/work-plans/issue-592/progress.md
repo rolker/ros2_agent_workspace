@@ -193,11 +193,33 @@ From the consequences map:
 **Round**: 1 | **Ship**: continue — one precise, mechanical must-fix (hook path); regex/test are suggestions
 
 ### Findings
-- [ ] (must-fix) Hook wired by bare relative path; PreToolUse hooks run in the agent's cwd (changes on `cd` into layer subdirs), so `.agent/hooks/...` won't resolve in orchestration sessions and the nudge silently never fires — fails safe but defeats the feature. Use `${CLAUDE_PROJECT_DIR}` — `.claude/settings.json:44`
-- [ ] (suggestion) Regex `\S+#\d+` accepts no-space non-repo tokens (`PR#24`, `issue#5`) as conforming → suppresses the nudge; tighten to a repo-shaped prefix — `.agent/hooks/check_question_context.py:47`
-- [ ] (suggestion) Smoke test's only non-conforming case is `PR #25` (with space); add no-space false-positive + empty-string cases — `.agent/scripts/tests/test_check_question_context.sh:37`
+- [x] (must-fix) Hook wired by bare relative path; PreToolUse hooks run in the agent's cwd (changes on `cd` into layer subdirs), so `.agent/hooks/...` won't resolve in orchestration sessions and the nudge silently never fires — fails safe but defeats the feature. Use `${CLAUDE_PROJECT_DIR}` — `.claude/settings.json:44` (fixed: `python3 "$CLAUDE_PROJECT_DIR"/.agent/hooks/check_question_context.py`)
+- [x] (suggestion) Regex `\S+#\d+` accepts no-space non-repo tokens (`PR#24`, `issue#5`) as conforming → suppresses the nudge; tighten to a repo-shaped prefix — `.agent/hooks/check_question_context.py:47` (fixed: token now requires a repo-slug separator `[/_-]`; `PR#24`/`issue#5` nudge, `owner/repo#3` / `ros2_agent_workspace#592` conform)
+- [x] (suggestion) Smoke test's only non-conforming case is `PR #25` (with space); add no-space false-positive + empty-string cases — `.agent/scripts/tests/test_check_question_context.sh:37` (fixed: added cases 7 `PR#24` no-space + 8 empty question string; 9/9 pass)
 
 ### Notes
 - Fail-safe contract verified against the Claude Code hooks spec: exit 0 + only `systemMessage`/`hookSpecificOutput.additionalContext` can never block/deny; interpreter-fail is non-blocking; `additionalContext` is supported for PreToolUse. Hook can never break a checkpoint.
 - Static analysis clean (flake8 enforced workspace profile; shellcheck; JSON valid; smoke test 7/7). No plan drift. ADR-0004/0005 enforcement requirement satisfied.
 - Host action at close: post the Bash-description-hook infeasibility conclusion (mirrored from the hook header comment) as a comment on #592 — no `gh` auth in this dispatch.
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 21:14 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-592 at `cf3bdad`
+**Addressed**: `## Local Review (Pre-Push)` (When 2026-07-31 21:10 +00:00, at `485f116`) — 1 must-fix + 2 suggestions, all open
+**Commits**: `49d025e`, `649d2de`, `cf3bdad`
+
+### Actions
+- [x] (must-fix) Hook wired by bare relative path won't resolve when cwd changes → use `$CLAUDE_PROJECT_DIR` — `.claude/settings.json:44` (`49d025e`: command is now `python3 "$CLAUDE_PROJECT_DIR"/.agent/hooks/check_question_context.py`; JSON re-validated)
+- [x] (suggestion) Regex `\S+#\d+` wrongly accepts no-space bare words (`PR#24`, `issue#5`) → tighten to a repo-shaped token — `.agent/hooks/check_question_context.py:47` (`649d2de`: token now `[A-Za-z0-9._/-]*[/_-][A-Za-z0-9._/-]*#\d+`, requiring a repo-slug separator; verified `PR#24`/`issue#5`/`PR #25` nudge while `owner/repo#3`, `ros2_agent_workspace#592`, `project11_navigation#466`, `my-repo#7` conform. Trade-off noted in the code comment: a separator-less single-word repo also nudges — the safe direction for a warn-only hook)
+- [x] (suggestion) Smoke test's only non-conforming case was `PR #25` (with space) → add no-space false-positive + empty-string cases — `.agent/scripts/tests/test_check_question_context.sh:37` (`cf3bdad`: added case 7 `PR#24` no-space and case 8 empty question string; suite now 9/9 pass)
+
+### Checks
+- `bash .agent/scripts/tests/test_check_question_context.sh` → 9 passed, 0 failed.
+- Pre-commit hooks ran on every commit (black/flake8 on the Python change, JSON well-formedness, identity gate) — all pass.
+- The pre-existing, unrelated `test_check_commit_identity.sh` env-driven failure noted in the prior Implementation entry is untouched by this work (no identity files changed).
+
+### Next step
+- Lifecycle: **Implementation → review-code** (re-review the three fixes). Dispatch a fresh-context sub-agent per the skill's Next-step contract; no auto-chaining — the host orchestrator drives.
