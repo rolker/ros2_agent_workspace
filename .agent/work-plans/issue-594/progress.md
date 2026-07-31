@@ -147,3 +147,24 @@ Per-machine `.claude/settings.local.json` still layers on top, so a machine can 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
 `.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 17:23 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-594 at `b4c01c5`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant — first tracked permission allowlist + script that shells out to git commit)
+**Must-fix**: 1 | **Suggestions**: 1
+**Round**: 2 | **Ship**: recommended — must-fix falling 2→1; the one remaining is a precise, mechanical file:line fix (idempotency exit-code), address then ship rather than loop a full round 3
+
+Static analysis clean (shellcheck both scripts; settings.json valid JSON; test-file SC2015 are info-level, below the --severity=warning profile). Both fresh-context Claude Adversarial lenses ran (A logic, B systemic); Copilot off (default), local off (--no-local, #590). Round-1's two must-fixes (identity env-precedence, non-hermetic test) are correctly resolved — suite 12/12 green. Plan adherence strong (7/7 files, no scope creep, all 3 plan-review suggestions applied). Test verified discovered by tests/run_script_tests.sh (make test-scripts). Lens B: no new must-fix — the :* wildcard pairs with a trusted-operator model and grants no capability beyond plain bash/git; the one propagating item (git fetch:* on the shared tracked settings.json) is already on the operator-deferred shareability list.
+
+### Findings
+- [ ] (must-fix) Idempotency guard reports false failure on the success path: re-running a byte-identical entry after a successful commit skips the re-append, then git finds a clean tree and the script exits 3 with "commit failed (pre-commit hook?)" though the entry IS committed — violates the exit-3=git-failure contract in the prompt-free host path (verified empirically). Fix: exit 0 when tail matches and nothing to commit. — `.agent/scripts/progress_append.sh:99-104,116-122`
+- [ ] (suggestion) Idempotency test case 12 asserts only entry count, not exit code — passes despite the spurious exit-3; add an rc assertion to pin exit semantics. — `.agent/scripts/tests/test_progress_append.sh:129-140`
+
+### Next step
+Lifecycle: **Local Review** → address-findings (one mechanical must-fix) → re-review, then push / open PR. Verdict is changes-requested, so the host dispatches **address-findings** on the open finding above; Ship: recommended means a full round-3 re-review is optional once the mechanical fix + test assertion land.
