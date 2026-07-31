@@ -85,3 +85,28 @@ The issue is a workspace infrastructure change (scripts, settings, skill guidanc
 - [x] (suggestion) Allowlist anchoring: the proposed relative form `Bash(.agent/scripts/progress_append.sh:*)` only matches when invoked exactly that way from the workspace root; the dlog precedent uses the absolute `Bash(<workspace_root>/.agent/scripts/dlog.sh:*)` form for robustness across cwd. Since progress writes happen from both the host (workspace root) and worktrees, prefer the absolute form or document the invocation contract. — `plan.md:39`
 - [x] (suggestion) Commit identity in `progress_append.sh`: the script commits, so it must carry agent identity robustly. `$AGENT_NAME`/`$AGENT_EMAIL` are frequently lost across fresh subshells (per AGENTS.md), which would fall back to human git config and trip `check_pr_authors.py`. Have the script fail loud when identity is unset, or accept identity as args — note this in the plan's script contract (dlog has no precedent here since it doesn't commit). — `plan.md:31`
 - [x] (suggestion) Test placement: `.agent/scripts/test_progress_append.sh` is picked up by `make test-scripts` (run_script_tests.sh globs sibling `test_*.sh`), so it works — but the dlog precedent lives at `.agent/scripts/tests/test_dlog.sh`. Consider `.agent/scripts/tests/` for consistency. Also reconcile the two names in the plan: Approach step 4 says `scripts/test_progress_append.sh`, the Files table says `.agent/scripts/test_progress_append.sh`. — `plan.md:51`, `plan.md:71`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 17:03 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-594 at `a460099`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant — tracked permission allowlist + script that shells out to git)
+**Must-fix**: 2 | **Suggestions**: 5
+**Round**: 1 | **Ship**: continue — one cross-pass-confirmed root-cause defect (identity/test); address then re-review
+
+Static analysis clean (shellcheck both scripts, settings.json valid JSON). Both fresh-context Claude Adversarial lenses (A logic, B systemic) independently flagged the same two must-fixes → cross-pass confirmed. Copilot off (default); local off (--no-local, #590). Plan adherence strong (7/7 files, no scope creep, all 3 plan-review suggestions applied).
+
+### Findings
+- [ ] (must-fix) Identity guarantee defeated by env precedence: script commits via `git -c user.name/email`, but ambient `GIT_AUTHOR_*`/`GIT_COMMITTER_*` (exported by set_git_identity_env.sh) outrank `-c` — silently disables the `--name`/`--email` override and can commit under a stale/human identity (the check_pr_authors.py trip it claims to prevent). Fix: set the four GIT_* vars to the validated identity. — `.agent/scripts/progress_append.sh:100-101`
+- [ ] (must-fix) Shipped smoke test is non-hermetic — fails 2/10 (cases 1, 8) in the standard agent shell; picked up by run_script_tests.sh so `make test-scripts`/`make validate` go red. Same root cause as above; the deterministic-authorship fix turns it green without masking. — `.agent/scripts/tests/test_progress_append.sh` (cases 1, 8)
+- [ ] (suggestion) Machine-specific absolute paths (`/home/roland/project11/...`) baked into the now-shared tracked settings.json, redundant with the relative forms — drop the absolute duplicates. — `.claude/settings.json:5,6,30,32`
+- [ ] (suggestion) First tracked *shared* allowlist also shares git fetch/gh search/journalctl/etc.; confirm each entry is intentionally shareable + note settings.local.json still layers on top. — `.claude/settings.json:3-33`
+- [ ] (suggestion) CRLF/trailing-space heading leaks `\r`/double-space into the commit subject; trim trailing whitespace from ENTRY_TYPE. — `.agent/scripts/progress_append.sh:81`
+- [ ] (suggestion) Non-idempotent on commit failure: entry appended before commit, so a naive re-run after exit-3 double-appends. — `.agent/scripts/progress_append.sh:97-104`
+- [ ] (suggestion) `git commit -- <pathspec>` would desync tree vs HEAD if a hook mutates progress.md and exits 0 (latent — no such hook today); add a note. — `.agent/scripts/progress_append.sh:101`
+
+**Dogfood note**: this entry was written and committed by the shipped `progress_append.sh` — it worked (appended + scoped commit succeeded). Commit landed correctly under the agent identity here only because ambient `GIT_AUTHOR_*` equals the agent identity in this session — which is exactly why must-fix #1 stays latent on the happy path.
