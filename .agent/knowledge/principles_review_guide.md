@@ -48,6 +48,8 @@ humans use it as a checklist.
 | Workflow skill list (add/remove a skill) | Skill list in non-Claude adapters (`.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`) |
 | Add a workflow skill that produces durable findings | Persist a typed entry to `progress.md` per [ADR-0013](../../docs/decisions/0013-progress-md-entry-type-vocabulary.md); pick an existing entry type or introduce a new one via a **superseding ADR** (ADR-0012's cross-reference-addendum carve-out does not cover changes to ADR-0013's Decision table) |
 | Package interfaces (`.msg`/`.srv`) | Downstream packages, documentation, tests |
+| Package parameters, topics, or services (declared in node code) | The package README / API docs; `.agents/review-context.yaml` if it maps them — stale docs must land in the same PR |
+| Implementation surfaces a reusable pattern or a pitfall | Propose a `.agent/knowledge/` note or `.agents/README.md` entry as an instruction-update **candidate** — the operator approves before any edit lands (never auto-applied) |
 | Worktree scripts | `.agent/WORKTREE_GUIDE.md`; `AGENTS.md` worktree section |
 
 ## Governance Layering

@@ -422,6 +422,22 @@ ADRs. For each: does the PR comply with the key requirement?
 changes something in the "If you change..." column. Are the corresponding
 "Also update..." items addressed? Mark each as Done or Missing.
 
+**Doc-impact check**: Beyond the map, verify the change carries its
+documentation consequences and check the plan's `## Documentation &
+Instruction Impact` section against the diff. (Tier note: 5b runs at
+Standard and Deep only — a Light-tier diff gets no reviewer-side doc-impact
+check and relies on the plan section plus the review-plan step-4 dimension;
+that is an accepted gap, sized to Light's <50-line no-trigger diffs.)
+
+- If the PR changes package **parameters, topics, or services**, confirm
+  the package README / API docs — and `.agents/review-context.yaml` if it
+  maps them — were updated in the same PR. Stale docs are **Missing**.
+- If implementation **surfaced a reusable pattern or pitfall**, check
+  whether the plan flagged it as an instruction-update candidate. If a
+  pattern clearly worth capturing was missed, raise it as a **candidate**
+  (a proposal for the operator — never an auto-applied edit to
+  `.agent/knowledge/`, `.agents/README.md`, or an instruction file).
+
 **Existing review comments** (post-PR mode only): Check for unresolved
 human and bot comments:
 
