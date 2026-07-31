@@ -176,7 +176,12 @@ checkpoint, not a pending approval. Therefore: parse with `jq` (auto-allowed)
 and `progress_read.py` (allowlisted) — **never ad-hoc interpreter heredocs**
 (`python3 - <<EOF`…), which can never be allowlisted; append + commit progress
 entries via `.agent/scripts/progress_append.sh` (allowlisted; see review-code
-step 8 for the pattern) — never inline `cat >>` + `git commit`.
+step 8 for the pattern) — never inline `cat >>` + `git commit`. **Task-output
+files a sub-agent writes under `/tmp`** (a dispatch's captured output, a fetched
+issue body) are read with the **`Read` tool**, or — for progress entries —
+`progress_read.py`; **never `grep`/`cat` them via Bash**. A Bash read *outside
+the project directory* isn't covered by the project allowlist, so it prompts —
+defeating the prompt-free host flow — whereas the `Read` tool never does.
 
 ## Decision table (the spine)
 
@@ -265,16 +270,25 @@ Use `AskUserQuestion` — **never block silently**. Mandatory checkpoints:
 4. **Before any push, PR creation, or merge** — local-first: the user confirms
    that work publishes.
 
-**Every checkpoint dialog must stand on its own.** The operator runs multiple
-agent sessions concurrently and jumps between them answering prompts and
-questions — that is the *normal* operating mode, not an occasional
-return-after-hours. Every checkpoint lands in front of someone who was just
-thinking about a different repo, so it must be adjudicable from the dialog
-alone, without scrolling back for the context that triggered it. Two
-requirements make that true, and **both apply to every `AskUserQuestion` this
-orchestrator asks** — all four checkpoints above, every round, including
-sessions resumed mid-lifecycle (re-read this section on resume; do not skip
-the header because "the operator was just here"):
+**Every operator-facing surface must stand on its own.** The operator runs
+multiple agent sessions concurrently and jumps between them answering prompts
+and questions — that is the *normal* operating mode, not an occasional
+return-after-hours. Whatever lands in front of them lands in front of someone
+who was just thinking about a different repo, so it must be adjudicable — or at
+least comprehensible — from itself alone, without scrolling back for the context
+that triggered it. **Three** surfaces carry that burden, because all three are
+points where the operator's attention re-enters a session cold:
+
+1. **`AskUserQuestion` checkpoint dialogs** — the four checkpoints above.
+2. **Bash `description` fields** during orchestration — if a command trips a
+   permission prompt, the `description` is the *only* context the operator sees.
+3. **Transition / status reports** between phases — the running narration the
+   operator skims to stay oriented.
+
+For an **`AskUserQuestion`**, two requirements make that true, and **both apply
+to every such call this orchestrator makes** — all four checkpoints above, every
+round, including sessions resumed mid-lifecycle (re-read this section on resume;
+do not skip the header because "the operator was just here"):
 
 - **Re-orientation header** — every `AskUserQuestion` call must open its
   `question` text with a one-line header:
@@ -310,8 +324,24 @@ options:
     description: "Publish as-is; track the [HIGH] stale-fix finding separately."
 ```
 
+**Bash `description` fields** — every orchestration Bash command must open its
+`description` with `<repo>#<N> <phase>: …` (e.g. `ros2_agent_workspace#592
+implement: append progress entry`). A permission prompt shows the operator the
+`description` and nothing else, so a bare "append progress entry" is
+unadjudicable when several repos are in flight at once. The repo slug is the
+**GitHub repo name** (see the re-orientation header rule above), not the local
+directory name.
+
+**Transition / status reports** — every between-phase report must open with
+`<repo>#<N>` (plus `(PR #M)` when a PR exists) and a **plain-words statement of
+what the work is**, never bare numbers. "Dispatching phase 4" or "moving on to
+#592" tells an operator mid-context-switch nothing; `ros2_agent_workspace#592
+(checkpoint hook): Plan Review approved → running implementation` reloads the
+whole picture in one line.
+
 Between checkpoints the orchestrator proceeds automatically, reporting each
-transition (entry read → next dispatch).
+transition in that repo-qualified form (`<repo>#<N> …: entry read → next
+dispatch`) — never a bare number.
 
 ## Publish step (local-first, field-mode aware)
 
