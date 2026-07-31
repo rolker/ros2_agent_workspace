@@ -582,6 +582,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/test_layer_sourcing.sh` | Regression guard for runtime layer chaining (ADR-0016 / #559, #566): static no-baked-chain-source check + built-layer overlay precedence + baked-chain purity + mountpoint ownership; run by `make test-scripts` / `make validate` |
 | `.agent/hooks/identity_patterns.py` | Shared agent/human email patterns + agent-branch regex (imported by commit-identity hooks + CI script) |
 | `.agent/hooks/check_pr_authors.py` | CI-callable PR-commit author validator (Mechanism C from issue #468) |
+| `.agent/hooks/check_question_context.py` | Warn-only, always-on `PreToolUse` hook (matcher `AskUserQuestion`, wired in `.claude/settings.json`): nudges when no question opens with a repo-qualified `<repo>#<N>` re-orientation header (#592). Fails safe — any parse/schema error exits 0 silently; never blocks a checkpoint |
 
 ## Layered Architecture
 
