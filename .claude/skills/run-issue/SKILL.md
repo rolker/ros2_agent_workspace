@@ -170,7 +170,10 @@ variant, pass both (`--type` is repeatable).
 
 ## Decision table (the spine)
 
-Read the **last** progress.md entry; act per its type + verdict:
+Read the **last** progress.md entry; act per its type + verdict. Every row
+whose Checkpoint column fires asks via `AskUserQuestion` — and every such call
+must carry the repo-qualified re-orientation header defined in
+[Checkpoints](#checkpoints) below, no exceptions:
 
 | Last entry | Condition | Next action | Checkpoint |
 |---|---|---|---|
@@ -252,18 +255,25 @@ Use `AskUserQuestion` — **never block silently**. Mandatory checkpoints:
 4. **Before any push, PR creation, or merge** — local-first: the user confirms
    that work publishes.
 
-**Every checkpoint dialog must stand on its own.** An operator returning to a
-checkpoint — possibly after attending to another issue running concurrently —
-should be able to adjudicate it from the dialog alone, without scrolling back
-for the context that triggered it. Two requirements make that true, and **both
-apply to all four checkpoints above**:
+**Every checkpoint dialog must stand on its own.** The operator runs multiple
+agent sessions concurrently and jumps between them answering prompts and
+questions — that is the *normal* operating mode, not an occasional
+return-after-hours. Every checkpoint lands in front of someone who was just
+thinking about a different repo, so it must be adjudicable from the dialog
+alone, without scrolling back for the context that triggered it. Two
+requirements make that true, and **both apply to every `AskUserQuestion` this
+orchestrator asks** — all four checkpoints above, every round, including
+sessions resumed mid-lifecycle (re-read this section on resume; do not skip
+the header because "the operator was just here"):
 
 - **Re-orientation header** — every `AskUserQuestion` call must open its
   `question` text with a one-line header:
-  `Issue #N: <title> — phase X of Y; <one-line state>`. Put it in the
-  **`question` field, not the `header` field** — the `header` chip is capped at
-  ~12 chars and cannot hold it. This reloads the operator's context the moment
-  attention returns.
+  `<repo>#<N> (PR #M): <issue title> — phase X of Y (<phase name>); <one-line state>`.
+  The **repo slug is mandatory** — issue and PR numbers collide across project
+  repos, so a bare `#24` is ambiguous by construction; include `(PR #M)`
+  whenever a PR exists. Put it in the **`question` field, not the `header`
+  field** — the `header` chip is capped at ~12 chars and cannot hold it. This
+  reloads the operator's context the moment attention returns.
 - **Finding-embedding** — when a checkpoint is triggered by a review entry's
   findings or open questions (`## Issue Review` open-question actions → checkpoint
   1; `## Plan Review` → checkpoint 2; `## Integrated Review` → checkpoint 3; and
@@ -276,9 +286,10 @@ apply to all four checkpoints above**:
 Worked example — checkpoint 3, triggered by an `## Integrated Review` must-fix:
 
 ```
-question: "Issue #466: Recover from GPS dropout — phase 6 of 7; Integrated
-           Review found 1 must-fix. [HIGH] stale fix published when RTK age
-           > 2s (nav_node.cpp:212). How should I proceed?"
+question: "project11_navigation#466 (PR #467): Recover from GPS dropout —
+           phase 6 of 7 (triage-reviews); Integrated Review found 1 must-fix.
+           [HIGH] stale fix published when RTK age > 2s (nav_node.cpp:212).
+           How should I proceed?"
 options:
   - label:       "Fix via address-findings"
     description: "Dispatch address-findings to gate publishing on RTK age —

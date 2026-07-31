@@ -382,6 +382,14 @@ orchestrator (`/run-issue`,
 last `## Integrated Review` entry and drives the next phase, pausing at user
 checkpoints.
 
+**Checkpoint context:** whoever asks the resulting fix-vs-defer question (the
+`/run-issue` host, or a hand-driven session) must open the `AskUserQuestion`
+`question` text with the full re-orientation header —
+`<repo>#<N> (PR #M): <issue title> — <phase>; <one-line state>` — per
+run-issue § Checkpoints. The operator juggles concurrent sessions across
+repos; a question like "how should we handle the four open findings on
+PR #25?" is unanswerable without the repo, issue, and work context.
+
 ## Guidelines
 
 - **Triage, don't fix** — output the classified plan in the conversation. The user
