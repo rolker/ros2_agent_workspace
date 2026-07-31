@@ -116,6 +116,16 @@ printf '## X Review\n' | "$PA" -C "$NOREPO" 7 > /dev/null 2>&1
 rc=$?
 [ "$rc" -eq 2 ] && pass "non-repo dir exits 2" || fail "non-repo dir exits 2 (rc=$rc)"
 
+# 11. CRLF / padded heading: trailing \r and spaces must not leak into the
+#     commit subject (entry type is trimmed).
+printf '## Plan Authored  \r\nbody\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1
+subj=$(git -C "$REPO" log -1 --format=%s)
+if [ "$subj" = "progress: plan authored for #9" ]; then
+    pass "trailing CR/space in heading trimmed from commit subject"
+else
+    fail "trailing CR/space in heading trimmed (subj='$subj')"
+fi
+
 echo ""
 echo "test_progress_append: $TEST_PASS passed, $TEST_FAIL failed"
 [ "$TEST_FAIL" -eq 0 ]

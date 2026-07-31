@@ -73,6 +73,9 @@ if [[ ! "$FIRST" =~ ^##\ [A-Za-z] ]]; then
     exit 2
 fi
 ENTRY_TYPE="${FIRST#\#\# }"
+# Strip any trailing whitespace run (a CR from a CRLF heading, or a padded
+# heading) so it can't leak `\r`/double-space into the commit subject.
+ENTRY_TYPE="${ENTRY_TYPE%"${ENTRY_TYPE##*[![:space:]]}"}"
 TYPE_MSG=$(printf '%s' "$ENTRY_TYPE" | tr '[:upper:]' '[:lower:]')
 
 FILE_REL=".agent/work-plans/issue-$ISSUE/progress.md"
