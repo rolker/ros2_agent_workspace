@@ -179,3 +179,25 @@ From the consequences map:
   this worktree) and touches identity files this branch does **not** modify — not
   introduced by this work. Flagging, not fixing (would need its own investigation).
 - Next: host review-code → publish checkpoint → push + open PR (`Closes #592`).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-07-31 21:10 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-592 at `485f116`
+**Mode**: pre-push
+**Depth**: Standard (reason: `.claude/skills/*/SKILL.md` + `.claude/settings.json` governance override + new always-on hook code)
+**Must-fix**: 1 | **Suggestions**: 2
+**Round**: 1 | **Ship**: continue — one precise, mechanical must-fix (hook path); regex/test are suggestions
+
+### Findings
+- [ ] (must-fix) Hook wired by bare relative path; PreToolUse hooks run in the agent's cwd (changes on `cd` into layer subdirs), so `.agent/hooks/...` won't resolve in orchestration sessions and the nudge silently never fires — fails safe but defeats the feature. Use `${CLAUDE_PROJECT_DIR}` — `.claude/settings.json:44`
+- [ ] (suggestion) Regex `\S+#\d+` accepts no-space non-repo tokens (`PR#24`, `issue#5`) as conforming → suppresses the nudge; tighten to a repo-shaped prefix — `.agent/hooks/check_question_context.py:47`
+- [ ] (suggestion) Smoke test's only non-conforming case is `PR #25` (with space); add no-space false-positive + empty-string cases — `.agent/scripts/tests/test_check_question_context.sh:37`
+
+### Notes
+- Fail-safe contract verified against the Claude Code hooks spec: exit 0 + only `systemMessage`/`hookSpecificOutput.additionalContext` can never block/deny; interpreter-fail is non-blocking; `additionalContext` is supported for PreToolUse. Hook can never break a checkpoint.
+- Static analysis clean (flake8 enforced workspace profile; shellcheck; JSON valid; smoke test 7/7). No plan drift. ADR-0004/0005 enforcement requirement satisfied.
+- Host action at close: post the Bash-description-hook infeasibility conclusion (mirrored from the hook header comment) as a comment on #592 — no `gh` auth in this dispatch.
