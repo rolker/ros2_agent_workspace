@@ -126,17 +126,20 @@ else
     fail "trailing CR/space in heading trimmed (subj='$subj')"
 fi
 
-# 12. idempotency: if the entry is already the file tail (a prior run appended
-#     but its commit failed), a re-run must not double-append.
+# 12. idempotency: if the entry is already the file tail, a re-run must not
+#     double-append AND must exit 0 — the already-committed success path is not
+#     a git failure (exit 3). The rc assertion pins that exit semantics; without
+#     it the entry-count check alone passes even on the spurious exit-3.
 PROG9="$REPO/.agent/work-plans/issue-9/progress.md"
 before=$(grep -c '^## Implementation$' "$PROG9")
 printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # first append+commit
 printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # identical re-run
+rc=$?
 after=$(grep -c '^## Implementation$' "$PROG9")
-if [ "$before" -eq 0 ] && [ "$after" -eq 1 ]; then
-    pass "identical entry as file tail is not re-appended (idempotent replay)"
+if [ "$before" -eq 0 ] && [ "$after" -eq 1 ] && [ "$rc" -eq 0 ]; then
+    pass "identical entry as file tail is not re-appended, re-run exits 0 (idempotent replay)"
 else
-    fail "idempotent replay (before=$before after=$after)"
+    fail "idempotent replay (before=$before after=$after rc=$rc)"
 fi
 
 echo ""

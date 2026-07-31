@@ -104,6 +104,16 @@ else
 fi
 
 git -C "$ROOT" add -- "$FILE_REL" || exit 3
+# If nothing is staged for this file, the entry is already committed (a prior
+# run appended AND committed this exact entry — the append guard above then
+# skipped the re-append). That is success, not a git failure: report it and
+# exit 0 rather than letting the empty `git commit` below fail into exit 3
+# (which the prompt-free host path reads as a real commit failure).
+if git -C "$ROOT" diff --cached --quiet -- "$FILE_REL"; then
+    echo "note: '$ENTRY_TYPE' entry already committed for #$ISSUE (nothing to commit) — treating as success" >&2
+    echo "appended + committed '$ENTRY_TYPE' entry to $FILE_REL"
+    exit 0
+fi
 # Force the validated identity onto BOTH author and committer via the GIT_*
 # env vars: ambient GIT_AUTHOR_*/GIT_COMMITTER_* (exported by
 # set_git_identity_env.sh) outrank `-c user.name/email`, so `-c` alone can be
