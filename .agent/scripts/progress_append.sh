@@ -23,7 +23,11 @@
 #     agent-convention branches)
 #
 # -C <dir> targets another worktree (the `git -C` pattern the skills use);
-# default is the repo containing the current directory.
+# default is the repo containing the current directory. Scope note: -C is
+# deliberately unbounded — the script can append+commit a progress entry in
+# any git repo on the host (worktrees live outside the workspace root). The
+# blast radius stays tiny because everything else is derived/fixed; keep it
+# that way when modifying this script.
 #
 # Exit codes: 0 ok, 2 usage/validation error, 3 git failure.
 
