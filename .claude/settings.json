@@ -33,5 +33,18 @@
       "Bash(git fetch:*)",
       "Bash(.agent/scripts/progress_append.sh:*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.agent/hooks/check_question_context.py || true"
+          }
+        ]
+      }
+    ]
   }
 }

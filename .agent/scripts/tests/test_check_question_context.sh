@@ -1,0 +1,166 @@
+#!/bin/bash
+# .agent/scripts/tests/test_check_question_context.sh
+# Smoke test for the warn-only AskUserQuestion context hook
+# (.agent/hooks/check_question_context.py, #592).
+#
+# The hook is warn-only and fail-safe by contract: it must never break an
+# AskUserQuestion call (always exit 0), nudge only when NO question opens with a
+# repo-qualified <repo>#<N> token, and stay silent on conforming or malformed
+# input. These cases pin exactly that.
+#
+# Run: bash .agent/scripts/tests/test_check_question_context.sh
+
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK="$SCRIPT_DIR/../../hooks/check_question_context.py"
+TEST_PASS=0
+TEST_FAIL=0
+
+pass() { echo "PASS: $1"; TEST_PASS=$((TEST_PASS + 1)); }
+fail() { echo "FAIL: $1"; TEST_FAIL=$((TEST_FAIL + 1)); }
+
+# Run the hook with the given stdin; capture stdout + exit code into globals.
+run_hook() {
+    HOOK_OUT="$(printf '%s' "$1" | python3 "$HOOK" 2>/dev/null)"
+    HOOK_RC=$?
+}
+
+# 1. Conforming question (opens with <repo>#<N>) → silent allow, exit 0.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"project11_navigation#466 (PR #467): Recover GPS — phase 6 of 7; how to proceed?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "conforming question → silent allow, exit 0"
+else
+    fail "conforming question (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 2. Non-conforming question (bare 'PR #25', no <repo>#<N>) → warn present, exit 0.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"How should we handle the four open findings on PR #25?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage' \
+    && printf '%s' "$HOOK_OUT" | grep -qi 're-orientation header'; then
+    pass "non-conforming question → warn present, exit 0"
+else
+    fail "non-conforming question (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 2b. The warn must NOT carry a blocking decision (warn-only contract).
+if printf '%s' "$HOOK_OUT" | grep -qiE '"(permissionDecision|decision)"[[:space:]]*:[[:space:]]*"(deny|block)"'; then
+    fail "warn output must not contain a deny/block decision"
+else
+    pass "warn output carries no deny/block decision"
+fi
+
+# 3. One conforming among several → silent allow (at least one satisfies).
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"plain question with no token"},{"question":"ros2_agent_workspace#592: fix hook — phase 4; ok?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "at least one conforming question → silent allow"
+else
+    fail "mixed questions with one conforming (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 4. Malformed JSON → silent allow, exit 0 (fail safe).
+run_hook 'not json at all'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "malformed stdin → silent allow, exit 0"
+else
+    fail "malformed stdin (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 5. Empty stdin → silent allow, exit 0 (fail safe).
+run_hook ''
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "empty stdin → silent allow, exit 0"
+else
+    fail "empty stdin (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 6. Valid JSON but no questions list → silent allow (unexpected schema, fail safe).
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{}}'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "missing questions list → silent allow, exit 0"
+else
+    fail "missing questions list (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 7. No-space bare token ('PR#24', no repo-slug separator) → warn, exit 0. A
+#    looser \S+#\d+ would wrongly accept this; the tightened regex must nudge.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"How should we handle the findings on PR#24?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage' \
+    && printf '%s' "$HOOK_OUT" | grep -qi 're-orientation header'; then
+    pass "no-space bare token 'PR#24' → warn present, exit 0"
+else
+    fail "no-space bare token 'PR#24' (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 8. Empty question string → warn, exit 0 (no conforming token to find).
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":""}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "empty question string → warn present, exit 0"
+else
+    fail "empty question string (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 9. Non-dict top-level JSON (valid JSON, wrong shape → data.get raises) →
+#    silent allow, exit 0 (the except-everything fail-safe path).
+run_hook '["a","list","not","a","dict"]'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "non-dict top-level JSON → silent allow, exit 0"
+else
+    fail "non-dict top-level JSON (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 10. Non-dict question entry + non-str question value → fail-safe handling,
+#     exit 0, and never a crash-shaped empty rc≠0.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":["bare string", {"question": 42}]}}'
+if [ "$HOOK_RC" -eq 0 ]; then
+    pass "non-dict/non-str question entries → exit 0 (fail safe)"
+else
+    fail "non-dict/non-str question entries (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 11. Warn-path output contract: stderr empty, stdout parses as JSON.
+HOOK_ERR="$(printf '%s' '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"no token here"}]}}' | python3 "$HOOK" 2>&1 >/dev/null)"
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"no token here"}]}}'
+if [ -z "$HOOK_ERR" ] && printf '%s' "$HOOK_OUT" | python3 -m json.tool > /dev/null 2>&1; then
+    pass "warn path: stderr empty, stdout is valid JSON"
+else
+    fail "warn path output contract (err='$HOOK_ERR')"
+fi
+
+# 12. Degenerate fragment with empty leading slug segment ('-#1') → warn. The
+#     old `*`-both-sides regex accepted this; non-empty segments must reject it.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"-#1 what now?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "degenerate '-#1' fragment → warn present, exit 0"
+else
+    fail "degenerate '-#1' fragment (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 13. Degenerate fragment with empty trailing slug segment ('foo/#12') → warn.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"foo/#12 proceed?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "degenerate 'foo/#12' fragment → warn present, exit 0"
+else
+    fail "degenerate 'foo/#12' fragment (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 14. Well-formed token buried mid-line, not opening the question → warn. The
+#     anchored regex must not let a mid-window path/URL fragment suppress the nudge.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Regarding docs/#12, proceed?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && printf '%s' "$HOOK_OUT" | grep -q 'systemMessage'; then
+    pass "mid-line fragment (not opening) → warn present, exit 0"
+else
+    fail "mid-line fragment not opening (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+# 15. Still-conforming: 'owner/repo#3' opening the question → silent allow. Guards
+#     against the anchored+non-empty tightening over-rejecting a real slug.
+run_hook '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"owner/repo#3 (PR #4): do the thing — phase 2 of 3; ok?"}]}}'
+if [ "$HOOK_RC" -eq 0 ] && [ -z "$HOOK_OUT" ]; then
+    pass "conforming 'owner/repo#3' → silent allow, exit 0"
+else
+    fail "conforming 'owner/repo#3' (rc=$HOOK_RC, out=$HOOK_OUT)"
+fi
+
+echo
+echo "check_question_context.py tests: $TEST_PASS passed, $TEST_FAIL failed"
+[ "$TEST_FAIL" -eq 0 ]
