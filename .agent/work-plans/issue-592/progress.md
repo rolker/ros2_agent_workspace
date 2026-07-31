@@ -250,3 +250,27 @@ From the consequences map:
 
 ### Next step
 - Lifecycle: **Local Review (approved) → push / open PR (`Closes #592`) → triage-reviews**. No auto-chaining — the host orchestrator drives and pauses at the publish checkpoint. Suggestions are optional; may be applied in-branch or tracked.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-31 17:38 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #600 at `3671f67`
+**Sources**: 3 (Copilot R1 @ `3671f67`, Local Review (Pre-Push) @ `485f116`, Local Review (Pre-Push) @ `55a180a`, CI rollup)
+**Cross-source confirmations**: 1
+**CI**: all-pass
+
+### Findings
+- [ ] (cross-confirmed: Copilot R1 @ `3671f67` + Local Review (Pre-Push) @ `55a180a`) `REPO_ISSUE_TOKEN` is unanchored and both slug sides are `*`, so degenerate fragments conform and suppress the nudge — verified empirically: `-#1`, `foo/#12`, `issue-#5`, and mid-window `Regarding docs/#12, proceed?` all match; docstring says "opens with" but the regex searches anywhere in the 120-char first-line window. The hook's only failure mode is exactly this (silenced nudge), and the fix direction (more nudges) is the safe one for a warn-only hook. Fix: require non-empty segments on both sides of each separator and anchor to the leading token, e.g. `^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+` against the leading slice; sync the header comment; add smoke-test cases for `-#1`, `foo/#12`, and a mid-window path fragment (still-conforming: `owner/repo#3`, `ros2_agent_workspace#592`) — `.agent/hooks/check_question_context.py:54`
+- [ ] (low, Local Review @ `55a180a` #3 — reclassified valid) The unset-`$CLAUDE_PROJECT_DIR` note called the resulting python3 exit 2 "non-blocking", but per the Claude Code hooks contract exit 2 from a PreToolUse hook is the *blocking* error code — a missing var or missing script path would block the checkpoint, violating the PR's security-critical never-blocks property. The precondition is near-unreachable under Claude Code (harness sets the var; wiring and script land in the same commit), but the wiring-level hardening is one token: append `|| true` to the hook command so every path exits 0 — `.claude/settings.json:44`
+
+### False positives
+- (none) Copilot's single inline comment is valid (cross-confirmed above); no false positives this round.
+
+### CI status
+All 9 checks green at `3671f67` (Lint, Script tests, Validate Documentation, Validate commit identity ×2 runs — one identity check skipped on the push-event run, expected; Copilot reviewer success).
+
+### Next step
+Cross-confirmed finding remains open → hand off to `address-findings`:
+`.agent/scripts/dispatch_subagent.sh --mode in-process --issue 592 --skill address-findings`
