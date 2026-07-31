@@ -262,8 +262,8 @@ From the consequences map:
 **CI**: all-pass
 
 ### Findings
-- [ ] (cross-confirmed: Copilot R1 @ `3671f67` + Local Review (Pre-Push) @ `55a180a`) `REPO_ISSUE_TOKEN` is unanchored and both slug sides are `*`, so degenerate fragments conform and suppress the nudge — verified empirically: `-#1`, `foo/#12`, `issue-#5`, and mid-window `Regarding docs/#12, proceed?` all match; docstring says "opens with" but the regex searches anywhere in the 120-char first-line window. The hook's only failure mode is exactly this (silenced nudge), and the fix direction (more nudges) is the safe one for a warn-only hook. Fix: require non-empty segments on both sides of each separator and anchor to the leading token, e.g. `^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+` against the leading slice; sync the header comment; add smoke-test cases for `-#1`, `foo/#12`, and a mid-window path fragment (still-conforming: `owner/repo#3`, `ros2_agent_workspace#592`) — `.agent/hooks/check_question_context.py:54`
-- [ ] (low, Local Review @ `55a180a` #3 — reclassified valid) The unset-`$CLAUDE_PROJECT_DIR` note called the resulting python3 exit 2 "non-blocking", but per the Claude Code hooks contract exit 2 from a PreToolUse hook is the *blocking* error code — a missing var or missing script path would block the checkpoint, violating the PR's security-critical never-blocks property. The precondition is near-unreachable under Claude Code (harness sets the var; wiring and script land in the same commit), but the wiring-level hardening is one token: append `|| true` to the hook command so every path exits 0 — `.claude/settings.json:44`
+- [x] (cross-confirmed: Copilot R1 @ `3671f67` + Local Review (Pre-Push) @ `55a180a`) `REPO_ISSUE_TOKEN` is unanchored and both slug sides are `*`, so degenerate fragments conform and suppress the nudge — verified empirically: `-#1`, `foo/#12`, `issue-#5`, and mid-window `Regarding docs/#12, proceed?` all match; docstring says "opens with" but the regex searches anywhere in the 120-char first-line window. The hook's only failure mode is exactly this (silenced nudge), and the fix direction (more nudges) is the safe one for a warn-only hook. Fix: require non-empty segments on both sides of each separator and anchor to the leading token, e.g. `^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+` against the leading slice; sync the header comment; add smoke-test cases for `-#1`, `foo/#12`, and a mid-window path fragment (still-conforming: `owner/repo#3`, `ros2_agent_workspace#592`) — `.agent/hooks/check_question_context.py:54` (`9dabc4d`: regex now `^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+` — anchored + non-empty segments both sides; header comment synced; smoke cases 12 `-#1`, 13 `foo/#12`, 14 mid-line `docs/#12`, 15 still-conforming `owner/repo#3` added; suite 16/16)
+- [x] (low, Local Review @ `55a180a` #3 — reclassified valid) The unset-`$CLAUDE_PROJECT_DIR` note called the resulting python3 exit 2 "non-blocking", but per the Claude Code hooks contract exit 2 from a PreToolUse hook is the *blocking* error code — a missing var or missing script path would block the checkpoint, violating the PR's security-critical never-blocks property. The precondition is near-unreachable under Claude Code (harness sets the var; wiring and script land in the same commit), but the wiring-level hardening is one token: append `|| true` to the hook command so every path exits 0 — `.claude/settings.json:44` (`4d2bbcb`: command now ends `... || true`; JSON re-validated)
 
 ### False positives
 - (none) Copilot's single inline comment is valid (cross-confirmed above); no false positives this round.
@@ -274,3 +274,25 @@ All 9 checks green at `3671f67` (Lint, Script tests, Validate Documentation, Val
 ### Next step
 Cross-confirmed finding remains open → hand off to `address-findings`:
 `.agent/scripts/dispatch_subagent.sh --mode in-process --issue 592 --skill address-findings`
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 21:41 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #600 at `4d2bbcb`
+**Addressed**: `## Integrated Review` (When 2026-07-31 17:38 -04:00, at `3671f67`) — 2 open findings (1 cross-confirmed, 1 low reclassified-valid)
+**Commits**: `9dabc4d`, `4d2bbcb`
+
+### Actions
+- [x] (cross-confirmed) `REPO_ISSUE_TOKEN` unanchored + `*`-both-slug-sides lets degenerate fragments (`-#1`, `foo/#12`, `issue-#5`, mid-window `docs/#12`) suppress the nudge → anchor + require non-empty segments — `.agent/hooks/check_question_context.py:54` (`9dabc4d`: regex now `^\s*[A-Za-z0-9._]+(?:[/_-][A-Za-z0-9._]+)+#\d+`; header comment synced to document the anchor + non-empty-segment properties; smoke cases 12 `-#1`, 13 `foo/#12`, 14 mid-line `Regarding docs/#12`, 15 still-conforming `owner/repo#3` added)
+- [x] (low, reclassified valid) Unset `$CLAUDE_PROJECT_DIR` → python3 exit 2 is the *blocking* PreToolUse code, violating never-blocks → append `|| true` to the wired command — `.claude/settings.json:44` (`4d2bbcb`: command now ends `... || true`; every path exits 0 regardless of interpreter/path failure; JSON re-validated)
+
+### Checks
+- `bash .agent/scripts/tests/test_check_question_context.sh` → 16 passed, 0 failed (was 12; +4 for the tightened regex).
+- Empirically re-verified against the finding's cases: `-#1`, `foo/#12`, `issue-#5`, and mid-window `Regarding docs/#12, proceed?` now all nudge; `owner/repo#3`, `ros2_agent_workspace#592`, `project11_navigation#466` still conform.
+- Pre-commit hooks ran on every commit (black/flake8/shellcheck on the touched files, JSON well-formedness, identity gate) — all pass.
+- Pre-existing, unrelated `test_check_commit_identity.sh` env-driven failure (noted in earlier entries) untouched — this work changes no identity files.
+
+### Next step
+- Lifecycle: **Implementation → review-code** (re-review the two fixes). Dispatch a fresh-context sub-agent per the skill's Next-step contract; no auto-chaining — the host orchestrator drives.
