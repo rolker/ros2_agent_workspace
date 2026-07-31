@@ -192,3 +192,20 @@ Lifecycle: **Local Review** → address-findings (one mechanical must-fix) → r
 Lifecycle: **Implementation** → **review-code** (re-review the fixes). Hand off to a fresh-context sub-agent:
 `.agent/scripts/dispatch_subagent.sh --mode in-process --issue 594 --skill review-code`
 Round-2 Ship was "recommended" (must-fix 2→1, mechanical), so a full round-3 re-review is optional once this mechanical fix + rc assertion land.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-07-31 13:46 -04:00
+**By**: Claude Code Agent (Claude Fable 5)
+
+**PR**: #595 at `e3a753d`
+**Sources**: 3 (Copilot R1 @ `e3a753d`, Local Review (Pre-Push) x2 @ `a460099`/`b4c01c5` — all prior findings addressed, CI rollup)
+**Cross-source confirmations**: 0
+**CI**: all-pass
+
+### Findings
+- [ ] (must-fix, Copilot R1) Entry-type validation accepts any `## <letter>...` heading — ADR-0013 says writers MUST use the canonical set, and the script's allowlist-safety rationale ("commit message is fixed apart from the entry-type slot") is defeated by a free-text heading; a non-canonical entry is also invisible to `progress_read.py` filters, so the run-issue host would misread the phase outcome. Fix: validate ENTRY_TYPE against the writable ADR-0013 set (Issue Review, Plan Authored, Plan Review, Local Review, Local Review (Pre-Push), Integrated Review, Implementation — exclude read-only predecessor External Review), exit 2 with the allowed list on mismatch; switch tests 4/7/10 to canonical headings and add a rejection case. — `.agent/scripts/progress_append.sh:71-79`
+- [ ] (suggestion, Copilot R1) Already-committed idempotent-replay path prints "appended + committed ..." on stdout though nothing was appended or committed — print a distinct no-op success message instead (no caller greps stdout — verified across run-issue/review-code/triage-reviews SKILL.md); optionally assert it in test 12. — `.agent/scripts/progress_append.sh:114`
+
+### False positives
+- none — both Copilot comments verified valid against local code; prior local-review findings all addressed at earlier SHAs (no cross-source repeats)
