@@ -66,3 +66,22 @@ The issue is a workspace infrastructure change (scripts, settings, skill guidanc
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-07-31 16:23 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-594/plan.md` at `af42e6f`
+**PR**: PR-less (--issue mode; gh unauthenticated in this container)
+**Verdict**: changes-requested
+
+<!-- Independence: plan authored by "Claude Code Agent (Claude Sonnet)"; this review
+     is a separate fresh-context dispatch on a different model (Opus). Genuinely
+     independent — no author self-review annotation. -->
+
+### Findings
+- [ ] (must-fix) Step 2 targets `.claude/settings.json` as a committed "Files to Change" item, but that file is **not git-tracked** (never in history; only exists untracked in the developer's main tree). The "existing entries (dispatch_subagent.sh, dlog.sh, dashboard.sh)" it claims consistency with live in that untracked local file (dlog is actually in `settings.local.json`). As written, the allowlist edit cannot land in the PR and won't propagate to other agents/machines — defeating the issue's "prompt-free thereafter" goal. Decide the mechanism: follow the dlog precedent (document a manual "allowlist once" step adding `Bash(<workspace_root>/.agent/scripts/progress_append.sh:*)` to `.claude/settings.local.json` in the skill guidance), or deliberately introduce a *new committed* shared `.claude/settings.json` and call that out (it's a first — a tracked shared-settings file — and interacts with the untracked local one; may warrant an Ask-First note). — `plan.md:39-42`, `plan.md:69`
+- [ ] (suggestion) Allowlist anchoring: the proposed relative form `Bash(.agent/scripts/progress_append.sh:*)` only matches when invoked exactly that way from the workspace root; the dlog precedent uses the absolute `Bash(<workspace_root>/.agent/scripts/dlog.sh:*)` form for robustness across cwd. Since progress writes happen from both the host (workspace root) and worktrees, prefer the absolute form or document the invocation contract. — `plan.md:39`
+- [ ] (suggestion) Commit identity in `progress_append.sh`: the script commits, so it must carry agent identity robustly. `$AGENT_NAME`/`$AGENT_EMAIL` are frequently lost across fresh subshells (per AGENTS.md), which would fall back to human git config and trip `check_pr_authors.py`. Have the script fail loud when identity is unset, or accept identity as args — note this in the plan's script contract (dlog has no precedent here since it doesn't commit). — `plan.md:31`
+- [ ] (suggestion) Test placement: `.agent/scripts/test_progress_append.sh` is picked up by `make test-scripts` (run_script_tests.sh globs sibling `test_*.sh`), so it works — but the dlog precedent lives at `.agent/scripts/tests/test_dlog.sh`. Consider `.agent/scripts/tests/` for consistency. Also reconcile the two names in the plan: Approach step 4 says `scripts/test_progress_append.sh`, the Files table says `.agent/scripts/test_progress_append.sh`. — `plan.md:51`, `plan.md:71`
