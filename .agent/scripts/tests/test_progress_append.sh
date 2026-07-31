@@ -67,7 +67,7 @@ git -C "$REPO" reset -q unrelated.txt && rm -f "$REPO/unrelated.txt"
 
 # 4. non-numeric issue number -> exit 2, no commit
 head_before=$(git -C "$REPO" rev-parse HEAD)
-printf '## X\n' | "$PA" -C "$REPO" seven > /dev/null 2>&1
+printf '## Implementation\n' | "$PA" -C "$REPO" seven > /dev/null 2>&1
 rc=$?
 [ "$rc" -eq 2 ] && [ "$(git -C "$REPO" rev-parse HEAD)" = "$head_before" ] \
     && pass "non-numeric issue exits 2" || fail "non-numeric issue exits 2 (rc=$rc)"
@@ -83,7 +83,7 @@ rc=$?
 [ "$rc" -eq 2 ] && pass "missing '##' heading exits 2" || fail "missing '##' heading exits 2 (rc=$rc)"
 
 # 7. identity unset (env cleared, no args) -> exit 2, fail loud, no fallback commit
-out=$(printf '## X Review\n' | env -u AGENT_NAME -u AGENT_EMAIL "$PA" -C "$REPO" 7 2>&1)
+out=$(printf '## Implementation\n' | env -u AGENT_NAME -u AGENT_EMAIL "$PA" -C "$REPO" 7 2>&1)
 rc=$?
 if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qi 'identity'; then
     pass "unset identity fails loud (exit 2)"
@@ -112,9 +112,22 @@ fi
 # 10. outside a git repo -> exit 2
 NOREPO="$TMPD/norepo"
 mkdir -p "$NOREPO"
-printf '## X Review\n' | "$PA" -C "$NOREPO" 7 > /dev/null 2>&1
+printf '## Implementation\n' | "$PA" -C "$NOREPO" 7 > /dev/null 2>&1
 rc=$?
 [ "$rc" -eq 2 ] && pass "non-repo dir exits 2" || fail "non-repo dir exits 2 (rc=$rc)"
+
+# 10b. non-canonical entry type (well-formed '## ' heading, not an ADR-0013
+#      writable type) -> exit 2 listing the allowed types, no commit
+head_before=$(git -C "$REPO" rev-parse HEAD)
+out=$(printf '## Bogus Type\nbody\n' | "$PA" -C "$REPO" 7 2>&1); rc=$?
+if [ "$rc" -eq 2 ] \
+    && printf '%s' "$out" | grep -qi 'not a writable' \
+    && printf '%s' "$out" | grep -q 'Implementation' \
+    && [ "$(git -C "$REPO" rev-parse HEAD)" = "$head_before" ]; then
+    pass "non-canonical entry type exits 2 with allowed list, no commit"
+else
+    fail "non-canonical entry type exits 2 (rc=$rc, out=$out)"
+fi
 
 # 11. CRLF / padded heading: trailing \r and spaces must not leak into the
 #     commit subject (entry type is trimmed).

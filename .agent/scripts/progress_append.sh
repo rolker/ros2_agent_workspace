@@ -76,6 +76,33 @@ ENTRY_TYPE="${FIRST#\#\# }"
 # Strip any trailing whitespace run (a CR from a CRLF heading, or a padded
 # heading) so it can't leak `\r`/double-space into the commit subject.
 ENTRY_TYPE="${ENTRY_TYPE%"${ENTRY_TYPE##*[![:space:]]}"}"
+
+# Validate against the WRITABLE ADR-0013 entry types. A free-text heading would
+# defeat the fixed-commit-message scope rationale (see the header comment) and be
+# invisible to progress_read.py's type filters, so the run-issue host would
+# misread the phase outcome. Keep this list in sync with CANONICAL_TYPES in
+# .agent/scripts/progress_read.py — but EXCLUDE "External Review": it is a
+# read-only predecessor the reader still recognizes for legacy history, never a
+# type a writer should freshly emit.
+WRITABLE_TYPES=(
+    "Issue Review"
+    "Plan Authored"
+    "Plan Review"
+    "Local Review"
+    "Local Review (Pre-Push)"
+    "Integrated Review"
+    "Implementation"
+)
+_type_ok=0
+for _t in "${WRITABLE_TYPES[@]}"; do
+    [[ "$ENTRY_TYPE" == "$_t" ]] && { _type_ok=1; break; }
+done
+if [[ "$_type_ok" -ne 1 ]]; then
+    echo "error: '$ENTRY_TYPE' is not a writable ADR-0013 entry type." >&2
+    { printf '       allowed:'; printf ' "%s";' "${WRITABLE_TYPES[@]}"; printf '\n'; } >&2
+    exit 2
+fi
+
 TYPE_MSG=$(printf '%s' "$ENTRY_TYPE" | tr '[:upper:]' '[:lower:]')
 
 FILE_REL=".agent/work-plans/issue-$ISSUE/progress.md"
