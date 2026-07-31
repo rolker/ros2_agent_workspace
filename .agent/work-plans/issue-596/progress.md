@@ -78,3 +78,65 @@ Per the Consequences Map:
 - [x] (suggestion) plan-task file-change note points at "step 6" for line-count guidance; guidance actually lives in the Guidelines section (`plan-task/SKILL.md:409`) — `plan.md:51`
 - [x] (suggestion) new required plan section is framed as documentation-only, but review-plan step-4 dimension + review-code 5b are review-layer checks — state this to strengthen the ADR-0004 posture — `plan.md:60-63,71`
 - [x] (suggestion) `review-plan/SKILL.md` is in Files to Change but absent from the Consequences "framework skill → adapters" rows; add it (adapters reference by URL only, no update needed) — `plan.md:76-81`
+
+
+## Implementation
+**Status**: complete
+**When**: 2026-07-31 19:17 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-596 at `048c26a`
+**Plan**: `.agent/work-plans/issue-596/plan.md`
+
+### What landed
+
+Six atomic commits on `feature/issue-596` (plan-sync + four seams):
+
+1. `9c949cb` — **plan-sync**: folded the three operator-approved amendments
+   into `plan.md` and checked off the three Plan Review findings in this file:
+   (1) fixed the plan-task line-count pointer to the Guidelines section
+   (`plan-task/SKILL.md:409`), not "step 6"; (2) restated the new plan
+   section's ADR-0004 posture as instruction + review layer (review-plan
+   step-4 + review-code 5b), not documentation-only; (3) added
+   `review-plan/SKILL.md` to the plan's own Consequences rows.
+2. `3d75f82` — **plan-task/SKILL.md**: added the required
+   `## Documentation & Instruction Impact` section to the plan template
+   (step 5), obliging an explicit "None — <reason>" so silence is a
+   conspicuous omission; separates stale docs (same-PR) from
+   agent-instruction candidates (operator decides, never auto-applied).
+3. `f156180` — **principles_review_guide.md**: two additive Consequences Map
+   rows — parameter/topic/service changes → package README/API docs +
+   review-context.yaml; surfaced pattern/pitfall → operator-approved
+   knowledge/README candidate.
+4. `3b4d16a` — **review-code/SKILL.md**: doc-impact check added to Governance
+   specialist 5b (parameter/topic/service doc updates Missing-if-stale;
+   missed pattern raised as operator-facing candidate).
+5. `048c26a` — **review-plan/SKILL.md**: new step-4 "Documentation &
+   instruction impact" dimension + Evaluation-table row verifying the plan
+   section exists, is non-silent, and frames instruction updates as
+   candidates.
+
+### Issue Review actions honored
+
+- Framework adapters checked (`.github/copilot-instructions.md`,
+  `.agent/instructions/gemini-cli.instructions.md`,
+  `.agent/AGENT_ONBOARDING.md`): all reference plan-task/review-code/
+  review-plan by SKILL.md **URL and skill-list name only**, no behavior
+  prose — no adapter update needed (recorded in the plan Consequences).
+- `review-plan/SKILL.md` verified against source before editing — it does
+  enumerate plan dimensions (step 4 + report table), so both were updated.
+- Instruction-update design kept flag-at-checkpoints: candidates are
+  proposals in the plan section / review findings, never auto-applied.
+
+### Verification
+
+- Documentation claims verified against source (read the actual skill text
+  cited before each edit).
+- All six commits passed pre-commit hooks (identity, branch, issue-match)
+  under the agent identity. Not pushed — host performs the push.
+
+### Next step
+
+Lifecycle: **Implementation** → **review-code** (pre-push). Hand off to a
+fresh-context `review-code` sub-agent, then push / open the PR
+(`Closes #596`).
