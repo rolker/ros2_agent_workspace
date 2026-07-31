@@ -91,7 +91,17 @@ if [[ ! -f "$FILE" ]]; then
         fi
     } > "$FILE"
 fi
-{ printf '\n'; printf '%s\n' "$ENTRY"; } >> "$FILE"
+# Idempotency guard: the entry is appended before the commit, so a naive re-run
+# after a commit failure (exit 3) would double-append. If the file already ends
+# with this exact entry (a prior run appended but its commit failed), skip the
+# re-append and just re-attempt the commit. This is not full transactionality —
+# it only covers the append-then-commit-failed replay.
+CURRENT=$(cat "$FILE")   # $(…) strips trailing newlines, so CURRENT ends at the last entry's last non-blank line
+if [[ "$CURRENT" == *$'\n'"$ENTRY" ]]; then
+    echo "note: identical entry already present as file tail (uncommitted from a prior run?) — skipping re-append, re-attempting commit" >&2
+else
+    { printf '\n'; printf '%s\n' "$ENTRY"; } >> "$FILE"
+fi
 
 git -C "$ROOT" add -- "$FILE_REL" || exit 3
 # Force the validated identity onto BOTH author and committer via the GIT_*

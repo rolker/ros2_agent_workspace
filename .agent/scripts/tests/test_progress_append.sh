@@ -126,6 +126,19 @@ else
     fail "trailing CR/space in heading trimmed (subj='$subj')"
 fi
 
+# 12. idempotency: if the entry is already the file tail (a prior run appended
+#     but its commit failed), a re-run must not double-append.
+PROG9="$REPO/.agent/work-plans/issue-9/progress.md"
+before=$(grep -c '^## Implementation$' "$PROG9")
+printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # first append+commit
+printf '## Implementation\nsame body\n' | "$PA" -C "$REPO" 9 > /dev/null 2>&1   # identical re-run
+after=$(grep -c '^## Implementation$' "$PROG9")
+if [ "$before" -eq 0 ] && [ "$after" -eq 1 ]; then
+    pass "identical entry as file tail is not re-appended (idempotent replay)"
+else
+    fail "idempotent replay (before=$before after=$after)"
+fi
+
 echo ""
 echo "test_progress_append: $TEST_PASS passed, $TEST_FAIL failed"
 [ "$TEST_FAIL" -eq 0 ]
