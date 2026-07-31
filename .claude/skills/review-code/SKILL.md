@@ -424,7 +424,10 @@ changes something in the "If you change..." column. Are the corresponding
 
 **Doc-impact check**: Beyond the map, verify the change carries its
 documentation consequences and check the plan's `## Documentation &
-Instruction Impact` section against the diff:
+Instruction Impact` section against the diff. (Tier note: 5b runs at
+Standard and Deep only — a Light-tier diff gets no reviewer-side doc-impact
+check and relies on the plan section plus the review-plan step-4 dimension;
+that is an accepted gap, sized to Light's <50-line no-trigger diffs.)
 
 - If the PR changes package **parameters, topics, or services**, confirm
   the package README / API docs — and `.agents/review-context.yaml` if it

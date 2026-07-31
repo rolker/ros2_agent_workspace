@@ -152,6 +152,12 @@ an oversight. Silence here is a review finding (review-plan step 4). -->
   belong in `.agent/knowledge/`, `.agents/README.md`, or an instruction
   file — or "None — <reason>">
 
+<!-- Disambiguation: the same file can appear on either side. A doc the
+diff itself edits or invalidates (including a knowledge doc or
+.agents/README.md) is a STALE-DOCS item — it lands in this PR. A NEW
+insight that would ADD instruction content is a CANDIDATE — proposed,
+operator-decided. The split is stale-vs-new content, not which file. -->
+
 ## Open Questions
 
 - <anything that needs human input before implementation>
