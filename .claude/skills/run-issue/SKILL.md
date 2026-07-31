@@ -271,7 +271,9 @@ the header because "the operator was just here"):
   `<repo>#<N> (PR #M): <issue title> — phase X of Y (<phase name>); <one-line state>`.
   The **repo slug is mandatory** — issue and PR numbers collide across project
   repos, so a bare `#24` is ambiguous by construction; include `(PR #M)`
-  whenever a PR exists. Put it in the **`question` field, not the `header`
+  whenever a PR exists. The slug is the **GitHub repo name** (`gh repo view
+  --json name`), not the local directory name — they can differ (e.g., dir
+  `project11` = repo `ros2_agent_workspace`). Put it in the **`question` field, not the `header`
   field** — the `header` chip is capped at ~12 chars and cannot hold it. This
   reloads the operator's context the moment attention returns.
 - **Finding-embedding** — when a checkpoint is triggered by a review entry's
