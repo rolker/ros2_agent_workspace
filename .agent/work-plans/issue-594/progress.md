@@ -54,3 +54,15 @@ The issue is a workspace infrastructure change (scripts, settings, skill guidanc
 - [ ] Add `progress_append.sh` entry to AGENTS.md script reference table in the same PR.
 - [ ] Confirm allowlist entry uses the anchored `Bash(.agent/scripts/progress_append.sh:*)` form consistent with existing `.claude/settings.json` entries.
 - [ ] Consider a smoke test for `progress_append.sh` (at minimum, verify it fails gracefully on a bad issue number or non-existent progress.md parent dir).
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-07-31 16:19 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-594/plan.md` at `af42e6f`
+**Branch**: feature/issue-594 at `af42e6f`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
