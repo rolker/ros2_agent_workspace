@@ -1005,21 +1005,9 @@ no owning worktree exists). Fetch the issue title via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
-For new files, create the parent directory first:
-
-```bash
-mkdir -p .agent/work-plans/issue-<N>
-```
-
-Frontmatter for new files:
-
-```yaml
----
-issue: <N>
----
-
-# Issue #<N> — <issue title>
-```
+File creation (parent dir + frontmatter `issue: <N>` + `# Issue #<N> — <issue
+title>` heading) is handled by `progress_append.sh` below — pass the fetched
+title via `--title`.
 
 Append this step entry. The snippet below shows the post-PR header; in
 pre-push mode change just the header to `## Local Review (Pre-Push)` so
@@ -1057,17 +1045,22 @@ Key points:
 - Use `- [ ]` checkboxes so findings can be checked off as addressed.
 - Include only the one-line summary and location, not the full
   description.
-- Commit progress.md after appending. Run `git add` and `git commit` in
-  the worktree where progress.md was found or created (which may differ
-  from the current working directory):
+- Append **and** commit in one prompt-free step via
+  [`progress_append.sh`](../../../.agent/scripts/progress_append.sh)
+  ([#594](https://github.com/rolker/ros2_agent_workspace/issues/594)) — never
+  inline `cat >>` + `git commit` (both prompt). `-C` targets the worktree
+  where progress.md was found or created (which may differ from the current
+  working directory); the script creates the file with frontmatter if absent,
+  commits only that file, and forms the `progress: <entry type> for #<N>`
+  message from the entry heading:
   ```bash
-  git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-  git -C <worktree-path> \
-      -c user.name="$AGENT_NAME" \
-      -c user.email="$AGENT_EMAIL" \
-      commit -m "progress: local review for #<N>"
+  .agent/scripts/progress_append.sh -C <worktree-path> <N> --title "<issue title>" <<'ENTRY'
+  ## Local Review (Pre-Push)
+  ...the entry as specified above...
+  ENTRY
   ```
-  The per-invocation `-c` overrides are required by
+  Identity comes from `$AGENT_NAME`/`$AGENT_EMAIL` (or `--name`/`--email`);
+  the script fails loud when unset, satisfying
   [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
   on agent-convention branches.
 - If no issue number was resolved in step 1, skip persistence and note

@@ -168,6 +168,16 @@ real type.) Pre-push `review-code` always writes `## Local Review (Pre-Push)`;
 orchestrator routes on the real heading. When you need either Local Review
 variant, pass both (`--type` is repeatable).
 
+**Host-side parsing and writes must be prompt-free by construction**
+([#594](https://github.com/rolker/ros2_agent_workspace/issues/594)). The host
+runs under the operator's permission policy, and a stalled prompt defeats the
+hands-off dispatch flow — the operator should return to a *processed*
+checkpoint, not a pending approval. Therefore: parse with `jq` (auto-allowed)
+and `progress_read.py` (allowlisted) — **never ad-hoc interpreter heredocs**
+(`python3 - <<EOF`…), which can never be allowlisted; append + commit progress
+entries via `.agent/scripts/progress_append.sh` (allowlisted; see review-code
+step 8 for the pattern) — never inline `cat >>` + `git commit`.
+
 ## Decision table (the spine)
 
 Read the **last** progress.md entry; act per its type + verdict. Every row

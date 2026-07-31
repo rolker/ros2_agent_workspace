@@ -63,3 +63,7 @@ presentations/*/slides.pdf
 
 # CodeQL generated files
 _codeql_detected_source_root
+
+# Claude Code per-machine permission overrides — layers on top of the tracked
+# .claude/settings.json baseline (#594); never commit machine-specific config
+.claude/settings.local.json
