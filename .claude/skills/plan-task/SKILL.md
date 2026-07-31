@@ -138,6 +138,20 @@ exist:
 |---|---|---|
 | <item from consequences map> | <dependent item> | Yes / No — follow-up |
 
+## Documentation & Instruction Impact
+
+<!-- Required section — never omit it. If the change genuinely has no
+documentation or instruction impact, write exactly "None — <one-line
+reason>" under each heading so the absence is a deliberate statement, not
+an oversight. Silence here is a review finding (review-plan step 4). -->
+
+- **Stale docs** (must land in this PR): <package README, API docs, or
+  other documentation this change makes inaccurate — or "None — <reason>">
+- **Agent-instruction candidates** (proposals only — the operator decides,
+  never auto-applied): <patterns or pitfalls this work surfaced that may
+  belong in `.agent/knowledge/`, `.agents/README.md`, or an instruction
+  file — or "None — <reason>">
+
 ## Open Questions
 
 - <anything that needs human input before implementation>
