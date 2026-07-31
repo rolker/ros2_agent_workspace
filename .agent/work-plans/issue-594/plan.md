@@ -30,26 +30,41 @@ The issue review (#594) flagged two consequences not in the issue body:
 1. **Write `.agent/scripts/progress_append.sh`** — reads entry text from stdin,
    appends to `.agent/work-plans/issue-<N>/progress.md` (creates file +
    frontmatter if absent, per review-code step-8 pattern), `git add`s only that
-   file, and commits with agent identity (`-c` overrides) and a message of the
-   form `progress: <entry-type> for #<N>`. The entry-type slot is extracted from
+   file, and commits with agent identity and a message of the form
+   `progress: <entry-type> for #<N>`. The entry-type slot is extracted from
    the first `## Heading` line in the stdin text. Scope discipline: no arbitrary
    paths, no arbitrary commit messages beyond the entry-type slot, nothing else
-   staged.
+   staged (`git commit -- <file>` so a dirty index is untouched). Identity
+   (plan-review suggestion): taken from `$AGENT_NAME`/`$AGENT_EMAIL` or
+   `--name`/`--email` args; the script **fails loud when unset** — never falls
+   back to human git config (would trip `check_pr_authors.py`). An optional
+   `-C <dir>` targets another worktree (the `git -C` pattern the skills use).
 
-2. **Add allowlist entry to `.claude/settings.json`** — `Bash(.agent/scripts/progress_append.sh:*)`,
-   consistent with existing entries (`dispatch_subagent.sh`, `dlog.sh`,
-   `dashboard.sh`, etc.). This is what makes every future progress append
-   prompt-free.
+2. **Start tracking `.claude/settings.json` and add the allowlist entry** —
+   the project settings file existed only untracked on the dev machine
+   (plan-review must-fix; operator decided at the plan checkpoint to commit
+   it). This PR adds the file to git with its existing allow entries plus
+   `Bash(.agent/scripts/progress_append.sh:*)`. This is the workspace's first
+   *tracked* shared-settings file: it propagates the allowlist to other
+   machines/agents and layers under each developer's personal
+   `.claude/settings.local.json`. The relative `:*` form is used (not an
+   absolute path) because a committed file cannot carry machine-specific
+   paths; the invocation contract is "run as
+   `.agent/scripts/progress_append.sh` from the workspace root, with `-C
+   <dir>` to target another worktree".
 
 3. **Add AGENTS.md script reference table entry** — one row for
    `progress_append.sh` with its purpose, following the existing table format.
    Required by ADR-0006 and flagged by the issue review.
 
-4. **Add a smoke test** — `scripts/test_progress_append.sh` exercises the script
-   against a temp git repo fixture: verify it creates progress.md with correct
-   frontmatter when absent, appends correctly when present, extracts the
-   entry-type and forms the commit message correctly, and fails loud on bad input
-   (no issue dir parent, empty stdin). Run from `make test-scripts`.
+4. **Add a smoke test** — `.agent/scripts/tests/test_progress_append.sh`
+   (the `tests/` dir, matching the `test_dlog.sh` precedent; picked up by
+   `run_script_tests.sh`'s glob / `make test-scripts`) exercises the script
+   against a temp git repo fixture: creates progress.md with correct
+   frontmatter when absent, appends when present, extracts the entry-type and
+   forms the commit message correctly, commits only the progress file (dirty
+   index untouched), and fails loud on bad input (non-numeric issue, empty
+   stdin, missing `##` heading, unset identity).
 
 5. **Update skill guidance** — replace `cat >>` / `python3 -` heredoc patterns
    with the prompt-free equivalents in:
@@ -65,10 +80,10 @@ The issue review (#594) flagged two consequences not in the issue body:
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/progress_append.sh` | New script — stdin→progress.md append + git add + commit |
-| `.claude/settings.json` | Add `Bash(.agent/scripts/progress_append.sh:*)` allowlist entry |
+| `.agent/scripts/progress_append.sh` | New script — stdin→progress.md append + scoped commit |
+| `.claude/settings.json` | **Newly tracked** (operator decision at plan checkpoint) — existing allow entries + `Bash(.agent/scripts/progress_append.sh:*)` |
 | `AGENTS.md` | Add `progress_append.sh` row to script reference table |
-| `.agent/scripts/test_progress_append.sh` | New smoke test against temp git repo fixture |
+| `.agent/scripts/tests/test_progress_append.sh` | New smoke test against temp git repo fixture |
 | `.claude/skills/review-code/SKILL.md` | Step 8: replace inline `cat >>` + `git commit` with `progress_append.sh` |
 | `.claude/skills/triage-reviews/SKILL.md` | Replace inline progress append with `progress_append.sh` |
 | `.claude/skills/run-issue/SKILL.md` | Guidance: `jq`/`progress_read.py` for parsing; `progress_append.sh` for writes |
