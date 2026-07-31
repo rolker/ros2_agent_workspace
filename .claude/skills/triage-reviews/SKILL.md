@@ -283,21 +283,9 @@ title from the correct repo via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
-For new files, create the parent directory first:
-
-```bash
-mkdir -p .agent/work-plans/issue-<N>
-```
-
-Frontmatter for new files:
-
-```yaml
----
-issue: <N>
----
-
-# Issue #<N> — <issue title>
-```
+File creation (parent dir + frontmatter `issue: <N>` + `# Issue #<N> — <issue
+title>` heading) is handled by `progress_append.sh` below — pass the fetched
+title via `--title`.
 
 Append this step entry:
 
@@ -327,23 +315,25 @@ plain bullets (not checkboxes) with a justification — they are dismissals, not
 action items. This shape matches the worked example in
 `.agent/work-plans/issue-468/progress.md`.
 
-Commit `progress.md` after appending. Run `git add` and `git commit` in
-the worktree where progress.md was found or created (which may differ
-from the current working directory):
+Append **and** commit in one prompt-free step via
+[`progress_append.sh`](../../../.agent/scripts/progress_append.sh)
+([#594](https://github.com/rolker/ros2_agent_workspace/issues/594)) — never
+inline `cat >>` + `git commit` (both prompt). `-C` targets the worktree where
+progress.md was found or created (which may differ from the current working
+directory):
 
 ```bash
-git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-git -C <worktree-path> \
-    -c user.name="$AGENT_NAME" \
-    -c user.email="$AGENT_EMAIL" \
-    commit -m "progress: integrated review for #<N>"
+.agent/scripts/progress_append.sh -C <worktree-path> <N> --title "<issue title>" <<'ENTRY'
+## Integrated Review
+...the entry as specified above...
+ENTRY
 ```
 
-The per-invocation `-c` overrides are required by
-[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity);
-agents run each bash invocation in a fresh subshell where
-`set_git_identity_env.sh`'s env exports may not be in scope, and a
-plain `git commit` then trips `check_pr_authors.py` (CI mechanism C,
+Identity comes from `$AGENT_NAME`/`$AGENT_EMAIL` (or `--name`/`--email`) and
+the script fails loud when unset — satisfying
+[AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
+without a fresh-subshell footgun: a plain `git commit` with the env exports
+out of scope would trip `check_pr_authors.py` (CI mechanism C,
 [#468](https://github.com/rolker/ros2_agent_workspace/issues/468)).
 `## Integrated Review` is the current entry type per
 [ADR-0013](../../../docs/decisions/0013-progress-md-entry-type-vocabulary.md)
