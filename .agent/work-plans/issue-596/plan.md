@@ -48,7 +48,7 @@ ADR required.
 
 | File | Change |
 |------|--------|
-| `.claude/skills/plan-task/SKILL.md` | Add `## Documentation & Instruction Impact` section to plan template in step 5; update step 6 note if section affects line-count guidance |
+| `.claude/skills/plan-task/SKILL.md` | Add `## Documentation & Instruction Impact` section to plan template in step 5. The plan line-count guidance that a companion note would touch lives in the **Guidelines** section (`plan-task/SKILL.md:409`), not "step 6" — one small required section keeps plans within the 30-80 line target, so no companion note is needed. |
 | `.agent/knowledge/principles_review_guide.md` | Add two rows to Consequences Map: interface changes → package README; pattern surfaced → knowledge/README candidate |
 | `.claude/skills/review-code/SKILL.md` | Extend 5b consequence check prose with explicit doc-impact and instruction-candidate instructions |
 | `.claude/skills/review-plan/SKILL.md` | Add "Documentation & instruction impact" evaluation dimension to step 4 |
@@ -58,7 +58,7 @@ ADR required.
 | Principle | Consideration |
 |---|---|
 | Human control and transparency | Instruction-update candidates are proposals only; operator decides before any edits land. Design explicitly rejects auto-drafting. |
-| Enforcement over documentation | New plan section is documentation-only; no hook or CI check added. Acceptable for instruction files — noted as a known gap. |
+| Enforcement over documentation | The new required plan section is **not** documentation-only — it is backed by the review layer: `review-plan` step-4 gains a "Documentation & instruction impact" dimension that verifies the section exists and is non-silent, and `review-code` specialist 5b gains doc-impact rows. The ADR-0004 enforcement posture is therefore **instruction + review layer** (no hook/CI check, which is the appropriate ceiling for the instruction-file domain). |
 | A change includes its consequences | Framework adapters verified (no update needed). review-plan gains the new dimension check. |
 | Only what's needed | Three targeted seams; no new lifecycle phase. document-package wiring is out of scope (kept as a "consider" item). |
 | Improve incrementally | Additive changes to existing files; no rewrites. |
@@ -68,7 +68,7 @@ ADR required.
 | ADR | Triggered | How addressed |
 |---|---|---|
 | ADR-0006 — Shared AGENTS.md | Watch | Changing `.claude/skills/` files. Framework adapters checked — reference skills by URL only, no behavior text needs updating. |
-| ADR-0004/0005 — Enforcement hierarchy | Watch | New plan section requirement is documentation-only. Acceptable for instruction-file domain; noted as known gap. |
+| ADR-0004/0005 — Enforcement hierarchy | Watch | New plan section is enforced at **instruction + review layer** (`review-plan` step-4 dimension + `review-code` 5b doc-impact rows), not documentation-only. No hook/CI check — instruction + review layer is the appropriate posture for the instruction-file domain. |
 | ADR-0013 — progress.md entry types | No | No new entry types introduced. |
 
 ## Consequences
@@ -77,6 +77,7 @@ ADR required.
 |---|---|---|
 | `.claude/skills/plan-task/SKILL.md` | Framework adapters | Yes — verified, no update needed |
 | `.claude/skills/review-code/SKILL.md` | Framework adapters | Yes — verified, no update needed |
+| `.claude/skills/review-plan/SKILL.md` | Framework adapters | Yes — verified; adapters reference it by URL only, no update needed |
 | `.agent/knowledge/principles_review_guide.md` | Skills that reference it (review-issue, review-plan, review-code) | Yes — additive rows; existing consumers are not broken |
 | A framework skill | Adapter files | Yes — checked; adapters reference by URL, content unchanged |
 

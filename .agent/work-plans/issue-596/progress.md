@@ -75,6 +75,6 @@ Per the Consequences Map:
 **Verdict**: approve-with-suggestions
 
 ### Findings
-- [ ] (suggestion) plan-task file-change note points at "step 6" for line-count guidance; guidance actually lives in the Guidelines section (`plan-task/SKILL.md:409`) — `plan.md:51`
-- [ ] (suggestion) new required plan section is framed as documentation-only, but review-plan step-4 dimension + review-code 5b are review-layer checks — state this to strengthen the ADR-0004 posture — `plan.md:60-63,71`
-- [ ] (suggestion) `review-plan/SKILL.md` is in Files to Change but absent from the Consequences "framework skill → adapters" rows; add it (adapters reference by URL only, no update needed) — `plan.md:76-81`
+- [x] (suggestion) plan-task file-change note points at "step 6" for line-count guidance; guidance actually lives in the Guidelines section (`plan-task/SKILL.md:409`) — `plan.md:51`
+- [x] (suggestion) new required plan section is framed as documentation-only, but review-plan step-4 dimension + review-code 5b are review-layer checks — state this to strengthen the ADR-0004 posture — `plan.md:60-63,71`
+- [x] (suggestion) `review-plan/SKILL.md` is in Files to Change but absent from the Consequences "framework skill → adapters" rows; add it (adapters reference by URL only, no update needed) — `plan.md:76-81`
