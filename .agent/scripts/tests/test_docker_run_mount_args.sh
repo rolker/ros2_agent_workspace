@@ -7,7 +7,7 @@
 # absolute path and mix objects compiled against different ROS package sets.
 #
 # The test drives the Docker-free `--print-mounts` dry run against a fabricated
-# temp tree injected via the ROOT_DIR env hook, and asserts:
+# temp tree injected via the DRA_ROOT_DIR_OVERRIDE env hook, and asserts:
 #   - a REAL *_ws dir in the worktree gets -v mounts for build/install/log,
 #   - a SYMLINKED *_ws dir in the worktree (a sibling pointing into
 #     layers/main) is NOT re-shielded by section 4b — [ ! -L ] filters it,
@@ -28,7 +28,7 @@ pass() { echo "PASS: $1"; TEST_PASS=$((TEST_PASS + 1)); }
 fail() { echo "FAIL: $1"; TEST_FAIL=$((TEST_FAIL + 1)); }
 
 # ---------- Fixtures ----------
-# A fabricated workspace root. ROOT_DIR is injected via the env hook so the
+# A fabricated workspace root, injected via DRA_ROOT_DIR_OVERRIDE so the
 # script's worktree resolution + shield loops operate on this tree, not the
 # real repo.
 ROOT="$(mktemp -d /tmp/dra_mounts.XXXXXX)"
@@ -54,7 +54,7 @@ WWT="$ROOT/.workspace-worktrees/issue-workspace-$NW"
 mkdir -p "$WWT/.agent"
 
 # ---------- Run 1: layer worktree ----------
-lout=$(ROOT_DIR="$ROOT" "$DRA" --issue "$NL" --repo-slug "$SLUG" --print-mounts 2>&1); lrc=$?
+lout=$(DRA_ROOT_DIR_OVERRIDE="$ROOT" "$DRA" --issue "$NL" --repo-slug "$SLUG" --print-mounts 2>&1); lrc=$?
 
 if [ "$lrc" -ne 0 ]; then
     fail "layer-worktree --print-mounts exits 0 (rc=$lrc; out=$lout)"
@@ -96,7 +96,7 @@ else
 fi
 
 # ---------- Run 2: workspace worktree (no real *_ws -> no-op) ----------
-wout=$(ROOT_DIR="$ROOT" "$DRA" --issue "$NW" --print-mounts 2>&1); wrc=$?
+wout=$(DRA_ROOT_DIR_OVERRIDE="$ROOT" "$DRA" --issue "$NW" --print-mounts 2>&1); wrc=$?
 
 if [ "$wrc" -ne 0 ]; then
     fail "workspace-worktree --print-mounts exits 0 (rc=$wrc; out=$wout)"

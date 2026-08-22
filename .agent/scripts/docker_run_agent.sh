@@ -16,11 +16,18 @@ set -euo pipefail
 # ---------- Constants ----------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# ROOT_DIR is normally derived from the script's own location, but honor a
-# pre-set value from the environment so tests can point the mount logic at a
-# fabricated worktree tree (used by --print-mounts; see
-# tests/test_docker_run_mount_args.sh). := assigns only when unset or empty.
-: "${ROOT_DIR:=$(dirname "$(dirname "$SCRIPT_DIR")")}"
+# ROOT_DIR is derived from the script's own location. A test can point the
+# mount logic at a fabricated worktree tree via DRA_ROOT_DIR_OVERRIDE (used by
+# --print-mounts; see tests/test_docker_run_mount_args.sh).
+#
+# The override is deliberately purpose-named rather than honouring an ambient
+# ROOT_DIR: this value decides every docker bind mount, so an inherited one
+# would silently repoint them and widen what the container can reach. That is
+# not hypothetical — .agent/scripts/agent:19-20 already exports ROOT_DIR, and
+# dispatch_subagent.sh invokes this script as a child, so a bare
+# ${ROOT_DIR:=...} would consume it. The two happen to compute the same path
+# today; a purpose-named knob means they cannot diverge into a surprise.
+ROOT_DIR="${DRA_ROOT_DIR_OVERRIDE:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
 
 # If running from inside a worktree, resolve to the main workspace root.
 # Worktree directories (.workspace-worktrees/, layers/worktrees/) live there.
