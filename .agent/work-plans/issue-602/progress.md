@@ -175,3 +175,34 @@ review-code re-review (pre-push) before the host opens the PR.
 - Local Model Adversarial skipped: no Ollama server at http://localhost:11434.
 - Copilot Adversarial: off (default; not opted in).
 - Reviewed against local `origin/main` (fetch offline — base may be stale); `gh issue view 602` unavailable offline, context taken from plan.md/progress.md.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-22 17:28 -04:00
+**By**: Claude Code Agent (Claude Opus 5 (1M context))
+
+**PR**: #603 at `578b3d5`
+**Sources**: 2 (Copilot R1 @ `578b3d5`, CI rollup). The `Local Review (Pre-Push)` sits at `67c4ca3` — an older head — so nothing correlates at the current SHA.
+**Cross-source confirmations**: 0
+**CI**: all-pass (Lint (pre-commit), Validate Documentation, Script tests, Validate commit identity — all SUCCESS)
+
+1 unresolved thread, current (not outdated). Verified empirically rather than by argument.
+
+### Findings
+- [ ] (valid, Copilot) **My `set -e` comment is factually wrong** — `.agent/scripts/docker_run_agent.sh:352`. The comment claims `[ "$PRINT_MOUNTS" = false ] && mkdir -p ...` "exits non-zero the moment the guard is false, aborting the dry run at that line". Copilot says `set -e` does not abort on a failing command that is part of an `&&` list when it is not the last command. **Tested, and Copilot is right for this position:**
+
+  | case | result |
+  |---|---|
+  | mid-script (the actual site, line 352) | `line after` printed, **exit 0 — no abort** |
+  | last line of a script | script **exits 1** |
+  | last line of a function under `set -e` | caller **aborts, exit 1** |
+
+  So the hazard is real, but only when the AND-OR list is the final command of a script or function — not here. The `if` form is still defensible (uniform with the two `if ! mkdir` sites, and safe if the block is ever relocated), but the stated justification is incorrect and would mislead the next reader into believing a rule that does not hold. Fix: correct the comment to state the real rule and why the `if` is kept, or drop the claim.
+- [ ] (suggestion, carried from `Local Review (Pre-Push)` @ `67c4ca3`, still open) `ROOT_DIR` is a generic env-overridable name; no caller exports it today, but a future `export ROOT_DIR` in a wrapper would silently repoint every mount. Consider `DRA_ROOT_DIR_OVERRIDE`. Left as a judgement call at the publish gate; unaddressed.
+
+### False positives
+- None. The single Copilot comment is correct, and correct about something I asserted confidently and wrongly in a code comment.
+
+### Notes
+- The other two `Local Review (Pre-Push)` suggestions are fixed at this head: the `mkdir` side-effect gating (`ffb66b2`) and the reworded duplication assertion (`578b3d5`).
+- CI is fully green including `Script tests`, which exercises the new `test_docker_run_mount_args.sh` (6/6) via `run_script_tests.sh`'s glob.
