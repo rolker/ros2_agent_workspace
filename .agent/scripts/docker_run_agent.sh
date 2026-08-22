@@ -356,6 +356,39 @@ for ws_dir in "$ROOT_DIR"/layers/main/*_ws; do
     done
 done
 
+# 4b. Anonymous volumes for build/install/log in the DISPATCHED WORKTREE's
+#     layer workspaces. The section-4 loop only shields layers/main/*_ws; a
+#     dispatched worktree has its own *_ws build artifacts at a distinct
+#     absolute path, and the workspace bind mount (section 1) otherwise shares
+#     that path straight through to the host. Without this shield, container
+#     and host builds write objects compiled against different ROS package sets
+#     to the same path — the contamination #602 fixes.
+#
+#     Scope to the already-resolved $WORKTREE_PATH ONLY, never a glob of all
+#     worktrees: globbing every worktree path matches hundreds of entries (many
+#     stale/removed) and would mount scratch space this launch never touches.
+#
+#     Guard on [ -d ] AND [ ! -L ]: inside a layer worktree only the --layer
+#     target is a real directory; its sibling *_ws entries are symlinks into
+#     layers/main, which the section-4 loop already shields. [ -d ] follows
+#     symlinks (so it does NOT filter them) — the explicit [ ! -L ] does,
+#     preventing mkdir -p from reaching through a symlink into the
+#     already-shielded layers/main tree. Inside a workspace worktree no real
+#     *_ws dirs exist, so the loop is a clean no-op. Mirror section 4's
+#     mkdir-as-invoking-user precaution and fail-loud handling (#566).
+for ws_dir in "$WORKTREE_PATH"/*_ws; do
+    [ -d "$ws_dir" ] || continue
+    [ ! -L "$ws_dir" ] || continue
+    for subdir in build install log; do
+        if ! mkdir -p "$ws_dir/$subdir"; then
+            echo "❌ Error: cannot create mountpoint $ws_dir/$subdir (would be" >&2
+            echo "   created root-owned by docker — see #566). Fix and retry." >&2
+            exit 1
+        fi
+        MOUNT_ARGS+=(-v "$ws_dir/$subdir")
+    done
+done
+
 # 5. Read-write: worktree directories (where agent makes changes)
 MOUNT_ARGS+=(-v "$ROOT_DIR/layers/worktrees:$ROOT_DIR/layers/worktrees")
 MOUNT_ARGS+=(-v "$ROOT_DIR/.workspace-worktrees:$ROOT_DIR/.workspace-worktrees")
