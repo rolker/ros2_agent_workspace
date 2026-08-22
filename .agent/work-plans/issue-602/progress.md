@@ -206,3 +206,33 @@ review-code re-review (pre-push) before the host opens the PR.
 ### Notes
 - The other two `Local Review (Pre-Push)` suggestions are fixed at this head: the `mkdir` side-effect gating (`ffb66b2`) and the reworded duplication assertion (`578b3d5`).
 - CI is fully green including `Script tests`, which exercises the new `test_docker_run_mount_args.sh` (6/6) via `run_script_tests.sh`'s glob.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-22 17:46 -04:00
+**By**: Claude Code Agent (Claude Opus 5 (1M context))
+
+**PR**: #603 at `c7c469c` (round 2)
+**Sources**: 2 (Copilot R2 @ `c7c469c`, CI rollup). Prior `Local Review (Pre-Push)` is at `67c4ca3`; the round-1 `Integrated Review` at `578b3d5`. Neither correlates at the current head.
+**Cross-source confirmations**: 0
+**CI**: all-pass (Lint (pre-commit), Validate Documentation, Script tests, commit identity — all SUCCESS)
+
+1 unresolved thread, current. Verified empirically; Copilot is right for the second consecutive round about the same comment.
+
+### Findings
+- [ ] (valid, Copilot R2) **The corrected `set -e` comment is still wrong** — `.agent/scripts/docker_run_agent.sh:358`. Round 1 fixed the claim that `set -e` aborts mid-script. The replacement said the `&&` form "only bites when such a list is the FINAL command of a script or function, where its non-zero status ... does propagate under `set -e`" — which lumps two different mechanisms under `set -e`. Copilot: a script whose final command is a failing `&&` list exits non-zero **regardless of `set -e`**. Tested, and correct:
+
+  | case | `set -e` | result |
+  |---|---|---|
+  | script, last line | **off** | **exit 1** — plain exit-status propagation, no `set -e` involved |
+  | function, last line | off | caller continues, exit 0 |
+  | function, last line | on | caller **aborts**, exit 1 — genuinely a `set -e` effect |
+
+  So only the *function* case is a `set -e` behaviour; the *script* case is ordinary shell exit-status semantics. Fix: reword to name each mechanism correctly, and shorten — a guard comment should not be a shell-semantics tutorial, and this one has now been wrong twice.
+
+### False positives
+- None.
+
+### Notes
+- Round-1's finding (the original, opposite error) was fixed in `c7c469c`; this is a fresh defect introduced by that fix, not a re-raise.
+- Standing pattern worth recording: two consecutive rounds of a bot correcting confidently-worded shell semantics in a *comment*. The code was never wrong — only the prose explaining it. The durable lesson is to keep explanatory comments minimal and verifiable rather than authoritative-sounding.
