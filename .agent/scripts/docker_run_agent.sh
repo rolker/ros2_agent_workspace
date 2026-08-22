@@ -9,13 +9,25 @@
 #   .agent/scripts/docker_run_agent.sh --issue <N>
 #   .agent/scripts/docker_run_agent.sh --issue <N> --build
 #   .agent/scripts/docker_run_agent.sh --issue <N> --shell
+#   .agent/scripts/docker_run_agent.sh --issue <N> --print-mounts
 
 set -euo pipefail
 
 # ---------- Constants ----------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# ROOT_DIR is derived from the script's own location. A test can point the
+# mount logic at a fabricated worktree tree via DRA_ROOT_DIR_OVERRIDE (used by
+# --print-mounts; see tests/test_docker_run_mount_args.sh).
+#
+# The override is deliberately purpose-named rather than honouring an ambient
+# ROOT_DIR: this value decides every docker bind mount, so an inherited one
+# would silently repoint them and widen what the container can reach. That is
+# not hypothetical — .agent/scripts/agent:19-20 already exports ROOT_DIR, and
+# dispatch_subagent.sh invokes this script as a child, so a bare
+# ${ROOT_DIR:=...} would consume it. The two happen to compute the same path
+# today; a purpose-named knob means they cannot diverge into a surprise.
+ROOT_DIR="${DRA_ROOT_DIR_OVERRIDE:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
 
 # If running from inside a worktree, resolve to the main workspace root.
 # Worktree directories (.workspace-worktrees/, layers/worktrees/) live there.
@@ -39,6 +51,7 @@ PROMPT=""              # kickoff prompt text (dispatch mode); empty → interact
 PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
 OUTPUT_FORMAT="stream-json"  # claude -p --output-format in dispatch mode
 MODEL=""               # claude --model (alias like 'opus'/'sonnet', or full id); empty → claude default
+PRINT_MOUNTS=false     # --print-mounts: dry-run, dump docker -v args and exit (no Docker)
 
 show_usage() {
     cat <<'EOF'
@@ -65,6 +78,10 @@ Options:
   --model <id>          claude --model (prefer an alias like 'opus'/'sonnet'
                         over a pinned id). Empty => claude's default. An
                         unavailable model makes claude exit non-zero.
+  --print-mounts        Dry run: print the docker -v mount arguments that would
+                        be used and exit, without building the image or running
+                        a container. Requires no Docker daemon or auth; used by
+                        tests/test_docker_run_mount_args.sh.
   -h, --help            Show this help
 
 Prerequisites:
@@ -147,6 +164,8 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             MODEL="$2"; shift 2 ;;
+        --print-mounts)
+            PRINT_MOUNTS=true; shift ;;
         -h|--help)
             show_usage; exit 0 ;;
         *)
@@ -217,7 +236,8 @@ fi
 #      reliably refresh inside the sandbox, so it's unreliable for headless
 #      dispatch (works for interactive sessions where a fresh login is at
 #      hand).
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
+if [ "$PRINT_MOUNTS" = false ] \
+   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
    && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
     echo "ERROR: No authentication found." >&2
     echo "Pick one:" >&2
@@ -285,12 +305,14 @@ echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
 
 DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
 
-if ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
+# --print-mounts is a Docker-free dry run: skip the image existence check
+# (a docker call) so the mount logic can be exercised without a daemon.
+if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME:$IMAGE_TAG not found — building..."
     BUILD_IMAGE=true
 fi
 
-if [ "$BUILD_IMAGE" = true ]; then
+if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # ---------- Stage layer manifests for the rosdep bake (#520) ----------
     # The agent image bakes the workspace's layer system-deps at build time so
     # each launch installs only the delta. The build context (.devcontainer/
@@ -331,7 +353,17 @@ MOUNT_ARGS+=(-v "$ROOT_DIR:$ROOT_DIR")
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent:$ROOT_DIR/.agent:ro")
 
 # 3. Read-write override for .agent/scratchpad/ (push requests, temp files)
-mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
+# Skipped for --print-mounts: a dry run must be inert (#602 review).
+# Written as an `if` rather than `[ ... ] && mkdir -p ...`. At this position
+# either form is safe. The difference is the block's exit status: the `&&` form
+# evaluates to the guard's status, so it is false whenever the guard is. That
+# only matters if this block ever ends a function (`set -e` then aborts the
+# caller) or ends a script (its status becomes the script's, with or without
+# `set -e`). The `if` has no such coupling and matches the two `if ! mkdir`
+# guards below.
+if [ "$PRINT_MOUNTS" = false ]; then
+    mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
+fi
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 
 # 4. Anonymous volumes for build/install/log in each layer workspace
@@ -347,7 +379,40 @@ MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 for ws_dir in "$ROOT_DIR"/layers/main/*_ws; do
     [ -d "$ws_dir" ] || continue
     for subdir in build install log; do
-        if ! mkdir -p "$ws_dir/$subdir"; then
+        if [ "$PRINT_MOUNTS" = false ] && ! mkdir -p "$ws_dir/$subdir"; then
+            echo "❌ Error: cannot create mountpoint $ws_dir/$subdir (would be" >&2
+            echo "   created root-owned by docker — see #566). Fix and retry." >&2
+            exit 1
+        fi
+        MOUNT_ARGS+=(-v "$ws_dir/$subdir")
+    done
+done
+
+# 4b. Anonymous volumes for build/install/log in the DISPATCHED WORKTREE's
+#     layer workspaces. The section-4 loop only shields layers/main/*_ws; a
+#     dispatched worktree has its own *_ws build artifacts at a distinct
+#     absolute path, and the workspace bind mount (section 1) otherwise shares
+#     that path straight through to the host. Without this shield, container
+#     and host builds write objects compiled against different ROS package sets
+#     to the same path — the contamination #602 fixes.
+#
+#     Scope to the already-resolved $WORKTREE_PATH ONLY, never a glob of all
+#     worktrees: globbing every worktree path matches hundreds of entries (many
+#     stale/removed) and would mount scratch space this launch never touches.
+#
+#     Guard on [ -d ] AND [ ! -L ]: inside a layer worktree only the --layer
+#     target is a real directory; its sibling *_ws entries are symlinks into
+#     layers/main, which the section-4 loop already shields. [ -d ] follows
+#     symlinks (so it does NOT filter them) — the explicit [ ! -L ] does,
+#     preventing mkdir -p from reaching through a symlink into the
+#     already-shielded layers/main tree. Inside a workspace worktree no real
+#     *_ws dirs exist, so the loop is a clean no-op. Mirror section 4's
+#     mkdir-as-invoking-user precaution and fail-loud handling (#566).
+for ws_dir in "$WORKTREE_PATH"/*_ws; do
+    [ -d "$ws_dir" ] || continue
+    [ ! -L "$ws_dir" ] || continue
+    for subdir in build install log; do
+        if [ "$PRINT_MOUNTS" = false ] && ! mkdir -p "$ws_dir/$subdir"; then
             echo "❌ Error: cannot create mountpoint $ws_dir/$subdir (would be" >&2
             echo "   created root-owned by docker — see #566). Fix and retry." >&2
             exit 1
@@ -398,6 +463,16 @@ MOUNT_ARGS+=(-v "ros2-agent-precommit-cache:/home/ros/.cache/pre-commit")
 #    ~/.claude/plugins. The entrypoint's recursive chown of ~/.claude fixes
 #    the root-owned mountpoint docker creates on first use.
 MOUNT_ARGS+=(-v "ros2-agent-claude-plugins:/home/ros/.claude/plugins")
+
+# ---------- Dry-run short-circuit (--print-mounts) ----------
+# Dump the assembled docker -v arguments and exit before any Docker
+# interaction. Placed after all MOUNT_ARGS assembly (through section 8) and
+# before the container launch, so tests/test_docker_run_mount_args.sh can
+# inspect the mount plan in CI without a daemon or credentials.
+if [ "$PRINT_MOUNTS" = true ]; then
+    printf '%s\n' "${MOUNT_ARGS[@]}"
+    exit 0
+fi
 
 # ---------- Read-only GitHub token (optional) ----------
 # Provides container agents with read-only gh CLI access (view issues, PRs, code search).
