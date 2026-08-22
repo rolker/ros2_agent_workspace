@@ -347,9 +347,15 @@ MOUNT_ARGS+=(-v "$ROOT_DIR/.agent:$ROOT_DIR/.agent:ro")
 
 # 3. Read-write override for .agent/scratchpad/ (push requests, temp files)
 # Skipped for --print-mounts: a dry run must be inert (#602 review).
-# NOTE: an `if`, not `[ ... ] && mkdir` — the script runs under `set -e`,
-# and the bare-&& form exits non-zero when the guard is false, aborting
-# the dry run at this line.
+# Written as an `if` rather than `[ ... ] && mkdir -p ...` for uniformity with
+# the two `if ! mkdir` guards below, and to stay correct if this block is ever
+# moved. To be precise about why (an earlier revision of this comment got it
+# wrong): `set -e` does NOT abort here on the bare-&& form — a failing command
+# that is part of an AND-OR list is exempt, so mid-script the list simply
+# evaluates to false and execution continues. The form only bites when such a
+# list is the FINAL command of a script or function, where its non-zero status
+# becomes the exit status and does propagate under `set -e`. Verified all three
+# cases; this site is the mid-script one.
 if [ "$PRINT_MOUNTS" = false ]; then
     mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
 fi
