@@ -236,3 +236,34 @@ review-code re-review (pre-push) before the host opens the PR.
 ### Notes
 - Round-1's finding (the original, opposite error) was fixed in `c7c469c`; this is a fresh defect introduced by that fix, not a re-raise.
 - Standing pattern worth recording: two consecutive rounds of a bot correcting confidently-worded shell semantics in a *comment*. The code was never wrong — only the prose explaining it. The durable lesson is to keep explanatory comments minimal and verifiable rather than authoritative-sounding.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-22 17:55 -04:00
+**By**: Claude Code Agent (Claude Opus 5 (1M context))
+
+**PR**: #603 at `af1f5cd` (round 3)
+**Sources**: 3 (Copilot R3 @ `af1f5cd`, `Local Review (Pre-Push)` @ `67c4ca3`, CI rollup)
+**Cross-source confirmations**: 1
+**CI**: all-pass (Lint (pre-commit), Validate Documentation, Script tests, commit identity — all SUCCESS)
+
+Copilot's round-3 verdict is "🔵 Needs a closer look". Zero unresolved threads — the concern is in its summary and suppressed comments, not a thread. The round-2 comment finding is fixed and its thread resolved.
+
+### Findings
+- [ ] (cross-confirmed — `Local Review (Pre-Push)` @ `67c4ca3` + Copilot R3 @ `af1f5cd`) **`ROOT_DIR` is an ambient env override on a script that builds docker bind mounts** — `.agent/scripts/docker_run_agent.sh:23`. Both reviewers reached this independently. Copilot frames it harder than the local review did: an ambient `ROOT_DIR` "can accidentally repoint bind mounts and expand host exposure". The SHAs differ, but Copilot itself labels it "previously missed — in code that hasn't changed since the last review", so the two sources describe identical code; recording as cross-confirmed rather than letting a SHA technicality understate the strongest signal available.
+
+  **The justification for deferring it was false.** Both the earlier triage and PR #603's body state "no caller exports `ROOT_DIR` today". Verified now — **`.agent/scripts/agent:19-20` does exactly that**:
+  ```
+  ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+  export ROOT_DIR
+  ```
+  and `dispatch_subagent.sh:562` invokes `"$SCRIPT_DIR/docker_run_agent.sh"` as a child process, so an exported value is inherited on that path. Today the two computations agree (both are `dirname` twice from `.agent/scripts`), so behaviour is unchanged — but the hook is **live, not dormant**, and the claim that nothing exports it is simply wrong. I repeated it from the round-1 review without checking.
+
+  Fix: scope the override to a purpose-specific name (e.g. `DRA_ROOT_DIR_OVERRIDE`) so an ambient `ROOT_DIR` cannot reach the mount logic; update `tests/test_docker_run_mount_args.sh` (three call sites) and the comment at :19-23. Also correct the "no caller exports it" claim in the PR body and in issue #602.
+
+### False positives
+- None.
+
+### Notes
+- Round-2's finding (the `set -e` comment) is fixed at `af1f5cd` and its thread resolved; Copilot did not re-raise it.
+- Three rounds, and the *code* has been correct throughout — rounds 1 and 2 were both about prose in one comment. This round is the first substantive one since the pre-push review, and it is substantive because a shared assumption ("nothing exports ROOT_DIR") went unverified by me across the issue body, the PR body, and two triage reports.
