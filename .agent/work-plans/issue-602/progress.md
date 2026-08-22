@@ -152,3 +152,26 @@ absolute path, plus the four approved Plan Review findings.
 ### Next step
 
 review-code re-review (pre-push) before the host opens the PR.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-22 21:02 +00:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**Branch**: feature/issue-602 at `67c4ca3`
+**Mode**: pre-push
+**Depth**: Deep (reason: container-sandbox mount/isolation change + ROOT_DIR env-injection hook on a user-input script that shells out to docker)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 1 | **Ship**: recommended — no must-fix; core shield correct across static + governance + plan-drift + 2 adversarial lenses; 3 suggestions applyable or trackable
+
+### Findings
+- [ ] (suggestion) `--print-mounts` "dry run" still runs `mkdir -p` (sections 3/4/4b) before the short-circuit, creating build/install/log + scratchpad on the host — cross-pass confirmed (Lens A+B); gate mkdir behind `[ "$PRINT_MOUNTS" = false ]` — `.agent/scripts/docker_run_agent.sh:349,365,398`
+- [ ] (suggestion) Test assertion #4 ("no symlink duplication") is redundant/misleading — a removed `[ ! -L ]` guard is caught by assertion #3, not #4 — `.agent/scripts/tests/test_docker_run_mount_args.sh:82`
+- [ ] (suggestion) `ROOT_DIR` is a generic env-overridable name; low risk today (no caller exports it) but a future `export ROOT_DIR` would silently repoint mounts — consider `DRA_ROOT_DIR_OVERRIDE` — `.agent/scripts/docker_run_agent.sh:23`
+
+### Notes
+- Static analysis: shellcheck clean on both changed files (pre-existing SC2016 at line 278 is on an untouched line — not reported).
+- Local Model Adversarial skipped: no Ollama server at http://localhost:11434.
+- Copilot Adversarial: off (default; not opted in).
+- Reviewed against local `origin/main` (fetch offline — base may be stale); `gh issue view 602` unavailable offline, context taken from plan.md/progress.md.
