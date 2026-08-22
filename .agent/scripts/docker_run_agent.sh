@@ -346,7 +346,13 @@ MOUNT_ARGS+=(-v "$ROOT_DIR:$ROOT_DIR")
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent:$ROOT_DIR/.agent:ro")
 
 # 3. Read-write override for .agent/scratchpad/ (push requests, temp files)
-mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
+# Skipped for --print-mounts: a dry run must be inert (#602 review).
+# NOTE: an `if`, not `[ ... ] && mkdir` — the script runs under `set -e`,
+# and the bare-&& form exits non-zero when the guard is false, aborting
+# the dry run at this line.
+if [ "$PRINT_MOUNTS" = false ]; then
+    mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
+fi
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 
 # 4. Anonymous volumes for build/install/log in each layer workspace
@@ -362,7 +368,7 @@ MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 for ws_dir in "$ROOT_DIR"/layers/main/*_ws; do
     [ -d "$ws_dir" ] || continue
     for subdir in build install log; do
-        if ! mkdir -p "$ws_dir/$subdir"; then
+        if [ "$PRINT_MOUNTS" = false ] && ! mkdir -p "$ws_dir/$subdir"; then
             echo "❌ Error: cannot create mountpoint $ws_dir/$subdir (would be" >&2
             echo "   created root-owned by docker — see #566). Fix and retry." >&2
             exit 1
@@ -395,7 +401,7 @@ for ws_dir in "$WORKTREE_PATH"/*_ws; do
     [ -d "$ws_dir" ] || continue
     [ ! -L "$ws_dir" ] || continue
     for subdir in build install log; do
-        if ! mkdir -p "$ws_dir/$subdir"; then
+        if [ "$PRINT_MOUNTS" = false ] && ! mkdir -p "$ws_dir/$subdir"; then
             echo "❌ Error: cannot create mountpoint $ws_dir/$subdir (would be" >&2
             echo "   created root-owned by docker — see #566). Fix and retry." >&2
             exit 1
