@@ -65,3 +65,25 @@ Per the consequences map:
 
 ### Open questions
 - [ ] Should `--print-mounts` be the dry-run API, or is it cleaner to extract the mount-generation block into a sourced helper and test it directly?
+
+## Plan Review
+**Status**: complete
+**When**: 2026-08-22 19:55 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-602/plan.md` at `46fa709`
+**PR**: PR-less (`--issue 602`)
+**Verdict**: approve-with-suggestions
+
+Verified against `docker_run_agent.sh` (lines 322–393) and a real layer worktree
+(`layers/worktrees/issue-camp-199`: `ui_ws` is a real dir, siblings are symlinks
+into `layers/main` — confirms the plan's symlink-guard analysis). The mount
+mechanics, no-op behavior for workspace worktrees, and section-4 mirroring are
+all sound. All three review-issue actions (test, code comments, follow-up issue)
+are carried into the plan.
+
+### Findings
+- [ ] (must-fix) Test harness can't control the tree as written — plan.md:44–50 has the test call `docker_run_agent.sh --issue X --print-mounts` "with `ROOT_DIR` pointed at a temp tree", but `ROOT_DIR` is computed from the script's own path (script line 18) with no env override, and `WORKTREE_PATH` derives from it (lines 244–264). Implementation must add an injection hook (e.g. `: "${ROOT_DIR:=<computed>}"` so an env value wins, or a `WORKTREE_PATH` override) or the `--print-mounts` test cannot fabricate a fake worktree. Resolve the open question in favor of whichever approach makes this injection clean.
+- [ ] (suggestion) `--print-mounts` must short-circuit before any docker call — to stay Docker-free in CI it must print `MOUNT_ARGS[@]` and exit before the image build/stage step (script lines 286–320) and the `docker run` at line 527. Call this out in the plan so the flag is placed correctly.
+- [ ] (suggestion) Consequence not captured: the new `--print-mounts` flag should be added to `show_usage()` (script lines 43–81) and the `# Usage:` header comment (lines 8–10); the Consequences table omits this doc-drift.
+- [ ] (suggestion) Positive/no-action: placing the test at `.agent/scripts/tests/test_docker_run_mount_args.sh` is correct — `run_script_tests.sh` auto-globs `tests/test_*.sh`, so `make test-scripts` / `make validate` will pick it up with no wiring.
