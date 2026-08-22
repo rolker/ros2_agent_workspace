@@ -80,11 +80,17 @@ else
     pass "symlinked worktree nav_ws is skipped ([ ! -L ] guard works)"
 fi
 
-# The symlink's real target under layers/main is shielded exactly once
-# (section 4), not duplicated by section 4b reaching through the symlink.
+# The symlink's real target under layers/main is shielded exactly once.
+#
+# This does NOT re-test the [ ! -L ] guard — the assertion above already
+# covers that, because dropping the guard emits the SYMLINKED path
+# ($LWT/nav_ws/build), which this grep for the resolved path would not see.
+# What this catches is a different regression: a section-4b implementation
+# that RESOLVES symlinks (realpath/readlink) before mounting would emit
+# $ROOT/layers/main/nav_ws/build a second time, duplicating section 4's mount.
 count=$(printf '%s\n' "$lout" | grep -cxF -- "$ROOT/layers/main/nav_ws/build")
 if [ "$count" -eq 1 ]; then
-    pass "layers/main nav_ws/build shielded exactly once (no symlink duplication)"
+    pass "layers/main nav_ws/build shielded once (4b does not resolve symlinks)"
 else
     fail "layers/main nav_ws/build appears $count times (want 1; out=$lout)"
 fi
