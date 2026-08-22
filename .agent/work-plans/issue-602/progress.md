@@ -53,3 +53,15 @@ Per the consequences map:
 - [ ] Add an automated test (akin to `test_layer_sourcing.sh`) that verifies the new worktree-path loop adds anonymous-volume mounts for real `*_ws` directories and skips symlinked ones.
 - [ ] Ensure code comments in `docker_run_agent.sh` capture the symlink-guard rationale and the "only dispatched worktree, not all worktrees" design decision so it survives beyond the issue.
 - [ ] File a follow-up issue for the image staleness check (launcher warning when image predates host ROS packages) after this PR merges.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-22 19:47 +00:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-602/plan.md` at `46fa709`
+**Branch**: feature/issue-602 at `46fa709`
+**Phases**: single
+
+### Open questions
+- [ ] Should `--print-mounts` be the dry-run API, or is it cleaner to extract the mount-generation block into a sourced helper and test it directly?
