@@ -87,3 +87,68 @@ are carried into the plan.
 - [ ] (suggestion) `--print-mounts` must short-circuit before any docker call — to stay Docker-free in CI it must print `MOUNT_ARGS[@]` and exit before the image build/stage step (script lines 286–320) and the `docker run` at line 527. Call this out in the plan so the flag is placed correctly.
 - [ ] (suggestion) Consequence not captured: the new `--print-mounts` flag should be added to `show_usage()` (script lines 43–81) and the `# Usage:` header comment (lines 8–10); the Consequences table omits this doc-drift.
 - [ ] (suggestion) Positive/no-action: placing the test at `.agent/scripts/tests/test_docker_run_mount_args.sh` is correct — `run_script_tests.sh` auto-globs `tests/test_*.sh`, so `make test-scripts` / `make validate` will pick it up with no wiring.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-22 20:53 +00:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Issue**: #602
+**Branch**: feature/issue-602
+**Commits**: `7596d74`, `113ce69`, `a7b147b`
+
+### What was implemented
+
+Core fix — shield the dispatched worktree's `*_ws` build artifacts so the
+container no longer shares `build/install/log` with the host at the same
+absolute path, plus the four approved Plan Review findings.
+
+### Actions
+
+- [x] **Core change** — added a section-4b anonymous-volume shield loop over
+  the resolved `$WORKTREE_PATH/*_ws`, guarded on `[ -d ]` **and** `[ ! -L ]`
+  (symlinked siblings into `layers/main` are already shielded by section 4;
+  `[ -d ]` follows symlinks so `[ ! -L ]` is what filters them). Mirrors
+  section 4's `mkdir -p` ownership precaution and fail-loud handling (#566).
+  Scoped to the one resolved worktree, not a glob of all worktrees. `7596d74`
+- [x] **(must-fix)** Test-injection hook — `ROOT_DIR` now honors a pre-set env
+  value via `: "${ROOT_DIR:=…}"`, so a test can point worktree resolution and
+  both shield loops at a fabricated temp tree. Open question resolved in favor
+  of `--print-mounts` + this hook. `113ce69`
+- [x] **(suggestion)** `--print-mounts` short-circuits before all Docker
+  interaction — the image inspect/build block and the auth-required check are
+  skipped in this mode, and the print-and-exit sits after section 8 (mounts
+  assembled) but before `docker run`. Docker- and credential-free. `113ce69`
+- [x] **(suggestion)** Flag documented in `show_usage()` and the `# Usage:`
+  header comment; Consequences table in plan.md extended to capture the
+  doc-drift. `113ce69`
+- [x] **(suggestion, no action)** Test placed at
+  `.agent/scripts/tests/test_docker_run_mount_args.sh`; auto-globbed by
+  `run_script_tests.sh`. `a7b147b`
+- [x] Plan kept in sync — open question resolved, injection/Docker-free
+  placement recorded, Files-to-Change + Consequences updated. `113ce69`
+
+### Verification actually run
+
+- New test `test_docker_run_mount_args.sh`: **6/6 pass** — real worktree
+  `ui_ws` shielded (build/install/log), symlinked `nav_ws` skipped by
+  `[ ! -L ]`, `layers/main` target shielded exactly once (no duplication),
+  workspace worktree a clean no-op. Both `--print-mounts` runs exit 0.
+- `shellcheck` on the new test: clean.
+- Manual `--print-mounts` smoke test against a fabricated tree: correct mount
+  plan (real `*_ws` mounted, symlink skipped).
+- `run_script_tests.sh` (full suite): my test passes; all shell + 73 pytest
+  tests pass **except** the pre-existing `test_check_commit_identity.sh`
+  "no propagation rejection" case, which fails identically on base commit
+  `9cfa05a` (unrelated `git -c` propagation/env issue, not touched by this
+  change — verified by checkout).
+- Pre-commit hooks ran on every commit (shellcheck included); none bypassed.
+
+### Not done (out of scope, as planned)
+
+- Follow-up issue for the image-staleness launcher warning — plan step 4,
+  explicitly deferred until after this PR merges.
+
+### Next step
+
+review-code re-review (pre-push) before the host opens the PR.
