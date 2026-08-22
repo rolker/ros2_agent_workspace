@@ -49,6 +49,19 @@ symlinks into `layers/main`.
    a temp tree and checks the output. This also makes the mount logic
    independently inspectable going forward.
 
+   **Injection hook (Plan Review must-fix)**: `ROOT_DIR` is made to honor a
+   pre-set environment value — `: "${ROOT_DIR:=$(dirname …)}"` — so a test can
+   point the whole mount pipeline (worktree resolution + both shield loops) at
+   a fabricated temp tree. `WORKTREE_PATH` then derives from the injected root
+   with no further hooks needed.
+
+   **Docker-free placement (Plan Review suggestion)**: `--print-mounts` must
+   short-circuit before any Docker interaction. Two guards keep it daemon-free:
+   the image-inspect/build block is skipped when `PRINT_MOUNTS=true`, and a
+   print-and-exit sits after section 8 (all `MOUNT_ARGS` assembled) but before
+   the GitHub-token/env/`docker run` steps. The auth-required check is also
+   bypassed in `--print-mounts` mode so the dry run needs no credentials.
+
 4. **File follow-up issue for image staleness check** — after the PR merges,
    file a new issue for the launcher warning (when image predates host ROS
    packages). Not in this PR.
@@ -57,7 +70,7 @@ symlinks into `layers/main`.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/docker_run_agent.sh` | Add worktree-path shield loop after section 4; add `--print-mounts` flag; add inline comments |
+| `.agent/scripts/docker_run_agent.sh` | Add worktree-path shield loop after section 4; add `--print-mounts` flag; `ROOT_DIR` env-injection hook; guard Docker/auth steps behind `--print-mounts`; add inline comments; document the flag in `show_usage()` + header |
 | `.agent/scripts/tests/test_docker_run_mount_args.sh` | New test: verifies real dirs get anonymous mounts, symlinks are skipped |
 
 ## Principles Self-Check
@@ -81,6 +94,7 @@ symlinks into `layers/main`.
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
+| Add `--print-mounts` flag | `show_usage()` + `# Usage:` header comment in the same script | Yes — both updated in the same commit (Plan Review suggestion) |
 | `docker_run_agent.sh` | `AGENTS.md` script table description | No — "Launch sandboxed agent container for a worktree" remains accurate; no update needed |
 | `docker_run_agent.sh` | `.agent/knowledge/` note about host/container build contamination | No — knowledge-doc additions are operator-approved; flagged as candidate below |
 
@@ -97,10 +111,12 @@ symlinks into `layers/main`.
 
 ## Open Questions
 
-- Should `--print-mounts` be the dry-run API, or is it cleaner to extract
-  the mount-generation block into a sourced helper and test it directly?
-  Either approach works; `--print-mounts` is simpler (no refactor needed)
-  and makes the flag available at the command line for debugging.
+- ~~Should `--print-mounts` be the dry-run API, or is it cleaner to extract
+  the mount-generation block into a sourced helper and test it directly?~~
+  **Resolved (Plan Review): `--print-mounts` + a `ROOT_DIR` env-injection
+  hook.** No refactor needed, the flag is also useful for command-line
+  debugging, and the `: "${ROOT_DIR:=…}"` hook is a one-line, clean injection
+  point that lets the test drive worktree resolution and both shield loops.
 
 ## Estimated Scope
 

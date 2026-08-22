@@ -9,13 +9,18 @@
 #   .agent/scripts/docker_run_agent.sh --issue <N>
 #   .agent/scripts/docker_run_agent.sh --issue <N> --build
 #   .agent/scripts/docker_run_agent.sh --issue <N> --shell
+#   .agent/scripts/docker_run_agent.sh --issue <N> --print-mounts
 
 set -euo pipefail
 
 # ---------- Constants ----------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# ROOT_DIR is normally derived from the script's own location, but honor a
+# pre-set value from the environment so tests can point the mount logic at a
+# fabricated worktree tree (used by --print-mounts; see
+# tests/test_docker_run_mount_args.sh). := assigns only when unset or empty.
+: "${ROOT_DIR:=$(dirname "$(dirname "$SCRIPT_DIR")")}"
 
 # If running from inside a worktree, resolve to the main workspace root.
 # Worktree directories (.workspace-worktrees/, layers/worktrees/) live there.
@@ -39,6 +44,7 @@ PROMPT=""              # kickoff prompt text (dispatch mode); empty → interact
 PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
 OUTPUT_FORMAT="stream-json"  # claude -p --output-format in dispatch mode
 MODEL=""               # claude --model (alias like 'opus'/'sonnet', or full id); empty → claude default
+PRINT_MOUNTS=false     # --print-mounts: dry-run, dump docker -v args and exit (no Docker)
 
 show_usage() {
     cat <<'EOF'
@@ -65,6 +71,10 @@ Options:
   --model <id>          claude --model (prefer an alias like 'opus'/'sonnet'
                         over a pinned id). Empty => claude's default. An
                         unavailable model makes claude exit non-zero.
+  --print-mounts        Dry run: print the docker -v mount arguments that would
+                        be used and exit, without building the image or running
+                        a container. Requires no Docker daemon or auth; used by
+                        tests/test_docker_run_mount_args.sh.
   -h, --help            Show this help
 
 Prerequisites:
@@ -147,6 +157,8 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             MODEL="$2"; shift 2 ;;
+        --print-mounts)
+            PRINT_MOUNTS=true; shift ;;
         -h|--help)
             show_usage; exit 0 ;;
         *)
@@ -217,7 +229,8 @@ fi
 #      reliably refresh inside the sandbox, so it's unreliable for headless
 #      dispatch (works for interactive sessions where a fresh login is at
 #      hand).
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
+if [ "$PRINT_MOUNTS" = false ] \
+   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
    && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
     echo "ERROR: No authentication found." >&2
     echo "Pick one:" >&2
@@ -285,12 +298,14 @@ echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
 
 DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
 
-if ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
+# --print-mounts is a Docker-free dry run: skip the image existence check
+# (a docker call) so the mount logic can be exercised without a daemon.
+if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME:$IMAGE_TAG not found — building..."
     BUILD_IMAGE=true
 fi
 
-if [ "$BUILD_IMAGE" = true ]; then
+if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # ---------- Stage layer manifests for the rosdep bake (#520) ----------
     # The agent image bakes the workspace's layer system-deps at build time so
     # each launch installs only the delta. The build context (.devcontainer/
@@ -431,6 +446,16 @@ MOUNT_ARGS+=(-v "ros2-agent-precommit-cache:/home/ros/.cache/pre-commit")
 #    ~/.claude/plugins. The entrypoint's recursive chown of ~/.claude fixes
 #    the root-owned mountpoint docker creates on first use.
 MOUNT_ARGS+=(-v "ros2-agent-claude-plugins:/home/ros/.claude/plugins")
+
+# ---------- Dry-run short-circuit (--print-mounts) ----------
+# Dump the assembled docker -v arguments and exit before any Docker
+# interaction. Placed after all MOUNT_ARGS assembly (through section 8) and
+# before the container launch, so tests/test_docker_run_mount_args.sh can
+# inspect the mount plan in CI without a daemon or credentials.
+if [ "$PRINT_MOUNTS" = true ]; then
+    printf '%s\n' "${MOUNT_ARGS[@]}"
+    exit 0
+fi
 
 # ---------- Read-only GitHub token (optional) ----------
 # Provides container agents with read-only gh CLI access (view issues, PRs, code search).
