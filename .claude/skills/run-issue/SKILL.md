@@ -189,15 +189,22 @@ is forwarded at 690 as `-e GH_TOKEN`. So the honest summary is: a container
 gives the phase a **clean machine and no GitHub write auth** — it does not put
 the host's files out of its reach.
 
-**In-process, markedly less contains the phase**, and none of the mechanisms you
-might reach for actually hold:
+**In-process, markedly less contains the phase.** Take the mechanisms you might
+reach for one at a time — each does less than its name suggests:
 
-- The host **permission policy** is not a guardrail here — auto mode is
-  precisely what stands it down; that is the whole premise of preferring
-  in-process.
-- The **allowlist** refuses nothing. `.claude/settings.json` carries a
-  `permissions.allow` array and there is no `deny` list anywhere in this
-  workspace's settings. An allowlist pre-approves; it does not deny.
+- The host **permission policy** is stood down for exactly the calls at issue:
+  auto mode approves the routine ones, which is the whole premise of preferring
+  in-process. It is not off altogether — `ask` rules and the `PreToolUse` hooks
+  wired in `.claude/settings.json` still fire — but routine edits, commits and
+  shell calls go through unprompted.
+- The **allowlist** refuses nothing. The tracked baseline every host gets,
+  `.claude/settings.json`, carries a `permissions.allow` array and **no** `deny`
+  key; neither does `~/.claude/settings.json`. An allowlist pre-approves; it
+  does not deny. This machine's untracked `.claude/settings.local.json` does add
+  a `permissions.ask` list over the destructive ops (`merge_pr.sh`,
+  `gh pr merge`, `make merge-pr`, `tmux send-keys`), which genuinely forces a
+  prompt — but it is per-machine and untracked, so no other host can be relied
+  on to have it.
 - The **worktree does not confine anything.** The scoping is prose *addressed to
   the sub-agent*, not a boundary: `dispatch_subagent.sh:469` writes "Work only
   within this issue's worktree; do not touch other issues" into the handoff
