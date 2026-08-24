@@ -120,3 +120,17 @@ should be corrected before or during planning.
 - [ ] Correct the issue's "#585 is downstream of this" framing — #605 and #585 are independent problems (context/capacity vs. container networking); do not treat #605 as blocking or resolving #585.
 - [ ] Re-triage #590 once #605's acceptance criteria are met — likely close as superseded rather than leaving both default-on and default-off issues open.
 - [ ] Verify `local_review.sh`'s existing test coverage and add tests for the chunking logic, not just manual verification against a real diff.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-23 23:46 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5 (1M context))
+
+**Plan**: `.agent/work-plans/issue-605/plan.md` at `2ef2541`
+**Branch**: feature/issue-605 at `2ef2541`
+**Phases**: single (5 sequenced commits within the one PR: chunking+tests, per-request keep_alive+tests, model-default change pending empirical check, knowledge doc, conditional systemd drop-in script written-but-not-executed)
+
+### Open questions
+- [ ] Does `qwen3.5:4b-q8_0` clear the planted-defect recall check well enough to ship alone, or is the `9b-q4_K_M` stretch candidate (needing KV-cache-type) necessary for acceptable review quality? Determines whether item 4 (systemd drop-in) is needed at all.
+- [ ] If the drop-in is needed, operator sign-off on running `setup_ollama_kv_cache.sh` is a separate ask at implementation time — not covered by plan approval.
+- [ ] Is `LOCAL_REVIEW_KEEP_ALIVE` default of `30s` right, or should it be tuned after observing real chunked-request timing?
