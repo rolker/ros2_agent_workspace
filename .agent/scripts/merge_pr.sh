@@ -22,6 +22,16 @@
 #
 # Steps: resolve → field-mode guard → wait for CI → merge (--merge) →
 #        remove worktree → delete branches → make sync.
+#
+# Exit codes:
+#   0  merged, cleaned up and synced
+#   1  failed before/at the merge — nothing irreversible happened, safe to retry
+#   2  usage error (bad or missing arguments)
+#   3  MERGE COMPLETE, post-merge `make sync` failed (#609). The merge, worktree
+#      removal and branch deletion have all happened and must NOT be retried;
+#      re-run `make sync` alone. Deliberately not 2 — make reports 2 for a
+#      failed recipe, and 2 is this script's usage-error code, so propagating it
+#      would tell a caller "you invoked me wrong" about a finished merge.
 
 set -eo pipefail
 
@@ -29,6 +39,10 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     echo "Error: execute this script, don't source it." >&2
     return 1 2>/dev/null || exit 1
 fi
+
+# Exit code for "the merge finished, the post-merge sync did not" — see the
+# Exit codes block above (#609).
+SYNC_FAILED_RC=3
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=.agent/scripts/_worktree_helpers.sh
@@ -378,19 +392,26 @@ echo "  Syncing all repos..."
 sync_status=0
 make -C "$ROOT_DIR" sync || sync_status=$?
 
-echo ""
-echo "========================================"
 if [ "$sync_status" -eq 0 ]; then
+    echo ""
+    echo "========================================"
     echo "✅ Done: PR #${PR_NUM} merged, cleaned up, and synced."
     echo "========================================"
 else
-    # Note: this is make's exit code (make reports 2 for a failed recipe), not
-    # sync_repos.py's own 1 — the named repos in the sync output above are the
-    # actionable detail.
-    echo "⚠️  PR #${PR_NUM} merged and cleaned up — but the repo sync FAILED"
-    echo "   (make exit ${sync_status}). The merge is complete and needs no retry."
-    echo "   See the sync output above for which repos are stale, then re-run:"
-    echo "       make sync"
-    echo "========================================"
-    exit "$sync_status"
+    # The failure banner goes to stderr like every other failure block here, and
+    # the script exits SYNC_FAILED_RC rather than propagating $sync_status: that
+    # is make's code (2 for a failed recipe), which collides with this script's
+    # usage-error code. rc=2 read as "invoked wrong" invites retrying a merge
+    # that already happened and cannot be undone (#609).
+    {
+        echo ""
+        echo "========================================"
+        echo "⚠️  PR #${PR_NUM} merged and cleaned up — but the repo sync FAILED"
+        echo "   (make exit ${sync_status}). The merge is complete and needs no retry."
+        echo "   See the sync output above for which repos are stale, then re-run:"
+        echo "       make sync"
+        echo "   (merge_pr.sh exits ${SYNC_FAILED_RC} for this case.)"
+        echo "========================================"
+    } >&2
+    exit "$SYNC_FAILED_RC"
 fi

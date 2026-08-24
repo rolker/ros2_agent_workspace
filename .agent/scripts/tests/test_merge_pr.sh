@@ -167,6 +167,20 @@ out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
 { [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
     && ok "conflicting --issue/--pr rejected" || bad "conflicting flags (rc=$rc, out: $(head -1 <<<"$out"))"
 
+# The post-merge sync failure path itself is not reachable here (every test
+# stops at a pre-merge guard, by design — see the scope note at the top), but
+# its exit code is a contract: it must not collide with the usage-error code
+# asserted above, or an agent reads a finished, irreversible merge as "invoked
+# wrong" and retries it (#609).
+echo "Test: post-merge sync-failure exit code is distinct from usage/generic errors"
+sync_rc=$(sed -n 's/^SYNC_FAILED_RC=\([0-9]\+\).*/\1/p' "$MERGE_PR")
+{ [[ -n "$sync_rc" ]] && [[ "$sync_rc" -ne 0 ]] && [[ "$sync_rc" -ne 1 ]] && [[ "$sync_rc" -ne 2 ]]; } \
+    && ok "SYNC_FAILED_RC=$sync_rc is reserved (not 0/1/2)" \
+    || bad "SYNC_FAILED_RC must be a non-zero code other than 1 (generic) or 2 (usage); got '${sync_rc:-unset}'"
+{ ! grep -q 'exit "\$sync_status"' "$MERGE_PR"; } \
+    && ok "make's exit code is not propagated verbatim" \
+    || bad "merge_pr.sh propagates make's exit code (2 collides with its usage error)"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"
