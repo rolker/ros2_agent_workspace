@@ -306,11 +306,24 @@ loops:
 .agent/scripts/docker_run_agent.sh --issue <N> --shell
 ls -ld layers/main/core_ws/build/           # loop 1
 ls -ld "$WORKTREE_ROOT"/*_ws/build/         # loop 2 (the #604 gap)
+```
 
-# Re-run the ownership pass alone (inside the container, as root)
-/usr/local/bin/fix-volume-ownership.sh "$(id -u ros)" "$(id -g ros)" \
+The `--shell` session above is the dropped-privilege `ros` user (the entrypoint
+hands off via `setpriv`), the image ships no `sudo`, and the container runs with
+`--security-opt no-new-privileges:true` — so the chown cannot be re-run from
+inside that session. Re-run it from the **host**, as root in the same container:
+
+```bash
+# Host, in a second terminal while the --shell session is still up.
+# `docker ps` gives the container name (prefix: ros2-agent-).
+docker exec -u 0 <container> \
+    /usr/local/bin/fix-volume-ownership.sh "$(docker exec <container> id -u ros)" \
+    "$(docker exec <container> id -g ros)" \
     "$ROS2_AGENT_WORKSPACE_ROOT" "$WORKTREE_ROOT"
 ```
+
+Substitute the workspace and worktree paths the launcher used (they are printed
+in the container's startup banner and the `Using worktree:` line).
 
 A root-owned volume with an image that predates the fix is the likely cause —
 check for the staleness warning at launch and rebuild. `bash
