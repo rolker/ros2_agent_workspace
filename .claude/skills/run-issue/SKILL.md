@@ -195,12 +195,16 @@ A **container** contains real things, but fewer than "sandbox" suggests, so name
 them precisely. It isolates the **OS and dependency state** and the **build
 artifacts** (each layer workspace's `build`/`install`/`log` is an anonymous
 volume, not the host's — `docker_run_agent.sh:546`, and `:591` for the
-worktrees' copies). And it withholds GitHub **write** auth: a container run
-that goes wrong cannot push and cannot open a PR. Not *all* GitHub credentials —
-`.devcontainer/agent/README.md:3-5` states the absolute ("No GitHub credentials
-enter the container"), and the optional read-only token below contradicts it; the
-sentence it *leads* with, "container filesystem isolation as the security
-boundary", is the framing this paragraph corrects.
+worktrees' copies). And it is *configured* without GitHub **write** auth — no
+SSH keys and no `~/.config/gh` are mounted — so a container run that goes wrong
+cannot push and cannot open a PR. Read "configured" literally: that is what the
+launcher forwards, not something the container enforces, and it is narrower than
+"no GitHub credentials" (next paragraph).
+`.devcontainer/agent/README.md`'s opening and § Security Model state the same
+boundary in the same terms, corrected to match in this PR — before it, that
+README led with "container filesystem isolation as the security boundary" and
+the flat absolute "No GitHub credentials enter the container", which is the
+framing this paragraph corrects.
 
 What it does **not** isolate is the workspace itself.
 `docker_run_agent.sh:509` bind-mounts the **entire workspace root read-write at
