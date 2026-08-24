@@ -193,8 +193,9 @@ write auth and machine state, not access to your files.
 
 A **container** contains real things, but fewer than "sandbox" suggests, so name
 them precisely. It isolates the **OS and dependency state** and the **build
-artifacts** (each layer workspace's `build/`/`install`/`log` is an anonymous
-volume, not the host's). And it withholds GitHub **write** auth: a container run
+artifacts** (each layer workspace's `build`/`install`/`log` is an anonymous
+volume, not the host's — `docker_run_agent.sh:546`, and `:591` for the
+worktrees' copies). And it withholds GitHub **write** auth: a container run
 that goes wrong cannot push and cannot open a PR. Not *all* GitHub credentials —
 `.devcontainer/agent/README.md:3-5` states the absolute ("No GitHub credentials
 enter the container"), and the optional read-only token below contradicts it; the
@@ -209,8 +210,11 @@ punched back read-write over it at 526. Nor is it credential-free in general:
 §6 (599-616) mounts the host's `~/.claude/.credentials.json`, `~/.claude.json`
 and `~/.claude/settings.json`, the long-lived `CLAUDE_CODE_OAUTH_TOKEN` is
 forwarded at 688, and where the optional read-only GitHub token is configured it
-is forwarded at 690 as `-e GH_TOKEN`. So the honest summary is: a container
-gives the phase a **clean machine and no GitHub write auth** — it does not put
+is forwarded at 690 as `-e GH_TOKEN`. That token's read-only-ness is a
+convention of the filename it is read from, not a scope the script validates
+(651-665), so "no write auth" is how the container is *configured*, not a
+property it enforces. So the honest summary is: a container gives the phase a
+**clean machine and, by configuration, no GitHub write auth** — it does not put
 the host's files out of its reach.
 
 **In-process, markedly less contains the phase.** Take the mechanisms you might
