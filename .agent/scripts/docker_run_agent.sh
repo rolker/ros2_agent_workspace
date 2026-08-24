@@ -230,6 +230,45 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; t
     export CLAUDE_CODE_OAUTH_TOKEN
 fi
 
+# ---------- Validation ----------
+
+# Check for authentication. Three sources, in order of robustness for a
+# headless/sandboxed run:
+#   1. CLAUDE_CODE_OAUTH_TOKEN — long-lived (1yr) subscription token from
+#      `claude setup-token`. Subscription-native (counts against Max/Pro
+#      limits, not API billing), purpose-built for CI/headless. Best for
+#      dispatch mode.
+#   2. ANTHROPIC_API_KEY — pay-as-you-go API billing.
+#   3. ~/.claude/.credentials.json — interactive subscription OAuth. The
+#      access token is short-lived and a transplanted stale token can't
+#      reliably refresh inside the sandbox, so it's unreliable for headless
+#      dispatch (works for interactive sessions where a fresh login is at
+#      hand).
+# --build-only never launches a container, so it needs no credentials.
+if [ "$PRINT_MOUNTS" = false ] && [ "$BUILD_ONLY" = false ] \
+   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
+   && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
+    echo "ERROR: No authentication found." >&2
+    echo "Pick one:" >&2
+    echo "  - CLAUDE_CODE_OAUTH_TOKEN  (recommended; 'claude setup-token' in a real" >&2
+    echo "                              terminal, then save to $CLAUDE_OAUTH_TOKEN_FILE" >&2
+    echo "                              [chmod 600], or export the env var)" >&2
+    echo "  - ANTHROPIC_API_KEY        (API billing, not subscription)" >&2
+    echo "  - 'claude' + /login on the host for interactive subscription auth" >&2
+    exit 1
+fi
+
+# Dispatch mode is headless, so transplanted OAuth credentials.json can't
+# refresh — steer the user to the long-lived token unless they've set one
+# (or an API key).
+if [ "$DISPATCH_MODE" = true ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "⚠️  Dispatch (headless) mode with no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY." >&2
+    echo "    Mounted ~/.claude/.credentials.json OAuth tokens expire and cannot refresh in" >&2
+    echo "    the sandbox — the run will likely fail with 'Not logged in'. Generate a" >&2
+    echo "    long-lived subscription token with 'claude setup-token' and save it to" >&2
+    echo "    $CLAUDE_OAUTH_TOKEN_FILE (chmod 600) before dispatching." >&2
+fi
+
 # ---------- Build image (if requested or missing) ----------
 
 DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
@@ -351,44 +390,6 @@ fi
 # no worktree, no auth, no container.
 if [ "$BUILD_ONLY" = true ]; then
     exit 0
-fi
-
-# ---------- Validation ----------
-
-# Check for authentication. Three sources, in order of robustness for a
-# headless/sandboxed run:
-#   1. CLAUDE_CODE_OAUTH_TOKEN — long-lived (1yr) subscription token from
-#      `claude setup-token`. Subscription-native (counts against Max/Pro
-#      limits, not API billing), purpose-built for CI/headless. Best for
-#      dispatch mode.
-#   2. ANTHROPIC_API_KEY — pay-as-you-go API billing.
-#   3. ~/.claude/.credentials.json — interactive subscription OAuth. The
-#      access token is short-lived and a transplanted stale token can't
-#      reliably refresh inside the sandbox, so it's unreliable for headless
-#      dispatch (works for interactive sessions where a fresh login is at
-#      hand).
-if [ "$PRINT_MOUNTS" = false ] \
-   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
-   && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
-    echo "ERROR: No authentication found." >&2
-    echo "Pick one:" >&2
-    echo "  - CLAUDE_CODE_OAUTH_TOKEN  (recommended; 'claude setup-token' in a real" >&2
-    echo "                              terminal, then save to $CLAUDE_OAUTH_TOKEN_FILE" >&2
-    echo "                              [chmod 600], or export the env var)" >&2
-    echo "  - ANTHROPIC_API_KEY        (API billing, not subscription)" >&2
-    echo "  - 'claude' + /login on the host for interactive subscription auth" >&2
-    exit 1
-fi
-
-# Dispatch mode is headless, so transplanted OAuth credentials.json can't
-# refresh — steer the user to the long-lived token unless they've set one
-# (or an API key).
-if [ "$DISPATCH_MODE" = true ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "⚠️  Dispatch (headless) mode with no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY." >&2
-    echo "    Mounted ~/.claude/.credentials.json OAuth tokens expire and cannot refresh in" >&2
-    echo "    the sandbox — the run will likely fail with 'Not logged in'. Generate a" >&2
-    echo "    long-lived subscription token with 'claude setup-token' and save it to" >&2
-    echo "    $CLAUDE_OAUTH_TOKEN_FILE (chmod 600) before dispatching." >&2
 fi
 
 # Find worktree for this issue
