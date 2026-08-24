@@ -45,8 +45,9 @@ Each phase runs in a **fresh-context sub-agent** via the dispatcher:
 
 **Context-needing phases: the host fetches the body and passes `--context-file`
 ([#552](https://github.com/rolker/ros2_agent_workspace/issues/552)).** A
-container dispatch has no GitHub read auth, so a phase whose first step reads the
-issue/PR body (e.g. `review-issue`) would fail on `gh issue view`. For those
+container dispatch has GitHub read auth only when the optional read-only token is
+configured, so a phase whose first step reads the issue/PR body (e.g.
+`review-issue`) fails on `gh issue view` without it. For those
 phases the **host** fetches the body and passes it to the dispatcher:
 
 ```bash
@@ -197,7 +198,8 @@ boundary", is the framing this paragraph corrects.
 What it does **not** isolate is the workspace itself.
 `docker_run_agent.sh:509` bind-mounts the **entire workspace root read-write at
 the same absolute path**, and 596-597 mount both worktree trees read-write
-again; only `.agent/` is re-mounted `:ro`. Nor is it credential-free in general:
+again; only `.agent/` is re-mounted `:ro` (512) — and `.agent/scratchpad` is
+punched back read-write over it at 526. Nor is it credential-free in general:
 §6 (599-616) mounts the host's `~/.claude/.credentials.json`, `~/.claude.json`
 and `~/.claude/settings.json`, the long-lived `CLAUDE_CODE_OAUTH_TOKEN` is
 forwarded at 688, and where the optional read-only GitHub token is configured it
@@ -226,7 +228,7 @@ reach for one at a time — each does less than its name suggests:
   prompt — but it is per-machine and untracked, so no other host can be relied
   on to have it.
 - The **worktree does not confine anything.** The scoping is prose *addressed to
-  the sub-agent*, not a boundary: `dispatch_subagent.sh:469` writes "Work only
+  the sub-agent*, not a boundary: `dispatch_subagent.sh:468-469` writes "Work only
   within this issue's worktree; do not touch other issues" into the handoff
   text, and nothing enforces it. The in-process mode line in
   `skill_workflows.md` says the same from the other side — "no filesystem
@@ -349,7 +351,7 @@ must carry the repo-qualified re-orientation header defined in
 `review-code` writes, and **the orchestrator only ever dispatches `review-code`
 in pre-push mode** — so within this flow that is the only Local-Review heading
 produced, and the table keys on it verbatim. `## Local Review` (no parenthetical)
-is review-code's real **post-PR** heading (`review-code/SKILL.md:864-866, 872`),
+is review-code's real **post-PR** heading (`review-code/SKILL.md:1043-1051`),
 *not* a mere abbreviation — but the orchestrator never drives post-PR
 `review-code`: post-PR review feedback is consumed by `triage-reviews`, which
 writes `## Integrated Review`. (`skill_workflows.md`'s handoff table does
