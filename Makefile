@@ -65,7 +65,9 @@ help:
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
-	@echo "  validate      - Validate workspace config (CI-oriented; 0 match / 1 drift / 3 nothing configured)"
+	@echo "  validate      - Validate workspace config + layer sourcing (CI-oriented)"
+	@echo "                  make reports 2 for ANY failure here; run"
+	@echo "                  validate_workspace.py directly for 0 match / 1 drift / 3 unconfigured"
 	@echo ""
 	@echo "Remote sync:"
 	@echo "  add-remote REMOTE=<name> URL_PREFIX=<prefix> - Add remote to all repos"
@@ -138,9 +140,20 @@ test-scripts:
 	@PYTHON=$$([ -x "$(VENV_BIN)/python3" ] && echo "$(VENV_BIN)/python3" || echo "python3"); \
 	PYTHON=$$PYTHON ./.agent/scripts/tests/run_script_tests.sh
 
+# Both checks always run, and the first failure's status is what the recipe
+# returns. Left as two plain lines, validate_workspace.py's new exit 3 for an
+# un-bootstrapped workspace (#609) aborted the recipe before
+# test_layer_sourcing.sh — retiring ADR-0016's named enforcement path in every
+# workspace worktree and every un-bootstrapped clone, which is exactly where
+# agents work. The layer-sourcing guard needs no configs/manifest, so it has
+# something to say in that state.
+# GNU make flattens whatever this returns to its own 2; the code is preserved
+# for a direct `./.agent/scripts/validate_workspace.py` call, not for `make`.
 validate:
-	@python3 ./.agent/scripts/validate_workspace.py
-	@./.agent/scripts/test_layer_sourcing.sh
+	@vrc=0; python3 ./.agent/scripts/validate_workspace.py || vrc=$$?; \
+	lrc=0; ./.agent/scripts/test_layer_sourcing.sh || lrc=$$?; \
+	if [ "$$vrc" -ne 0 ]; then exit $$vrc; fi; \
+	exit $$lrc
 
 # =============================================================================
 # Tier 1 — Setup chain (stamp-based dependencies)
