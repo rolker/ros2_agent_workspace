@@ -20,6 +20,7 @@ import pytest  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import get_repo_info  # noqa: E402
 import list_overlay_repos  # noqa: E402
 import workspace  # noqa: E402
 from workspace import WorkspaceConfigError, get_optional_layers  # noqa: E402
@@ -165,7 +166,7 @@ def test_a_non_mapping_repositories_key_is_an_error(tmp_path, monkeypatch):
         workspace.get_overlay_repos()
 
 
-def test_find_repo_version_raises_on_the_same_manifest(tmp_path, monkeypatch):
+def test_find_repo_version_raises_when_the_only_manifest_will_not_parse(tmp_path, monkeypatch):
     """find_repo_version() swallowed the identical error and returned
     "unknown"; worktree_create.sh branches a worktree off that answer."""
     write_manifest(tmp_path, "core.repos", BAD_MANIFEST)
@@ -179,6 +180,71 @@ def test_find_repo_version_still_answers_from_a_good_manifest(tmp_path, monkeypa
     monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
     assert workspace.find_repo_version("alpha") == "jazzy"
     assert workspace.find_repo_version("nope") == "unknown"
+
+
+def test_one_broken_manifest_does_not_break_lookups_in_the_valid_ones(tmp_path, monkeypatch):
+    """The regression the shared loader introduced: a single-key lookup used to
+    `continue` past an unparseable file, and now aborted at the *first* one in
+    glob order — so a broken `site.repos` broke version lookup for repos
+    declared in perfectly valid manifests. A valid manifest that holds the
+    answer answers it, whatever state the others are in (#609)."""
+    # "broken" sorts before "core": the loop reaches the unparseable file
+    # first, which is exactly the ordering the abort regressed on.
+    write_manifest(tmp_path, "broken.repos", BAD_MANIFEST)
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    assert workspace.find_repo_version("alpha") == "jazzy"
+
+
+def test_a_lookup_that_finds_nothing_still_raises_if_a_manifest_went_unread(tmp_path, monkeypatch):
+    """The other direction, and where the strictness is load bearing: the
+    answer may have been in the file we could not read, so "unknown" would be a
+    guess — and the caller branches a worktree off it."""
+    # "broken" sorts before "core": the loop reaches the unparseable file
+    # first, which is exactly the ordering the abort regressed on.
+    write_manifest(tmp_path, "broken.repos", BAD_MANIFEST)
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    with pytest.raises(WorkspaceConfigError) as exc:
+        workspace.find_repo_version("not-declared-anywhere")
+    assert "broken.repos" in str(exc.value)
+
+
+def test_enumeration_still_refuses_the_broken_manifest(tmp_path, monkeypatch):
+    """Relaxing the *lookup* must not relax the *enumeration*: get_overlay_repos
+    answers "here is every repo", which it cannot do over a file it skipped."""
+    # "broken" sorts before "core": the loop reaches the unparseable file
+    # first, which is exactly the ordering the abort regressed on.
+    write_manifest(tmp_path, "broken.repos", BAD_MANIFEST)
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    with pytest.raises(WorkspaceConfigError):
+        workspace.get_overlay_repos()
+
+
+def test_get_repo_info_cli_refuses_to_print_a_guessed_unknown(tmp_path, monkeypatch, capsys):
+    """The consumer the raise was added for had no handler at all: a traceback
+    and rc 1 where its own docs promise "unknown". It now refuses in one line,
+    on stderr, with the exit status documented (#609)."""
+
+    def boom(target_repo):
+        raise WorkspaceConfigError("cannot parse site.repos: mapping values not allowed")
+
+    monkeypatch.setattr(get_repo_info, "find_repo_version", boom)
+    with pytest.raises(SystemExit) as exc:
+        get_repo_info.main(["alpha"])
+    out = capsys.readouterr()
+    assert exc.value.code == 1
+    assert out.out == ""  # never a bare "unknown" a caller would branch off
+    assert "site.repos" in out.err
+
+
+def test_get_repo_info_cli_prints_a_well_founded_unknown(monkeypatch, capsys):
+    """False-RED direction: "every manifest read, nobody declares it" is a real
+    answer and must stay exit 0."""
+    monkeypatch.setattr(get_repo_info, "find_repo_version", lambda target_repo: "unknown")
+    assert get_repo_info.main(["alpha"]) is None
+    assert capsys.readouterr().out.strip() == "unknown"
 
 
 # --------------------------------------------------------------------------

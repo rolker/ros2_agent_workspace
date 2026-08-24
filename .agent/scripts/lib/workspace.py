@@ -86,10 +86,13 @@ def get_overlay_repos(include_underlay=False):
         os.path.join(workspace_root, "configs"),
     ]
 
+    # Sorted: glob order is filesystem order, which decided *which* manifest
+    # error a caller saw first, and whether a lookup reached a valid manifest
+    # before an invalid one. Neither should depend on inode order.
     repo_files = []
     for d in config_dirs:
         if os.path.isdir(d):
-            repo_files.extend(glob.glob(os.path.join(d, "*.repos")))
+            repo_files.extend(sorted(glob.glob(os.path.join(d, "*.repos"))))
 
     for repo_file in repo_files:
         filename = os.path.basename(repo_file)
@@ -172,7 +175,19 @@ def find_repo_version(target_repo):
         str: Version string (e.g., "jazzy", "main", "feature/foo") or "unknown" if not found
 
     Raises:
-        WorkspaceConfigError: a .repos file exists but could not be parsed.
+        WorkspaceConfigError: the repo was not found AND at least one .repos
+            file could not be parsed, so the answer may have been in the file
+            we could not read.
+
+    Unlike get_overlay_repos(), which enumerates *every* repo and so cannot be
+    honest about a manifest it skipped, this is a single-key lookup: a valid
+    manifest that holds the answer answers it, whatever state the other files
+    are in. Aborting at the first bad file in glob order (which is what the
+    shared loader does unguarded) let one broken `site.repos` break version
+    lookup for repos declared in perfectly valid manifests — and the old code
+    did `continue` past exactly this. The strictness is kept where it is load
+    bearing: if the lookup comes up empty and a file went unread, "unknown" is
+    a guess, and callers branch a worktree off that answer (#609).
     """
     workspace_root = get_workspace_root()
 
@@ -183,19 +198,31 @@ def find_repo_version(target_repo):
         os.path.join(workspace_root, "configs"),
     ]
 
+    # Sorted: glob order is filesystem order, which decided *which* manifest
+    # error a caller saw first, and whether a lookup reached a valid manifest
+    # before an invalid one. Neither should depend on inode order.
     repo_files = []
     for d in config_dirs:
         if os.path.isdir(d):
-            repo_files.extend(glob.glob(os.path.join(d, "*.repos")))
+            repo_files.extend(sorted(glob.glob(os.path.join(d, "*.repos"))))
 
+    unread = []
     for repo_file in repo_files:
-        # Same contract as get_overlay_repos(): a manifest we cannot parse is an
-        # error, not a file that declares nothing. Swallowing it here returned
-        # "unknown", and callers branch a worktree off that answer (#609).
-        repositories = _load_repos_file(repo_file)
+        try:
+            repositories = _load_repos_file(repo_file)
+        except WorkspaceConfigError as exc:
+            # Remembered, not swallowed: it only matters if no valid manifest
+            # answers the lookup.
+            unread.append(str(exc))
+            continue
         if target_repo in repositories:
             return repositories[target_repo].get("version", "unknown")
 
+    if unread:
+        raise WorkspaceConfigError(
+            f"cannot determine the version of '{target_repo}': not found in the "
+            f"manifests that parsed, and {len(unread)} did not parse — " + "; ".join(unread)
+        )
     return "unknown"
 
 

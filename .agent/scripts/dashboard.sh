@@ -327,13 +327,22 @@ if command -v vcs &> /dev/null; then
                         status_str="${status_str:+$status_str, }$sync_status"
                     fi
 
+                    expected_branch=""
+                    expected_rc=0
                     if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
-                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null)
+                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null) \
+                            || expected_rc=$?
                     else
                         expected_branch="unknown"
                     fi
 
-                    if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
+                    if [ "$expected_rc" -ne 0 ]; then
+                        # get_repo_info.py refuses to guess when a manifest
+                        # would not parse. "unknown" here would report the
+                        # unreadable manifest as a repo nobody configured, and
+                        # send the operator looking in the wrong place (#609).
+                        status_str="${status_str:+$status_str, }Expected branch unreadable (manifest will not parse)"
+                    elif [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
                         if [ "$branch" != "$expected_branch" ]; then
                             warning="$branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"

@@ -46,18 +46,32 @@ fetch_remote_branch() {
 
 # Resolve the .repos version (branch/tag) for a package name.
 # Prints the version on stdout; prints nothing if not found or unknown.
+# Returns 0 when the lookup produced an answer (including a well-founded
+# "not declared anywhere"), 1 when it could not be made at all — a manifest
+# that would not parse. The two used to be one silent empty string: the lookup
+# ran under `2>/dev/null` and the caller then opened a draft PR against an
+# empty base branch without a word (#609). The caller warns on 1.
 resolve_repos_branch() {
     local pkg_name="$1"
-    local version
+    local version rc err
+    err=$(mktemp)
     version=$(python3 -c "
 import sys; sys.path.insert(0, '${SCRIPT_DIR}')
 from lib.workspace import find_repo_version
 v = find_repo_version('$pkg_name')
 if v and v != 'unknown': print(v)
-" 2>/dev/null)
+" 2>"$err")
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "  ⚠️  Could not resolve the .repos branch for '$pkg_name': $(tr '\n' ' ' < "$err")" >&2
+        rm -f "$err"
+        return 1
+    fi
+    rm -f "$err"
     if [ -n "$version" ]; then
         echo "$version"
     fi
+    return 0
 }
 
 # Generate convenience scripts for layer worktrees.
@@ -945,8 +959,11 @@ EOF
                         cd "$pkg_path"
                         WORKTREE_PKG_PATH="$WORKTREE_DIR/${LAYER_WS}/src/$pkg_name"
 
-                        # Resolve the .repos base branch for this package
-                        REPOS_BRANCH=$(resolve_repos_branch "$pkg_name")
+                        # Resolve the .repos base branch for this package.
+                        # An unresolvable lookup is not "no base branch": the
+                        # fallback chain below then silently drops a rung.
+                        REPOS_BRANCH=$(resolve_repos_branch "$pkg_name") || \
+                            echo "      ⚠️  Falling back to the parent/HEAD branch for $pkg_name"
                         if [ -n "$REPOS_BRANCH" ]; then
                             git fetch --quiet origin "$REPOS_BRANCH" 2>/dev/null || true
                         fi
@@ -1293,7 +1310,15 @@ PREOF
                 fi
             fi
             if [ -z "$PKG_BASE_BRANCH" ]; then
-                PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name")
+                # A failed lookup and "no version declared" both leave this
+                # empty, and create_draft_pr then omits --base entirely — the
+                # PR targets whatever GitHub calls default. Benign when we
+                # know there is no declared version; a silent wrong base when
+                # we simply could not read the manifest, so say which (#609).
+                if ! PKG_BASE_BRANCH=$(resolve_repos_branch "$pkg_name"); then
+                    echo "  ⚠️  Draft PR for $pkg_name will target the repo's default branch"
+                    PKG_BASE_BRANCH=""
+                fi
             fi
 
             create_draft_pr "$pkg_dir" "$ISSUE_REF" "$PKG_REPO_SLUG" "$PKG_BASE_BRANCH"

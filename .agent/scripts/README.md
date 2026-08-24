@@ -594,6 +594,16 @@ python3 ./.agent/scripts/get_repo_info.py project11
 # Output: jazzy
 ```
 
+**Exit status:**
+- `0` — the version was printed. `unknown` is printed (and is exit 0) only when
+  every manifest was read and none declares the repo.
+- `1` — the answer is not knowable: a `.repos` file could not be parsed and none
+  of the readable ones declares the repo. The reason goes to stderr as
+  `ERROR: …`. Callers branch a worktree off this answer, so a guessed `unknown`
+  would be worse than a refusal (#609). Check `$?` — do not read an empty
+  stdout as `unknown`.
+- `2` — argparse usage error.
+
 **Note:** Now uses the shared `lib/workspace.py` module for consistency.
 
 ---
