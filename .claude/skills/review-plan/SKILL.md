@@ -368,27 +368,28 @@ re-reading their own work, annotate the entry's `**By**` field with
 `(in-context — author self-review)` so downstream consumers can weight
 the entry appropriately.
 
-To detect: find the most recent `## Plan Authored` entry in this
-`progress.md`. If one exists, compare it against the **whole** `**By**`
-field — `<agent name> (<model>)` per ADR-0013 — not the agent-name
-portion alone.
+**To detect, ask about your own context, not about the file.** Did *you*
+write the `## Plan Authored` entry earlier in **this** context, with no
+fresh dispatch in between? If yes, annotate. If you arrived as a
+dispatched sub-agent and read the plan cold, do not — you are
+independent, and that is a fact about how you were invoked, which only
+you can report.
 
-**Do not match on `$AGENT_NAME` by itself.** Every dispatched agent in
-this workspace shares one `$AGENT_NAME` (set once per session by
-`set_git_identity_env.sh`), so a name-only comparison matches on *every*
-review — including a genuinely independent fresh-context sub-agent on a
-different model. That fires the annotation universally and destroys the
-signal it exists to carry (#607). A dispatched review is a separate
-sub-agent with its own context; the shared identity string says nothing
-about whether it authored the plan.
+**No comparison of the `**By**` line can decide this** (#607). Every
+dispatched agent in this workspace shares one `$AGENT_NAME` (set once
+per session by `set_git_identity_env.sh`), so a name-only match fires on
+*every* review. Comparing the whole `<agent name> (<model>)` field
+narrows that false positive without removing it: a genuinely independent
+fresh-context sub-agent dispatched on the *same* model still matches. A
+dispatched review is a separate sub-agent with its own context; the
+identity string says nothing about whether it authored the plan.
 
-Annotate only when you are *actually* re-reading your own work — you
-wrote the plan earlier in **this same context**, without a fresh
-dispatch in between. When the plan was authored by a separate dispatch,
-the review is independent no matter what the `**By**` line says; if the
-model strings also differ, say so in the entry as positive evidence.
-When in doubt, state the basis for your judgement in the entry rather
-than relying on the string comparison.
+The `**By**` field is therefore useful in exactly one direction, as
+corroboration and never as the test: **differing** model strings are
+positive evidence of independence, and worth stating in the entry.
+**Matching** strings are evidence of nothing. If you are genuinely
+unsure how you were invoked, state the basis for your judgement in the
+entry rather than resolving it by string comparison.
 
 If no `## Plan Authored` entry exists (PR-less invocation, or an older
 plan that pre-dates `plan-task`'s persistence step), omit the
