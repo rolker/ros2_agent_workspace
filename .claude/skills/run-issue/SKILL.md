@@ -135,12 +135,13 @@ is not the check.
   - **`review-code` is the exception, not a member of that list.** Its
     specialist fan-out wants the `Agent` tool for fresh-context independence,
     and the sandbox has neither that nor the host Ollama endpoint. It still
-    *runs* there — `review-code/SKILL.md:333` evaluates specialists
-    sequentially when the `Agent` tool is unavailable, and specialist 5f skips
-    itself with a notice when Ollama is unreachable (it is opt-in and off by
-    default anyway) — but it runs **degraded**, losing exactly the independence
-    that makes the specialist read worth having. The `Agent`-tool reason alone
-    carries the point. Run it in-process and accept the prompts.
+    *runs* there — `review-code/SKILL.md:333-335` evaluates specialists
+    sequentially when the `Agent` tool is unavailable, and specialist 5f (on by
+    default; `--no-local` opts out) skips itself with a one-line notice when
+    Ollama is unreachable — but it runs **degraded**, losing exactly the
+    independence that makes the specialist read worth having, and silently
+    dropping the cross-model pass. The `Agent`-tool reason alone carries the
+    point. Run it in-process and accept the prompts.
   - **On a non-Claude host runtime there is no in-process option at all** — the
     `Agent` tool *is* in-process dispatch. Drive the phases manually (as the
     in-process bullet above says) or dispatch them with `--mode container`;

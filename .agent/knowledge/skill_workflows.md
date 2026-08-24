@@ -152,7 +152,8 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   the `Agent` tool *is* in-process dispatch — so drive the phases manually or
   containerize them. **`review-code` is excluded**: it *runs* in a container
   but degraded (specialists evaluate sequentially without the `Agent` tool, and
-  the opt-in local-model specialist skips itself with no host Ollama endpoint),
+  the local-model specialist — on by default — skips itself with no host Ollama
+  endpoint),
   losing the fresh-context independence that is the point — so it stays
   in-process in every mode and pays the prompts. If
   container auth is not ready either (`dispatch_subagent.sh --check`), run
