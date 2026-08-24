@@ -449,7 +449,10 @@ Two phases follow this review:
 1. **Implementation** (no skill yet) — the implementer reads the last `## Plan
    Review` entry in `.agent/work-plans/issue-<N>/progress.md` and the linked
    plan. If the verdict is `changes-requested`, address must-fix findings before
-   starting. Use `--mode container` for isolation-worthy implementation work:
+   starting. Pick the dispatch mode per `run-issue/SKILL.md` § Choosing a mode
+   (#607): **in-process** is the default when auto mode is confirmed active;
+   reach for `--mode container` when auto mode cannot be confirmed, or when the
+   work is isolation-worthy (untrusted input, clean dependency environment):
 
        .agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
 
