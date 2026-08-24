@@ -341,6 +341,26 @@ else
     fail "each request's prompt contains only its own chunk's diff"
 fi
 
+# keep_alive must travel as a per-request JSON field, never as a global
+# OLLAMA_KEEP_ALIVE -- the workspace must not reach into the operator's
+# machine-wide Ollama config.
+ka=$(jq -r '.keep_alive' "$REQ_DIR/req_001.json")
+if [ "$ka" = "30s" ]; then
+    pass "requests carry the default keep_alive (30s) as a per-request field"
+else
+    fail "requests carry the default keep_alive as a per-request field (got '$ka')"
+fi
+
+rm -f "$REQ_DIR"/*
+LOCAL_REVIEW_KEEP_ALIVE=5m PATH="$STUB_DIR:$PATH" LOCAL_REVIEW_MODEL="stub-model" \
+    LOCAL_REVIEW_ANSWER_HEADROOM=4096 "$LR" < "$ONE_FILE" > /dev/null 2>&1
+ka=$(jq -r '.keep_alive' "$REQ_DIR/req_001.json")
+if [ "$ka" = "5m" ]; then
+    pass "LOCAL_REVIEW_KEEP_ALIVE overrides the default"
+else
+    fail "LOCAL_REVIEW_KEEP_ALIVE overrides the default (got '$ka')"
+fi
+
 # --- 6b. splitting is lossless ---------------------------------------
 #
 # The strongest property of the split: every changed line of the original

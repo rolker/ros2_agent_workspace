@@ -79,6 +79,18 @@
 #                         saves VRAM. See
 #                         .agent/knowledge/local_model_sizing.md for how to
 #                         measure it for a new tag.
+#   LOCAL_REVIEW_KEEP_ALIVE
+#                         how long the server keeps the model loaded after
+#                         each request (default: 30s), sent as a
+#                         per-request field. A chunked review makes
+#                         several sequential requests to the same model,
+#                         so unloading immediately ("0") would force a
+#                         reload per chunk; 30s keeps it warm across the
+#                         sequence without squatting in RAM for Ollama's
+#                         5m default once the review is done. Set
+#                         per-invocation rather than via a global
+#                         OLLAMA_KEEP_ALIVE, so this script never reaches
+#                         into the operator's machine-wide Ollama config.
 #
 # Exit codes:
 #   0  review produced (findings on stdout)
@@ -112,6 +124,7 @@ BASE_URL="${LOCAL_REVIEW_URL:-http://localhost:11434}"
 TIMEOUT="${LOCAL_REVIEW_TIMEOUT:-900}"
 NUM_CTX="${LOCAL_REVIEW_NUM_CTX:-32768}"
 ANSWER_HEADROOM="${LOCAL_REVIEW_ANSWER_HEADROOM:-12288}"
+KEEP_ALIVE="${LOCAL_REVIEW_KEEP_ALIVE:-30s}"
 
 BASE_BRANCH=""
 CONTEXT_FILE=""
@@ -607,14 +620,19 @@ BODY_FILE="$WORK_DIR/body.json"
 RESPONSE_FILE="$WORK_DIR/response.json"
 
 build_body() {  # $1 = "true" | "false" (think flag), $2 = prompt file, $3 = num_ctx
+    # keep_alive is a per-request field in Ollama's /api/chat, so the
+    # model's residency is scoped to this review rather than set globally
+    # via OLLAMA_KEEP_ALIVE in the operator's server environment.
     jq -n \
         --arg model "$MODEL" \
         --rawfile prompt "$2" \
         --argjson num_ctx "$3" \
         --argjson think "$1" \
+        --arg keep_alive "$KEEP_ALIVE" \
         '{model: $model,
           messages: [{role: "user", content: $prompt}],
           stream: false, think: $think,
+          keep_alive: $keep_alive,
           options: {num_ctx: $num_ctx}}' > "$BODY_FILE"
 }
 
