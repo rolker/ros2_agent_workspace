@@ -177,6 +177,17 @@ tri-state outcome instead of widening the boolean.
 | `.agent/hooks/README.md` | Round 3 — same correction, and says the sync fails naming `configs/manifest` |
 | `Makefile` | Round 3 — `make help`'s `validate` line attributes the codes to the script, not to `make`; the `validate` recipe runs both checks and returns the first failure |
 | `.agent/scripts/tests/test_merge_pr.sh` | Round 3 — structural check that the sync-failure branch actually exits (deleting that `exit` had passed the whole suite) |
+| `.agent/scripts/pull_remote.py` (cont.) | Round 5 — a named `STATE_NO_LOCAL_BRANCH`: a default branch that exists only as a remote-tracking ref (a SHA/tag-pinned manifest entry) is a state to report, not a run to fail, and `--json` and default mode now agree on it. `_ahead_behind()` returns `(counts, state, error)`; every `--json` entry carries an explicit `state`, plus `commits_truncated`; both ref probes namespaced (`refs/heads/`, `refs/remotes/`) so a same-named tag cannot satisfy them |
+| `.claude/skills/import-field-changes/SKILL.md` | Round 5 — the consumer the producer fix was for: reads the exit status and the `ERROR:` stderr lines before concluding anything from an empty report, consumes the new `state` field, and reports the repos that were *not* checked |
+| `.agent/scripts/lib/workspace.py` (cont.) | Round 5 — `find_repo_version()` skips and continues past an unparseable manifest (a valid one that holds the answer answers it) and raises only when the lookup found nothing *and* a file went unread; manifest globs sorted so neither answer depends on inode order |
+| `.agent/scripts/get_repo_info.py` | Round 5 — given a `main()`; handles `WorkspaceConfigError` with a one-line `ERROR:` and exit 1 instead of a traceback, and documents its exit status |
+| `.agent/scripts/worktree_create.sh` | Round 5 — `resolve_repos_branch()` no longer swallows the lookup failure into an empty version; both callers say when they are falling back |
+| `.agent/scripts/pr_status.sh` | Round 5 — a failed `list_overlay_repos.py` is reported instead of `|| echo "[]"`-ed into zero repos |
+| `.agent/scripts/dashboard.sh` (cont.) | Round 5 — same for both of its enumeration call sites, plus a `4` arm for `validate_workspace.py`'s new unreadable-repo code, and `get_repo_info.py`'s refusal distinguished from "unknown" |
+| `.agent/scripts/tests/test_dashboard_repo_enumeration.sh` | Round 5, new — runs the real `dashboard.sh` against a failing enumeration stub |
+| `.agent/scripts/lib/remote_utils.py` (cont.) | Round 5 — `ENUMERATION_FAILURE` is its own bucket (it exits non-zero but is not a repo, so it is out of the `Summary: N repos` count); `get_repos()` returns `(repos, empty_reason)` so a `--manifest` typo is not diagnosed as an unbootstrapped workspace |
+| `.agent/scripts/validate_workspace.py` (cont. 2) | Round 5 — `ValidationResult.UNREADABLE` (exit 4) with its own report heading and remedy: a corrupt `.git` is not drift; `get_optional_repo_names()` decides through the shared `repo_absence_is_allowed()` |
+| `.agent/scripts/add_remote.py` | Round 5 — documents the exit contract it inherited through `run_script` |
 
 ## Principles Self-Check
 
