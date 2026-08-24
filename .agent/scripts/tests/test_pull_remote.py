@@ -291,7 +291,7 @@ def test_json_mode_reports_an_unreadable_repo_instead_of_silently_skipping(monke
     )
     monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
-    monkeypatch.setattr(pull_remote, "_json_report", lambda *a: None)
+    monkeypatch.setattr(pull_remote, "json_report", lambda *a: None)
     monkeypatch.setattr(
         pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
     )
@@ -313,7 +313,7 @@ def test_json_mode_stays_silent_about_a_repo_with_no_such_remote(monkeypatch, tm
     )
     monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
-    monkeypatch.setattr(pull_remote, "_json_report", lambda *a: None)
+    monkeypatch.setattr(pull_remote, "json_report", lambda *a: None)
     monkeypatch.setattr(
         pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
     )
@@ -322,3 +322,235 @@ def test_json_mode_stays_silent_about_a_repo_with_no_such_remote(monkeypatch, tm
     with pytest.raises(SystemExit) as exc:
         pull_remote.main()
     assert exc.value.code == 0
+
+
+# --------------------------------------------------------------------------
+# --json: a failed probe is not "no field changes to import" (#609)
+#
+# The sole consumer is the /import-field-changes skill, which is instructed to
+# stop when the report is empty. A repo silently dropped here is a field
+# hotfix that never reconciles to GitHub, reported green.
+# --------------------------------------------------------------------------
+
+REV_PARSE = ("rev-parse", "--verify")
+REV_LIST = ("rev-list", "--left-right")
+LOG = ("log", "--oneline")
+
+
+def _report_git(monkeypatch, table):
+    """Stub run_git with a table keyed on the *full* argv tuple.
+
+    json_report distinguishes the remote ref from the local branch with two
+    otherwise-identical `rev-parse --verify` calls, so these tests cannot key
+    on the first two arguments the way the classification tests do.
+    """
+
+    def fake_run_git(repo_path, args, dry_run=False):
+        success, out = table.get(tuple(args), (True, ""))
+        return success, out, "" if success else "fatal: stubbed failure"
+
+    monkeypatch.setattr(pull_remote, "run_git", fake_run_git)
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "jazzy")
+
+
+def test_json_report_errors_when_rev_list_fails(monkeypatch):
+    """The reproduced trigger: rev-list exits 128 and the repo vanished from
+    both the report and the errors, leaving --json exit 0."""
+    _report_git(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (False, "")},
+    )
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert entry is None
+    assert err and "jazzy...gitcloud/jazzy" in err
+
+
+def test_json_report_errors_when_the_local_default_branch_is_absent(monkeypatch):
+    """What produces that rc 128: a default branch that resolved through
+    refs/remotes/origin/ only. Named precisely, because the remedy (check out
+    the branch) is not the remedy for an unreadable repo."""
+    _report_git(monkeypatch, {("rev-parse", "--verify", "jazzy"): (False, "")})
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert entry is None
+    assert err and "no local 'jazzy'" in err
+
+
+def test_json_report_is_silent_when_the_remote_has_no_such_branch(monkeypatch):
+    """False-RED direction: a remote that simply does not carry the branch is
+    a real answer — nothing to import — and must stay out of the errors."""
+    _report_git(monkeypatch, {("rev-parse", "--verify", "gitcloud/jazzy"): (False, "")})
+    assert pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud") == (None, None)
+
+
+def test_json_report_is_silent_when_the_remote_is_not_ahead(monkeypatch):
+    """The other benign answer: the branch exists on both sides and the remote
+    carries nothing new."""
+    _report_git(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "2\t0")},
+    )
+    assert pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud") == (None, None)
+
+
+def test_json_report_returns_the_entry_when_the_remote_is_ahead(monkeypatch):
+    """And the case the skill actually acts on, so none of the above can be
+    satisfied by never producing an entry at all."""
+    _report_git(
+        monkeypatch,
+        {
+            ("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "0\t2"),
+            (
+                "log",
+                "--oneline",
+                "--max-count=50",
+                "jazzy..gitcloud/jazzy",
+            ): (True, "abc123 field fix\ndef456 another"),
+        },
+    )
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert err is None
+    assert entry["behind"] == 2 and entry["ahead"] == 0
+    assert entry["diverged"] is False
+    assert [c["sha"] for c in entry["commits"]] == ["abc123", "def456"]
+
+
+def test_json_report_errors_when_the_commit_log_fails(monkeypatch):
+    """We already know the remote is ahead here, so an empty commit list from a
+    *failed* log would describe a repo with pending field commits as carrying
+    none — the same collapse one probe further down."""
+    _report_git(
+        monkeypatch,
+        {
+            ("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "0\t2"),
+            ("log", "--oneline", "--max-count=50", "jazzy..gitcloud/jazzy"): (False, ""),
+        },
+    )
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert entry is None
+    assert err and "cannot list" in err
+
+
+def test_json_report_errors_on_unreadable_rev_list_output(monkeypatch):
+    """A successful rev-list whose output is not two integers used to fall
+    through to `return None`, and would now raise ValueError on int()."""
+    _report_git(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "garbage")},
+    )
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert entry is None
+    assert err and "unreadable rev-list output" in err
+
+
+def _json_main(monkeypatch, tmp_path, **opts):
+    """Drive main() in --json mode with the workspace fully stubbed.
+
+    Options: `repos` (the enumeration), `report` (the json_report stub),
+    `probe` (per-path RemoteState), `resolve` (resolve_repo_path stub),
+    `optional_layers` (declared optional on this host).
+    """
+    monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
+    monkeypatch.setattr(pull_remote, "get_repos", lambda args: list(opts.get("repos", [])))
+    monkeypatch.setattr(
+        pull_remote,
+        "resolve_repo_path",
+        opts.get("resolve", lambda root, repo: tmp_path / repo["name"]),
+    )
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "jazzy")
+    if "optional_layers" in opts:
+        monkeypatch.setattr(
+            pull_remote, "get_optional_layers", lambda root: set(opts["optional_layers"])
+        )
+    else:
+        monkeypatch.setattr(pull_remote, "get_optional_layers", lambda root: set())
+    monkeypatch.setattr(pull_remote, "json_report", opts.get("report", lambda *a: (None, None)))
+    monkeypatch.setattr(
+        pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
+    )
+    monkeypatch.setattr(
+        pull_remote,
+        "remote_probe",
+        opts.get("probe", lambda repo_path, remote: RemoteState.PRESENT),
+    )
+    monkeypatch.setattr(sys, "argv", ["pull_remote.py", "--remote", "gitcloud", "--json"])
+    with pytest.raises(SystemExit) as exc:
+        pull_remote.main()
+    return exc.value.code
+
+
+def test_json_mode_exits_non_zero_when_a_report_probe_failed(monkeypatch, tmp_path, capsys):
+    """End to end for must-fix 3: the failed probe reaches the exit status and
+    names the repo on stderr, instead of leaving a gap in a green report."""
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[{"name": "alpha", "version": "jazzy", "source_file": "core.repos"}],
+        report=lambda *a: (None, "cannot compare jazzy...gitcloud/jazzy: fatal"),
+    )
+    assert code == 1
+    assert "alpha: cannot compare" in capsys.readouterr().err
+
+
+def test_json_mode_still_exits_zero_on_a_clean_report(monkeypatch, tmp_path):
+    """False-RED direction: a workspace where every repo genuinely has nothing
+    to import must stay 0, or /import-field-changes fails on every run."""
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[{"name": "alpha", "version": "jazzy", "source_file": "core.repos"}],
+    )
+    assert code == 0
+
+
+def test_json_mode_errors_when_no_repos_were_enumerated(monkeypatch, tmp_path, capsys):
+    """Run from a workspace worktree, --json printed `[]` and exited 0 — which
+    /import-field-changes reads as "no field changes to import" for the entire
+    workspace."""
+    code = _json_main(monkeypatch, tmp_path, repos=[])
+    assert code == 1
+    assert "configs/manifest" in capsys.readouterr().err
+
+
+def test_json_mode_errors_on_a_repo_missing_from_a_required_layer(monkeypatch, tmp_path, capsys):
+    """A configured repo with no checkout was `continue`d over silently."""
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[{"name": "alpha", "version": "jazzy", "source_file": "core.repos"}],
+        resolve=lambda root, repo: None,
+    )
+    assert code == 1
+    assert "alpha: no local checkout" in capsys.readouterr().err
+
+
+def test_json_mode_stays_green_for_a_repo_missing_from_an_optional_layer(monkeypatch, tmp_path):
+    """The field-facing false-RED guard: `site` is optional on every manifest
+    this workspace ships and absent on salmon/gabby."""
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[{"name": "alpha", "version": "jazzy", "source_file": "site.repos"}],
+        resolve=lambda root, repo: None,
+        optional_layers={"site"},
+    )
+    assert code == 0
+
+
+def test_json_mode_skips_a_workspace_root_with_no_such_remote(monkeypatch, tmp_path, capsys):
+    """The root was fetched without a remote_probe, so a workspace whose root
+    has no secondary remote reported a fetch failure where non-JSON mode
+    benignly skips it — contradicting the documented contract."""
+
+    def fetch_fails(repo_path, args, dry_run=False):
+        return False, "", "fatal: 'gitcloud' does not appear to be a git repository"
+
+    monkeypatch.setattr(pull_remote, "run_git_network", fetch_fails, raising=True)
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[],
+        probe=lambda repo_path, remote: RemoteState.ABSENT,
+    )
+    # Exit 1 is from the empty enumeration above, not from the root's fetch.
+    assert code == 1
+    assert "ros2_agent_workspace" not in capsys.readouterr().err

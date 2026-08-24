@@ -17,10 +17,15 @@ Prerequisites:
 
 Exit status:
     0  every repo was fetched/merged, or deliberately skipped (dirty tree,
-       detached HEAD, off the default branch, remote not configured).
-    1  at least one repo errored: a failed fetch/merge, or a working tree or
-       git state that could not be read at all. A probe that failed is not a
-       benign answer — see is_dirty()/get_current_branch() (#609).
+       detached HEAD, off the default branch, remote not configured, or absent
+       from a layer that is optional on this host).
+    1  at least one repo errored: a failed fetch/merge, a working tree or git
+       state that could not be read at all, a configured repo with no checkout
+       in a *required* layer, or an enumeration that produced no repos at all
+       (configs/manifest missing, or a manifest that would not parse). A probe
+       that failed is not a benign answer — see is_dirty()/get_current_branch()
+       (#609). --json exits 1 on the same conditions, after printing each to
+       stderr and the (possibly partial) report to stdout.
     2  argparse usage error.
 
     `make pull-remote` reports GNU make's own 2 for any non-zero recipe status,
@@ -36,8 +41,13 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 from remote_utils import (  # noqa: E402
+    NO_REPOS_ENUMERATED,
+    UNREADABLE_STATE,
+    UNREADABLE_TREE,
     RemoteState,
     add_common_args,
+    classify_missing_repo,
+    classify_remote_state,
     get_default_branch,
     get_repos,
     remote_probe,
@@ -46,13 +56,7 @@ from remote_utils import (  # noqa: E402
     run_git_network,
     run_script,
 )
-
-
-# Reasons for a repo whose git state could not be read at all. These are
-# "error", never "skip": a probe that failed is not a benign answer, and
-# reporting it as one is what let a failed run exit 0 (#609).
-UNREADABLE_TREE = "cannot read working tree (corrupt .git, or not a repo)"
-UNREADABLE_STATE = "cannot read git state (not a repo, or corrupt .git)"
+from workspace import WorkspaceConfigError, get_optional_layers  # noqa: E402
 
 
 def is_dirty(repo_path):
@@ -94,16 +98,20 @@ def _compare_branches(repo_path, branch, remote_ref):
             return "skip", f"fetched (no {ref} on {label})"
 
     # Count commits ahead/behind
-    success, output, _ = run_git(
+    success, output, err = run_git(
         repo_path,
         ["rev-list", "--left-right", "--count", f"{branch}...{remote_ref}"],
     )
-    if not success or not output:
-        return "ok", "fetched"
+    if not success:
+        # Both refs verified above, so this failing means we could not read the
+        # repo — and a bare "fetched" would claim we checked whether the remote
+        # is ahead when we could not. sync_repos.py fixed the byte-identical
+        # line for `git status -sb` on this branch (#609).
+        return "error", f"cannot compare {branch}...{remote_ref}: {err or 'git rev-list failed'}"
 
     parts = output.split()
-    if len(parts) != 2:
-        return "ok", "fetched"
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return "error", f"unreadable rev-list output for {branch}...{remote_ref}: {output!r}"
 
     ahead, behind = int(parts[0]), int(parts[1])
     if ahead == 0 and behind == 0:
@@ -236,14 +244,9 @@ def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
 
 def process_repo(repo_path, repo_name, version, args):
     """Dispatch to the appropriate pull mode. Returns (status, message)."""
-    state = remote_probe(repo_path, args.remote)
-    if state is RemoteState.UNREADABLE:
-        # `git remote` failed, so we never learned whether the remote is
-        # configured. Skipping on that reads as "nothing to do here" and keeps
-        # the run green over a repo that was never fetched (#609).
-        return "error", UNREADABLE_STATE
-    if state is RemoteState.ABSENT:
-        return "skip", f"remote '{args.remote}' not found"
+    problem = classify_remote_state(remote_probe(repo_path, args.remote), args.remote)
+    if problem:
+        return problem
 
     if args.pull:
         return _fetch_and_pull(repo_path, args.remote, version, args.dry_run)
@@ -253,45 +256,97 @@ def process_repo(repo_path, repo_name, version, args):
 
 
 def _get_ahead_commits(repo_path, branch, remote_ref, max_count=50):
-    """Get list of commits on remote not on local. Returns list of dicts."""
-    success, output, _ = run_git(
+    """List the commits on the remote but not local. Returns (commits, error).
+
+    `error` is a string when `git log` itself failed. The caller only asks once
+    it already knows the remote is ahead, so an empty list from a *failed* log
+    would describe a repo with pending field commits as having none (#609).
+    """
+    success, output, err = run_git(
         repo_path, ["log", "--oneline", f"--max-count={max_count}", f"{branch}..{remote_ref}"]
     )
-    if not success or not output:
-        return []
+    if not success:
+        return [], f"cannot list {branch}..{remote_ref}: {err or 'git log failed'}"
     commits = []
     for line in output.splitlines():
         parts = line.split(" ", 1)
         commits.append({"sha": parts[0], "subject": parts[1] if len(parts) > 1 else ""})
-    return commits
+    return commits, None
 
 
-def _json_report(repo_path, repo_name, version, remote_name):
-    """Generate JSON-friendly report for a single repo."""
+def _ahead_behind(repo_path, branch, remote_ref):
+    """Count commits each side of branch...remote_ref. Returns (counts, error).
+
+    `counts` is an (ahead, behind) pair, or None when the remote has no such
+    branch — a real, benign answer. `error` is set when a probe *failed*, which
+    is not the same answer and must never be reported as one (#609).
+    """
+    # No such branch on the remote: nothing to import, and not an error.
+    # Checked before the local branch so a repo the remote simply does not
+    # carry stays silent rather than complaining about a local ref.
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", remote_ref])
+    if not success:
+        return None, None
+
+    # The remote branch exists but the local one does not (a default branch that
+    # resolved through refs/remotes/origin/ only — the reproduced trigger for
+    # the rc-128 rev-list below). Non-JSON mode surfaces this as a visible skip
+    # line; --json has no such line, so silence there would read as "nothing to
+    # import" for a repo that may carry every unreconciled field commit.
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", branch])
+    if not success:
+        return None, (
+            f"no local '{branch}' to compare against {remote_ref} — cannot tell "
+            "whether the remote is ahead; check out the default branch"
+        )
+
+    success, output, err = run_git(
+        repo_path, ["rev-list", "--left-right", "--count", f"{branch}...{remote_ref}"]
+    )
+    if not success:
+        return None, f"cannot compare {branch}...{remote_ref}: {err or 'git rev-list failed'}"
+
+    parts = output.split()
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None, f"unreadable rev-list output for {branch}...{remote_ref}: {output!r}"
+
+    return (int(parts[0]), int(parts[1])), None
+
+
+def json_report(repo_path, repo_name, version, remote_name):
+    """Build the JSON entry for one repo. Returns (entry, error).
+
+    Public rather than module-private: this pair *is* the --json contract that
+    `/import-field-changes` consumes, and it is asserted directly in
+    test_pull_remote.py rather than only through main().
+
+    Exactly one of the two is ever set, and the distinction is the point (#609):
+
+    - `(entry, None)` — the remote is ahead; these are the commits.
+    - `(None, None)`  — a real, benign answer: the remote has no such branch,
+      or it has one and it is not ahead. Mirrors what non-JSON mode reports as
+      a skip / "up to date".
+    - `(None, error)` — a probe *failed*, so we never learned whether the remote
+      is ahead. This used to collapse into the benign `None` above, and the
+      only consumer of --json is `/import-field-changes`, which stops when the
+      report is empty. A field repo whose commits were never reconciled to
+      GitHub therefore reported green — the exact false green this issue is
+      about, in its most costly form.
+    """
     branch = get_default_branch(repo_path, version)
     remote_ref = f"{remote_name}/{branch}"
 
-    # Check remote ref exists
-    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", remote_ref])
-    if not success:
-        return None  # no remote branch
+    counts, err = _ahead_behind(repo_path, branch, remote_ref)
+    if err or counts is None:
+        return None, err
 
-    # Count ahead/behind
-    success, output, _ = run_git(
-        repo_path, ["rev-list", "--left-right", "--count", f"{branch}...{remote_ref}"]
-    )
-    if not success or not output:
-        return None
-
-    parts = output.split()
-    if len(parts) != 2:
-        return None
-
-    ahead, behind = int(parts[0]), int(parts[1])
+    ahead, behind = counts
     if behind == 0:
-        return None  # nothing new on remote
+        return None, None  # remote carries nothing we do not already have
 
-    commits = _get_ahead_commits(repo_path, branch, remote_ref)
+    commits, err = _get_ahead_commits(repo_path, branch, remote_ref)
+    if err:
+        return None, err
     return {
         "repo": repo_name,
         "path": str(repo_path),
@@ -301,7 +356,7 @@ def _json_report(repo_path, repo_name, version, remote_name):
         "behind": behind,
         "diverged": ahead > 0 and behind > 0,
         "commits": commits,
-    }
+    }, None
 
 
 def main():
@@ -328,37 +383,55 @@ def main():
 
     if args.json:
         root_dir = SCRIPT_DIR.parent.parent
-        repos = get_repos(args)
         results = []
         errors = []
-
-        # Workspace repo
-        success, _, err = run_git_network(root_dir, ["fetch", args.remote], args.dry_run)
-        if not success:
-            errors.append(f"ros2_agent_workspace: fetch failed: {err}")
+        try:
+            repos = get_repos(args)
+        except WorkspaceConfigError as exc:
+            # A .repos file we could not parse: every repo it declares goes
+            # unenumerated, and an empty report reads as "nothing to import".
+            repos = []
+            errors.append(str(exc))
         else:
-            ws_version = get_default_branch(root_dir, None)
-            entry = _json_report(root_dir, "ros2_agent_workspace", ws_version, args.remote)
-            if entry:
+            if not repos:
+                errors.append(NO_REPOS_ENUMERATED)
+
+        def collect(repo_path, repo_name, version):
+            """Probe, fetch and report one repo into results/errors."""
+            state = remote_probe(repo_path, args.remote)
+            if state is RemoteState.UNREADABLE:
+                errors.append(f"{repo_name}: {UNREADABLE_STATE}")
+                return
+            if state is RemoteState.ABSENT:
+                # Most repos legitimately have no secondary remote. Probing the
+                # workspace root too keeps --json consistent with non-JSON mode,
+                # which skips it rather than reporting a failed fetch.
+                return
+            success, _, err = run_git_network(repo_path, ["fetch", args.remote], args.dry_run)
+            if not success:
+                errors.append(f"{repo_name}: fetch failed: {err}")
+                return
+            entry, report_err = json_report(repo_path, repo_name, version, args.remote)
+            if report_err:
+                errors.append(f"{repo_name}: {report_err}")
+            elif entry:
                 results.append(entry)
+
+        collect(root_dir, "ros2_agent_workspace", get_default_branch(root_dir, None))
+
+        # Read the optional-layer list once, not per repo.
+        optional_layers = get_optional_layers(root_dir)
 
         for repo in repos:
             repo_path = resolve_repo_path(root_dir, repo)
             if repo_path is None:
+                # Not found on disk. Optional layers are allowed to be absent;
+                # anything else is a repo this report silently omitted (#609).
+                skip, reason = classify_missing_repo(root_dir, repo, optional_layers)
+                if not skip:
+                    errors.append(f"{repo['name']}: {reason}")
                 continue
-            state = remote_probe(repo_path, args.remote)
-            if state is RemoteState.UNREADABLE:
-                errors.append(f"{repo['name']}: {UNREADABLE_STATE}")
-                continue
-            if state is RemoteState.ABSENT:
-                continue
-            success, _, err = run_git_network(repo_path, ["fetch", args.remote], args.dry_run)
-            if not success:
-                errors.append(f"{repo['name']}: fetch failed: {err}")
-                continue
-            entry = _json_report(repo_path, repo["name"], repo["version"], args.remote)
-            if entry:
-                results.append(entry)
+            collect(repo_path, repo["name"], repo["version"])
 
         if errors:
             for e in errors:
