@@ -28,9 +28,10 @@ at all and are already called out separately in the file).
 
 **Note on the #606 citation**: the issue's "Root-owned volumes fix" section
 cites "until #604 / #606". The Issue Review flagged #606 as absent from git
-history and treated it as a citation error. That flag is superseded: #606 is
-an open PR (fixing #604) created by the host after the review ran. Leave
-that citation as-is in both target files — do not "correct" it to #604-only.
+history and treated it as a citation error. That flag was superseded: #606 was
+the PR fixing #604, created by the host after the review ran, and it has since
+merged as `a00193c`. Leave that citation as-is in both target files — do not
+"correct" it to #604-only.
 
 ## Approach
 
@@ -57,8 +58,12 @@ that citation as-is in both target files — do not "correct" it to #604-only.
      *(Superseded during implementation — see Implementation Notes: the
      sandbox-boundary paragraph was rewritten, not kept "content unchanged",
      and now covers both dispatch paths. The `review-code` fan-out was also
-     removed from the container list — it needs the `Agent` tool and the host
-     Ollama endpoint, so it cannot be containerized in any mode.)*
+     removed from the container list — it wants the `Agent` tool and the host
+     Ollama endpoint, neither of which the sandbox has, so a container run of it
+     is **degraded** (specialists evaluate sequentially; specialist 5f cannot run
+     at all) rather than impossible. The landed guidance therefore prefers
+     in-process wherever an `Agent` tool is available, with the degraded
+     container run as the fallback on runtimes that have none.)*
    - Update the section heading's inline citation from "(#545)" to
      "(#607)" — record **auto mode** as the reason the advice moved, so a
      future reader sees why, not that it drifted.
@@ -138,7 +143,7 @@ that citation as-is in both target files — do not "correct" it to #604-only.
 
 | If we change... | Also update... | Included in plan? |
 |---|---|---|
-| The "Choosing a mode" heading text and citation in `run-issue/SKILL.md` | Any other place that cites "(#545)" as the mode-choice rationale | Yes — checked: `skill_workflows.md`'s bullet doesn't carry an inline issue citation, so no second citation update is needed there. |
+| The "Choosing a mode" heading text and citation in `run-issue/SKILL.md` | Any other place that cites "(#545)" as the mode-choice rationale | Yes. *(Revised during implementation: the plan had recorded that `skill_workflows.md`'s bullet carried no inline issue citation and so needed none. The landed edit added one — the fail-safe paragraph now closes with `#545 → #607` — so both files carry the rationale trail.)* |
 | The "Fan-out goes to containers" rule in `skill_workflows.md` | `run-issue/SKILL.md`'s own container/in-process definitions (~L76-91), which restate the prompt-elimination claim in the bullet describing `container` | Yes — step 1 explicitly conditions that bullet's "biggest practical reason" language too, so the two files stay consistent with each other. |
 | Removing "prompt volume" as the primary in-process-vs-container driver | Downstream advice that assumed the old default (e.g. any skill telling agents to reach for `--mode container` "for prompt-free work" without an isolation reason) | No further instances found — `grep` across `.claude/` and `.agent/knowledge/` for "prompt-free" / "permission prompt" also hits `start-deployment/SKILL.md`, `deployment_mode.md`, `triage-reviews/SKILL.md`, and `review-code/SKILL.md`, but those all discuss unrelated prompt sources (deployment-log git commits, `progress_append.sh` usage) — none restate the container-vs-in-process dispatch-mode rationale this issue changes (verified during exploration). |
 
