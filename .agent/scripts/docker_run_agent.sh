@@ -32,10 +32,20 @@ ROOT_DIR="${DRA_ROOT_DIR_OVERRIDE:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
 
 # If running from inside a worktree, resolve to the main workspace root.
 # Worktree directories (.workspace-worktrees/, layers/worktrees/) live there.
+#
+# This rewind governs the image build too, and that is deliberate: the build
+# must bake the same tree the launcher mounts and hashes, or the staleness
+# marker would be stamped from a worktree copy and read as permanently "stale"
+# (#604). The consequence is that a worktree edit to agent-entrypoint.sh /
+# fix-volume-ownership.sh is NOT baked by a build launched from that worktree —
+# INVOKED_FROM_WORKTREE below drives the build-time notice that says so.
+INVOKED_FROM_WORKTREE=false
 if [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     ROOT_DIR="${ROOT_DIR%%/.workspace-worktrees/*}"
+    INVOKED_FROM_WORKTREE=true
 elif [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     ROOT_DIR="${ROOT_DIR%%/layers/worktrees/*}"
+    INVOKED_FROM_WORKTREE=true
 fi
 
 IMAGE_NAME="ros2-agent-workspace-agent"
@@ -72,6 +82,11 @@ Options:
   --build-only          Build the image and exit — no worktree, no container.
                         The single build path: `make agent-build` runs this, so
                         both entry points bake and stamp identically (#604).
+                        Always builds from the MAIN workspace root, even when
+                        run from a worktree — that is what the launcher mounts
+                        and hashes. A worktree edit to agent-entrypoint.sh /
+                        fix-volume-ownership.sh is therefore NOT baked until it
+                        is merged; the build prints a notice when it applies.
   --shell               Drop into bash instead of Claude Code (debugging)
   --prompt <text>       Dispatch mode: run a headless `claude -p` with this
                         kickoff prompt and exit (non-interactive). Mutually
@@ -401,6 +416,17 @@ fi
 
 if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
     warn_if_startup_scripts_stale
+fi
+
+# The build always bakes the MAIN workspace's startup scripts, even when
+# launched from a worktree (see the ROOT_DIR rewind above). Say so on every
+# build path, dry run included: editing those scripts in a worktree and running
+# `make agent-build` there would otherwise silently bake the main tree's copies
+# instead — in exactly the workflow this marker exists to protect.
+if [ "$BUILD_IMAGE" = true ] && [ "$INVOKED_FROM_WORKTREE" = true ]; then
+    echo "NOTE: launched from a worktree — baking the MAIN workspace's startup scripts"
+    echo "      from $DOCKERFILE_DIR, not this worktree's copies. Merge worktree edits to"
+    echo "      ${STARTUP_SCRIPTS[*]} before they can be baked."
 fi
 
 if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = true ]; then

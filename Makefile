@@ -279,6 +279,11 @@ agent-build:
 	@# rosdep manifests, runs `docker build`, and stamps the startup-scripts
 	@# digest. Duplicating any of that here is what let the two paths hash
 	@# different directories and produce a permanent false "stale" warning.
+	@#
+	@# The build resolves the MAIN workspace root even when run from a
+	@# worktree — that is the tree the launcher mounts and hashes. So a
+	@# worktree edit to agent-entrypoint.sh / fix-volume-ownership.sh is NOT
+	@# baked until it is merged; the build prints a notice when that applies.
 	@./.agent/scripts/docker_run_agent.sh --build-only
 
 agent-run:
