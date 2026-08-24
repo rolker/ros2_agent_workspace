@@ -660,3 +660,31 @@ Pre-commit ran clean on all six commits (no `--no-verify`); no linter profile
 applies to `.md`. Tree clean; nothing pushed. Residual-claim sweep over both
 files finds no surviving "credentials enter", "on by default", "silently", or
 "no GitHub read auth" text.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-24 14:53 -04:00
+**By**: Claude Code Agent (Claude Opus 5)
+
+**PR**: #608 at `517faa9`
+**Sources**: 3 (Copilot R1 @ `517faa9`, Local Review (Pre-Push) R3 @ `517faa9`, CI rollup)
+**Cross-source confirmations**: 2
+**CI**: all-pass (9 checks: Lint, Script tests, Validate Documentation, commit identity)
+
+11 inline comments, 0 conversation comments, resolving to 9 distinct findings
+(two are the same finding mirrored across both files). **No false positives** —
+every comment was checked against the local file at the cited line and holds.
+
+### Findings
+- [ ] (cross-confirmed) The credential boundary is still stated as an absolute in two places despite `AGENT_GH_TOKEN` being accepted and forwarded with no scope validation: "it withholds GitHub **write** auth: a container run that goes wrong cannot push" and "Containers have no GitHub *write* auth". Each is qualified later in its own paragraph, so the text argues with itself rather than being simply wrong — but the flat claim is what a skimming reader takes. Round 3 raised this and the fix pass corrected the mirrors while leaving these two leads — `.claude/skills/run-issue/SKILL.md:199`, `.agent/knowledge/skill_workflows.md:175`
+- [ ] (cross-confirmed) `.devcontainer/agent/README.md:3-5` still tells users "No GitHub credentials enter the container". This PR cites that line as the false absolute it is correcting, but does not fix it — so anyone following `make agent-run` still reads a credential boundary we now document as untrue. Round 3 asked for re-attribution; that was done in run-issue's prose, not in the README itself — `.devcontainer/agent/README.md`
+- [ ] (must-fix, Copilot) "Choose `container` regardless of mode when isolation is the actual requirement: anything processing untrusted input" overstates the boundary, and contradicts this PR's own containment paragraph 40 lines later: the launcher bind-mounts the workspace and both worktree trees read-write and forwards `CLAUDE_CODE_OAUTH_TOKEN`, so a prompt-injected phase can still alter host-visible files and use the host credential. Container dispatch is partial OS/dependency isolation, not sufficient containment on its own; the data-fence requirement should stay — `.claude/skills/run-issue/SKILL.md:160`
+- [ ] (must-fix, Copilot) The fail-safe branch reintroduces "or the operator has permission prompts enabled" as a decision input immediately after the same section establishes that the operator's permission-mode indicator is NOT visible to the agent. The executable rule is the sentinel check alone. This is a recurrence of Round 3's must-fix 1, in both files — `.claude/skills/run-issue/SKILL.md:134`, `.agent/knowledge/skill_workflows.md:151`
+- [ ] (valid, Copilot) "so it stays in-process in every mode" is unfollowable on a non-Claude runtime, where the same paragraph has just said there is no in-process option at all. Say it stays in-process where an `Agent` tool is available, with container as the degraded fallback — `.agent/knowledge/skill_workflows.md:158`
+- [ ] (valid, Copilot) "(`triage-reviews` needs both)" is wrong: it fetches reviews, comments and check-runs and writes local progress.md, and its own Guidelines say it performs no GitHub review actions. It needs **read** access only, which is also what `run-issue/SKILL.md:159` says — the two files disagree — `.agent/knowledge/skill_workflows.md:170`
+- [ ] (valid, Copilot) Plan says `review-code` "cannot be containerized in any mode"; the landed guidance treats container execution as supported but degraded. The plan contradicts the implementation it is meant to track. (Traceable to the host's dispatch brief, not to the fix pass) — `.agent/work-plans/issue-607/plan.md:61`
+- [ ] (valid, Copilot) Consequences row records "no inline citation update for skill_workflows.md", but the landed diff adds the #545 → #607 citation at `skill_workflows.md:163-164` — `.agent/work-plans/issue-607/plan.md:141`
+- [ ] (valid, Copilot) Plan describes #606 as an open PR; it merged as `a00193c`. Date it as historical rather than restating it as current — `.agent/work-plans/issue-607/plan.md:33`
+
+### False positives
+- None. All 11 comments were verified against the local file at the cited line; each describes a real defect in the current head.
