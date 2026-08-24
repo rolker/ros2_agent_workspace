@@ -207,3 +207,142 @@ should be corrected before or during planning.
 - [ ] The `num_ctx` bucket set (`8192 16384 24576 32768`) is a first proposal, not a measured optimum — may need adjusting once real per-chunk token counts are observed.
 - [ ] If the drop-in is needed, operator sign-off on running `setup_ollama_kv_cache.sh` is a separate ask at implementation time — not covered by plan approval.
 - [ ] Is `LOCAL_REVIEW_KEEP_ALIVE` default of `30s` right, or should it be tuned after observing real chunked-request timing?
+
+## Plan Review
+**Status**: complete
+**When**: 2026-08-24 00:04 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-605/plan.md` at `5d3f2a9` (revision of `2ef2541`)
+**PR**: PR-less (reviewed via worktree/issue number)
+**Verdict**: changes-requested
+
+### Revision assessment
+
+The revision closes the prior must-fix's *mechanism* — item 1 step 5 now
+sizes each request's `options.num_ctx` per chunk from a fixed bucket set
+(`8192 16384 24576 32768`) instead of every chunk reusing the single
+global 32768 default. That part is real, verified against
+`local_review.sh:224`'s current `build_body()`, which today sends the one
+global `NUM_CTX` unconditionally. The suggestion (cross-file blind-spot
+documentation) is also genuinely closed — step 9 puts it in the script's
+own header comment, not only the plan file, so a reader of a chunked
+review actually sees it. But the bucket-sizing fix reintroduces the same
+class of gap in a new place: it depends on `ANSWER_HEADROOM`, and nothing
+in the plan updates that constant in code.
+
+### Findings
+
+1. **(must-fix) `ANSWER_HEADROOM` never gets updated in code, so the
+   8192 bucket is dead and the "smaller model → smaller buckets" claim is
+   unimplemented.** Read against the actual source
+   (`local_review.sh:197`): `EST_TOKENS=$(( ${#PROMPT} / 3 + 12288 ))` —
+   the `12288` headroom is a bare literal, not a named/overridable
+   constant, and it is *added into* the same estimate the plan says
+   chunk-level bucket selection reuses verbatim ("estimating its tokens
+   the same way the whole-diff estimate works today (`${#CHUNK_PROMPT} /
+   3 + headroom`)", plan.md:102-103, repeated at plan.md:78-80 for the
+   per-file check). That means `chunk_estimated_tokens` for *any* chunk,
+   however small, is always ≥ 12288 as long as the literal stays at
+   12288. Since the smallest bucket is 8192 < 12288, no chunk can ever
+   select it — the 8192 bucket is inert from day one, not just "pending
+   measurement." The plan's own candidate table acknowledges this
+   implicitly (every candidate row lands on 16384, never 8192, except a
+   speculative "plausibly fits the 8192 bucket instead, to be confirmed"
+   for `4b-q8_0` at plan.md:218 — which is arithmetically impossible
+   under the plan's own formula unless the 12288 literal is actually
+   lowered in the shipped code).
+
+   The plan repeatedly says the headroom "must be re-measured" for the
+   candidate model (plan.md:111-118, 209, 244-245) but every one of those
+   passages ends with "record the measured value in
+   `.agent/knowledge/local_model_sizing.md`" — never "update the constant
+   in `local_review.sh`." The Files to Change row for `local_review.sh`
+   (plan.md:361) only lists "updated header doc comments... `num_ctx`/
+   `ANSWER_HEADROOM` rationale" for this constant — prose, not code.  So
+   as scoped, the measurement step (item 3 step 1) produces a number that
+   goes into a knowledge doc and nowhere else; the running script keeps
+   using the `qwen3.5:35b`-derived 12288 headroom regardless of which
+   model item 3 ultimately picks. That is exactly the shape of the prior
+   round's must-fix — a claimed VRAM-saving mechanism ("a smaller model
+   that reasons in fewer tokens lets smaller buckets be viable, which is
+   the actual mechanism that makes the item-3 headroom numbers real
+   rather than aspirational," plan.md:113-116) with no commit that wires
+   it into the code the mechanism depends on. Needs: make
+   `ANSWER_HEADROOM` an env-overridable constant (`LOCAL_REVIEW_ANSWER_HEADROOM`,
+   matching the existing `LOCAL_REVIEW_*` pattern) or a literal updated in
+   the same commit that changes the default model tag (item 3), sourced
+   from item 3 step 1's per-candidate measurement — and add that to Files
+   to Change / the commit list explicitly, not left implicit in narrative.
+   — `plan.md:93-123` (item 1 step 5), `plan.md:239-251` (item 3 step 1),
+   `plan.md:361` (Files to Change)
+
+### Other probes — no blocking findings, two informational notes
+
+- **Bucket coarseness / worst-case waste**: with the 8192 bucket
+  effectively dead under the current headroom (finding 1), the three
+  practically reachable buckets (16384/24576/32768) still round a
+  just-over-boundary chunk up by as much as ~1.5x (e.g. 16385 tokens →
+  24576 bucket). The plan doesn't quantify or acknowledge this, but it
+  isn't a correctness bug — the empirical `ollama ps` PROCESSOR=100%GPU +
+  no-OOM gate (plan.md:226-231, applied per real chunked request during
+  selection) catches any resulting overrun directly rather than relying
+  on the arithmetic being tight. Worth a one-line acknowledgment in the
+  arithmetic-method section or the knowledge doc so the bucket set's
+  coarseness reads as a deliberate, documented tradeoff — not a blocker.
+- **Empirical check doesn't exercise the top bucket**: item 3's
+  measurement step (step 1) runs each candidate on "a single
+  representative file-sized chunk" (plan.md:242) and the planted-defect
+  fixture — neither is guaranteed to be large enough to land in the
+  32768 (or even 24576) bucket. A real PR with an unusually large
+  single-file diff could request a bigger bucket than anything tested
+  before model selection ships. Recommend the empirical check include at
+  least one chunk sized near the top of the candidate's viable bucket
+  range, not only a typical one, before signing off on the model choice.
+- **Headroom-GB placeholders (probe 3)**: honest, not evasive — every
+  placeholder cell in the item-3 table is explicitly labeled as such
+  (plan.md:217, 222-226), and the actual acceptance gate is the
+  `ollama ps` / no-OOM check on a real chunked request, not the table
+  arithmetic, which is correctly framed as "a first-pass filter, not the
+  acceptance gate" (plan.md:222). The plan cannot reach a model choice
+  without running that gate per candidate (item 3 steps 1-5), so this
+  isn't a case of numbers marked "pending" that the plan then quietly
+  proceeds past.
+- **Cross-file blind-spot documentation placement (probe 4)**: verified
+  landed correctly — item 1 step 9 (plan.md:146-161) puts the limitation
+  in `local_review.sh`'s own header comment, next to the existing
+  chunking/env-var docs, in addition to the knowledge doc. A reader of a
+  chunked review's "No findings" output sees the caveat in the artifact
+  they're actually looking at, not only in a plan file. Files to Change
+  (plan.md:361) and Documentation & Instruction Impact (plan.md:403-412)
+  both list it as landing in this PR, not as a future proposal.
+
+### Not re-litigated (per caller's instruction)
+
+No per-request `OLLAMA_KV_CACHE_TYPE` override in Ollama 0.32.0 (verified
+against the binary, plan.md:38-64) and the `run_script_tests.sh` glob
+auto-discovery claim — both carried forward unchanged from the prior
+round and already independently verified there.
+
+### Summary
+
+The revision genuinely closes the prior round's must-fix at the
+mechanism level (per-chunk `num_ctx` now varies instead of always being
+the global 32768) and cleanly closes the documentation suggestion. But it
+reintroduces the identical failure shape in the constant the new
+mechanism depends on: `ANSWER_HEADROOM` is discussed at length as
+something that "must be re-measured" per candidate model, but no commit
+actually updates it in `local_review.sh` — only the knowledge doc records
+it. Until that's fixed, the 8192 bucket is dead code and the plan's
+central claim that a smaller model unlocks smaller buckets is not backed
+by any code change. Not ready for implementation as written.
+
+### Recommended Actions
+- [ ] Add an explicit step (and a Files to Change line) making
+      `ANSWER_HEADROOM` env-overridable or otherwise updated in the same
+      commit as the model-default change, sourced from item 3 step 1's
+      per-candidate measurement — not just recorded in the knowledge doc.
+- [ ] Optional: acknowledge bucket-rounding waste (up to ~1.5x on the
+      reachable buckets) in the arithmetic-method section.
+- [ ] Optional: have item 3's empirical check exercise a chunk near the
+      top of the candidate's viable bucket range, not only a typical one.
