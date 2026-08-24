@@ -155,7 +155,9 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   degraded — specialists evaluate sequentially without the `Agent` tool, and the
   local-model specialist (5f, opt-in via `--local`) cannot run there at all, there
   being no host Ollama endpoint — losing the fresh-context independence that is
-  the point, so it stays in-process in every mode and pays the prompts. If
+  the point. So run it in-process wherever an `Agent` tool exists, in every
+  permission mode, and pay the prompts; on a runtime that has none, the degraded
+  container run is the fallback, not a preference. If
   container auth is not ready either (`dispatch_subagent.sh --check`), run
   in-process and accept the prompts rather than not running at all. The fallback
   direction is deliberate: an uncertain reader must not land on the
