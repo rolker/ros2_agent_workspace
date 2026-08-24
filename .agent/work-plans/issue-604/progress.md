@@ -269,3 +269,47 @@ All 15 open findings (3 must-fix, 12 suggestions) actioned; none deferred.
 - `pre-commit run --from-ref main --to-ref HEAD`: clean over the whole range.
 - Every regression-test change mutation-checked in both directions (details per action above).
 - No image was built: the shared `ros2-agent-workspace-agent:latest` tag is untouched. The local image predates the marker, so the baked-digest check still SKIPs — that path remains unexercised locally and is exercised on the first real `make agent-build`.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-24 09:31 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #606 at `7831658`
+**Sources**: 3 (Copilot R1 @ `7831658`, `## Local Review (Pre-Push)` R1 @ `96ad78b` + R2 @ `26270ac`, CI rollup @ `7831658`)
+**Cross-source confirmations**: 0 strict (no two sources at the same head SHA); **2 incomplete-fix lineages** — see below
+**CI**: all-pass (Lint (pre-commit), Script tests, Validate Documentation, Validate commit identity (Mechanism C), Copilot reviewer — 9 check-runs, 0 failures)
+
+Copilot's review is against the current head, so nothing here is stale. It
+raised 3 inline comments, no conversation comments, no human reviewer. All 3
+are new — none repeats a finding already open in the timeline, and none
+re-opens either settled operator decision (container smoke test folded into
+this PR; stale-image guard stays here).
+
+The notable signal is not a same-SHA cross-confirmation but a **pattern**: two
+of Copilot's three findings land on code the round-2 fixes touched, and each is
+the half that fix did not reach. Round 2's suggestion 5 warned that
+`chown -R … 2>/dev/null || true` swallowed failures; the fix added the warning
+at that one call site (18ba230) and left the sibling `chown` in the same
+function's other branch unguarded — which Copilot now flags. Round 2's must-fix
+2 said the documented recovery block could not run from the `--shell` session;
+the fix rewrote it as a host-side `docker exec -u 0` (f427244) and left the
+arguments unrunnable on the host — which Copilot now flags. Both fixes were
+verified for the mechanism they changed and not for the block they left behind.
+That is the class of residue to watch when addressing these.
+
+### Findings
+- [ ] (must-fix, Copilot; lineage: R2 suggestion 5, partially fixed at 18ba230) The mkdir branch's `chown` is unguarded under `set -e`, so it aborts where the sibling recursive `chown` warns — contradicting the function's own "non-fatal by design … under a rootless or userns-remapped daemon every chown fails, that is the case this warning exists for" comment eight lines above. The entrypoint calls this script unguarded under `set -euo pipefail`, so the abort is a container that refuses to start with a bare `chown: Operation not permitted` and no context; in the documented `docker exec -u 0` recovery path it strands every workspace after the failing one — the exact harm the recursive branch's comment says it is avoiding. Reachability is narrow and should be stated honestly: the launcher mkdir -p's and mounts all three subdirs (sections 4/4b), so under a normal launch `[ -d "$target" ]` is always true and this branch is not taken. It is taken in the standalone recovery invocation, in layer A of the coverage test, and for any `*_ws` whose subdir appeared after the launcher's scan. Not impossible, so not dismissible. Fix: mirror lines 71-75 — `if ! mkdir -p "$target" || ! chown …; then` warn with the path and the rootless/userns cause, and continue. Guard the `mkdir` too, which Copilot did not mention but has the same abort behaviour on a read-only mount — `.devcontainer/agent/fix-volume-ownership.sh:77-78`
+- [ ] (suggestion, Copilot; lineage: R2 must-fix 2, partially fixed at f427244) The recovery block's `"$ROS2_AGENT_WORKSPACE_ROOT"` / `"$WORKTREE_ROOT"` expand in the **host** shell, where the launcher never sets them — the launcher passes them into the container (`docker_run_agent.sh:696-697`), not out to the caller. Copy-paste therefore passes two empty strings. Rated suggestion, not must-fix, on a deliberate distinction from its round-2 predecessor: that one failed **silently** (the chown no-oped through `2>/dev/null || true`), whereas this one fails **loud** — the root validation added this round catches it with `ERROR: workspace root is not a directory:` — and the next sentence already tells the operator to substitute the real paths. Still worth fixing in this round, since the roots are readable from the container the command already targets: `"$(docker exec <container> printenv ROS2_AGENT_WORKSPACE_ROOT)"` and the same for `WORKTREE_ROOT`. Adjust the following sentence, which would then be describing a substitution the command no longer needs — `.devcontainer/agent/README.md:330-338`
+- [ ] (suggestion, Copilot) Inverted failure message: the branch fires when `--print-mounts` exits **non-zero**, but prints `FAIL: --print-mounts exits 0`. Confirmed against the file's own conventions — every other failure-only message here is a problem statement (`could not read IMAGE_NAME…`, `fixture produced no *_ws anonymous volumes…`), and the one assertion-phrased message (line 166) has a paired `pass` at 168 that makes it read correctly. Line 129 has no `pass` twin, so the assertion phrasing has nothing to disambiguate it. Fix: `fail "--print-mounts exited non-zero (rc=$?, out=$mount_out)"`, capturing `rc` before the `[` overwrites `$?` — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:129`
+
+### False positives
+- None. All three Copilot comments were verified against the local files and hold.
+
+### Carried forward (not a finding)
+- The baked-digest assertion (`test_entrypoint_chown_coverage.sh:341-350`) still SKIPs locally because the `:latest` image predates the staleness marker, so that path stays unexercised until the next real `make agent-build`. Recorded in the PR body rather than hidden; unchanged by this round and not actionable here.
+
+### Next step
+Three open findings, one must-fix → `address-findings`. All three are localized
+mechanical edits (one shell branch, one docs command block, one message string)
+with no design question outstanding; a re-review should be cheap.
