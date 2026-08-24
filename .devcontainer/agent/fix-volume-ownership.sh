@@ -37,6 +37,23 @@ TARGET_GID="$2"
 WORKSPACE_ROOT="$3"
 WORKTREE_ROOT="${4:-}"
 
+# Validate both roots. Neither loop below can tell "nothing to chown here" from
+# "I was pointed at the wrong path" — a stale or typo'd root just makes its loop
+# iterate over nothing, which is #604's failure mode exactly: volumes left
+# root-owned, no diagnostic, and the agent discovering it as an EACCES from
+# colcon much later. Fail here instead.
+if [ ! -d "$WORKSPACE_ROOT" ]; then
+    echo "ERROR: $(basename "$0"): workspace root is not a directory: $WORKSPACE_ROOT" >&2
+    exit 1
+fi
+# An EMPTY worktree root is the legitimate "not a dispatched worktree" case and
+# skips loop 2. A non-empty one that isn't a directory is a misconfiguration.
+if [ -n "$WORKTREE_ROOT" ] && [ ! -d "$WORKTREE_ROOT" ]; then
+    echo "ERROR: $(basename "$0"): worktree root is not a directory: $WORKTREE_ROOT" >&2
+    echo "       Its anonymous volumes would be left root-owned (#604)." >&2
+    exit 1
+fi
+
 # Chown one build/install/log mountpoint, creating it if docker did not.
 fix_ws_dir() {
     local ws_dir="$1" subdir target
@@ -67,7 +84,7 @@ done
 #    and so does NOT filter them — the explicit [ ! -L ] does, keeping this
 #    loop from reaching through a symlink into the already-handled tree. In a
 #    workspace worktree there are no real *_ws dirs, so this is a clean no-op.
-if [ -n "$WORKTREE_ROOT" ] && [ -d "$WORKTREE_ROOT" ]; then
+if [ -n "$WORKTREE_ROOT" ]; then   # existence already validated above
     for ws_dir in "$WORKTREE_ROOT"/*_ws; do
         [ -d "$ws_dir" ] || continue
         [ ! -L "$ws_dir" ] || continue

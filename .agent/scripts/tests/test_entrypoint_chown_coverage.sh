@@ -191,6 +191,20 @@ else
 $ws_reached"
 fi
 
+# ---------- A3. Bad roots fail loud ----------
+# A stale or typo'd root would otherwise make its loop iterate over nothing —
+# root-owned volumes and no diagnostic, which is #604's failure mode.
+if bash "$OWNERSHIP_SH" "$(id -u)" "$(id -g)" "$ROOT/nope" >/dev/null 2>&1; then
+    fail "a non-existent workspace root is accepted silently"
+else
+    pass "a non-existent workspace root fails loud"
+fi
+if bash "$OWNERSHIP_SH" "$(id -u)" "$(id -g)" "$ROOT" "$ROOT/nope" >/dev/null 2>&1; then
+    fail "a non-existent worktree root is accepted silently (loop 2 no-ops)"
+else
+    pass "a non-existent worktree root fails loud"
+fi
+
 # ---------- B. Container-side end-to-end ----------
 # Skips cleanly when Docker or the agent image is unavailable, keeping
 # run_script_tests.sh hermetic in CI.
