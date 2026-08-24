@@ -209,3 +209,43 @@ conflation, and the test isolation seams. Everything else is refinement.
 - [ ] Correct step 2's "behavior tightening" framing — git-bug already skips dirty/detached repos today
 - [ ] Give the unresolvable-path failure a distinct reason string in the summary
 - [ ] Adopt the `merge_pr.sh` handling with `|| sync_status=$?`; keep `SyncOutcome` in `sync_repos.py`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-24 13:43 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-609 at `41e708c`
+**Mode**: pre-push
+**Depth**: Deep (reason: 200+ changed lines; `AGENTS.md` governance override trigger)
+**Must-fix**: 5 | **Suggestions**: 9
+**Round**: 1 | **Ship**: continue — two independently-reproduced false-signal defects (one green, one red) sit on either side of the signal this PR exists to make trustworthy
+
+**Specialists**: static analysis (pre-commit: shellcheck/black/flake8/pylint all pass), governance, plan drift, Claude Adversarial Lens A + Lens B. Copilot off (default). **Local Adversarial skipped: the Ollama server is up on this host but has no models pulled (`/api/tags` -> `{"models":[]}`), so `qwen3.5:35b` was unavailable** — the quota-free cross-model read did not happen on this diff.
+
+**Verification performed**: full `run_script_tests.sh` green (21 shell, 87 pytest). 11 mutations run against a scratch copy — all eight core-classification regressions (pull/fetch fall-through, `None` collapsed into the detached-HEAD skip, dirty->FAILED, detached->FAILED, unresolvable path back to a silent skip, FAILED tallied as skipped, unconditional git-bug, removed `sys.exit(1)`) each broke a named test. Three mutations passed untouched (M9/M10/M11, below). The `is_dirty` false-green and the worktree all-clear were reproduced live, not inferred.
+
+### Findings
+- [ ] (must-fix) Root workspace repo's outcome is untested in every `main()` test — `outcomes.get()` never keys on `"ros2_agent_workspace"`; mutation M9 (root call site reverted to the `if sync_repo(...)` truthiness trap) and M10 (root FAILED demoted to SKIPPED) both leave all 14 tests passing. It is the repo `merge_pr.sh` just merged into — `.agent/scripts/tests/test_sync_repos.py:163`
+- [ ] (must-fix) `is_dirty()` returns `success and bool(output)`, so a failed `git status` reads as "clean" — reproduced: corrupt `.git/index` plus real uncommitted changes on a feature branch classifies SYNCED, a false green of the exact class #609 removes, and contradicts the `SyncOutcome` docstring's "cannot even read" claim — `.agent/scripts/sync_repos.py:111,165`
+- [ ] (must-fix) `exit "$sync_status"` propagates make's 2, already this script's usage-error code (asserted by `test_merge_pr.sh`); rc=2 read as "invoked wrong" invites retrying an irreversible merge. Use a reserved code, and add the contract to `merge_pr.sh`'s own `AGENTS.md` row — `.agent/scripts/merge_pr.sh:395`, `AGENTS.md:572`
+- [ ] (must-fix) `path not resolved` -> FAILED makes `make sync` permanently red on a supported host config: `optional_layers.txt` lists `site`, and `setup_layers.sh:349-360` `rm -rf`s an optional layer that fails import and exits 0. Also fresh clones and the vcs-missing path (all 35 repos). This is the false-red the design names as worse than the false green — discriminate layer-absent (SKIPPED) from repo-missing-inside-imported-layer (FAILED) — `.agent/scripts/sync_repos.py:346-354`
+- [ ] (must-fix) An empty repo list reports a quantified all-clear: run from a workspace worktree (no `configs/manifest`), the new summary prints `✅ Sync complete — 1 synced, 0 skipped, 0 failures.` while 35 configured repos were never enumerated — a stronger false claim than the old bare success line — `.agent/scripts/sync_repos.py:294,370`
+- [ ] (suggestion) Failure summary records the literal `"sync failed"` for every cause, against `plan.md` step 4's "reuse the captured `output`" and inconsistent with line 353, which does give a specific reason — fix or record the decision — `.agent/scripts/sync_repos.py:314`
+- [ ] (suggestion) `test_outcomes_are_all_truthy` asserts a Python language invariant, not a property of this code — M9 shows it passes with the truthiness trap reintroduced — `.agent/scripts/tests/test_sync_repos.py:118`
+- [ ] (suggestion) Success-summary counts unasserted — mutation M11 (dropping the synced/skipped counts) passes all 14 tests; both tests only match the substring `"0 failures"` — `.agent/scripts/tests/test_sync_repos.py:180,209`
+- [ ] (suggestion) `git status -sb` failing still prints `✅ Fetched.` — Plan Review finding 8 asked for a fix or an out-of-scope declaration; neither happened — `.agent/scripts/sync_repos.py:218-226`
+- [ ] (suggestion) `run_git_cmd` catches only `CalledProcessError`, so an unreadable repo dir raises `PermissionError` and kills the run mid-way with no summary; still loud rather than false-green, but the new docstring overclaims — `.agent/scripts/sync_repos.py:90-96`
+- [ ] (suggestion) Failure banner writes to stdout while every other failure block in the script uses stderr — `.agent/scripts/merge_pr.sh:388-394`
+- [ ] (suggestion) Plan-sync: the `preflight_repo()` extraction and its pylint-return-limit rationale are absent from "Review-driven corrections", and the `test_merge_pr.sh` consequences row still reads "open question" — independently confirmed that file only exercises pre-merge guards and never reaches the sync tail, so `bash -n`/shellcheck is the realistic coverage; close the row with that — `.agent/work-plans/issue-609/plan.md`
+- [ ] (suggestion) git-bug failures warn but are never tallied (sync stays green) with the ADR-0010 graceful-degradation rationale recorded nowhere; `AGENTS.md:571` also omits two FAILED causes (non-existent path, unreadable git state) — `.agent/scripts/sync_repos.py:265-267`, `AGENTS.md:571`
+- [ ] (suggestion) A plain offline error (`Could not resolve hostname`) is not a retried transient signature, so an off-network host FAILs every repo; dev-side only today, but `transient_error_seen()` already carries the signal to report "remote unreachable" distinctly — `.agent/scripts/sync_repos.py:207,229`
+
+### Clean
+- Static analysis: `pre-commit` on all 4 changed files — shellcheck, black, flake8, pylint, identity and branch hooks all pass.
+- Caller audit re-verified independently (not taken on trust from the Plan Review): `Makefile:221` and `merge_pr.sh:379` are the only invokers. No CI workflow, skill, hook, dashboard (it uses `vcs` directly), container or dispatch script consumes it, and no Makefile target lists `sync` as a prerequisite.
+- `sync_status=0; make ... || sync_status=$?` is correct under `set -eo pipefail`, and no bannerless abort is reachable after the irreversible merge — every command from line 367 on is `|| true`-protected or captured. Only the exit *value* is wrong (must-fix 3).
+- Tri-state classification of the four core cases is sound and genuinely tested; `test_net_retry.py` is unaffected (asserts nothing on `sync_repo`'s return).
+- Commit hygiene: 8 commits, correct agent identity, atomic, no issue-closing keywords.
+- Both settled operator decisions honoured: `merge_pr.sh` handling is in this PR, and `SyncOutcome` stays in `sync_repos.py`.
