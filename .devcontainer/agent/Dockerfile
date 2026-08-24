@@ -119,5 +119,7 @@ RUN rosdep update
 # via setpriv (no setuid bits — compatible with --security-opt no-new-privileges)
 USER root
 COPY --chmod=755 agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
+COPY --chmod=755 fix-volume-ownership.sh /usr/local/bin/fix-volume-ownership.sh
+
 ENTRYPOINT ["agent-entrypoint.sh"]
 CMD ["claude", "--dangerously-skip-permissions"]

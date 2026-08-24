@@ -408,6 +408,18 @@ done
 #     already-shielded layers/main tree. Inside a workspace worktree no real
 #     *_ws dirs exist, so the loop is a clean no-op. Mirror section 4's
 #     mkdir-as-invoking-user precaution and fail-loud handling (#566).
+#
+#     THE MOUNT IS ONLY HALF THE MECHANISM (#604). The mkdir below is the
+#     #566 precaution about the *host* mountpoint; it has NO effect on the
+#     volume's ownership inside the container, because docker initializes an
+#     anonymous volume from the IMAGE at that path, not from the host dir
+#     underneath it. The volume therefore comes up root-owned, and the
+#     entrypoint chown is what makes it writable by the dropped-privilege
+#     agent. #602 added this loop without the matching chown, and dispatched
+#     agents could not build in their own worktree. ANY new anonymous volume
+#     added here needs a matching loop in
+#     .devcontainer/agent/fix-volume-ownership.sh; that pairing is enforced
+#     by tests/test_entrypoint_chown_coverage.sh.
 for ws_dir in "$WORKTREE_PATH"/*_ws; do
     [ -d "$ws_dir" ] || continue
     [ ! -L "$ws_dir" ] || continue
