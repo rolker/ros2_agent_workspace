@@ -199,3 +199,38 @@ here rather than split out, and the test-coverage must-fix is answered by
 - Found while fixing must-fix 3: moving the build section above the worktree lookup also moved it above the credential check, so a `--build` launch with no auth would have paid the ten-minute rosdep bake before failing. The build now sits between validation and the worktree lookup; `--build-only` is exempt from the auth check since it never launches a container.
 - Behaviour note for review: `make agent-build` now resolves the **main workspace root** even when run from a worktree (the launcher's existing rewind), so a worktree's edits to the startup scripts are not what gets baked. That was already true of every container the launcher ran; it is now also true of the build, and is documented in the devcontainer README.
 - Full `run_script_tests.sh` green: 21 shell + 73 pytest, container layer included. Pre-commit (incl. shellcheck) ran on every commit.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-24 00:43 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-604 at `26270ac`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1132 added lines / 15 files; privilege-drop + file-ownership surface; AGENTS.md + ADR governance triggers)
+**Must-fix**: 3 | **Suggestions**: 12
+**Round**: 2 | **Ship**: recommended — must-fix fell 6 -> 3 and all three are precise mechanical edits (a contradicted comment, a recovery command that cannot run, a three-line hermetic assertion); no design question remains open
+
+### Findings
+- [ ] (must-fix) Marker's defining comment states the launcher treats an absent label as "unknown" and does not warn — it warns, deliberately (round-1 must-fix 2); a maintainer trusting the comment would re-hide the pre-#604 population — `.devcontainer/agent/Dockerfile:129-131`
+- [ ] (must-fix) Documented recovery cannot run: the `--shell` session it follows is the `ros` user (entrypoint setpriv), the image has no sudo, and no-new-privileges blocks escalation, so the chown silently no-ops through `2>/dev/null || true`; needs `docker exec -u 0` — `.devcontainer/agent/README.md:303-312`
+- [ ] (must-fix) The #604 defect (dropped `WORKTREE_ROOT` argument) is caught only by layer B, which always SKIPs in CI, and `run_script_tests.sh` suppresses passing output so the SKIP is invisible — a re-deletion merges green; add a hermetic both-roots assertion ALONGSIDE layer B, not replacing it (the call-site-coverage decision stands) — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:22-26,226-232`
+- [ ] (suggestion) Reorder lost fail-fast: `--issue <bad> --build` now reaches the build before the worktree lookup (verified against main, which errors in under a second); move the lookup above the build when not `--build-only` — `.agent/scripts/docker_run_agent.sh:272-393`
+- [ ] (suggestion) `--build-only --print-mounts` prints nothing and exits 0; the new test's last case relies on that, and would overwrite the real `:latest` tag if it ever dropped `--print-mounts` — `.agent/scripts/docker_run_agent.sh:352,391`
+- [ ] (suggestion) `baked_sha=$(docker run ... 2>&1)` folds daemon chatter into the compared digest, and the label name is hardcoded while `IMAGE` is read from the launcher — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:291,295-296`
+- [ ] (suggestion) OAuth token is read and exported before the `--build-only` short-circuit, so a credential-free build still pulls the subscription token into the `docker build` child's environment — `.agent/scripts/docker_run_agent.sh:220-231`
+- [ ] (suggestion) `chown -R ... 2>/dev/null || true` swallows every failure; under rootless/userns-remap Docker that leaves #604's exact signature with no diagnostic — `.devcontainer/agent/fix-volume-ownership.sh:63`
+- [ ] (suggestion) Baking from the main root is the right call, but it is silent: a worktree edit to the startup scripts is neither baked nor warned about, in the workflow this PR exists to protect; README documents it, the `--build-only` help / Makefile comment / AGENTS.md row do not, and there is no runtime signal — `.agent/scripts/docker_run_agent.sh:33-39`
+- [ ] (suggestion) `STAGE_DIR` is one fixed path under an `rm -rf` EXIT trap shared by every entry point — a dispatch auto-build racing `make agent-build` deletes the other's build context; a stale `.rosdep-manifests/` is present in this worktree now — `.agent/scripts/docker_run_agent.sh:368`
+- [ ] (suggestion) Three places still say the stager is "called by both build entry points"; and README's bare `docker build` now yields a permanently unmarked image — `.agent/scripts/stage_rosdep_manifests.sh:16-17`, `AGENTS.md:562`, `.agent/scripts/docker_run_agent.sh:367`, `.devcontainer/agent/README.md:285`
+- [ ] (suggestion) `grep -c 'sha256sum'` counts comment lines; the sibling Makefile check strips comments first — `.agent/scripts/tests/test_agent_image_build_paths.sh:60`
+- [ ] (suggestion) Layer B's `docker run` omits `--security-opt no-new-privileges:true` and `-w`, both of which the launcher passes — a setpriv-to-setuid swap would pass this test and break every real launch — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:254-262`
+- [ ] (suggestion) Layer B chowns the `/tmp` fixture to the image's `ros` uid; cleanup cannot remove it when that differs from the runner's — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:99,233-270`
+- [ ] (suggestion) Plan's Files to Change omits `run_script_tests.sh` and `.github/workflows/validate.yml`, both changed — `.agent/work-plans/issue-604/plan.md`
+
+### Notes
+- Round-1 fixes verified, not trusted. Mutation-proved both directions here: deleting `"${WORKTREE_ROOT:-}"` at `agent-entrypoint.sh:48` fails the suite; deleting loop 2 of `fix-volume-ownership.sh` fails 3 assertions across both layers. `warn_if_startup_scripts_stale` exercised in isolation for both-missing / one-missing / unlabelled-image — all warn and return 0. Full `run_script_tests.sh` green (21 shell + 73 pytest, container layer included). Pre-commit clean over the whole range.
+- On the handoff's first question (the reorder): it broke fail-fast, verified empirically against `main`. Nothing else — the STAGE_DIR EXIT trap is the script's only one, so no trap collision, and the `--build-only` credential exemption is sound in itself (no container is launched); the only residue is the token still being read (suggestion 4).
+- On the handoff's second question (`make agent-build` resolving the main root): the behaviour is correct — it matches the tree the launcher mounts and the digest it compares, and baking a worktree's copy is what produced the permanent false "stale". The documentation is adequate in the README and nowhere else, and there is no runtime signal; see suggestion 6.
+- Local Adversarial (qwen3.5:35b) needed `LOCAL_REVIEW_NUM_CTX=44000` — the 32k default rejected this diff. Its single finding (TOCTOU between the `[ -f ]` loop and the `cat` in `startup_scripts_sha`) was spot-checked and dropped: `pipefail` already fails the build path loud, and the residual window needs a mid-invocation deletion by the invoking user.
