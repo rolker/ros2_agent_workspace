@@ -10,9 +10,12 @@ https://github.com/rolker/ros2_agent_workspace/issues/607
 currently tell agents to **lean toward `container`** dispatch, on the stated
 grounds that it eliminates permission prompts (traced to #545). Claude Code's
 **auto mode** now auto-approves the routine tool calls that made in-process
-dispatch prompt-heavy, and in-process `Agent`-tool sub-agents inherit the
-session's permission mode — so the fan-out case the knowledge file singles
-out goes quiet too, when auto mode is active.
+dispatch prompt-heavy — observed across the whole #604 lifecycle, which ran
+in-process under auto mode with no operator approvals for the dispatched
+work, `triage-reviews` fan-out included. (The shipped text cites that
+observation rather than asserting that in-process `Agent` sub-agents inherit
+the session's permission mode: that is a claim about Claude Code internals
+this workspace cannot verify from source.)
 
 The Issue Review entry (`.agent/work-plans/issue-607/progress.md`, commit
 `70be42f`) verified the issue's quotations and container-limitation claims
@@ -158,80 +161,46 @@ Single PR, three files, prose-only edits (the third,
 operator decision — see Approach step 3 and the scope additions below).
 
 
-## Implementation notes (plan sync)
+## Implementation Notes
 
-Written after `review-plan` returned `changes-requested` (5 must-fix, 3
-suggestions) and the operator ruled at the plan checkpoint. What actually
-shipped differs from the plan above in four ways, all review-driven:
+Rationale for the design decisions that are not obvious from the diff (the
+*what* is synced inline above; per `plan-task` § During implementation rule 2,
+this section carries only the *why*).
 
-1. **The do-not-touch fence was redrawn.** The plan fenced off the
-   in-process/container bullet definitions (~L76-91). The review showed that
-   fence protected three statements the change falsifies — the `for quick /
-   cheap phases` scoping label, the unconditional prompt-flood Caveat, and the
-   `for isolation *and* prompt-free dispatch` bullet heading (with the "biggest
-   practical reason" claim spanning L90-92, partly outside the named range).
-   Both bullets were rewritten; the genuinely orthogonal `--context-file` and
-   background/freshness paragraphs were left alone.
+- **The plan's do-not-touch fence around the in-process/container bullet
+  definitions was redrawn** because that fence protected three statements this
+  change falsifies — the "for quick / cheap phases" scoping label, the
+  unconditional prompt-flood caveat, and the "for isolation *and* prompt-free
+  dispatch" bullet heading. A fence that preserves false text is not a scope
+  boundary worth keeping. The genuinely orthogonal `--context-file` and
+  background/freshness paragraphs were left alone.
 
-2. **The auto-mode condition names its tell and fails safe.** The plan
-   conditioned the new default on auto mode while declining to say how a reader
-   determines which case they are in — but the reader *is* the agent choosing.
-   The text now names an observable the *agent* can read — the
-   `While auto mode is active:` system reminder auto mode injects into the
-   session's own context — and states the fallback explicitly: *cannot
-   confirm auto mode → the container-leaning guidance is in force*. (An
-   earlier draft named the operator's permission-mode indicator; that is
-   terminal UI the agent cannot see, so the condition would never have
-   evaluated true. Corrected during pre-push review.) The
-   asymmetry is deliberate, since an uncertain reader must not land on the
-   prompt-flooding branch #545 existed to prevent.
+- **The new default names an observable tell** even though the plan said "no new
+  detection mechanism", because the reader who applies the condition *is* the
+  agent choosing the mode: an unstated condition is one nobody can evaluate. The
+  tell is the `While auto mode is active:` `system-reminder` injected into the
+  session's own context (once, early — not per turn), not the operator's
+  permission-mode indicator, which is terminal UI the agent cannot see. The
+  fallback direction is asymmetric on purpose: an uncertain reader must land on
+  the container-leaning branch #545 exists to protect, not on the
+  prompt-flooding one.
 
-3. **The safety reasoning was rewritten for both paths** (operator decision at
-   the plan checkpoint). The plan said keep the sandbox-boundary paragraph
-   "content unchanged", but that paragraph was a *caution against* reaching for
-   container — incoherent once the surrounding advice says to choose container
-   for untrusted input. It is now affirmative, every clause of the reasoning
-   preserved, and it covers the mirror case the plan missed entirely: what
-   contains an in-process phase under auto mode. That answer was verified
-   against source rather than reasoned from plausibility, and it is *less*
-   than an earlier draft claimed — auto mode is exactly what stands the host
-   permission policy down; `.claude/settings.json` has an `allow` array and no
-   `deny` anywhere, so the allowlist refuses nothing; and the worktree scoping
-   is convention, not a boundary (`dispatch_subagent.sh`'s own header:
-   "convention-only (no enforcement, per ADR-0004/0005)"). What actually
-   differs is that in-process hands the phase the *host's credentials*, the
-   property `.devcontainer/agent/README.md` leads with; the checkpoints survive
-   but gate publication after the fact. Stated plainly, the gap strengthens
-   rather than weakens the case for containers on untrusted input, and the
-   original's residual caution is kept.
+- **The sandbox-boundary paragraph became affirmative and two-sided** (operator
+  decision at the plan checkpoint) because as a *caution against* reaching for
+  container it was incoherent beside advice that says to choose container for
+  untrusted input. Rewriting it forced both halves to be verified against
+  source, and the verified answer narrows *both* modes: auto mode stands down
+  routine approvals in-process, the tracked settings carry no `deny`, the
+  worktree scoping is handoff prose with nothing enforcing it — and on the
+  container side, `docker_run_agent.sh` bind-mounts the whole workspace root
+  read-write and forwards the host's Claude credentials, so the sandbox's real
+  contribution is a clean machine plus the absence of GitHub write auth. Stated
+  that plainly, the case for containers on untrusted input rests on where it
+  actually holds.
 
-4. **The claim is grounded in observation, not asserted mechanism.** Rather
-   than stating that in-process `Agent` sub-agents inherit the session
-   permission mode — a claim about Claude Code internals this workspace cannot
-   verify from source — the text cites the observed #604 lifecycle: nine typed
-   `progress.md` entries (`review-issue`, `plan-task`, `review-plan`, two
-   `review-code` rounds, `triage-reviews`, three `address-findings` passes) plus
-   an unentried implementation pass, all in-process under auto mode with no
-   approvals for the dispatched work.
-
-Scope additions:
-
-- **Third stale surface** (review finding 1): the `# Container (isolation; use
-  for implementation-heavy phases):` code-block comment in
-  `skill_workflows.md` ~L102-107 — the retired advice in miniature, ~25 lines
-  above the bullet the plan did rewrite, and invisible to the plan's
-  consequences grep because it contains neither "prompt-free" nor "permission
-  prompt". The widened search (`implementation-heavy`, bare `--mode container`,
-  "lean toward", "prefer container") found no further surfaces.
-  `review-plan/SKILL.md`'s implementation-dispatch block already read
-  "isolation-worthy", but still recommended `--mode container` with no
-  reference to the new default; it was aligned during the pre-push review pass.
-- **`skill_workflows.md` now carries the #545 → #607 citation** so a reader
-  arriving at the knowledge file first learns the rule was reversed
-  deliberately (review suggestion 7 / issue proposal item 3).
-- **`.claude/skills/review-plan/SKILL.md` self-review heuristic** (operator
-  decision to fold in): it compared `$AGENT_NAME` against the plan author, but
-  every dispatched agent shares one `$AGENT_NAME`, so it matched on every
-  review and destroyed the signal it carries. Now keyed on whether the plan was
-  authored in the same context, with the shared-identity trap stated so it is
-  not reintroduced.
+- **`review-plan/SKILL.md` was folded in** (operator decision) rather than split
+  out: its self-review heuristic compared `$AGENT_NAME` against the plan author,
+  but every dispatched agent shares one `$AGENT_NAME`, so it matched on every
+  review and destroyed the signal it carried. Keying it on *how the reviewer was
+  invoked* is the same correction this PR makes elsewhere — read your own
+  context, not a string.
