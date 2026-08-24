@@ -863,9 +863,9 @@ review indefinitely:
     rising** versus the previous round and the remaining must-fixes are
     mechanical/clear (low ≈ **≤ 2** must-fixes, each a precise file:line fix with
     an obvious correction — not a design question) — recommend addressing them
-    and shipping rather than another full round (each round costs a container
-    cycle for diminishing return, especially on guidance docs after the
-    calibration above).
+    and shipping rather than another full round (each round costs a full
+    dispatch + re-review cycle for diminishing return, especially on guidance
+    docs after the calibration above).
   - **continue** when Must-fix is **rising, high, or includes a genuine
     design / correctness concern** that warrants another independent read.
 - Surface the round, verdict, and a one-line reason in the report header

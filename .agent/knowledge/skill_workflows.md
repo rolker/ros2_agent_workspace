@@ -163,9 +163,11 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   [#607](https://github.com/rolker/ros2_agent_workspace/issues/607)).
 - **Choose containers for isolation, not for prompt volume.** Untrusted input
   and work needing a clean dependency environment belong in the sandbox
-  whatever the host's permission mode. Conversely, a phase needing host GitHub
-  auth (`triage-reviews`), the host Ollama endpoint, host-built layer installs,
-  or further `Agent`-tool fan-out cannot run in a container at all. (Containers
+  whatever the host's permission mode. Conversely, a container simply does not
+  have host GitHub auth (`triage-reviews`), the host Ollama endpoint, or the
+  `Agent` tool for further fan-out, so a phase needing any of those runs
+  in-process. Host-built layer installs are a weaker case — a container *can*
+  rebuild the layers, it just pays for them. (Containers
   have no GitHub *write* auth ever, and read auth only when the optional
   read-only token is configured — `docker_run_agent.sh` forwards it as
   `-e GH_TOKEN`.) **Where the two rules collide, capability wins and you
