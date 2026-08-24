@@ -37,8 +37,9 @@ and a second disjoint-lens Claude Adversarial pass. Copilot Adversarial
 is opt-in at every tier via `--copilot` (off by default to conserve the
 Premium quota). Local Model Adversarial (a quota-free Ollama read via
 `.agent/scripts/local_review.sh`, runtime-agnostic — needs only
-bash/curl/jq and a local Ollama server) is default-on at every tier,
-opted out via `--no-local`. `review-code` also
+bash/curl/jq and a local Ollama server) is likewise opt-in at every
+tier via `--local` (off by default — the wall-clock long pole on
+current hardware, #590). `review-code` also
 accepts a PR number / URL for post-PR review of someone else's work.
 `triage-reviews` runs after a PR has accumulated review comments
 (human + bot) and classifies each against the current code.
