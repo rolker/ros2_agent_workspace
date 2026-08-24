@@ -155,3 +155,55 @@ should be corrected before or during planning.
 - Model-selection gate (probe 3, partial): the empirical planted-defect check (fixed defect set, objective scoring doc, `ollama ps` PROCESSOR=100%GPU + no-OOM as the real acceptance gate rather than the registry-size arithmetic) is well-specified and not a rubber stamp — the arithmetic table is correctly framed as a first-pass filter only. The one gap is the `num_ctx` interaction above.
 - Issue Review follow-through: all seven `review-issue` action items are addressed in the plan (separable commits, per-request `keep_alive` investigated and confirmed, drop-in gated on separate sign-off, planted-defect check specified, #585 framing corrected, #590 re-triage scheduled as a follow-up, existing test coverage checked — zero, addressed with new tests).
 - Documentation & Instruction Impact section: present, non-silent, correctly frames the new knowledge doc as a candidate for operator approval rather than an auto-applied edit.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-23 12:10 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-605/plan.md` at `5d3f2a9` (revision of `2ef2541`)
+**Branch**: feature/issue-605 at `5d3f2a9`
+**Phases**: single (5 sequenced commits within the one PR, unchanged from prior authoring — chunking+tests now includes per-chunk `num_ctx` sizing, per-request keep_alive+tests, model-default change pending empirical check, knowledge doc, conditional systemd drop-in script written-but-not-executed)
+
+### Revision summary (responds to Plan Review changes-requested, `91321a8`)
+
+- **Must-fix closed**: item 1 (chunking) gains an explicit new step 5,
+  "Per-chunk `num_ctx` sizing" — each chunk's request now sizes
+  `options.num_ctx` from that chunk's estimated tokens via a fixed bucket
+  set (`8192 16384 24576 32768`), capped at `LOCAL_REVIEW_NUM_CTX`, instead
+  of every chunk reusing the single global 32768 default
+  (`local_review.sh:224` today). `ANSWER_HEADROOM` (currently 12288,
+  tuned for `qwen3.5:35b`) is flagged as needing re-measurement per
+  candidate model — folded into item 3's empirical check as a new step 1
+  ("measure before scoring quality"). Item 3's candidate table is redone
+  to show the `num_ctx` bucket each candidate would actually request and
+  is explicit that the headroom-GB figures are order-of-magnitude
+  placeholders pending that measurement, not verified numbers. A new
+  "Arithmetic method" subsection states the general
+  weights+KV-cache-VRAM formula (`kv_bytes_per_token` from `ollama show
+  --verbose`, `kv_GB(num_ctx)`, `headroom_GB`) so it can be re-derived on
+  different hardware or a different model tag, per the review's ask.
+- **Suggestion closed**: item 1 gains step 9, documenting per-file/per-hunk
+  chunking's cross-file/caller-callee blind spot as a known v1 limitation
+  — added to the `local_review.sh` header comment and to the new
+  `.agent/knowledge/local_model_sizing.md` (item 5), explicitly noting 5f
+  is the only specialist affected (other `review-code` specialists retain
+  full-repo context).
+- Files to Change, Consequences, Documentation & Instruction Impact, and
+  Open Questions sections updated to reflect the num_ctx-sizing code work
+  and the new limitation-documentation content. Commit structure stays at
+  5 (num_ctx sizing folded into commit 1, not a new commit) — the review
+  did not require a 6th commit and the change is additive to the existing
+  chunking commit's own scope.
+- Not re-litigated, per the caller's instruction: the no-per-request
+  `OLLAMA_KV_CACHE_TYPE` investigation, the `run_script_tests.sh` glob
+  verification, the loud-failure guarantee, the drop-in gate, and the
+  planted-defect quality check all carry forward unchanged from the prior
+  plan version.
+
+### Open questions
+- [ ] Does `qwen3.5:4b-q8_0` clear the planted-defect recall check well enough to ship alone, or is the `9b-q4_K_M` stretch candidate necessary for acceptable review quality? Determines whether item 4 (systemd drop-in) is needed at all.
+- [ ] Item 3's candidate headroom numbers are placeholders pending the empirical check's new step 1 (`kv_bytes_per_token` measurement per candidate) — `9b-q4_K_M` may not clear the gate even with chunking once measured.
+- [ ] The `num_ctx` bucket set (`8192 16384 24576 32768`) is a first proposal, not a measured optimum — may need adjusting once real per-chunk token counts are observed.
+- [ ] If the drop-in is needed, operator sign-off on running `setup_ollama_kv_cache.sh` is a separate ask at implementation time — not covered by plan approval.
+- [ ] Is `LOCAL_REVIEW_KEEP_ALIVE` default of `30s` right, or should it be tuned after observing real chunked-request timing?
