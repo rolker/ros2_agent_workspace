@@ -369,10 +369,26 @@ re-reading their own work, annotate the entry's `**By**` field with
 the entry appropriately.
 
 To detect: find the most recent `## Plan Authored` entry in this
-`progress.md`. If one exists, compare `$AGENT_NAME` to the agent-name
-portion of its `**By**` field (the prefix before the first ` (`, since
-`**By**` is written as `<agent name> (<model>)` per ADR-0013). Match →
-annotate. No match → independent, no annotation.
+`progress.md`. If one exists, compare it against the **whole** `**By**`
+field — `<agent name> (<model>)` per ADR-0013 — not the agent-name
+portion alone.
+
+**Do not match on `$AGENT_NAME` by itself.** Every dispatched agent in
+this workspace shares one `$AGENT_NAME` (set once per session by
+`set_git_identity_env.sh`), so a name-only comparison matches on *every*
+review — including a genuinely independent fresh-context sub-agent on a
+different model. That fires the annotation universally and destroys the
+signal it exists to carry (#607). A dispatched review is a separate
+sub-agent with its own context; the shared identity string says nothing
+about whether it authored the plan.
+
+Annotate only when you are *actually* re-reading your own work — you
+wrote the plan earlier in **this same context**, without a fresh
+dispatch in between. When the plan was authored by a separate dispatch,
+the review is independent no matter what the `**By**` line says; if the
+model strings also differ, say so in the entry as positive evidence.
+When in doubt, state the basis for your judgement in the entry rather
+than relying on the string comparison.
 
 If no `## Plan Authored` entry exists (PR-less invocation, or an older
 plan that pre-dates `plan-task`'s persistence step), omit the
