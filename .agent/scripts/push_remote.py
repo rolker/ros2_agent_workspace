@@ -32,7 +32,8 @@ sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 from remote_utils import (
     add_common_args,
     get_default_branch,
-    remote_exists,
+    RemoteState,
+    remote_probe,
     run_git,
     run_git_network,
     run_script,
@@ -123,7 +124,13 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
 
 def process_repo(repo_path, repo_name, version, args):
     """Push a single repo to the named remote. Returns (status, message)."""
-    if not remote_exists(repo_path, args.remote):
+    state = remote_probe(repo_path, args.remote)
+    if state is RemoteState.UNREADABLE:
+        # Same false skip as pull_remote's: a repo whose `git remote` failed
+        # was never pushed, and reporting it as "remote not found" kept the
+        # run green (#609).
+        return "error", "cannot read git state (not a repo, or corrupt .git)"
+    if state is RemoteState.ABSENT:
         return "skip", f"remote '{args.remote}' not found"
 
     errors = []

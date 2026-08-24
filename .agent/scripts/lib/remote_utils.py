@@ -4,6 +4,7 @@ Shared utilities for secondary remote management scripts.
 Used by add_remote.py, push_remote.py, and pull_remote.py.
 """
 
+import enum
 import subprocess
 import sys
 import time
@@ -69,6 +70,12 @@ def run_git(repo_path, args, dry_run=False):
         return True, result.stdout.strip(), result.stderr.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip(), e.stderr.strip()
+    except OSError as e:
+        # The repo directory itself is unusable (unreadable, vanished mid-run,
+        # a dangling symlink). Without this the exception escapes and kills the
+        # whole run with no summary, stranding every later repo — the same hole
+        # sync_repos.py's run_git_cmd closed (#609).
+        return False, "", f"cannot run git in {repo_path}: {e}"
 
 
 def run_git_network(repo_path, args, dry_run=False):
@@ -77,12 +84,39 @@ def run_git_network(repo_path, args, dry_run=False):
     return retry_transient(run_git, repo_path, args, dry_run)
 
 
-def remote_exists(repo_path, remote_name):
-    """Check if a named remote exists in the repo."""
+class RemoteState(enum.Enum):
+    """What `git remote` could tell us about a named remote (#609).
+
+    UNREADABLE is not ABSENT: the command failing means we could not look, and
+    reporting "remote not configured" for a repo we cannot read is the same
+    false green as a failed `git status` reading as clean. Every member is
+    truthy, so compare against members explicitly.
+    """
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    UNREADABLE = "unreadable"
+
+
+def remote_probe(repo_path, remote_name):
+    """Look for a named remote. Returns a RemoteState."""
     success, output, _ = run_git(repo_path, ["remote"])
     if not success:
-        return False
-    return remote_name in output.splitlines()
+        return RemoteState.UNREADABLE
+    if remote_name in output.splitlines():
+        return RemoteState.PRESENT
+    return RemoteState.ABSENT
+
+
+def remote_exists(repo_path, remote_name):
+    """Check if a named remote exists in the repo.
+
+    Boolean view of remote_probe(): an unreadable repo answers False. Kept for
+    add_remote.py, where that is the right answer — it goes on to read the
+    origin URL and reports an explicit error when that fails. Callers that
+    would *skip* on False must use remote_probe() instead.
+    """
+    return remote_probe(repo_path, remote_name) is RemoteState.PRESENT
 
 
 def resolve_repo_path(root_dir, repo):

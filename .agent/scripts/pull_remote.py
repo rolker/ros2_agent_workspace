@@ -36,10 +36,11 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 from remote_utils import (  # noqa: E402
+    RemoteState,
     add_common_args,
     get_default_branch,
     get_repos,
-    remote_exists,
+    remote_probe,
     resolve_repo_path,
     run_git,
     run_git_network,
@@ -235,7 +236,13 @@ def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
 
 def process_repo(repo_path, repo_name, version, args):
     """Dispatch to the appropriate pull mode. Returns (status, message)."""
-    if not remote_exists(repo_path, args.remote):
+    state = remote_probe(repo_path, args.remote)
+    if state is RemoteState.UNREADABLE:
+        # `git remote` failed, so we never learned whether the remote is
+        # configured. Skipping on that reads as "nothing to do here" and keeps
+        # the run green over a repo that was never fetched (#609).
+        return "error", UNREADABLE_STATE
+    if state is RemoteState.ABSENT:
         return "skip", f"remote '{args.remote}' not found"
 
     if args.pull:
@@ -339,7 +346,11 @@ def main():
             repo_path = resolve_repo_path(root_dir, repo)
             if repo_path is None:
                 continue
-            if not remote_exists(repo_path, args.remote):
+            state = remote_probe(repo_path, args.remote)
+            if state is RemoteState.UNREADABLE:
+                errors.append(f"{repo['name']}: {UNREADABLE_STATE}")
+                continue
+            if state is RemoteState.ABSENT:
                 continue
             success, _, err = run_git_network(repo_path, ["fetch", args.remote], args.dry_run)
             if not success:

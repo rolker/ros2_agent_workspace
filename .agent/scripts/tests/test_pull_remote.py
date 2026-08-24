@@ -27,6 +27,7 @@ import pytest  # noqa: E402
 
 import pull_remote  # noqa: E402
 import remote_utils  # noqa: E402
+from remote_utils import RemoteState  # noqa: E402
 
 STATUS = ("status", "--porcelain")
 BRANCH = ("branch", "--show-current")
@@ -59,7 +60,7 @@ def _stub_repo(monkeypatch, responses, default_branch="main"):
     """
     fake = _stub_git(monkeypatch, responses)
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: default_branch)
-    monkeypatch.setattr(pull_remote, "remote_exists", lambda repo_path, remote: True)
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.PRESENT)
     return fake
 
 
@@ -181,7 +182,7 @@ def test_pull_mode_never_reaches_the_merge_when_the_tree_is_unreadable(monkeypat
     monkeypatch.setattr(pull_remote, "run_git", recording_run_git)
     monkeypatch.setattr(pull_remote, "run_git_network", recording_run_git)
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
-    monkeypatch.setattr(pull_remote, "remote_exists", lambda repo_path, remote: True)
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.PRESENT)
     pull_remote.process_repo(Path("/repo"), "r", "main", _args(pull=True))
     assert "merge" not in ran
     assert "fetch" not in ran
@@ -237,3 +238,87 @@ def test_error_status_makes_the_summary_exit_non_zero():
 def test_skip_status_leaves_the_summary_at_exit_zero():
     """The other direction: benign skips must not turn the run red."""
     remote_utils.print_summary_and_exit({"ok": 1, "skip": 2, "error": 0}, [("skip", "skipped")])
+
+
+# --------------------------------------------------------------------------
+# remote_probe(): "we could not look" is not "the remote is not configured"
+# --------------------------------------------------------------------------
+
+
+def test_unreadable_remote_is_an_error_not_a_missing_remote_skip(monkeypatch):
+    """`git remote` failing meant we never learned whether the remote exists;
+    "remote not found" kept a repo that was never fetched inside a green run."""
+    _stub_git(monkeypatch, {})
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
+    monkeypatch.setattr(
+        pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.UNREADABLE
+    )
+    status, msg = pull_remote.process_repo(Path("/repo"), "r", "main", _args(pull=True))
+    assert (status, msg) == ("error", pull_remote.UNREADABLE_STATE)
+
+
+def test_absent_remote_is_still_a_benign_skip(monkeypatch):
+    """Most repos legitimately have no secondary remote — that must stay 0."""
+    _stub_git(monkeypatch, {})
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.ABSENT)
+    status, msg = pull_remote.process_repo(Path("/repo"), "r", "main", _args(pull=True))
+    assert status == "skip"
+    assert "not found" in msg
+
+
+def test_an_unusable_repo_directory_lands_as_an_error_not_a_clean_tree(monkeypatch):
+    """End to end for the pair: the OSError becomes a failed probe, and the
+    failed probe becomes an error rather than "clean, nothing to merge"."""
+
+    def boom(*_a, **_kw):
+        raise OSError(2, "No such file or directory")
+
+    monkeypatch.setattr(remote_utils.subprocess, "run", boom)
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.PRESENT)
+    status, msg = pull_remote.process_repo(Path("/gone"), "r", "main", _args(pull=True))
+    assert (status, msg) == ("error", pull_remote.UNREADABLE_TREE)
+
+
+def test_json_mode_reports_an_unreadable_repo_instead_of_silently_skipping(monkeypatch, tmp_path):
+    """--json's loop `continue`d on a falsy remote check, so a repo whose git
+    state could not be read vanished from both the report and the errors, and
+    the process exited 0 with a JSON document that looked complete (#609)."""
+    monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
+    monkeypatch.setattr(
+        pull_remote, "get_repos", lambda args: [{"name": "alpha", "version": "jazzy"}]
+    )
+    monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
+    monkeypatch.setattr(pull_remote, "_json_report", lambda *a: None)
+    monkeypatch.setattr(
+        pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
+    )
+    monkeypatch.setattr(
+        pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.UNREADABLE
+    )
+    monkeypatch.setattr(sys, "argv", ["pull_remote.py", "--remote", "gitcloud", "--json"])
+    with pytest.raises(SystemExit) as exc:
+        pull_remote.main()
+    assert exc.value.code == 1
+
+
+def test_json_mode_stays_silent_about_a_repo_with_no_such_remote(monkeypatch, tmp_path):
+    """The other direction: a repo that simply has no secondary remote is not
+    an error, and must not turn --json red."""
+    monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
+    monkeypatch.setattr(
+        pull_remote, "get_repos", lambda args: [{"name": "alpha", "version": "jazzy"}]
+    )
+    monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
+    monkeypatch.setattr(pull_remote, "_json_report", lambda *a: None)
+    monkeypatch.setattr(
+        pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
+    )
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.ABSENT)
+    monkeypatch.setattr(sys, "argv", ["pull_remote.py", "--remote", "gitcloud", "--json"])
+    with pytest.raises(SystemExit) as exc:
+        pull_remote.main()
+    assert exc.value.code == 0
