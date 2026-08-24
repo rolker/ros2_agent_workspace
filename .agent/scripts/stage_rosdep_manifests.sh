@@ -13,10 +13,11 @@
 # relative to the workspace root so it lands in its own directory
 # (`rosdep install --from-paths` reads one package.xml per directory).
 #
-# This is the single source of truth for the gather, called by both build
-# entry points: docker_run_agent.sh --build and `make agent-build`. The CALLER
-# owns removing the staging dir after the build (it knows when the build is
-# done); this script only (re)populates it idempotently.
+# This is the single source of truth for the gather. It has exactly ONE caller:
+# docker_run_agent.sh's build block — the workspace's single image build path
+# since #604, which `make agent-build` reaches via --build-only. The CALLER owns
+# removing the staging dir after the build (it knows when the build is done);
+# this script only (re)populates it idempotently.
 #
 # Usage:
 #   stage_rosdep_manifests.sh <workspace_root> [<stage_dir>]

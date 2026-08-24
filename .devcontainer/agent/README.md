@@ -97,11 +97,17 @@ slower and the image larger; launches are much faster. The bake is best-effort:
 a dep that can't resolve at build time is logged and falls through to the
 launch-time install path rather than failing the build.
 
-> Build through `docker_run_agent.sh --build` or `make agent-build` — both
-> stage the manifests first (via `.agent/scripts/stage_rosdep_manifests.sh`).
-> A **manual** `docker build .devcontainer/agent/` that bypasses those wrappers
-> has no `.rosdep-manifests/` and the `COPY` step will fail; stage first with
-> `./.agent/scripts/stage_rosdep_manifests.sh "$PWD"` if you must build by hand.
+> Build through `docker_run_agent.sh --build` / `--build-only`, or
+> `make agent-build`, which delegates to `--build-only`. That build block is the
+> single build path (#604): it is the only caller of
+> `.agent/scripts/stage_rosdep_manifests.sh`, and the only thing that stamps the
+> startup-scripts staleness marker.
+>
+> A **manual** `docker build .devcontainer/agent/` bypasses both. It has no
+> `.rosdep-manifests/`, so the `COPY` step fails; and even after staging by
+> hand it passes no `--build-arg STARTUP_SCRIPTS_SHA`, leaving an image whose
+> marker is empty — which the launcher warns about at every launch until it is
+> rebuilt through the real path. Don't build by hand.
 >
 > The baked deps are a snapshot of whatever layers are checked out at build
 > time, so the image is **not** project-agnostic at runtime — it's a local,
@@ -281,10 +287,16 @@ If files inside the container are owned by a different user:
 ```bash
 # Rebuild with your UID
 make agent-build
-# Or:
-docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) \
-    -t ros2-agent-workspace-agent:latest .devcontainer/agent/
 ```
+
+`make agent-build` already passes your `USER_UID`/`USER_GID` — it delegates to
+`docker_run_agent.sh --build-only`, which reads them from `id -u` / `id -g`.
+
+Do **not** substitute a bare `docker build` here. It is not the single build
+path (#604): it stages no rosdep manifests, and it passes no
+`--build-arg STARTUP_SCRIPTS_SHA`, so the image is stamped with an empty
+startup-scripts marker — which the launcher warns about at *every* launch, with
+no way to clear it short of rebuilding through the real path.
 
 ### Volume ownership issues
 

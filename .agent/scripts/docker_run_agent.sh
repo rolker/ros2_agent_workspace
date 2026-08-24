@@ -451,8 +451,9 @@ if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # agent/) has no layer source — layers/ is gitignored and mounted at
     # runtime, never copied — so gather just the package.xml manifests here,
     # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
-    # The gather logic lives in stage_rosdep_manifests.sh (shared with
-    # `make agent-build`) so both build entry points stage identically.
+    # The gather logic lives in stage_rosdep_manifests.sh. This block is its
+    # only caller — `make agent-build` reaches it through --build-only rather
+    # than staging on its own (#604), so there is one gather, not two.
     STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
 
     # Serialize concurrent builds. STAGE_DIR is a FIXED path — the Dockerfile's
