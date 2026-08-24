@@ -203,3 +203,94 @@ excludes fixing CI in affected project repos — keep that boundary.
 - [ ] (suggestion) ADR-0018 decision 5 pushes `refs/notes/ci-local` at merge time. If `merge_pr.sh` now merges *because of* a local note, it should push that ref at merge time (or record why not) — otherwise the evidence that authorized the merge exists only on the merging machine. — `plan.md:117-131`
 - [ ] (suggestion) ADR-0012 instrument: the addendum is the right call, but the plan's reasoning inverts the ADR — substantive changes require **superseding**, not an addendum; addendums are permitted because they are navigational. Keep the `### Addendum (#610)` strictly navigational (gap closed → #610 / AGENTS.md). The new third-state policy ("merge proceeds when nothing verifies it") is a consequence ADR-0018 never recorded and must not be asserted inside it; land it in AGENTS.md. — `plan.md:117-131`
 - [ ] (suggestion) Test hermeticity holds — the bare-`origin` fetch fixture works over a local path with no network (verified), and the `upstream.repos` and no-attestation-at-all cases are pure fixtures. But the `merge_pr.sh`-side test only asserts `gh pr checks` is never called; add stubbed-`gh` cases asserting the three-way *outcomes* (warning text on stderr, attested-path message, workspace-repo fail-closed) — the wiring, not the helper, is what will rot. — `plan.md:166-175`
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 14:25 -04:00
+**By**: Claude Opus
+
+**Plan**: `.agent/work-plans/issue-610/plan.md` at `a4be918` (revised for the plan review before implementing)
+**Branch**: feature/issue-610 at `73470b7`
+**Commits**: `a4be918` (plan revision), `e228118` (helper + tests), `3c2bf92` (merge_pr.sh classification + tests), `73470b7` (AGENTS.md + ADR-0018 addendum)
+
+### What landed
+
+- **`.agent/scripts/_ci_verification_helpers.sh` (new)** —
+  `ci_local_attestation_status <repo> <head_sha>`: local-first note lookup,
+  scratch-ref fetch fallback with a **forced** refspec + up-front delete,
+  exact-head matching, all appended records parsed (`pass (partial)` never
+  matches), and `upstream.repos` completeness read **at the head commit**
+  (fails closed when that commit object is not local).
+- **`.agent/scripts/merge_pr.sh`** — the CI-wait block became a four-state
+  classification: checks present → unchanged wait/gate; workflows present at
+  the head but no checks registered → settle/re-poll then **refuse**; project
+  repo with no workflows + full-scope attestation → merge on it and push
+  `refs/notes/ci-local` first; project repo with no workflows and no
+  attestation → merge with a loud warning naming the recourse. `gh` failures
+  and non-404 probe failures are errors. `MERGE_PR_SETTLE_ATTEMPTS` /
+  `MERGE_PR_SETTLE_SECONDS` tune (and, in tests, zero out) the settle window.
+- **`AGENTS.md`** — the four states, the `gh`-failure rule, and the two
+  Script Reference rows. **ADR-0018** — Status-line pointer + a strictly
+  navigational `### Addendum`; no Decision/Consequences text edited.
+- **Tests** — `test_ci_verification_helpers.sh` (new, 15 assertions) and
+  eight new stubbed-`gh` cases in `test_merge_pr.sh`.
+
+### Plan review must-fixes — how each was closed
+
+1. **Empty-rollup race (fail-open risk)**: `[]` is never read as "no CI" on
+   its own. `gh api repos/<r>/contents/.github/workflows?ref=<head_sha>` is
+   the discriminator — 404 = genuinely no CI; a listing = CI exists, so
+   re-poll and then **fail closed** with a message that says what is actually
+   happening (Actions not started, or every workflow filtered out for this
+   PR's paths). A code comment records why
+   `gh api .../actions/workflows` must not be used (`total_count: 2` for
+   `mru_transform` from dynamic Copilot entries).
+2. **ADR-0018 decision 4**: the substitution path is gated on
+   `BRANCH_REPO != ROOT_DIR`. The workspace repo can only settle-and-refuse;
+   regression test asserts the ADR-0018-decision-4 message and that no merge
+   is attempted.
+3. **`gh` failure ≠ empty array**: `check_rollup_count()` treats non-zero
+   exit, empty output, and non-JSON as errors (`jq -e` separates "parsed" from
+   "input was not JSON"); the workflows probe likewise errors on anything that
+   is not a 404. Both have regression tests asserting the output does *not*
+   claim "no verification" and that no merge is attempted.
+4. **Leftover scratch ref**: forced refspec (`+refs/notes/ci-local:…`) plus an
+   up-front delete and a cleanup after use. Verified as a real guard: with the
+   `+` and the delete removed, `test_ci_verification_helpers.sh` drops to
+   14 passed / 1 failed; restored, 15/0.
+
+Suggestions also applied: `refs/notes/ci-local` is pushed at merge time when
+the note authorized the merge (decision 5); the ADR-0018 addendum is
+navigational with the third-state policy landing in `AGENTS.md` (ADR-0012
+reasoning corrected); the no-attestation message points at re-running
+`ci_local.sh` on the new head rather than `--no-wait`; `upstream.repos` is
+read at the head commit; the `merge_pr.sh` tests assert the three-way
+outcomes; the shared-ref-store point is documented in the helper's comments
+so nobody adds a redundant fetch.
+
+### Verification
+
+- `make test-scripts`: **22 shell test files ✅, 73 pytest tests passed, 0
+  failures** (includes the new `test_ci_verification_helpers.sh` at 15/15 and
+  `test_merge_pr.sh` at 24/24 — 16 pre-existing + 8 new).
+- `make validate`: **PASSED**. Its one warning (Check 3, polluted baked parent
+  chains in `underlay`/`core`) is a pre-existing build-state condition,
+  unrelated to this change.
+- Pre-commit hooks (incl. shellcheck) ran clean on every commit; no
+  `--no-verify`.
+- A green local run is **not** the gate for this PR: the workspace repo's
+  hosted checks are required — the very ADR-0018 decision implemented here.
+
+### Notes / follow-ups
+
+- One deliberate scope call: the `gh pr checks` **stderr string** (`no checks
+  reported on`) is not parsed anywhere. The classification makes it
+  structurally unreachable, which is stronger than matching an unversioned CLI
+  message, so the Issue Review's "note the fragility in a comment" action is
+  satisfied by removing the dependency instead.
+- Not in scope (per the issue): fixing CI in the 26 project repos that lack
+  it, and `ci_local.sh`'s inability to run against `mru_transform`.
+
+### Actions
+- [ ] Human content review of the `AGENTS.md` change (instruction file) before merge.
+- [ ] Hosted checks must be green before merging this PR (workspace repo, ADR-0018 decision 4).
