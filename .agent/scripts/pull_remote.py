@@ -18,7 +18,9 @@ Prerequisites:
 Exit status:
     0  every repo was fetched/merged, or deliberately skipped (dirty tree,
        detached HEAD, off the default branch, remote not configured, or absent
-       from a layer that is optional on this host).
+       from a layer that is optional on this host, or a default branch that
+       exists only as a remote-tracking ref — see STATE_NO_LOCAL_BRANCH, which
+       --json reports as its own entry rather than as an error or a silence).
     1  at least one repo errored: a failed fetch/merge, a working tree or git
        state that could not be read at all, a configured repo with no checkout
        in a *required* layer, or an enumeration that produced no repos at all
@@ -58,6 +60,32 @@ from remote_utils import (  # noqa: E402
 )
 from workspace import WorkspaceConfigError, get_optional_layers  # noqa: E402
 
+# Named states for a comparison that produced no counts. Both are normal,
+# supported workspace states, so neither may turn a run red — but both must be
+# *said*, never inferred from an absence, which is the whole of #609.
+#
+# NO_LOCAL_BRANCH is what `vcs import` leaves behind for a SHA- or tag-pinned
+# manifest entry: the default branch exists only as a remote-tracking ref.
+# validate_workspace.py protects the identical state for the identical reason
+# ("a repo pinned to a SHA is legitimately detached, and flagging it would be a
+# false red"). It used to be an error in --json and a benign skip in default
+# mode — the same repo, the same state, two verdicts. The modes now agree: a
+# visible non-fatal report in both, and its own entry in the JSON so
+# /import-field-changes sees the state rather than reading "nothing to import"
+# out of a silence.
+STATE_AHEAD = "ahead"
+STATE_NO_LOCAL_BRANCH = "no-local-branch"
+STATE_NO_REMOTE_BRANCH = "no-remote-branch"
+
+
+def no_local_branch_detail(branch, remote_ref):
+    """The one wording both modes report for STATE_NO_LOCAL_BRANCH."""
+    return (
+        f"cannot compare: no local '{branch}' to compare against {remote_ref} — "
+        "the default branch exists only as a remote-tracking ref (a SHA- or "
+        f"tag-pinned manifest entry). Check out '{branch}' to compare."
+    )
+
 
 def is_dirty(repo_path):
     """Check if the repo has uncommitted changes.
@@ -91,11 +119,19 @@ def get_current_branch(repo_path):
 
 def _compare_branches(repo_path, branch, remote_ref):
     """Compare local and remote branches. Returns (status, message)."""
-    # Verify both refs exist
-    for ref, label in [(remote_ref, "remote"), (branch, "local branch")]:
-        success, _, _ = run_git(repo_path, ["rev-parse", "--verify", ref])
-        if not success:
-            return "skip", f"fetched (no {ref} on {label})"
+    # Verify both refs exist. Probed in their own ref namespaces rather than
+    # by loose name: `rev-parse --verify jazzy` also matches refs/tags/jazzy,
+    # and the rev-list below would then compare the tag (get_default_branch()
+    # verifies refs/heads/ for the same reason).
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", f"refs/remotes/{remote_ref}"])
+    if not success:
+        return "skip", f"fetched (no {remote_ref} on remote)"
+
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", f"refs/heads/{branch}"])
+    if not success:
+        # The same state --json reports as STATE_NO_LOCAL_BRANCH. Benign in
+        # both modes, named in both, and 0 in both (#609).
+        return "skip", f"fetched ({no_local_branch_detail(branch, remote_ref)})"
 
     # Count commits ahead/behind
     success, output, err = run_git(
@@ -275,42 +311,48 @@ def _get_ahead_commits(repo_path, branch, remote_ref, max_count=50):
 
 
 def _ahead_behind(repo_path, branch, remote_ref):
-    """Count commits each side of branch...remote_ref. Returns (counts, error).
+    """Count commits each side of branch...remote_ref. Returns (counts, state, error).
 
-    `counts` is an (ahead, behind) pair, or None when the remote has no such
-    branch — a real, benign answer. `error` is set when a probe *failed*, which
-    is not the same answer and must never be reported as one (#609).
+    Exactly one of the three is ever set, and keeping them apart is the point
+    of #609:
+
+    - `counts` — an (ahead, behind) pair; the comparison was made.
+    - `state`  — a named, benign non-answer (STATE_NO_REMOTE_BRANCH or
+      STATE_NO_LOCAL_BRANCH). Real answers, not failures: neither turns a run
+      red, and neither is left to be inferred from a silence.
+    - `error`  — a probe *failed*, so we never learned whether the remote is
+      ahead. Never reportable as one of the benign answers above.
+
+    Both ref probes name their ref namespace rather than looking the name up
+    loosely: `rev-parse --verify jazzy` also matches refs/tags/jazzy, and the
+    rev-list would then compare the tag.
     """
     # No such branch on the remote: nothing to import, and not an error.
     # Checked before the local branch so a repo the remote simply does not
     # carry stays silent rather than complaining about a local ref.
-    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", remote_ref])
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", f"refs/remotes/{remote_ref}"])
     if not success:
-        return None, None
+        return None, STATE_NO_REMOTE_BRANCH, None
 
-    # The remote branch exists but the local one does not (a default branch that
-    # resolved through refs/remotes/origin/ only — the reproduced trigger for
-    # the rc-128 rev-list below). Non-JSON mode surfaces this as a visible skip
-    # line; --json has no such line, so silence there would read as "nothing to
-    # import" for a repo that may carry every unreconciled field commit.
-    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", branch])
+    # The remote branch exists but the local one does not — the state
+    # `vcs import` leaves for a SHA- or tag-pinned entry, and the trigger for
+    # the rc-128 rev-list below. Default mode calls this a skip and exits 0;
+    # this mode used to call the identical repo an error. Reported, not failed.
+    success, _, _ = run_git(repo_path, ["rev-parse", "--verify", f"refs/heads/{branch}"])
     if not success:
-        return None, (
-            f"no local '{branch}' to compare against {remote_ref} — cannot tell "
-            "whether the remote is ahead; check out the default branch"
-        )
+        return None, STATE_NO_LOCAL_BRANCH, None
 
     success, output, err = run_git(
         repo_path, ["rev-list", "--left-right", "--count", f"{branch}...{remote_ref}"]
     )
     if not success:
-        return None, f"cannot compare {branch}...{remote_ref}: {err or 'git rev-list failed'}"
+        return None, None, f"cannot compare {branch}...{remote_ref}: {err or 'git rev-list failed'}"
 
     parts = output.split()
     if len(parts) != 2 or not all(part.isdigit() for part in parts):
-        return None, f"unreadable rev-list output for {branch}...{remote_ref}: {output!r}"
+        return None, None, f"unreadable rev-list output for {branch}...{remote_ref}: {output!r}"
 
-    return (int(parts[0]), int(parts[1])), None
+    return (int(parts[0]), int(parts[1])), None, None
 
 
 def json_report(repo_path, repo_name, version, remote_name):
@@ -320,12 +362,19 @@ def json_report(repo_path, repo_name, version, remote_name):
     `/import-field-changes` consumes, and it is asserted directly in
     test_pull_remote.py rather than only through main().
 
-    Exactly one of the two is ever set, and the distinction is the point (#609):
+    At most one of the two is ever set, and the distinction is the point (#609):
 
-    - `(entry, None)` — the remote is ahead; these are the commits.
-    - `(None, None)`  — a real, benign answer: the remote has no such branch,
-      or it has one and it is not ahead. Mirrors what non-JSON mode reports as
-      a skip / "up to date".
+    - `(entry, None)` — something for the consumer to act on. Every entry
+      carries an explicit `state`, so no consumer has to infer one:
+        * STATE_AHEAD — the remote is ahead; these are the commits.
+        * STATE_NO_LOCAL_BRANCH — the default branch exists only as a
+          remote-tracking ref, so no comparison was possible. Not an error
+          (default mode skips the identical repo and exits 0), but reported
+          rather than silent: an absence here would read as "nothing to
+          import" for a repo that may carry every unreconciled field commit.
+    - `(None, None)` — nothing to act on and nothing to say: the remote has no
+      such branch, or it has one and it is not ahead. Mirrors what non-JSON
+      mode reports as a skip / "up to date".
     - `(None, error)` — a probe *failed*, so we never learned whether the remote
       is ahead. This used to collapse into the benign `None` above, and the
       only consumer of --json is `/import-field-changes`, which stops when the
@@ -335,10 +384,24 @@ def json_report(repo_path, repo_name, version, remote_name):
     """
     branch = get_default_branch(repo_path, version)
     remote_ref = f"{remote_name}/{branch}"
+    identity = {
+        "repo": repo_name,
+        "path": str(repo_path),
+        "default_branch": branch,
+        "remote_ref": remote_ref,
+    }
 
-    counts, err = _ahead_behind(repo_path, branch, remote_ref)
-    if err or counts is None:
+    counts, state, err = _ahead_behind(repo_path, branch, remote_ref)
+    if err:
         return None, err
+    if state == STATE_NO_LOCAL_BRANCH:
+        return {
+            **identity,
+            "state": STATE_NO_LOCAL_BRANCH,
+            "detail": no_local_branch_detail(branch, remote_ref),
+        }, None
+    if counts is None:
+        return None, None  # STATE_NO_REMOTE_BRANCH: the remote carries no such branch
 
     ahead, behind = counts
     if behind == 0:
@@ -348,14 +411,15 @@ def json_report(repo_path, repo_name, version, remote_name):
     if err:
         return None, err
     return {
-        "repo": repo_name,
-        "path": str(repo_path),
-        "default_branch": branch,
-        "remote_ref": remote_ref,
+        **identity,
+        "state": STATE_AHEAD,
         "ahead": ahead,
         "behind": behind,
         "diverged": ahead > 0 and behind > 0,
         "commits": commits,
+        # Non-JSON mode prints "... and N more"; without this a consumer
+        # diffing len(commits) against `behind` sees an unexplained shortfall.
+        "commits_truncated": behind > len(commits),
     }, None
 
 

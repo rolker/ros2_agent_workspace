@@ -365,20 +365,168 @@ def test_json_report_errors_when_rev_list_fails(monkeypatch):
     assert err and "jazzy...gitcloud/jazzy" in err
 
 
-def test_json_report_errors_when_the_local_default_branch_is_absent(monkeypatch):
+def test_json_report_names_the_no_local_branch_state_without_erroring(monkeypatch):
     """What produces that rc 128: a default branch that resolved through
-    refs/remotes/origin/ only. Named precisely, because the remedy (check out
-    the branch) is not the remedy for an unreadable repo."""
-    _report_git(monkeypatch, {("rev-parse", "--verify", "jazzy"): (False, "")})
+    refs/remotes/origin/ only — what `vcs import` leaves for a SHA- or
+    tag-pinned manifest entry. A normal supported state, so it is neither an
+    error (it was one, while default mode skipped the identical repo) nor a
+    silence: the consumer must see the state, not infer "nothing to import"."""
+    _report_git(monkeypatch, {("rev-parse", "--verify", "refs/heads/jazzy"): (False, "")})
     entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
-    assert entry is None
-    assert err and "no local 'jazzy'" in err
+    assert err is None
+    assert entry["state"] == pull_remote.STATE_NO_LOCAL_BRANCH
+    assert entry["repo"] == "alpha" and entry["remote_ref"] == "gitcloud/jazzy"
+    assert "no local 'jazzy'" in entry["detail"]
+    assert "commits" not in entry  # nothing was compared, so nothing is claimed
+
+
+def test_json_report_no_local_branch_does_not_turn_the_run_red(monkeypatch, tmp_path, capsys):
+    """End to end for the operator-decided contract: reported, not failed. It
+    reaches stdout as its own entry and leaves the exit status at 0."""
+    code = _json_main(
+        monkeypatch,
+        tmp_path,
+        repos=[{"name": "alpha", "version": "jazzy", "source_file": "core.repos"}],
+        report=lambda *a: (
+            {"repo": "alpha", "state": pull_remote.STATE_NO_LOCAL_BRANCH, "detail": "d"},
+            None,
+        ),
+    )
+    out = capsys.readouterr()
+    assert code == 0
+    assert pull_remote.STATE_NO_LOCAL_BRANCH in out.out
+    assert out.err == ""
+
+
+def _default_mode(monkeypatch, table):
+    """Drive the *default* (fetch-and-report) mode through process_repo().
+
+    Default mode is what `make pull-remote` runs and what dashboard reads; its
+    comparison arm had no test at all, so both of _compare_branches' error
+    returns survived mutation to a bare `("ok", "fetched")`.
+    """
+    _report_git(monkeypatch, table)
+    monkeypatch.setattr(
+        pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
+    )
+    monkeypatch.setattr(pull_remote, "remote_probe", lambda repo_path, remote: RemoteState.PRESENT)
+    return pull_remote.process_repo(Path("/repo"), "alpha", "jazzy", _args())
+
+
+def test_default_mode_errors_when_rev_list_fails(monkeypatch):
+    """Both refs verified, so a failing rev-list means we could not read the
+    repo — and a bare "fetched" would claim we checked whether the remote is
+    ahead. Surviving mutation from Round 4: this arm had no test."""
+    status, msg = _default_mode(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (False, "")},
+    )
+    assert status == "error"
+    assert "cannot compare jazzy...gitcloud/jazzy" in msg
+
+
+def test_default_mode_errors_on_unreadable_rev_list_output(monkeypatch):
+    """The other surviving mutation: a successful rev-list whose output is not
+    two integers is not a comparison either."""
+    status, msg = _default_mode(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "garbage")},
+    )
+    assert status == "error"
+    assert "unreadable rev-list output" in msg
+
+
+def test_default_mode_reports_up_to_date_when_the_comparison_succeeds(monkeypatch):
+    """False-RED direction for the pair above: a repo level with its remote
+    must stay "ok", or every clean run of `make pull-remote` goes red."""
+    status, msg = _default_mode(
+        monkeypatch,
+        {("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "0\t0")},
+    )
+    assert (status, msg) == ("ok", "up to date")
+
+
+def test_default_mode_skips_a_remote_that_has_no_such_branch(monkeypatch):
+    """Benign: nothing to compare against, and not this repo's problem."""
+    status, msg = _default_mode(
+        monkeypatch,
+        {("rev-parse", "--verify", "refs/remotes/gitcloud/jazzy"): (False, "")},
+    )
+    assert status == "skip"
+    assert "no gitcloud/jazzy on remote" in msg
+
+
+def test_both_modes_agree_on_the_no_local_branch_state(monkeypatch):
+    """The false RED this must-fix exists for: the same repo in the same state
+    was an error in --json and a benign skip in default mode. Pinned together,
+    through each mode's real entry point, so the two cannot drift apart."""
+    table = {("rev-parse", "--verify", "refs/heads/jazzy"): (False, "")}
+    status, msg = _default_mode(monkeypatch, table)
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert status == "skip"  # default mode: exits 0 via print_summary_and_exit
+    assert err is None  # --json: exits 0 too
+    assert entry["state"] == pull_remote.STATE_NO_LOCAL_BRANCH
+    assert msg.endswith(f"({entry['detail']})")  # and they say the same thing
+
+
+def test_json_report_ahead_entry_is_labelled_and_marks_truncation(monkeypatch):
+    """`commits` is capped at 50; without a marker a consumer diffing
+    len(commits) against `behind` sees an unexplained shortfall."""
+    _report_git(
+        monkeypatch,
+        {
+            ("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "0\t60"),
+            ("log", "--oneline", "--max-count=50", "jazzy..gitcloud/jazzy"): (
+                True,
+                "\n".join(f"sha{i} subject {i}" for i in range(50)),
+            ),
+        },
+    )
+    entry, err = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert err is None
+    assert entry["state"] == pull_remote.STATE_AHEAD
+    assert entry["commits_truncated"] is True
+
+
+def test_json_report_does_not_claim_truncation_when_every_commit_is_listed(monkeypatch):
+    """The false-RED direction of the marker: an untruncated list must not
+    tell the consumer commits are missing."""
+    _report_git(
+        monkeypatch,
+        {
+            ("rev-list", "--left-right", "--count", "jazzy...gitcloud/jazzy"): (True, "0\t2"),
+            ("log", "--oneline", "--max-count=50", "jazzy..gitcloud/jazzy"): (
+                True,
+                "abc123 one\ndef456 two",
+            ),
+        },
+    )
+    entry, _ = pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert entry["commits_truncated"] is False
+
+
+def test_local_branch_probe_does_not_accept_a_tag_of_the_same_name(monkeypatch):
+    """The probe was a loose `rev-parse --verify <branch>`, which also matches
+    refs/tags/<branch> — and the rev-list would then compare the tag."""
+    seen = []
+
+    def fake_run_git(repo_path, args, dry_run=False):
+        seen.append(tuple(args))
+        return True, "0\t0", ""
+
+    monkeypatch.setattr(pull_remote, "run_git", fake_run_git)
+    monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "jazzy")
+    pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud")
+    assert ("rev-parse", "--verify", "refs/heads/jazzy") in seen
+    assert ("rev-parse", "--verify", "refs/remotes/gitcloud/jazzy") in seen
 
 
 def test_json_report_is_silent_when_the_remote_has_no_such_branch(monkeypatch):
     """False-RED direction: a remote that simply does not carry the branch is
     a real answer — nothing to import — and must stay out of the errors."""
-    _report_git(monkeypatch, {("rev-parse", "--verify", "gitcloud/jazzy"): (False, "")})
+    _report_git(
+        monkeypatch, {("rev-parse", "--verify", "refs/remotes/gitcloud/jazzy"): (False, "")}
+    )
     assert pull_remote.json_report(Path("/repo"), "alpha", "jazzy", "gitcloud") == (None, None)
 
 
