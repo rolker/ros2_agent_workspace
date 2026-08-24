@@ -36,7 +36,15 @@ TARGET_GID="$(id -g "$TARGET_USER")"
 # header explains why the launcher's host-side mkdir cannot substitute for this
 # chown.
 echo "Fixing volume ownership..."
-/usr/local/bin/fix-volume-ownership.sh \
+OWNERSHIP_SH="/usr/local/bin/fix-volume-ownership.sh"
+if [ ! -x "$OWNERSHIP_SH" ]; then
+    # An image built before this script existed. Without this check `set -e`
+    # aborts on an opaque exit 127; say what is actually wrong instead.
+    echo "ERROR: $OWNERSHIP_SH not found in this image." >&2
+    echo "       The image predates it — rebuild: make agent-build" >&2
+    exit 1
+fi
+"$OWNERSHIP_SH" \
     "$TARGET_UID" "$TARGET_GID" "$WORKSPACE_ROOT" "${WORKTREE_ROOT:-}"
 
 # ---------- 2. Git identity: intentionally NOT configured here ----------
