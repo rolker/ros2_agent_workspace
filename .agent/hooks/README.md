@@ -11,7 +11,10 @@ This directory contains custom git hooks for the ROS2 Agent Workspace.
 **What it does**:
 - Detects when a workspace worktree is created (`.workspace-worktrees/issue-N/`)
 - Automatically creates symlink: `layers -> ../../layers`
-- Enables `make sync`, `make build`, and other layer-dependent commands in worktrees
+- Enables `make build` and other layer-dependent commands in worktrees. **Not `make sync`**:
+  `configs/manifest` is gitignored, so a worktree has no manifest symlink and cannot enumerate
+  the configured repos — since #609 that is a named exit 1 rather than a silent no-op. Run
+  `make sync` from the main workspace tree
 - Skips if symlink already exists or if not a workspace worktree
 
 **When it runs**: After git checkout, git worktree add, or git clone
