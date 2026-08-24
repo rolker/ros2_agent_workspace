@@ -160,3 +160,42 @@ test decision now that Docker and the agent image are confirmed available here.
 - Static analysis clean (shellcheck --severity=warning via pre-commit). Full `run_script_tests.sh` suite green (20 shell + 73 pytest), including the container smoke layer.
 - Local Adversarial (qwen3.5:35b) returned 2 uncorroborated findings; both discarded on spot-check — bash resolves EXIT traps by name at execution time, and macOS/BSD `sha256sum` portability is not a target environment for a Linux/Docker toolchain.
 - Process: `plan.md:171-176` flags the stale-image guard as scope beyond the reviewed plan and requests sign-off. That sign-off is still outstanding, and must-fix 2/3/4 all live inside that scope — dropping the guard to its own issue is a legitimate alternative to fixing it here.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 00:22 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-604 at `7971b64`
+**Addressed**: `## Local Review (Pre-Push)` (2026-08-24 00:02 -04:00, branch at `96ad78b`) — 6 must-fix, 12 suggestions
+**Commits**: 10ff8f8 c75e435 f3efa68 0b80779 9d8fb9b 16b4ac6 445a5ef ac11621 37b4747 f2a55ca bfd7a03 15d28f7
+
+Two operator decisions taken at the review checkpoint framed this pass: the
+stale-image guard **stays in this PR** with all three of its defects repaired
+here rather than split out, and the test-coverage must-fix is answered by
+**covering the call site**, not by a static text assertion.
+
+### Actions
+- [x] (must-fix) Regression test could not detect #604 being reintroduced — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh` layer B now runs the working tree's `agent-entrypoint.sh` as the image ENTRYPOINT over real anonymous volumes (both startup scripts mounted over their baked copies, both launcher env vars set) and probes each mountpoint as the user the entrypoint hands off to. Mutation-verified both ways: deleting `"${WORKTREE_ROOT:-}"` at `agent-entrypoint.sh:40` fails the suite, and so does deleting loop 2 of `fix-volume-ownership.sh` (which fails both layers). A new assertion also fails if the probe runs as uid 0 — a writable check under root proves nothing.
+- [x] (must-fix) Absent label now warns with its own message — an unmarked image predates the marker and is exactly the pre-#604 population — `.agent/scripts/docker_run_agent.sh`
+- [x] (must-fix) The two build paths are now one: `make agent-build` delegates to `docker_run_agent.sh --build-only`, so the digest has a single implementation over a single directory. `tests/test_agent_image_build_paths.sh` asserts the delegation, the absence of a second `docker build`/digest formula, one `sha256sum` site in the launcher, and that the Dockerfile ARG/LABEL name matches what the launcher reads back — `Makefile:276`, `.agent/scripts/docker_run_agent.sh`
+- [x] (must-fix) `startup_scripts_sha` can no longer abort the launcher: it returns empty (never a partial digest) when a script is missing, every failable substitution carries `|| true`, and the warn function ends `return 0`. Reproduced the abort before the fix and the clean warn after — `.agent/scripts/docker_run_agent.sh`
+- [x] (must-fix) `docker_run_agent.sh` script-table row updated for the single build path and the staleness warning — `AGENTS.md:561`
+- [x] (must-fix) ADR-0016 Check-4 coverage claim scoped via a References cross-reference addendum (ADR-0012), leaving the accepted Consequences text intact — `docs/decisions/0016-runtime-vs-baked-layer-chaining.md`
+- [x] (suggestion) Hardcoded uid/gid 1000 gone — the entrypoint resolves the target user itself now that layer B goes through it
+- [x] (suggestion) Non-local Docker daemon (remote/rootless) now SKIPs instead of failing spuriously; the hermeticity claims in `run_script_tests.sh` and `.github/workflows/validate.yml` say so explicitly
+- [x] (suggestion) Empty `mounted` set now stops the run via `summarize_and_exit` instead of printing a reassuring PASS beside the FAIL
+- [x] (suggestion) Contradictory stub comment corrected — only `chown` is stubbed; `mkdir` runs for real, deliberately
+- [x] (suggestion) Baked image copies now covered: the image's label is compared against a digest of the scripts actually baked into it (skips when unlabelled). Verified on a throwaway derived image, which was removed afterwards rather than overwriting the shared `:latest` tag
+- [x] (suggestion) `IMAGE` is read from the launcher, so a rename fails rather than degrading layer B to a permanent silent SKIP
+- [x] (suggestion) Workspace-worktree case is now asserted (loop 2 touches nothing inside it), not claimed in a comment
+- [x] (suggestion) Both roots validated in `fix-volume-ownership.sh` — a stale/typo'd root fails loud instead of no-oping into #604's failure mode, with test cases for each
+- [x] (suggestion) Unguarded entrypoint call replaced with an existence check naming the cause and the fix, instead of exit 127 — `.devcontainer/agent/agent-entrypoint.sh`
+- [x] (suggestion) Volume-ownership troubleshooting section rewritten around the two mount sets, `fix-volume-ownership.sh`, and why the host dir underneath an anonymous volume is irrelevant to its ownership — `.devcontainer/agent/README.md`
+- [x] (suggestion) Marker scope corrected: only the two startup scripts are hashed; Dockerfile/rosdep changes are not detected — `.devcontainer/agent/README.md`
+- [x] (suggestion) Plan step 3 re-synced (grep-for-loop-headers design and "smoke test" framing both superseded), new files and the Makefile delegation recorded, and the guard's sign-off question closed with the checkpoint decision — `.agent/work-plans/issue-604/plan.md`
+
+### Notes
+- Found while fixing must-fix 3: moving the build section above the worktree lookup also moved it above the credential check, so a `--build` launch with no auth would have paid the ten-minute rosdep bake before failing. The build now sits between validation and the worktree lookup; `--build-only` is exempt from the auth check since it never launches a container.
+- Behaviour note for review: `make agent-build` now resolves the **main workspace root** even when run from a worktree (the launcher's existing rewind), so a worktree's edits to the startup scripts are not what gets baked. That was already true of every container the launcher ran; it is now also true of the build, and is documented in the devcontainer README.
+- Full `run_script_tests.sh` green: 21 shell + 73 pytest, container layer included. Pre-commit (incl. shellcheck) ran on every commit.
