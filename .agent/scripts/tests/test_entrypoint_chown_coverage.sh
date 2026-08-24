@@ -19,14 +19,24 @@
 #      headers, means a reformatted loop doesn't cause a mystery failure while
 #      a genuinely uncovered mount still does.
 #
-#   B. Container-side smoke test (skips cleanly with no Docker/image). The
-#      property that actually broke is container-side: docker initializes an
-#      anonymous volume from the IMAGE at that path, not from the host dir
-#      underneath it, so it comes up root-owned no matter what the host did.
-#      Only a real container can observe that. This one runs the working
-#      tree's fix-volume-ownership.sh inside a container over real anonymous
-#      volumes and asserts the target uid can then write into them — so it
-#      tests the script under review, not whatever is baked into the image.
+#      What layer A CANNOT see is the call site: it invokes
+#      fix-volume-ownership.sh itself, with both roots. Deleting the
+#      "${WORKTREE_ROOT:-}" argument from agent-entrypoint.sh — #604 exactly —
+#      leaves layer A green.
+#
+#   B. Container-side end-to-end (skips cleanly with no local Docker/image).
+#      Runs the working tree's agent-entrypoint.sh as the image ENTRYPOINT over
+#      real anonymous volumes, and asserts the dropped-privilege user it hands
+#      off to can write into both of them. This exercises the whole chain the
+#      bug lived in — entrypoint call site, argument list, ownership loops,
+#      privilege drop — against the property that only exists inside a
+#      container: docker initializes an anonymous volume from the IMAGE at that
+#      path, not from the host dir underneath it, so it comes up root-owned no
+#      matter what the host did.
+#
+#      Mutation-checked both ways: deleting the "${WORKTREE_ROOT:-}" argument
+#      at the entrypoint call site, and deleting loop 2 of
+#      fix-volume-ownership.sh, each make this layer FAIL.
 #
 # Run: bash .agent/scripts/tests/test_entrypoint_chown_coverage.sh
 
@@ -36,18 +46,36 @@ SCRIPTS_DIR="$(dirname "$SCRIPT_DIR")"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPTS_DIR")")"   # .agent/scripts/tests -> repo root
 DRA="$SCRIPTS_DIR/docker_run_agent.sh"
 OWNERSHIP_SH="$ROOT_DIR/.devcontainer/agent/fix-volume-ownership.sh"
-IMAGE="ros2-agent-workspace-agent:latest"
+ENTRYPOINT_SH="$ROOT_DIR/.devcontainer/agent/agent-entrypoint.sh"
 
 TEST_PASS=0
 TEST_FAIL=0
 pass() { echo "PASS: $1"; TEST_PASS=$((TEST_PASS + 1)); }
 fail() { echo "FAIL: $1"; TEST_FAIL=$((TEST_FAIL + 1)); }
 skip() { echo "SKIP: $1"; }
-
-if [ ! -f "$OWNERSHIP_SH" ]; then
-    fail "fix-volume-ownership.sh not found at $OWNERSHIP_SH"
+summarize_and_exit() {
+    echo
     echo "entrypoint chown-coverage tests: $TEST_PASS passed, $TEST_FAIL failed"
-    exit 1
+    [ "$TEST_FAIL" -eq 0 ]
+    exit
+}
+
+# The image name is the launcher's, read from the launcher — hardcoding it here
+# means a rename downgrades layer B to a permanent silent SKIP instead of a
+# failure.
+IMAGE_NAME=$(sed -n 's/^IMAGE_NAME="\([^"]*\)".*/\1/p' "$DRA" | head -1)
+IMAGE_TAG=$(sed -n 's/^IMAGE_TAG="\([^"]*\)".*/\1/p' "$DRA" | head -1)
+IMAGE="$IMAGE_NAME:$IMAGE_TAG"
+
+for f in "$OWNERSHIP_SH" "$ENTRYPOINT_SH"; do
+    if [ ! -f "$f" ]; then
+        fail "startup script not found at $f"
+        summarize_and_exit
+    fi
+done
+if [ -z "$IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ]; then
+    fail "could not read IMAGE_NAME/IMAGE_TAG from $DRA (renamed?)"
+    summarize_and_exit
 fi
 
 # ---------- Fixture ----------
@@ -66,8 +94,10 @@ ISSUE=999604
 
 # ---------- A. Static coverage: mounted set ⊆ chowned set ----------
 ROOT="$(mktemp -d /tmp/chown_cov.XXXXXX)"
-cleanup_a() { rm -rf "$ROOT"; }
-trap cleanup_a EXIT
+STUB_BIN="$(mktemp -d /tmp/chown_stub.XXXXXX)"
+CROOT=""
+cleanup() { rm -rf "$ROOT" "$STUB_BIN" ${CROOT:+"$CROOT"}; }
+trap cleanup EXIT
 make_fixture "$ROOT" "$SLUG" "$ISSUE"
 
 mount_out=$(DRA_ROOT_DIR_OVERRIDE="$ROOT" "$DRA" --issue "$ISSUE" --repo-slug "$SLUG" --print-mounts 2>&1)
@@ -82,15 +112,18 @@ mounted=$(printf '%s\n' "$mount_out" \
     | grep -E "^$ROOT/.*_ws/(build|install|log)$" \
     | grep -v ':' | sort -u)
 
+# An empty set would make every comparison below vacuously true, so stop here
+# rather than reporting passes that assert nothing.
 if [ -z "$mounted" ]; then
     fail "fixture produced no *_ws anonymous volumes to check"
+    summarize_and_exit
 fi
 
 # Run the REAL ownership loops over the same fixture, as the current user.
-# chown/mkdir are stubbed to just record the paths the loops reach, so the
-# script's own control flow (including the [ ! -L ] guard) decides the set.
-STUB_BIN="$(mktemp -d /tmp/chown_stub.XXXXXX)"
-cleanup_a() { rm -rf "$ROOT" "$STUB_BIN"; }
+# Only `chown` is stubbed — it just records the paths the loops reach. `mkdir`
+# runs for real inside the fixture so the loops' create-then-chown branch is
+# exercised the same way it is in a container. The script's own control flow
+# (including the [ ! -L ] guard) therefore decides the recorded set.
 RECORD="$STUB_BIN/reached.txt"
 : > "$RECORD"
 cat > "$STUB_BIN/chown" <<STUB
@@ -102,8 +135,6 @@ done
 STUB
 chmod +x "$STUB_BIN/chown"
 
-# The loops mkdir any mountpoint docker did not create; let that happen for
-# real inside the fixture so the chown branch is exercised the same way.
 PATH="$STUB_BIN:$PATH" bash "$OWNERSHIP_SH" \
     "$(id -u)" "$(id -g)" "$ROOT" "$ROOT/layers/worktrees/issue-$SLUG-$ISSUE" \
     >/dev/null 2>&1
@@ -142,55 +173,119 @@ else
     pass "symlinked worktree nav_ws is skipped by the ownership loops"
 fi
 
-# ---------- B. Container-side smoke test ----------
-# The property under test only exists inside a container. Skips cleanly when
-# Docker or the agent image is unavailable, keeping run_script_tests.sh
-# hermetic in CI.
-if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
-    skip "container smoke test (no usable Docker daemon)"
-elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    skip "container smoke test (image $IMAGE not built — run 'make agent-build')"
+# ---------- A2. Workspace worktree: loop 2 is a clean no-op ----------
+# A workspace worktree (.workspace-worktrees/issue-workspace-<N>) has no *_ws
+# directories of its own. The script header claims loop 2 is a no-op there;
+# assert it rather than trusting the comment.
+WWT="$ROOT/.workspace-worktrees/issue-workspace-$ISSUE"
+mkdir -p "$WWT/docs"
+: > "$RECORD"
+PATH="$STUB_BIN:$PATH" bash "$OWNERSHIP_SH" \
+    "$(id -u)" "$(id -g)" "$ROOT" "$WWT" >/dev/null 2>&1
+ws_rc=$?
+ws_reached=$(grep -F "$WWT" "$RECORD" || true)
+if [ "$ws_rc" -eq 0 ] && [ -z "$ws_reached" ]; then
+    pass "workspace worktree: ownership loops touch nothing inside it"
 else
-    CROOT="$(mktemp -d /tmp/chown_smoke.XXXXXX)"
-    cleanup_a() { rm -rf "$ROOT" "$STUB_BIN" "$CROOT"; }
+    fail "workspace worktree fixture (rc=$ws_rc) reached:
+$ws_reached"
+fi
+
+# ---------- B. Container-side end-to-end ----------
+# Skips cleanly when Docker or the agent image is unavailable, keeping
+# run_script_tests.sh hermetic in CI.
+#
+# A REMOTE/rootless daemon is also skipped: the bind mounts below resolve on
+# the daemon's filesystem, not this one, so a remote daemon would fail on paths
+# it cannot see — a spurious failure, not a regression.
+docker_is_local() {
+    local host="${DOCKER_HOST:-}"
+    if [ -z "$host" ]; then
+        host=$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null || true)
+    fi
+    case "$host" in
+        ""|unix://*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    skip "container end-to-end test (no usable Docker daemon)"
+elif ! docker_is_local; then
+    skip "container end-to-end test (non-local Docker daemon: ${DOCKER_HOST:-remote context})"
+elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    skip "container end-to-end test (image $IMAGE not built — run 'make agent-build')"
+else
+    CROOT="$(mktemp -d /tmp/chown_e2e.XXXXXX)"
     make_fixture "$CROOT" "$SLUG" "$ISSUE"
     CLWT="$CROOT/layers/worktrees/issue-$SLUG-$ISSUE"
-    mkdir -p "$CLWT/ui_ws/build" "$CROOT/layers/main/nav_ws/build"
+    mkdir -p "$CLWT/ui_ws/build" "$CROOT/layers/main/nav_ws/build" "$CROOT/.agent/scripts"
+
+    # agent-entrypoint.sh sources the workspace's setup.bash. The fixture is not
+    # a real workspace, so stand in a no-op: this test is about the ownership
+    # step and the privilege drop, not about ROS. layers/main/nav_ws has no src/,
+    # so the entrypoint's rosdep loop skips it and no apt work happens either.
+    cat > "$CROOT/.agent/scripts/setup.bash" <<'STUBSETUP'
+# test stub — the real one sources ROS 2 and the layer chain
+:
+STUBSETUP
 
     # Anonymous volumes over both a layers/main and a worktree artifact dir,
-    # exactly as docker_run_agent.sh sections 4 and 4b do. The bind mount of
-    # $CROOT reproduces the launcher's section-1 workspace mount underneath
-    # them. The working tree's ownership script is mounted in, so this tests
-    # the script under review rather than the copy baked into the image.
-    # --entrypoint bash bypasses agent-entrypoint.sh: this test targets the
-    # ownership step alone, not the ROS sourcing and rosdep pass that follow it.
-    smoke_out=$(docker run --rm \
-        --entrypoint bash \
-        -u 0 \
+    # exactly as docker_run_agent.sh sections 4 and 4b do, plus the section-1
+    # workspace bind mount underneath them and the two env vars the launcher
+    # exports. Both startup scripts are mounted over their baked copies so this
+    # tests the working tree's versions, and the container runs the IMAGE'S
+    # ENTRYPOINT — so the entrypoint's call into fix-volume-ownership.sh, with
+    # its argument list, is part of what is under test.
+    e2e_out=$(docker run --rm \
+        -e "ROS2_AGENT_WORKSPACE_ROOT=$CROOT" \
+        -e "WORKTREE_ROOT=$CLWT" \
         -v "$CROOT:$CROOT" \
-        -v "$OWNERSHIP_SH:/tmp/fix-volume-ownership.sh:ro" \
+        -v "$ENTRYPOINT_SH:/usr/local/bin/agent-entrypoint.sh:ro" \
+        -v "$OWNERSHIP_SH:/usr/local/bin/fix-volume-ownership.sh:ro" \
         -v "$CROOT/layers/main/nav_ws/build" \
         -v "$CLWT/ui_ws/build" \
         "$IMAGE" \
-        -c "
+        bash -c "
             set -e
-            bash /tmp/fix-volume-ownership.sh 1000 1000 '$CROOT' '$CLWT'
+            echo \"probe uid=\$(id -u)\"
             for d in '$CROOT/layers/main/nav_ws/build' '$CLWT/ui_ws/build'; do
-                setpriv --reuid=1000 --regid=1000 --clear-groups \
-                    touch \"\$d/.probe\" || { echo \"UNWRITABLE \$d\"; exit 1; }
+                touch \"\$d/.probe\" || { echo \"UNWRITABLE \$d\"; exit 1; }
             done
-            echo SMOKE_OK
+            echo E2E_OK
         " 2>&1)
-    smoke_rc=$?
+    e2e_rc=$?
 
-    if [ "$smoke_rc" -eq 0 ] && printf '%s\n' "$smoke_out" | grep -q SMOKE_OK; then
-        pass "container: dropped-privilege user can write to both anonymous volumes"
+    if [ "$e2e_rc" -eq 0 ] && printf '%s\n' "$e2e_out" | grep -q E2E_OK; then
+        pass "container: entrypoint hands off a user that can write to both anonymous volumes"
     else
-        fail "container smoke test (rc=$smoke_rc):
-$smoke_out"
+        fail "container end-to-end test (rc=$e2e_rc):
+$e2e_out"
+    fi
+
+    # The probe must NOT have run as root, or "writable" proves nothing.
+    if printf '%s\n' "$e2e_out" | grep -q '^probe uid=0$'; then
+        fail "container: CMD ran as root — the privilege drop did not happen"
+    elif printf '%s\n' "$e2e_out" | grep -q '^probe uid='; then
+        pass "container: CMD ran as the dropped-privilege user"
+    fi
+
+    # The staleness marker must describe what is actually baked (#604). Compare
+    # the image's label against a digest of its own baked scripts — computed in
+    # a container with nothing mounted over them.
+    baked_label=$(docker image inspect "$IMAGE" \
+        --format '{{index .Config.Labels "org.ros2-agent.startup-scripts-sha"}}' 2>/dev/null || true)
+    if [ -z "$baked_label" ]; then
+        skip "baked-scripts digest check (image carries no startup-scripts label)"
+    else
+        baked_sha=$(docker run --rm --entrypoint bash "$IMAGE" -c \
+            'cd /usr/local/bin && cat agent-entrypoint.sh fix-volume-ownership.sh | sha256sum | cut -d" " -f1' 2>&1)
+        if [ "$baked_sha" = "$baked_label" ]; then
+            pass "image label matches a digest of the scripts actually baked into it"
+        else
+            fail "image label ($baked_label) does not match its baked scripts ($baked_sha)"
+        fi
     fi
 fi
 
-echo
-echo "entrypoint chown-coverage tests: $TEST_PASS passed, $TEST_FAIL failed"
-[ "$TEST_FAIL" -eq 0 ]
+summarize_and_exit
