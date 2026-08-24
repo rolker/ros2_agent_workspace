@@ -170,3 +170,36 @@ excludes fixing CI in affected project repos — keep that boundary.
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-08-24 14:08 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-610/plan.md` at `5f5efab`
+**PR**: PR-less (`--issue` mode; branch `feature/issue-610`, base `main`)
+**Verdict**: changes-requested
+
+### Evaluation
+
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | One script + one sourced helper + docs + two test files is proportionate; the separate helper file earns its keep by making the note logic hermetically testable. |
+| Issue alignment | Good | Implements the settled direction (ci-local first, then warn; no second override flag) and closes ADR-0018's named gap. |
+| File targeting | Good | Right files. `BRANCH_REPO` (the main project checkout) shares the ref store with linked worktrees, so a note written by `ci_local.sh` in a worktree is already visible — no extra fetch needed in the common case; worth stating so nobody adds one. |
+| Consequences | Needs work | Misses ADR-0018 decision 4 (workspace-repo exemption) and decision 5 (push `refs/notes/ci-local` at merge time when the note is what authorized the merge). |
+| Documentation & instruction impact | Good | Section present, non-silent, correctly scoped ("None" for instruction candidates with a reason). |
+| Principle alignment | Concern | "Test what breaks": the empty-rollup classification converts today's **fail-closed** race into a **fail-open** one on the 42% of repos that do have CI — the opposite of the transparency goal. |
+| ADR compliance | Needs work | ADR-0018 decision 4 unaddressed; ADR-0012 instrument is right but for the wrong stated reason, and the addendum must stay navigational. |
+| ROS conventions | N/A | Workspace tooling. |
+
+### Findings
+- [ ] (must-fix) Empty `statusCheckRollup` is **not** unambiguously "no CI configured" — a head whose workflows have not yet registered check runs, a `paths:`-filtered workflow that does not match, and a queued check suite with no runs all present as `[]`. Today that race fails **closed** (misleading message, no merge); the plan makes it fail **open** (merge on a warning). Add a distinguishing test — presence of `.github/workflows` **at the PR head** (`gh api repos/<repo>/contents/.github/workflows?ref=<head_sha>`; verified: 404 on `rolker/mru_transform`) — plus a short settle/re-poll, and keep the ambiguous case fail-closed with an accurate message. Do **not** use `gh api .../actions/workflows`: it returns `total_count: 2` for `mru_transform` (dynamic Copilot entries). — `plan.md:45`
+- [ ] (must-fix) ADR-0018 decision 4 exempts the **workspace repo** — its hosted checks stay required, and a `ci-local` attestation is accepted only for *project-repo* PRs. The plan's three-way logic is repo-agnostic, so on `ros2_agent_workspace` an empty rollup (most likely exactly when merging right after a push) would warn-and-merge. Gate the new path on the repo not being the workspace repo. — `plan.md:38-100`
+- [ ] (must-fix) A failed `gh pr view --json statusCheckRollup` (auth, network, rate limit) must not be read as an empty array — that is a second fail-open path. Specify: non-zero `gh` exit or non-JSON output → error out, never "no checks configured". (`jq` on empty input exits 4, so the plan's flow needs the distinction made explicitly.) — `plan.md:38-47`
+- [ ] (must-fix) Scratch-ref fetch: the non-clobbering claim is **verified** (fetching `refs/notes/ci-local:refs/notes/ci-local-merge-check` leaves a local unpushed `refs/notes/ci-local` intact). But a leftover scratch ref from an interrupted run makes the next fetch fail non-fast-forward (reproduced, rc=1), yielding a false `no-attestation` → merge on a warning instead of on evidence. Use a forced refspec (`+refs/...`) and delete the scratch ref up front / in a trap. — `plan.md:62-68`
+- [ ] (suggestion) The exact-head rule is **correct and workable, and not too strict**: `git notes --ref=<ref> show <sha>` is keyed by the sha path and resolves even when the head commit object is absent locally (verified), so no ancestor can be matched by accident and no commit fetch is needed. Keep it — but spell out the warning/verdict text so the recourse is "re-run `ci_local.sh` on the new head", not `--no-wait`; an unhelpful message here recreates the flag habituation the issue exists to prevent. — `plan.md:69-76`
+- [ ] (suggestion) `upstream.repos` completeness: the plan does not say *which* copy is parsed. `BRANCH_REPO` is the main checkout, typically on the default branch, so the working-tree file may not be the PR head's. Read it at the head commit (`git -C <repo> show <head_sha>:upstream.repos`) and state the verdict when the head object is not local (note lookup works without it; `git show` does not). — `plan.md:82-90`
+- [ ] (suggestion) ADR-0018 decision 5 pushes `refs/notes/ci-local` at merge time. If `merge_pr.sh` now merges *because of* a local note, it should push that ref at merge time (or record why not) — otherwise the evidence that authorized the merge exists only on the merging machine. — `plan.md:117-131`
+- [ ] (suggestion) ADR-0012 instrument: the addendum is the right call, but the plan's reasoning inverts the ADR — substantive changes require **superseding**, not an addendum; addendums are permitted because they are navigational. Keep the `### Addendum (#610)` strictly navigational (gap closed → #610 / AGENTS.md). The new third-state policy ("merge proceeds when nothing verifies it") is a consequence ADR-0018 never recorded and must not be asserted inside it; land it in AGENTS.md. — `plan.md:117-131`
+- [ ] (suggestion) Test hermeticity holds — the bare-`origin` fetch fixture works over a local path with no network (verified), and the `upstream.repos` and no-attestation-at-all cases are pure fixtures. But the `merge_pr.sh`-side test only asserts `gh pr checks` is never called; add stubbed-`gh` cases asserting the three-way *outcomes* (warning text on stderr, attested-path message, workspace-repo fail-closed) — the wiring, not the helper, is what will rot. — `plan.md:166-175`
