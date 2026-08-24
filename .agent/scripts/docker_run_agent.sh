@@ -428,6 +428,25 @@ if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # The gather logic lives in stage_rosdep_manifests.sh (shared with
     # `make agent-build`) so both build entry points stage identically.
     STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
+
+    # Serialize concurrent builds. STAGE_DIR is a FIXED path — the Dockerfile's
+    # `COPY .rosdep-manifests/` is build-context-relative, so it cannot be
+    # randomized per invocation — and it is removed by the EXIT trap below. Two
+    # builders racing (a dispatch auto-build and `make agent-build`, say) would
+    # otherwise have one delete the other's build context mid-build. The lock
+    # lives in TMPDIR, keyed by user and by the context path, so it pollutes
+    # neither the working tree nor another user's build. (cksum, not sha256sum:
+    # the launcher must carry exactly ONE sha256sum site — the startup-scripts
+    # digest formula — and test_agent_image_build_paths.sh enforces that.)
+    # fd 9 is released when
+    # this process exits. Where flock is unavailable, proceed unserialized
+    # rather than failing the build outright — the race is rare and the
+    # alternative is no build at all.
+    STAGE_LOCK="${TMPDIR:-/tmp}/ros2-agent-build-$(id -u)-$(printf '%s' "$DOCKERFILE_DIR" | cksum | cut -d' ' -f1).lock"
+    if command -v flock >/dev/null 2>&1 && exec 9>"$STAGE_LOCK"; then
+        flock 9 || echo "⚠️  could not acquire $STAGE_LOCK — building unserialized." >&2
+    fi
+
     # Clean the staging dir on any exit from here through the build — including
     # a `set -e` abort on a failed `docker build` — so it never lingers in the
     # working tree (workspace-cleanliness rule). Cleared after the build below.
