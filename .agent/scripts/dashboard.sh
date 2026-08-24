@@ -179,6 +179,7 @@ if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
         0) check_pass "Workspace matches .repos configuration" ;;
         1) check_warn "Workspace drift detected. Run: make validate" ;;
         3) check_warn "No repos configured — nothing validated. Run: make setup-all" ;;
+        4) check_warn "A repo's git state could not be read — not drift. Repair or re-clone it: python3 .agent/scripts/validate_workspace.py" ;;
         *) check_warn "Could not validate the workspace (validate_workspace.py exit $VALIDATE_RC). Run: python3 .agent/scripts/validate_workspace.py" ;;
     esac
 fi

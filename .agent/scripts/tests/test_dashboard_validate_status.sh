@@ -30,7 +30,7 @@ run_with_rc() {
     printf '#!/usr/bin/env python3\nimport sys\nsys.exit(%s)\n' "$1" \
         > "$sandbox/.agent/scripts/validate_workspace.py"
     bash "$sandbox/.agent/scripts/dashboard.sh" --quick 2>&1 \
-        | grep -iE "\.repos configuration|drift detected|nothing validated|could not validate" || true
+        | grep -iE "\.repos configuration|drift detected|nothing validated|could not validate|could not be read" || true
 }
 
 check() {
@@ -64,8 +64,22 @@ fi
 
 # An unexpected code must be surfaced — and NOT as drift. argparse's 2, a
 # missing python3 (127) and an unhandled traceback are not "the workspace has
-# drifted", and `make validate` is not their remedy (#609).
-for rc in 2 4 127; do
+# drifted", and `make validate` is not their remedy (#609). 4 is no longer in
+# this list because it is a *named* outcome now (an unreadable repo), checked
+# by name above.
+check "exit 4 reports an unreadable repo, not drift" 4 "could not be read"
+check "exit 4 does not point at make validate as the remedy" 4 "Repair or re-clone"
+
+out=$(run_with_rc 4)
+if [[ "$out" == *"drift detected"* ]]; then
+    echo "  ❌ exit 4 must not be reported as drift"
+    fail=1
+else
+    echo "  ✅ exit 4 is not reported as drift"
+    pass_count=$((pass_count + 1))
+fi
+
+for rc in 2 5 127; do
     out=$(run_with_rc "$rc")
     if [[ "$out" == *"Workspace matches"* || -z "$out" ]]; then
         echo "  ❌ exit $rc must not read as a pass"

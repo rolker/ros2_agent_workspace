@@ -271,6 +271,40 @@ def test_a_version_mismatch_alone_is_drift(monkeypatch, tmp_path):
     assert result is ValidationResult.DRIFTED
 
 
+def test_optional_repo_names_decide_through_the_one_shared_predicate(monkeypatch):
+    """This was the fourth implementation of the rule #609 consolidated onto
+    repo_absence_is_allowed() "so this and the remote scripts cannot drift".
+    Currently equivalent; pinned so it stays that way — if the shared predicate
+    changes its mind, this must change with it."""
+    configured = [
+        {"name": "opt", "source_file": "site.repos"},
+        {"name": "req", "source_file": "core.repos"},
+        {"name": "odd", "source_file": None},
+    ]
+    calls = []
+
+    def spy(repo, optional_layers):
+        calls.append(repo["source_file"])
+        return repo["source_file"] == "site.repos"
+
+    monkeypatch.setattr(vw, "repo_absence_is_allowed", spy)
+    assert vw.get_optional_repo_names(configured, {"site"}) == {"opt"}
+    assert calls == ["site.repos", "core.repos", ""]  # every repo, via the predicate
+
+
+def test_a_repo_with_no_source_file_is_not_optional(monkeypatch):
+    """False-RED direction, unstubbed: a malformed record must not become a
+    repo that is allowed to be missing."""
+    configured = [{"name": "odd", "source_file": None}]
+    assert vw.get_optional_repo_names(configured, {"site"}) == set()
+
+
+def test_nothing_is_optional_when_no_layer_is_declared_optional(monkeypatch):
+    """The rule that keeps a workspace with no optional_layers.txt honest."""
+    configured = [{"name": "opt", "source_file": "site.repos"}]
+    assert vw.get_optional_repo_names(configured, set()) == set()
+
+
 # --------------------------------------------------------------------------
 # The enumeration layer: a manifest that will not parse (#609)
 # --------------------------------------------------------------------------
@@ -310,7 +344,42 @@ def test_an_unreadable_repo_pinned_to_a_sha_is_not_a_pass(monkeypatch, tmp_path)
     actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": None, "context": "core_ws"}}
     _stub(monkeypatch, tmp_path, configured, actual=actual)
     result, _ = vw.validate_workspace()
-    assert result is ValidationResult.DRIFTED
+    assert result is ValidationResult.UNREADABLE
+
+
+def test_an_unreadable_repo_is_not_reported_as_drift(monkeypatch, tmp_path, capsys):
+    """It was appended to version_mismatches, so it printed under "Version
+    mismatches" and returned DRIFTED — which dashboard.sh renders as "Run:
+    make validate", the command that just said this. A corrupt .git is not
+    drift and --fix is not its remedy (#609)."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": None, "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    result, missing = vw.validate_workspace()
+    out = capsys.readouterr().out
+    assert result is not ValidationResult.DRIFTED
+    assert "Version mismatches" not in out
+    assert "could not be read" in out
+    assert "not drift" in out
+    assert not missing  # nothing for --fix to import
+
+
+def test_an_unreadable_repo_exits_four_not_one(monkeypatch, tmp_path):
+    """Its own exit code, because dashboard.sh branches on exactly these."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": None, "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    assert _run_main(monkeypatch) == 4
+
+
+def test_real_drift_is_still_drift_when_no_repo_is_unreadable(monkeypatch, tmp_path):
+    """False-RED direction: separating the state must not stop ordinary drift
+    from being reported as drift."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": "main", "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    assert vw.validate_workspace()[0] is ValidationResult.DRIFTED
+    assert _run_main(monkeypatch) == 1
 
 
 def test_an_unreadable_repo_says_so_rather_than_naming_a_branch(monkeypatch, tmp_path, capsys):

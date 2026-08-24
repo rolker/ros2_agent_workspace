@@ -67,7 +67,7 @@ help:
 	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
 	@echo "  validate      - Validate workspace config + layer sourcing (CI-oriented)"
 	@echo "                  make reports 2 for ANY failure here; run"
-	@echo "                  validate_workspace.py directly for 0 match / 1 drift / 3 unconfigured"
+	@echo "                  validate_workspace.py directly for 0 match / 1 drift / 3 unconfigured / 4 unreadable repo"
 	@echo ""
 	@echo "Remote sync:"
 	@echo "  add-remote REMOTE=<name> URL_PREFIX=<prefix> - Add remote to all repos"
