@@ -444,7 +444,7 @@ def main():
         # stronger false claim than the bare success line this fix removed:
         # it quantifies an all-clear over repos nothing looked at (#609).
         print("❌ No repositories could be enumerated — configs/manifest is missing or empty.")
-        print("   Nothing but the workspace root repo will be synced. Run `make setup`")
+        print("   Nothing but the workspace root repo will be synced. Run `make setup-all`")
         print("   (or run `make sync` from the main workspace tree, not a worktree).")
         failures.append(("configs/manifest", "no repositories configured"))
 
