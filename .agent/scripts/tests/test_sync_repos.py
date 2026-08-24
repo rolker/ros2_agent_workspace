@@ -199,12 +199,6 @@ def test_missing_path_is_failed(tmp_path):
     assert sync_repos.sync_repo(tmp_path / "nope", "r").outcome is SyncOutcome.FAILED
 
 
-def test_outcomes_are_all_truthy():
-    """Guards the trap the enum introduces: `if sync_repo(...)` would treat
-    FAILED as success. Any call site must compare against members."""
-    assert all(bool(o) for o in SyncOutcome)
-
-
 # --------------------------------------------------------------------------
 # main() accumulation + exit status
 # --------------------------------------------------------------------------
@@ -278,7 +272,9 @@ def test_all_success_exits_zero(monkeypatch, tmp_path, capsys):
     )
     sync_repos.main()
     out = capsys.readouterr().out
-    assert "0 failures" in out
+    # Exact counts: asserting only "0 failures" let a mutation that drops the
+    # synced/skipped tallies pass. The root repo plus a and b = 3 synced.
+    assert "✅ Sync complete — 3 synced, 0 skipped, 0 failures." in out
     assert "❌" not in out
 
 
@@ -309,7 +305,8 @@ def test_benign_skips_alone_exit_zero(monkeypatch, tmp_path, capsys):
         {"a": skipped_result("uncommitted changes"), "b": skipped_result("detached HEAD")},
     )
     sync_repos.main()
-    assert "0 failures" in capsys.readouterr().out
+    # Root repo synced; a and b skipped.
+    assert "✅ Sync complete — 1 synced, 2 skipped, 0 failures." in capsys.readouterr().out
 
 
 def test_unresolvable_path_is_a_failure(monkeypatch, tmp_path, capsys):
@@ -411,6 +408,41 @@ def test_gitbug_runs_only_for_synced_repos(monkeypatch, tmp_path):
     assert "bad" not in calls
     assert "skip" not in calls
     assert "ok" in calls
+
+
+def test_root_workspace_repo_failure_fails_the_run(monkeypatch, tmp_path, capsys):
+    """The root repo is synced from its own call site, and it is the repo
+    merge_pr.sh has just merged into. Without this, reverting that call site to
+    the `if sync_repo(...)` truthiness trap — every SyncOutcome and SyncResult
+    is truthy — left the whole suite green."""
+    calls = _run_main(
+        monkeypatch,
+        make_workspace(tmp_path, monkeypatch),
+        [repo_record("a")],
+        {"ros2_agent_workspace": failed_result("pull failed: Connection reset by peer")},
+    )
+    with pytest.raises(SystemExit) as exc:
+        sync_repos.main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "- ros2_agent_workspace: pull failed: Connection reset by peer" in out
+    assert "(1 synced, 0 skipped)" in out
+    # git-bug must not push against the repo whose pull just failed; the tmp
+    # workspace root is named "ws".
+    assert "ws" not in calls
+
+
+def test_root_workspace_repo_skip_is_not_a_failure(monkeypatch, tmp_path, capsys):
+    """A dirty workspace root is a benign skip like any other repo — it must not
+    be tallied as synced either."""
+    _run_main(
+        monkeypatch,
+        make_workspace(tmp_path, monkeypatch),
+        [repo_record("a")],
+        {"ros2_agent_workspace": skipped_result("uncommitted changes")},
+    )
+    sync_repos.main()
+    assert "✅ Sync complete — 1 synced, 1 skipped, 0 failures." in capsys.readouterr().out
 
 
 def test_mixed_run_counts_every_category(monkeypatch, tmp_path, capsys):
