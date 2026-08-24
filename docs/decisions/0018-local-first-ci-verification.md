@@ -5,7 +5,10 @@
 Accepted. Phase 1 governance of the local-first quality gates umbrella
 ([#572](https://github.com/rolker/ros2_agent_workspace/issues/572));
 tool delivered in [#573](https://github.com/rolker/ros2_agent_workspace/issues/573)
-(`.agent/scripts/ci_local.sh`).
+(`.agent/scripts/ci_local.sh`). The `merge_pr.sh` attestation check named as a
+follow-up in Consequences landed in
+[#610](https://github.com/rolker/ros2_agent_workspace/issues/610) — see the
+Addendum below.
 
 ## Context
 
@@ -134,3 +137,14 @@ zero; it is environment diversity.
 - **Making attestation mandatory for every merge including the workspace
   repo**: rejected — decision 4; the workspace repo's hosted checks are
   cheap and provide unique clean-room value.
+
+### Addendum (cross-reference, per [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md))
+
+- Issue [#610](https://github.com/rolker/ros2_agent_workspace/issues/610) —
+  the Consequences bullet above ("`merge_pr.sh` does not yet check for the
+  attestation before merging") described the state at the time this ADR was
+  written; that check has since landed, along with decision 5's note push at
+  merge time. `AGENTS.md` § "Merge verification (ADR-0018)" describes the
+  current `merge_pr.sh` behavior, including the case this ADR never covered —
+  a repo with neither hosted checks nor an attestation. This note is
+  navigational only; the Decision and Consequences text above is unchanged.

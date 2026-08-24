@@ -468,6 +468,31 @@ repos remains a mirror/backstop — triage its post-merge failures. The
 **workspace repo is exempt**: its hosted checks stay required. See
 [ADR-0018](docs/decisions/0018-local-first-ci-verification.md).
 
+`merge_pr.sh` performs this check itself, classifying the PR into one of four
+states (#610) — it no longer reports every non-zero `gh pr checks` as "CI
+checks failed":
+
+1. **Checks present** → wait on them and gate on them, as always.
+2. **Workflows exist at the PR head but no checks have registered** → short
+   re-poll, then **refuse**. An empty check rollup is ambiguous (head just
+   pushed, `paths:`-filtered workflow that didn't match, queued suite) and a
+   repo with CI must be verified by it. The **workspace repo always lands
+   here** rather than in 3/4 — its hosted checks are required (ADR-0018
+   decision 4) and no attestation substitutes.
+3. **Project repo, no `.github/workflows` at the head, full-scope `ci-local`
+   attestation on that exact commit** → merge on the attestation, and
+   `refs/notes/ci-local` is pushed at merge time (decision 5).
+4. **Project repo, no workflows at the head, no attestation** → the merge
+   **proceeds with a loud warning** that nothing verified this commit. This
+   is the honest third state: not a failure, not silent. To merge on evidence
+   instead, run `ci_local.sh` on **that** head commit and re-run merge-pr —
+   an attestation for an earlier commit does not count. Do not reach for
+   `--no-wait`: it skips verification entirely.
+
+A failed `gh` call (auth, network, rate limit) is an **error**, never "no CI
+configured" — merge-pr refuses rather than merging on a warning it could not
+substantiate.
+
 ## Documentation Accuracy
 
 - **Never document from assumptions** — every claim about parameters, topics, services,
@@ -569,7 +594,8 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/gitbug_helpers.sh` | Shared git-bug lookup helpers **(source)** |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
-| `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`) |
+| `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`). Verifies first via the four-state classification in [Merge verification](#merge-verification-adr-0018) (#610), consulting `refs/notes/ci-local` and pushing it when it authorized the merge |
+| `.agent/scripts/_ci_verification_helpers.sh` | `ci_local_attestation_status <repo> <sha>` — is there a full-scope `ci-local` attestation on that exact commit (ADR-0018 decisions 1/2 + the #577 `upstream.repos` completeness rule)? Sourced by `merge_pr.sh` **(source)** |
 | `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
 | `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
 | `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos (`--json` for structured output) |
