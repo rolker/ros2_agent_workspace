@@ -48,6 +48,29 @@ NO_REPOS_ENUMERATED = (
     "workspace tree, not a worktree)."
 )
 
+# The bucket iter_repos() records an enumeration failure into. Its own key,
+# not "error": it exits non-zero exactly like one, but it is not a *repo*, and
+# summing it into `total` printed "Summary: 2 repos" over one repo processed —
+# a miscount in the very line the fix exists to make trustworthy (#609).
+ENUMERATION_FAILURE = "enumeration"
+
+
+def no_repos_matched_filter(manifest_filter):
+    """The filter selected no repos — a different problem from an empty workspace.
+
+    `--manifest <typo>` (or any filter matching nothing) used to report
+    NO_REPOS_ENUMERATED: "no repositories configured … Run `make setup-all`".
+    Neither the diagnosis nor the remedy fits a filter that matched nothing,
+    and pointing a bootstrapped workspace at `make setup-all` sends the
+    operator to fix something that is not broken (#609).
+    """
+    return (
+        f"--manifest {manifest_filter}: no configured repository comes from that "
+        "manifest — check the name against `ls configs/manifest/repos/*.repos` "
+        "(pass the name without the .repos suffix)."
+    )
+
+
 # Set once any network operation in this process hits a dropped-connection
 # signature. Callers use this to enable pacing only when the remote is
 # actually rate-limiting (see sync_repos.py's adaptive throttle).
@@ -219,12 +242,24 @@ def add_common_args(parser):
 
 
 def get_repos(args):
-    """Get the filtered repo list based on parsed args."""
+    """Get the filtered repo list based on parsed args. Returns (repos, empty_reason).
+
+    `empty_reason` is None whenever `repos` is non-empty. When the list is
+    empty it names *why*, because the two causes have different remedies: an
+    unbootstrapped workspace (NO_REPOS_ENUMERATED, `make setup-all`) versus a
+    `--manifest` filter that matched nothing (a mistyped manifest name). The
+    filter is applied after the emptiness question is asked of the *unfiltered*
+    list, so a typo can no longer be diagnosed as an empty workspace (#609).
+    """
     repos = get_overlay_repos(include_underlay=args.include_underlay)
+    if not repos:
+        return [], NO_REPOS_ENUMERATED
     if args.manifest:
         manifest_filter = set(f"{m.strip()}.repos" for m in args.manifest.split(","))
         repos = [r for r in repos if r["source_file"] in manifest_filter]
-    return repos
+        if not repos:
+            return [], no_repos_matched_filter(args.manifest)
+    return repos, None
 
 
 def iter_repos(script_dir, args, process_fn, initial_results):
@@ -241,7 +276,8 @@ def iter_repos(script_dir, args, process_fn, initial_results):
 
     The enumeration itself is reported, not assumed (#609): a manifest that
     could not be parsed, and a run that enumerated no repos at all, both land in
-    the "error" bucket so print_summary_and_exit() turns them non-zero. A repo
+    the ENUMERATION_FAILURE bucket, which print_summary_and_exit() turns
+    non-zero and counts separately from the repos. A repo
     configured but absent from disk lands in "missing", which is now also a
     failure — unless its layer is optional on this host, which is a benign
     "skip".
@@ -253,15 +289,15 @@ def iter_repos(script_dir, args, process_fn, initial_results):
         results[status] = results.get(status, 0) + 1
 
     try:
-        repos = get_repos(args)
+        repos, empty_reason = get_repos(args)
     except WorkspaceConfigError as exc:
         print(f"  error: {exc}")
-        record("error")
+        record(ENUMERATION_FAILURE)
         repos = []
     else:
-        if not repos:
-            print(f"  error: {NO_REPOS_ENUMERATED}")
-            record("error")
+        if empty_reason:
+            print(f"  error: {empty_reason}")
+            record(ENUMERATION_FAILURE)
 
     # Workspace repo itself — detect its default branch rather than hard-coding
     ws_version = get_default_branch(root_dir, None)
@@ -326,10 +362,15 @@ def print_summary_and_exit(results, labels):
     legitimately-absent optional-layer repos to "skip" instead, so this does not
     turn a supported host red.
     """
-    total = sum(results.values())
+    enumeration_failures = results.get(ENUMERATION_FAILURE, 0)
+    # The enumeration failure is not a repo, so it is not in the repo count —
+    # it is stated separately instead (#609).
+    total = sum(count for key, count in results.items() if key != ENUMERATION_FAILURE)
     parts = [f"{results.get(key, 0)} {label}" for key, label in labels]
+    if enumeration_failures:
+        parts.append(f"{enumeration_failures} enumeration failure(s)")
     print(f"\nSummary: {total} repos — {', '.join(parts)}")
-    if results.get("error", 0) > 0 or results.get("missing", 0) > 0:
+    if results.get("error", 0) > 0 or results.get("missing", 0) > 0 or enumeration_failures:
         sys.exit(1)
 
 

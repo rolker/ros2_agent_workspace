@@ -27,7 +27,7 @@ import pytest  # noqa: E402
 
 import pull_remote  # noqa: E402
 import remote_utils  # noqa: E402
-from remote_utils import RemoteState  # noqa: E402
+from remote_utils import NO_REPOS_ENUMERATED, RemoteState  # noqa: E402
 
 STATUS = ("status", "--porcelain")
 BRANCH = ("branch", "--show-current")
@@ -287,7 +287,9 @@ def test_json_mode_reports_an_unreadable_repo_instead_of_silently_skipping(monke
     the process exited 0 with a JSON document that looked complete (#609)."""
     monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
     monkeypatch.setattr(
-        pull_remote, "get_repos", lambda args: [{"name": "alpha", "version": "jazzy"}]
+        pull_remote,
+        "get_repos",
+        lambda args: ([{"name": "alpha", "version": "jazzy"}], None),
     )
     monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
@@ -309,7 +311,9 @@ def test_json_mode_stays_silent_about_a_repo_with_no_such_remote(monkeypatch, tm
     an error, and must not turn --json red."""
     monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
     monkeypatch.setattr(
-        pull_remote, "get_repos", lambda args: [{"name": "alpha", "version": "jazzy"}]
+        pull_remote,
+        "get_repos",
+        lambda args: ([{"name": "alpha", "version": "jazzy"}], None),
     )
     monkeypatch.setattr(pull_remote, "resolve_repo_path", lambda root, repo: tmp_path / "alpha")
     monkeypatch.setattr(pull_remote, "get_default_branch", lambda repo_path, v: "main")
@@ -598,7 +602,14 @@ def _json_main(monkeypatch, tmp_path, **opts):
     `optional_layers` (declared optional on this host).
     """
     monkeypatch.setattr(pull_remote, "SCRIPT_DIR", tmp_path / ".agent" / "scripts")
-    monkeypatch.setattr(pull_remote, "get_repos", lambda args: list(opts.get("repos", [])))
+    monkeypatch.setattr(
+        pull_remote,
+        "get_repos",
+        lambda args: (
+            list(opts.get("repos", [])),
+            None if opts.get("repos") else opts.get("empty_reason", NO_REPOS_ENUMERATED),
+        ),
+    )
     monkeypatch.setattr(
         pull_remote,
         "resolve_repo_path",

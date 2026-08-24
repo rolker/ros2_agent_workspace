@@ -43,7 +43,6 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 from remote_utils import (  # noqa: E402
-    NO_REPOS_ENUMERATED,
     UNREADABLE_STATE,
     UNREADABLE_TREE,
     RemoteState,
@@ -450,15 +449,17 @@ def main():
         results = []
         errors = []
         try:
-            repos = get_repos(args)
+            repos, empty_reason = get_repos(args)
         except WorkspaceConfigError as exc:
             # A .repos file we could not parse: every repo it declares goes
             # unenumerated, and an empty report reads as "nothing to import".
             repos = []
             errors.append(str(exc))
         else:
-            if not repos:
-                errors.append(NO_REPOS_ENUMERATED)
+            if empty_reason:
+                # Names which empty this is — an unbootstrapped workspace or a
+                # --manifest filter that matched nothing have different remedies.
+                errors.append(empty_reason)
 
         def collect(repo_path, repo_name, version):
             """Probe, fetch and report one repo into results/errors."""

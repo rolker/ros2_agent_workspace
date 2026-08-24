@@ -169,10 +169,15 @@ def _iter(monkeypatch, tmp_path, repos, **opts):
     optional_layers = opts.get("optional_layers", ())
     on_disk = opts.get("on_disk", True)
     raises = opts.get("raises")
+    empty_reason = opts.get("empty_reason", remote_utils.NO_REPOS_ENUMERATED)
     if raises is not None:
         monkeypatch.setattr(remote_utils, "get_repos", lambda args: (_ for _ in ()).throw(raises))
     else:
-        monkeypatch.setattr(remote_utils, "get_repos", lambda args: list(repos))
+        monkeypatch.setattr(
+            remote_utils,
+            "get_repos",
+            lambda args: (list(repos), None if repos else empty_reason),
+        )
     monkeypatch.setattr(
         remote_utils, "resolve_repo_path", lambda root, repo: (tmp_path if on_disk else None)
     )
@@ -197,7 +202,8 @@ def test_enumerating_zero_repos_is_an_error_not_a_one_repo_success(monkeypatch, 
     all-clear over every repo it never saw. sync_repos.py already exits 1
     naming configs/manifest in exactly this state."""
     results = _iter(monkeypatch, tmp_path, [])
-    assert results["error"] == 1
+    assert results[remote_utils.ENUMERATION_FAILURE] == 1
+    assert results["error"] == 0  # it is not a repo that errored
     with pytest.raises(SystemExit) as exc:
         remote_utils.print_summary_and_exit(results, [("error", "errors")])
     assert exc.value.code == 1
@@ -214,7 +220,7 @@ def test_an_unparseable_manifest_is_an_error_not_an_empty_repo_list(monkeypatch,
     results = _iter(
         monkeypatch, tmp_path, [], raises=WorkspaceConfigError("cannot parse core.repos: boom")
     )
-    assert results["error"] == 1
+    assert results[remote_utils.ENUMERATION_FAILURE] == 1
 
 
 def test_a_repo_missing_from_a_required_layer_makes_the_run_non_zero(monkeypatch, tmp_path):
@@ -257,3 +263,56 @@ def test_the_summary_total_counts_each_repo_once(monkeypatch, tmp_path):
     in skip/error — the printed "N repos" is a count operators read."""
     results = _iter(monkeypatch, tmp_path, [_repo(), _repo("beta")], on_disk=False)
     assert sum(results.values()) == 3
+
+
+def test_the_enumeration_failure_is_not_counted_as_a_repo(monkeypatch, tmp_path, capsys):
+    """It was recorded into the same dict before the loop, so `total` included
+    it: "Summary: 2 repos" over one repo processed — a miscount in the very
+    line the enumeration fix exists to make trustworthy (#609)."""
+    results = _iter(monkeypatch, tmp_path, [])
+    with pytest.raises(SystemExit):
+        remote_utils.print_summary_and_exit(results, [("ok", "up to date")])
+    out = capsys.readouterr().out
+    assert "Summary: 1 repos" in out  # the workspace root, and only it
+    assert "1 enumeration failure(s)" in out  # stated, not folded into the count
+
+
+def test_a_manifest_filter_that_matches_nothing_is_not_an_empty_workspace(monkeypatch, tmp_path):
+    """`--manifest <typo>` reported "no repositories configured … Run
+    `make setup-all`". Neither the diagnosis nor the remedy fits a filter that
+    matched nothing in a perfectly well-configured workspace (#609)."""
+    monkeypatch.setattr(remote_utils, "get_overlay_repos", lambda include_underlay=False: [_repo()])
+    args = SimpleNamespace(
+        remote="gitcloud", manifest="typo", include_underlay=False, dry_run=False
+    )
+    repos, reason = remote_utils.get_repos(args)
+    assert repos == []
+    assert "--manifest typo" in reason
+    assert "make setup-all" not in reason
+
+
+def test_an_unbootstrapped_workspace_still_names_configs_manifest(monkeypatch, tmp_path):
+    """The other direction: with no repos configured at all, the remedy really
+    is `make setup-all`, filter or no filter."""
+    monkeypatch.setattr(remote_utils, "get_overlay_repos", lambda include_underlay=False: [])
+    args = SimpleNamespace(
+        remote="gitcloud", manifest="core", include_underlay=False, dry_run=False
+    )
+    repos, reason = remote_utils.get_repos(args)
+    assert repos == []
+    assert reason == remote_utils.NO_REPOS_ENUMERATED
+
+
+def test_a_filter_that_matches_something_reports_no_reason(monkeypatch, tmp_path):
+    """False-RED direction: an ordinary filtered run must stay clean."""
+    monkeypatch.setattr(
+        remote_utils,
+        "get_overlay_repos",
+        lambda include_underlay=False: [_repo(), _repo("beta", "site.repos")],
+    )
+    args = SimpleNamespace(
+        remote="gitcloud", manifest="core", include_underlay=False, dry_run=False
+    )
+    repos, reason = remote_utils.get_repos(args)
+    assert [r["name"] for r in repos] == ["alpha"]
+    assert reason is None
