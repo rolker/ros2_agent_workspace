@@ -136,7 +136,10 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   operator's permission-mode indicator is terminal UI you cannot see. Auto
   mode approves the routine tool calls, so the prompt flood that used to make
   fan-out unworkable in-process does not occur; observed over the whole #604
-  lifecycle, seven phases in-process with no approvals for the dispatched work.
+  lifecycle — nine typed `progress.md` entries (`review-issue`, `plan-task`,
+  `review-plan`, two `review-code` rounds, `triage-reviews`, three
+  `address-findings` passes) plus an unentried implementation pass, all
+  in-process, with no approvals for the dispatched work.
   **If you cannot confirm auto mode is active** — a non-Claude runtime with no
   `Agent` tool, or an operator running with prompts on — the older rule stands
   and the many-tool-call phases (**implement**, **address-findings**) go to

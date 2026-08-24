@@ -180,8 +180,11 @@ shipped differs from the plan above in four ways, all review-driven:
 4. **The claim is grounded in observation, not asserted mechanism.** Rather
    than stating that in-process `Agent` sub-agents inherit the session
    permission mode — a claim about Claude Code internals this workspace cannot
-   verify from source — the text cites the observed #604 lifecycle: seven
-   phases in-process under auto mode with no approvals for the dispatched work.
+   verify from source — the text cites the observed #604 lifecycle: nine typed
+   `progress.md` entries (`review-issue`, `plan-task`, `review-plan`, two
+   `review-code` rounds, `triage-reviews`, three `address-findings` passes) plus
+   an unentried implementation pass, all in-process under auto mode with no
+   approvals for the dispatched work.
 
 Scope additions:
 

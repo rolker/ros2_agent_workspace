@@ -107,10 +107,14 @@ is not the check.
 - **Auto mode active → default to `in-process`.** Under auto mode the host
   approves the routine tool calls a phase makes, so the prompt cost that used to
   argue for containers is not there to pay. Observed, not assumed: the #604
-  lifecycle ran all seven phases in-process under auto mode — `review-issue`,
-  `plan-task`, `review-plan`, implementation, two `review-code` rounds and two
-  `address-findings` passes — with no operator approvals for the dispatched
-  work. In-process also keeps what the container path gives up: host GitHub
+  lifecycle ran end to end in-process under auto mode with no operator approvals
+  for the dispatched work. Its `progress.md` records **nine** typed entries —
+  `review-issue`, `plan-task`, `review-plan`, two `review-code` rounds,
+  `triage-reviews`, and three `address-findings` passes — plus the
+  implementation pass, which committed between the plan review and the first
+  `review-code` without writing an entry of its own. `triage-reviews` is the
+  telling one: it needs host GitHub auth, so it could only ever have run this
+  way. In-process also keeps what the container path gives up: host GitHub
   auth, host-built layer installs, the local-model review specialist, and the
   `Agent` tool itself.
 - **Cannot confirm auto mode is active → the container-leaning guidance is in
