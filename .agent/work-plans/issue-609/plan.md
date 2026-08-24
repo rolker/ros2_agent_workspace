@@ -197,19 +197,67 @@ tri-state outcome instead of widening the boolean.
 
 ## Open Questions
 
-- [ ] **Confirm the `merge_pr.sh` messaging approach (step 5)** — this
-  plan proposes catching `make sync`'s exit code and printing a distinct
-  "merged and cleaned up, but sync failed" warning banner while still
-  exiting non-zero, instead of letting `set -eo pipefail` abort the
-  script with no final banner at all. This changes `merge_pr.sh` itself
-  (not just `sync_repos.py`), which is a second file beyond the issue's
-  literal scope — flagging explicitly per the issue review's finding #3
-  rather than silently deciding it. Alternative if rejected: leave
-  `merge_pr.sh` as-is (accept the abrupt `set -e` abort with no closing
-  banner) and only fix `sync_repos.py`'s own reporting/exit code.
-- [ ] Should the tri-state enum live in `sync_repos.py` itself or move to
-  a shared location (e.g. `lib/`)? Nothing else currently needs it, so
-  the plan keeps it local to `sync_repos.py` unless review disagrees.
+Both resolved; recorded here rather than deleted so the decision trail survives.
+
+- [x] **`merge_pr.sh` messaging (step 5)** — **RESOLVED at the plan checkpoint:
+  include it in this PR.** The reviewer's argument, which the operator accepted:
+  this is not scope creep, because the exit-code change is what *creates* the
+  abort, so handling it is that change's own consequence. By the time
+  `merge_pr.sh` reaches its sync call the merge, worktree removal and branch
+  deletion are all done and irreversible, so a bannerless `set -e` abort reads
+  as "the merge failed" and invites retrying finished work. Implemented with
+  `sync_status=0; make -C "$ROOT_DIR" sync || sync_status=$?` rather than
+  `if/else` plus a bare `$?`, and the banner names *make's* exit code (make
+  reports 2 for a failed recipe, not sync_repos.py's own 1).
+- [x] **Where the enum lives** — **RESOLVED: stays in `sync_repos.py`** as a
+  plain `enum.Enum`. `lib/` is for genuinely shared helpers; nothing else
+  consumes `SyncOutcome`, and moving it later costs one import.
+
+## Review-driven corrections (Plan Review, `5e3f763`)
+
+- **A miscategorised early return, now fixed.** `get_current_branch()` returns
+  `""` for a genuine detached HEAD but `None` when the git command itself
+  *fails* (not a repo, corrupt `.git`). The original `if not branch` collapsed
+  both, and this plan had classified both as SKIPPED — which would leave a
+  genuinely broken repo silently stale under a green exit, the exact failure
+  class #609 exists to kill. Split: `""` → `SKIPPED`, `None` → `FAILED`, each
+  with its own message.
+- **Test isolation seams named rather than left to "monkeypatch subprocess".**
+  `main()` derives `root_dir` from module-level `SCRIPT_DIR` and calls
+  `list_overlay_repos.get_overlay_repos()`, so end-to-end cases would otherwise
+  read this host's real `layers/`. The tests patch `SCRIPT_DIR` and
+  `get_overlay_repos`, build repo dirs under `tmp_path` so `.exists()` is
+  real-but-controlled, count `sync_gitbug` calls, and assert exit status via
+  `pytest.raises(SystemExit)`. Classification tests (at the `run_network_cmd`
+  seam) are kept separate from `main()` accumulation tests — the former are the
+  ones that catch the original fall-through.
+- **A factual correction to this plan's step 2**, which claimed `sync_gitbug()`
+  "runs unconditionally due to the True-everywhere bug". It does not: dirty,
+  detached and missing-path repos already early-returned `False` and skipped
+  git-bug. The only change is that git-bug now also stops running after a
+  *failed pull/fetch* — which is the fix, not a behaviour tightening. Corrected
+  so the wrong framing does not reach the PR body.
+- **Second call site caught during implementation.** The root repo was synced
+  via `if sync_repo(...)` at a separate line from the loop — the precise
+  truthy-enum trap the review warned about, since every Enum member is truthy.
+  Both call sites now route through one `record()` helper that compares against
+  members explicitly, and a test asserts all members are truthy so the trap
+  stays documented.
+- **Unresolvable paths report their own reason** (`path not resolved`) rather
+  than a generic failure, so a host with an un-imported layer can tell that
+  case apart from a network failure.
+
+## Verification performed
+
+- All 14 new tests pass; full `run_script_tests.sh` green (87 pytest, up from 73).
+- **Mutation-checked in both directions**: restoring the pull-failure
+  fall-through fails `test_failed_pull_is_failed`, and re-collapsing the
+  unreadable-git-state branch into the detached-HEAD skip fails
+  `test_unreadable_git_state_is_failed`. The tests catch the bug they exist for
+  rather than asserting the implementation back to itself.
+- `bash -n` clean on `merge_pr.sh`; `sync_repos.py --dry-run` exits 0 on a clean
+  run. Note a *workspace worktree* has an empty `layers/`, so a dry run there
+  only walks the root repo — the loop is exercised by the tests, not by that.
 
 ## Estimated Scope
 

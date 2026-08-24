@@ -568,7 +568,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/git_bug_setup.sh` | Configure git-bug identity + GitHub bridge |
 | `.agent/scripts/gitbug_helpers.sh` | Shared git-bug lookup helpers **(source)** |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
-| `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
+| `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug). Classifies each repo `SYNCED`/`SKIPPED`/`FAILED`: benign skips (dirty tree, detached HEAD) keep exit 0, while a failed pull/fetch or an unresolvable path names the repo in the summary and **exits 1** (#609). `merge_pr.sh` catches that and reports "merged, but sync failed" rather than aborting bannerless |
 | `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`) |
 | `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
 | `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
