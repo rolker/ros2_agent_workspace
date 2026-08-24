@@ -56,8 +56,10 @@ $recipe_code"
     fi
 fi
 
-# One digest formula, in the launcher, full stop.
-sha_sites=$(grep -c 'sha256sum' "$DRA")
+# One digest formula, in the launcher, full stop. Comment lines are stripped
+# first (as the Makefile check above does): the surrounding comments explain the
+# formula and would otherwise be counted as extra digest sites.
+sha_sites=$(grep -vE '^[[:space:]]*#' "$DRA" | grep -c 'sha256sum')
 if [ "$sha_sites" -eq 1 ]; then
     pass "docker_run_agent.sh computes the startup-scripts digest in exactly one place"
 else
