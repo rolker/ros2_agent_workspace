@@ -63,6 +63,66 @@ JSON tag and is read per-request in the handler). Item 4 below implements
 per-request path and stays gated behind explicit operator approval for a
 systemd drop-in — this plan does **not** authorize applying it.
 
+## Implementation deviations from this plan
+
+Recorded inline as the plan-first workflow expects, so this file stays
+usable as reference rather than describing something that was not built.
+All are documented against the plan text below.
+
+1. **A third split level was added: line ranges within one oversized
+   hunk.** Item 1 step 4 treated a single hunk as the smallest splittable
+   unit and failed loud past that. In practice the very first real diff
+   tripped it: a *large added file is one hunk*, so the common case
+   aborted the whole review. Splitting a hunk on line boundaries is a
+   lossless split, not a truncation — every line still reaches the model
+   exactly once, each part re-carrying the file header and a continuation
+   banner. The loud failure therefore moved down to a single *line* too
+   large for the window, which makes the guarantee stronger, not weaker.
+   A test asserts line-level losslessness across all three levels against
+   the request bodies actually sent.
+
+2. **`ANSWER_HEADROOM` went UP, not down — the plan's central premise on
+   this point is empirically false.** Item 1 step 5 and item 3 step 1
+   both assumed a smaller model reasons in fewer tokens, unlocking
+   smaller `num_ctx` buckets. Measured: `qwen3.5:4b-q8_0` generated
+   **14835** tokens (thinking + answer) on one ~180-line file, against
+   `qwen3.5:35b`'s ~7k. At `num_ctx=16384` it exhausted the window
+   mid-reasoning and returned `done_reason: length` with an empty answer.
+   So the shipped default headroom is **16384**, higher than the 35b's
+   12288. Parameter count does not predict verbosity.
+
+3. **Consequently, only two of the four ladder rungs are reachable at the
+   shipped defaults** (24576 and 32768; 8192 and 16384 are filtered out
+   because the headroom alone would fill them). The bucket filter handles
+   this correctly — it prunes unreachable rungs rather than leaving dead
+   entries, so the second Plan Review's must-fix is closed by
+   construction at any headroom — but the honest accounting is that
+   per-chunk sizing buys ~25% off the minimum allocation (32768 → 24576),
+   **not** a large factor. The dominant VRAM win was the model itself
+   (23 GB → 5.3 GB of weights). Stated in the script header and the
+   knowledge doc so the bucketing is not credited with the model
+   change's effect.
+
+4. **`ANSWER_HEADROOM` is env-overridable (`LOCAL_REVIEW_ANSWER_HEADROOM`),
+   not a literal.** This closes the second Plan Review's must-fix: the
+   plan only ever recorded the measured headroom in a knowledge doc, so
+   the running script would have kept the 35b-derived 12288 regardless of
+   which model shipped.
+
+5. **The `9b-q4_K_M` stretch candidate was not evaluated.** Blocked on
+   disk, not on quality: the root filesystem is 100% full and the 6.6 GB
+   pull would have taken it to zero. Recorded as an open gap rather than
+   silently dropped.
+
+6. **Item 4's systemd drop-in turned out to be unnecessary** and was
+   written but not run, exactly as the plan gated it. `4b-q8_0` clears
+   the VRAM gate with over 1 GB spare at the top bucket on the default
+   `f16` KV cache.
+
+7. **Added `--plan`** (print the chunk plan without contacting the
+   server). Not in the plan; it is the seam the chunking tests drive and
+   is independently useful for sizing a review before paying for it.
+
 ## Approach
 
 ### 1. Chunk large diffs in `local_review.sh` (host-independent correctness — Commit 1)
