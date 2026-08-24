@@ -428,6 +428,18 @@ def main():
             # future FAILED path that forgets to supply one.
             failures.append((repo_name, result.reason or "sync failed"))
 
+    if not repos:
+        # No .repos file was found at all — configs/manifest is missing or
+        # empty (an un-bootstrapped clone, or a workspace *worktree*, which has
+        # no manifest symlink). Every configured repo then goes unenumerated,
+        # and reporting "N synced, 0 failures" for the root repo alone is a
+        # stronger false claim than the bare success line this fix removed:
+        # it quantifies an all-clear over repos nothing looked at (#609).
+        print("❌ No repositories could be enumerated — configs/manifest is missing or empty.")
+        print("   Nothing but the workspace root repo will be synced. Run `make setup`")
+        print("   (or run `make sync` from the main workspace tree, not a worktree).")
+        failures.append(("configs/manifest", "no repositories configured"))
+
     # Also include the root repo itself. Compare against the member explicitly:
     # every Enum member is truthy, so `if sync_repo(...)` would treat a FAILED
     # sync as success (#609).

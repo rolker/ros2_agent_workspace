@@ -384,6 +384,20 @@ def test_absent_required_layer_fails_and_says_it_is_not_set_up(monkeypatch, tmp_
     assert "setup_layers.sh platforms" in out
 
 
+def test_empty_repo_list_does_not_report_a_quantified_all_clear(monkeypatch, tmp_path, capsys):
+    """When no .repos file is found (un-bootstrapped clone, or a workspace
+    worktree with no configs/manifest), every configured repo goes
+    unenumerated. Printing "1 synced, 0 skipped, 0 failures" for the root repo
+    alone claims more than the bare success line this fix replaced."""
+    _run_main(monkeypatch, make_workspace(tmp_path, monkeypatch), [], {})
+    with pytest.raises(SystemExit) as exc:
+        sync_repos.main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "No repositories could be enumerated" in out
+    assert "0 failures" not in out
+
+
 def test_gitbug_runs_only_for_synced_repos(monkeypatch, tmp_path):
     """git-bug must not push against a repo whose pull just failed."""
     calls = _run_main(
