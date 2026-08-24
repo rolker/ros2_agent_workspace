@@ -129,8 +129,11 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
 `docker_run_agent.sh`):
 
 - **The host session's permission mode picks the dispatch mode.** With Claude
-  Code **auto mode** active (check the session's permission-mode indicator),
-  default to **in-process** — including for review/exploration fan-out. Auto
+  Code **auto mode** active, default to **in-process** — including for
+  review/exploration fan-out. *Read the mode from your own context, not the
+  screen:* auto mode injects a system reminder opening `While auto mode is
+  active:` into every turn — present means active, absent means unconfirmed. The
+  operator's permission-mode indicator is terminal UI you cannot see. Auto
   mode approves the routine tool calls, so the prompt flood that used to make
   fan-out unworkable in-process does not occur; observed over the whole #604
   lifecycle, seven phases in-process with no approvals for the dispatched work.

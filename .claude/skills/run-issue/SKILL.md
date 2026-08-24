@@ -94,9 +94,15 @@ auth is available (in-process on the host), not as a body-only container dispatc
   confirmations and stay that way. "Out of the approval loop" means the
   *busywork* approvals, not the deliberate human gates.
 
-**Choosing a mode (#607).** **Check the host session's permission mode first —
-it decides the default.** In Claude Code, auto mode is shown in the session's
-own status/permission-mode indicator (and is toggled from the same place).
+**Choosing a mode (#607).** **The host session's permission mode decides the
+default — and you, the dispatching agent, are the one who has to read it.** The
+signal you can actually observe is in your own context, not on the operator's
+screen: while Claude Code auto mode is active, the session injects a
+system reminder that opens `While auto mode is active:` into every turn. If that
+reminder is present in this context, auto mode is active; if it is absent, treat
+auto mode as unconfirmed. The operator's permission-mode indicator reports the
+same state, but it is terminal UI rendered for *them* — you cannot see it, so it
+is not the check.
 
 - **Auto mode active → default to `in-process`.** Under auto mode the host
   approves the routine tool calls a phase makes, so the prompt cost that used to
