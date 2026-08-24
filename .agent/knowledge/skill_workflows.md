@@ -144,12 +144,17 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   `review-plan`, two `review-code` rounds, `triage-reviews`, three
   `address-findings` passes) plus an unentried implementation pass, all
   in-process, with no approvals for the dispatched work.
-  **If you cannot confirm auto mode is active** — a non-Claude runtime with no
-  `Agent` tool, or an operator running with prompts on — the older rule stands
-  and the many-tool-call phases (**implement**, **address-findings**) go to
-  **containers**, which run sandboxed and prompt-free. **`review-code` is
-  excluded**: its specialist fan-out needs the `Agent` tool and the host Ollama
-  endpoint, so it stays in-process in every mode and pays the prompts. If
+  **If you cannot confirm auto mode is active** — the reminder is absent from
+  your whole context, or the operator is running with prompts on — the older
+  rule stands and the many-tool-call phases (**implement**,
+  **address-findings**) go to **containers**, which run prompt-free. On a
+  **non-Claude host runtime** there is no in-process option to weigh at all —
+  the `Agent` tool *is* in-process dispatch — so drive the phases manually or
+  containerize them. **`review-code` is excluded**: it *runs* in a container
+  but degraded (specialists evaluate sequentially without the `Agent` tool, and
+  the opt-in local-model specialist skips itself with no host Ollama endpoint),
+  losing the fresh-context independence that is the point — so it stays
+  in-process in every mode and pays the prompts. If
   container auth is not ready either (`dispatch_subagent.sh --check`), run
   in-process and accept the prompts rather than not running at all. The fallback
   direction is deliberate: an uncertain reader must not land on the
