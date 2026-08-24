@@ -582,3 +582,42 @@ None.
 
 ### Next step
 `review-code` re-review, scoped to `c198240..HEAD` (11 commits).
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-24 16:36 -04:00
+**By**: Claude Code Agent (Claude Opus 5)
+
+**PR**: #611 at `1e2fd6d`
+**Sources**: 3 (Copilot @ `1e2fd6d`, four prior Local Review (Pre-Push) rounds, CI rollup)
+**Cross-source confirmations**: 0
+**CI**: all-pass (8 checks: Lint, Script tests, Validate Documentation, commit identity)
+
+Copilot reviewed 31/31 changed files at the current head and **generated zero
+comments** — no inline findings, no conversation comments. Its effort level was
+**Lite**, and its verdict is not an approval: **"🔵 Needs a closer look —
+it changes failure semantics and exit-code contracts across multiple
+operator-critical scripts (sync/merge/remote tooling), so it warrants final human
+verification despite the strong test coverage."**
+
+That is a scope judgement, not a defect. It matches AGENTS.md § Merging ("Green
+CI is not review — never merge a PR the user hasn't content-reviewed") and is
+being surfaced to the operator as the merge gate rather than treated as a pass.
+
+### Findings
+- [ ] (process, Copilot) Operator content-review required before merge: the PR
+  changes failure semantics and exit-code contracts in scripts the operator runs
+  daily (`make sync`, `merge_pr.sh`, `pull_remote.py`) and in the field-import
+  path. No code defect identified; this is a human-verification gate.
+
+### False positives
+- None to record — Copilot raised no findings.
+
+### Carried forward, no defect found
+- `validate_workspace.py`'s fourth outcome `UNREADABLE` (exit 4) was added by the
+  Round-4 fix pass on its own initiative, after this issue's last local review.
+  Copilot reviewed the file and raised nothing. Verified live against the real
+  44-repo workspace: returns DRIFTED/1 over the pre-existing `image_warper`
+  orphan, not UNREADABLE, so the new state does not fire on a healthy host. The
+  contract is updated in all three places that describe it (`dashboard.sh`,
+  `AGENTS.md`, Makefile) and the dashboard's exit-4 arm is tested.
