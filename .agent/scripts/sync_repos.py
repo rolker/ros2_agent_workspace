@@ -20,6 +20,7 @@ Options:
 """
 
 import sys
+import enum
 import math
 import time
 import shutil
@@ -111,7 +112,13 @@ def is_dirty(repo_path, dry_run=False):
 
 
 def get_current_branch(repo_path, dry_run=False):
-    """Get the current checked out branch."""
+    """Get the current checked out branch.
+
+    Returns the branch name, or "" on a genuine detached HEAD (the command
+    succeeded and printed nothing), or None when the git command itself failed
+    (not a repo, corrupt .git). Callers MUST distinguish those two: `""` is a
+    benign skip, `None` is a broken repo (#609).
+    """
     # Getting branch is a read-only operation, always execute regardless of dry_run
     success, output = run_git_cmd(repo_path, ["branch", "--show-current"], dry_run=False)
     if success:
@@ -119,26 +126,70 @@ def get_current_branch(repo_path, dry_run=False):
     return None
 
 
-def sync_repo(repo_path, repo_name, dry_run=False):
-    """Synchronize a single repository. Returns True if sync proceeded."""
-    print(f"Checking {repo_name}...")
+class SyncOutcome(enum.Enum):
+    """What happened to one repository during a sync (#609).
 
+    Three states, not two, because the reason a repo was left alone decides
+    whether the run failed:
+
+    - SYNCED — the pull/fetch ran and succeeded.
+    - SKIPPED — deliberately left alone for a benign, operator-visible reason
+      (uncommitted changes, detached HEAD). Normal, and NOT a failure: making
+      an intentionally dirty repo turn the whole run red would produce a signal
+      everyone learns to ignore, which is worse than the false green this fix
+      removes.
+    - FAILED — the repo was supposed to sync and did not: the network command
+      failed, or the repo is in a state we cannot even read.
+
+    Beware: every Enum member is truthy, so a call site left as
+    `if sync_repo(...)` would silently treat FAILED as success. Compare
+    against members explicitly.
+    """
+
+    SYNCED = "synced"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+def preflight_repo(repo_path, dry_run=False):
+    """Decide whether a repo can be synced at all.
+
+    Returns (outcome, branch): a SyncOutcome when the repo should not be
+    synced, or (None, branch) when it is ready. Split out from sync_repo() to
+    keep each function's branching legible now that the outcome is tri-state.
+    """
     if not repo_path.exists():
         print(f"  ❌ Path does not exist: {repo_path}")
-        return False
+        return SyncOutcome.FAILED, None
 
-    # 1. Check for local modifications
     if is_dirty(repo_path, dry_run):
         if dry_run:
             print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
             print("  ⚠️  Skipping: Uncommitted changes detected.")
-        return False
+        return SyncOutcome.SKIPPED, None
 
     branch = get_current_branch(repo_path, dry_run)
+    if branch is None:
+        # The git command itself failed — not a repo, or a corrupt .git. This
+        # is NOT the same as a detached HEAD, and collapsing the two is how a
+        # genuinely broken repo stays silently stale under a green exit (#609).
+        print("  ❌ Cannot read git state (not a repo, or corrupt .git).")
+        return SyncOutcome.FAILED, None
     if not branch:
-        print("  ❌ Skipping: Detached HEAD or invalid git state.")
-        return False
+        print("  ⚠️  Skipping: Detached HEAD.")
+        return SyncOutcome.SKIPPED, None
+
+    return None, branch
+
+
+def sync_repo(repo_path, repo_name, dry_run=False):
+    """Synchronize a single repository. Returns a SyncOutcome (#609)."""
+    print(f"Checking {repo_name}...")
+
+    outcome, branch = preflight_repo(repo_path, dry_run)
+    if outcome is not None:
+        return outcome
 
     # 2. Sync Logic
     if branch in ["main", "jazzy", "rolling"]:
@@ -153,6 +204,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 print(f"     ✅ Updated:\n{output}")
         else:
             print(f"     ❌ Update failed: {output}")
+            return SyncOutcome.FAILED
 
     else:
         print(f"  On feature branch '{branch}'. Fetching only...")
@@ -174,8 +226,9 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                     print("     ✅ Fetched.")
         else:
             print(f"     ❌ Fetch failed: {output}")
+            return SyncOutcome.FAILED
 
-    return True
+    return SyncOutcome.SYNCED
 
 
 def sync_gitbug(repo_path, dry_run=False):
@@ -244,9 +297,28 @@ def main():
 
     throttle = make_throttler(args.throttle, args.dry_run)
 
-    # Also include the root repo itself
-    if sync_repo(root_dir, "ros2_agent_workspace", args.dry_run):
-        sync_gitbug(root_dir, args.dry_run)
+    # Per-repo outcomes drive the summary and the exit status (#609).
+    synced = 0
+    skipped = 0
+    failures = []
+
+    def record(repo_path, repo_name, outcome):
+        """Tally one repo's outcome, running git-bug only on a real sync."""
+        nonlocal synced, skipped
+        if outcome is SyncOutcome.SYNCED:
+            synced += 1
+            sync_gitbug(repo_path, args.dry_run)
+        elif outcome is SyncOutcome.SKIPPED:
+            skipped += 1
+        else:
+            failures.append((repo_name, "sync failed"))
+
+    # Also include the root repo itself. Compare against the member explicitly:
+    # every Enum member is truthy, so `if sync_repo(...)` would treat a FAILED
+    # sync as success (#609).
+    record(
+        root_dir, "ros2_agent_workspace", sync_repo(root_dir, "ros2_agent_workspace", args.dry_run)
+    )
 
     for repo in repos:
         throttle()
@@ -273,15 +345,29 @@ def main():
 
         if repo_path is None:
             paths_str = ", ".join(tried_paths)
-            print(
-                f"Skipping {repo['name']}: could not resolve repository path (tried {paths_str})."
-            )
+            print(f"  ❌ {repo['name']}: could not resolve repository path (tried {paths_str}).")
+            # A configured repo we cannot even locate is a failure, not a benign
+            # skip — it is precisely the "left stale, nobody noticed" case #609
+            # exists to kill. A layer simply not imported on this host lands
+            # here too, so the reason names it rather than saying "sync failed".
+            failures.append((repo["name"], "path not resolved"))
             continue
 
-        if sync_repo(repo_path, repo["name"], args.dry_run):
-            sync_gitbug(repo_path, args.dry_run)
+        record(repo_path, repo["name"], sync_repo(repo_path, repo["name"], args.dry_run))
 
-    print("\n✅ Sync complete.")
+    # Summary + exit status (#609). This previously printed an unconditional
+    # success line and always exited 0, so a run that left repos stale still
+    # reported green — and `make sync` runs at the tail of merge_pr.sh, where
+    # nobody is reading the output.
+    print()
+    if failures:
+        print(f"❌ Sync finished with {len(failures)} failure(s):")
+        for name, reason in failures:
+            print(f"   - {name}: {reason}")
+        print(f"   ({synced} synced, {skipped} skipped)")
+        sys.exit(1)
+
+    print(f"✅ Sync complete — {synced} synced, {skipped} skipped, 0 failures.")
 
 
 if __name__ == "__main__":
