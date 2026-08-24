@@ -99,11 +99,11 @@ Use `dispatch_subagent.sh` to build a kickoff prompt that embeds the identity
 contract and `progress.md` exit contract, then pass it to a fresh sub-agent:
 
 ```bash
-# In-process (fast; no filesystem isolation):
+# In-process (the default under auto mode; fast, no filesystem isolation):
 .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill <next-skill>
 # → emits a handoff block; paste into a fresh Agent tool call
 
-# Container (isolation; use for implementation-heavy phases):
+# Container (use for isolation, or when the host is not in auto mode):
 .agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
 ```
 
@@ -128,9 +128,24 @@ prevents a single runaway sub-agent from racing through the whole lifecycle.
 Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
 `docker_run_agent.sh`):
 
-- **Fan-out goes to containers, not in-process agents.** Review/exploration
-  fan-out via in-process Agent-tool sub-agents floods the operator with
-  permission prompts; container dispatch runs sandboxed and prompt-free.
+- **The host session's permission mode picks the dispatch mode.** With Claude
+  Code **auto mode** active (check the session's permission-mode indicator),
+  default to **in-process** — including for review/exploration fan-out. Auto
+  mode approves the routine tool calls, so the prompt flood that used to make
+  fan-out unworkable in-process does not occur; observed over the whole #604
+  lifecycle, seven phases in-process with no approvals for the dispatched work.
+  **If you cannot confirm auto mode is active** — a non-Claude runtime with no
+  `Agent` tool, or an operator running with prompts on — the older rule stands
+  and fan-out goes to **containers**, which run sandboxed and prompt-free. That
+  fallback direction is deliberate: an uncertain reader must not land on the
+  prompt-flooding branch
+  ([#545](https://github.com/rolker/ros2_agent_workspace/issues/545) →
+  [#607](https://github.com/rolker/ros2_agent_workspace/issues/607)).
+- **Choose containers for isolation, not for prompt volume.** Untrusted input
+  and work needing a clean dependency environment belong in the sandbox
+  whatever the host's permission mode. Conversely, a phase needing host GitHub
+  auth (`triage-reviews`), the host Ollama endpoint, host-built layer installs,
+  or further `Agent`-tool fan-out cannot run in a container at all.
 - **Run container dispatches in the background** so the host session stays
   responsive to the operator; check results on completion.
 - **Never give a sub-agent filesystem-wide search scope** — scope prompts to
