@@ -167,6 +167,173 @@ out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
 { [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
     && ok "conflicting --issue/--pr rejected" || bad "conflicting flags (rc=$rc, out: $(head -1 <<<"$out"))"
 
+# ---------------------------------------------------------------------------
+# Verification classification (#610). merge_pr.sh no longer treats every
+# non-zero `gh pr checks` as "CI failed": it classifies four states and only
+# one of them merges without hosted checks. These assert the OUTCOMES, not
+# merely that the old call is skipped — the outcomes are what will rot.
+#
+# Shape: a temp project repo under layers/main/<layer>_ws/src/<slug> with a
+# github origin, reached via `--pr <N> --repo-slug <slug>`, with `gh` stubbed on
+# PATH. The stub's `pr merge` prints MERGE_ATTEMPTED and fails, so each case
+# stops right after the verification block — no real merge, worktree removal, or
+# `make sync`. Settle polling is driven to zero so nothing sleeps.
+# ---------------------------------------------------------------------------
+CI_TESTLAYER="$ROOT_DIR/layers/main/citest_ws"
+ci_stubdir=""
+ci_repo=""
+
+make_ci_stub() {
+    ci_stubdir=$(mktemp -d)
+    cat >"$ci_stubdir/gh" <<'STUB'
+#!/bin/bash
+# Minimal gh stub for merge_pr.sh's verification block. Behavior is driven by
+# STUB_* env vars; anything unexpected fails loudly rather than silently.
+args="$*"
+case "$1 $2" in
+    "pr view")
+        if [[ "$args" == *statusCheckRollup* ]]; then
+            [[ "${STUB_VIEW_FAILS:-0}" == 1 ]] && { echo "gh: auth required" >&2; exit 1; }
+            echo "{\"statusCheckRollup\":${STUB_ROLLUP:-[]}}"; exit 0
+        fi
+        if [[ "$args" == *headRefOid* ]]; then echo "${STUB_HEAD_SHA:-deadbeef}"; exit 0; fi
+        if [[ "$args" == *--json*url* ]]; then echo "https://example.invalid/pr/1"; exit 0; fi
+        echo "{\"number\":1,\"state\":\"OPEN\",\"headRefName\":\"feature/issue-88888\"}"; exit 0 ;;
+    "api repos"*|"api "*)
+        case "${STUB_WORKFLOWS:-404}" in
+            listing) echo '[{"name":"validate.yml","type":"file"}]'; exit 0 ;;
+            error)   echo "gh: connection refused" >&2; exit 1 ;;
+            *)       echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+        esac ;;
+    "pr checks")
+        echo "CHECKS_WATCHED"; exit "${STUB_CHECKS_RC:-0}" ;;
+    "pr merge")
+        echo "MERGE_ATTEMPTED"; exit 1 ;;
+esac
+echo "UNEXPECTED_GH_CALL: $args" >&2; exit 99
+STUB
+    chmod +x "$ci_stubdir/gh"
+}
+
+make_ci_repo() {   # a github-origin project repo with one commit
+    ci_repo="$CI_TESTLAYER/src/citestpkg"
+    mkdir -p "$ci_repo"
+    git -C "$ci_repo" init -q
+    git -C "$ci_repo" remote add origin "git@github.com:test/citestpkg.git"
+    git -C "$ci_repo" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m init
+}
+
+cleanup_ci_case() { rm -rf "$CI_TESTLAYER" "$ci_stubdir"; }
+
+# Run merge_pr.sh against the fake project repo with the stub active.
+# GIT_SSH_COMMAND=/bin/false keeps the attested case's `git push origin
+# refs/notes/ci-local` from touching the network (it fails fast into the
+# documented warning path).
+run_ci_case() {
+    ( cd "$ROOT_DIR" && \
+      PATH="$ci_stubdir:$PATH" \
+      GIT_SSH_COMMAND=/bin/false \
+      MERGE_PR_SETTLE_ATTEMPTS=1 MERGE_PR_SETTLE_SECONDS=0 \
+      "$@" "$MERGE_PR" --pr 1 --repo-slug citestpkg 2>&1 )
+}
+
+echo "Test: no CI workflows at head + no attestation → warns loudly, still merges (#610)"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 run_ci_case env)
+{ grep -qF "NO automated verification" <<<"$out" \
+  && grep -qF "ci_local.sh" <<<"$out" \
+  && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "third state: named warning naming the recourse, merge proceeds" \
+    || bad "third state (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: no CI workflows at head + full-scope attestation → merges on the note (#610)"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+git -C "$ci_repo" -c user.email="t@t" -c user.name="t" notes --ref=ci-local add -m \
+"ci-local: pass
+repo: citestpkg
+commit: $sha
+scope: full
+steps: template" "$sha"
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 run_ci_case env)
+{ grep -qF "full-scope ci-local attestation" <<<"$out" \
+  && grep -qF "Pushing refs/notes/ci-local" <<<"$out" \
+  && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "attested state: merges on the note and pushes it (ADR-0018 d5)" \
+    || bad "attested state (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: workflows exist but no checks registered → fail-closed, no merge (#610)"
+# The empty-rollup race: a head pushed moments ago, or paths-filtered workflows.
+# This must NOT be read as "no CI configured" — that would be fail-open.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=listing run_ci_case env)
+{ grep -qF "no checks have" <<<"$out" && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "empty-rollup race stays fail-closed" \
+    || bad "empty-rollup race (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: checks present → watched as before, then merges (#610 leaves this path alone)"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP='[{"name":"validate"}]' run_ci_case env)
+{ grep -qF "CHECKS_WATCHED" <<<"$out" && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "checks-present path unchanged" \
+    || bad "checks-present path (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: red checks → refuses (#610 must not weaken the existing gate)"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP='[{"name":"validate"}]' STUB_CHECKS_RC=1 run_ci_case env)
+{ grep -qF "CI checks failed" <<<"$out" && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "failed checks still block the merge" \
+    || bad "failed checks (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: gh failure is an error, never 'no CI configured' (#610)"
+# Auth expiry / network loss / rate limiting must fail closed. Classifying them
+# as an empty rollup would be a second fail-open path.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_VIEW_FAILS=1 run_ci_case env)
+{ grep -qF "could not read check status" <<<"$out" \
+  && ! grep -qF "NO automated verification" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "gh failure errors out, no merge" \
+    || bad "gh failure (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: probe failure (not a 404) is an error, never 'no CI configured' (#610)"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=error run_ci_case env)
+{ grep -qF "could not probe .github/workflows" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "unrunnable probe errors out, no merge" \
+    || bad "probe failure (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: workspace repo with an empty rollup → fail-closed (ADR-0018 decision 4)"
+# The workspace repo's hosted checks are REQUIRED; a ci-local attestation never
+# substitutes. Without this gate the empty-rollup race would warn-and-merge on
+# this very repo — most likely right after a push, which is when it fires.
+make_ci_stub
+out=$( cd "$ROOT_DIR" && PATH="$ci_stubdir:$PATH" \
+       MERGE_PR_SETTLE_ATTEMPTS=1 MERGE_PR_SETTLE_SECONDS=0 \
+       STUB_HEAD_SHA=deadbeef STUB_WORKFLOWS=404 \
+       "$MERGE_PR" --pr 1 --repo-slug workspace 2>&1 )
+{ grep -qF "hosted checks are required" <<<"$out" \
+  && ! grep -qF "NO automated verification" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "workspace repo never takes the substitution path" \
+    || bad "workspace-repo exemption (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"
