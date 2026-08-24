@@ -368,10 +368,29 @@ git -C "$BRANCH_REPO" branch -D "$BRANCH" 2>/dev/null && echo "  ✅ local branc
 git -C "$BRANCH_REPO" push origin --delete "$BRANCH" 2>/dev/null && echo "  ✅ remote branch deleted" || true
 
 # ---- sync -------------------------------------------------------------------
+# sync_repos.py now exits non-zero when a repo genuinely fails to update
+# (#609). Everything above this line — the merge, the worktree removal, the
+# branch deletions — has already happened and cannot be undone, so letting
+# `set -e` abort here would kill the closing banner and read as "the merge
+# failed", inviting someone to retry finished work. Capture the status instead
+# and say precisely what did and did not happen.
 echo "  Syncing all repos..."
-make -C "$ROOT_DIR" sync
+sync_status=0
+make -C "$ROOT_DIR" sync || sync_status=$?
 
 echo ""
 echo "========================================"
-echo "✅ Done: PR #${PR_NUM} merged, cleaned up, and synced."
-echo "========================================"
+if [ "$sync_status" -eq 0 ]; then
+    echo "✅ Done: PR #${PR_NUM} merged, cleaned up, and synced."
+    echo "========================================"
+else
+    # Note: this is make's exit code (make reports 2 for a failed recipe), not
+    # sync_repos.py's own 1 — the named repos in the sync output above are the
+    # actionable detail.
+    echo "⚠️  PR #${PR_NUM} merged and cleaned up — but the repo sync FAILED"
+    echo "   (make exit ${sync_status}). The merge is complete and needs no retry."
+    echo "   See the sync output above for which repos are stale, then re-run:"
+    echo "       make sync"
+    echo "========================================"
+    exit "$sync_status"
+fi
