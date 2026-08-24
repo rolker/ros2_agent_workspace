@@ -386,10 +386,14 @@ identity string says nothing about whether it authored the plan.
 
 The `**By**` field is therefore useful in exactly one direction, as
 corroboration and never as the test: **differing** model strings are
-positive evidence of independence, and worth stating in the entry.
-**Matching** strings are evidence of nothing. If you are genuinely
-unsure how you were invoked, state the basis for your judgement in the
-entry rather than resolving it by string comparison.
+positive evidence of independence — and the `**By**` line already records
+the model, so this needs no extra slot in the entry. **Matching** strings
+are evidence of nothing. If a `## Plan Authored` entry exists and you are
+genuinely unsure how you were invoked, **apply the
+`(in-context — author self-review)` annotation** and state in one line
+what left you unsure. Applying it is the conservative default: at worst it understates
+an independence you had, where omitting it claims one you could not
+establish.
 
 If no `## Plan Authored` entry exists (PR-less invocation, or an older
 plan that pre-dates `plan-task`'s persistence step), omit the
@@ -449,12 +453,14 @@ Two phases follow this review:
 1. **Implementation** (no skill yet) — the implementer reads the last `## Plan
    Review` entry in `.agent/work-plans/issue-<N>/progress.md` and the linked
    plan. If the verdict is `changes-requested`, address must-fix findings before
-   starting. Pick the dispatch mode per `run-issue/SKILL.md` § Choosing a mode
-   (#607): **in-process** is the default when auto mode is confirmed active;
-   reach for `--mode container` when auto mode cannot be confirmed, or when the
-   work is isolation-worthy (untrusted input, clean dependency environment):
+   starting. Pick the dispatch mode per `run-issue/SKILL.md`
+   § How phases are dispatched (its **Choosing a mode (#607)** paragraph):
+   **in-process** is the default when auto mode is confirmed active —
 
-       .agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
+       .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --prompt-file <task.md>
+
+   Swap in `--mode container` when auto mode cannot be confirmed, or when the
+   work is isolation-worthy (untrusted input, clean dependency environment).
 
 2. **Pre-push code review** — once implementation is complete and before pushing,
    hand off to `review-code` in a fresh-context sub-agent:
