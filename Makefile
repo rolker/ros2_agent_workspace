@@ -275,17 +275,11 @@ generate-skills:
 # --- Agent container targets ---
 
 agent-build:
-	@set -e; \
-	STAGE_DIR="$(CURDIR)/.devcontainer/agent/.rosdep-manifests"; \
-	trap 'rm -rf "$$STAGE_DIR"' EXIT; \
-	./.agent/scripts/stage_rosdep_manifests.sh "$(CURDIR)" "$$STAGE_DIR"; \
-	docker build \
-		--build-arg USER_UID=$$(id -u) \
-		--build-arg USER_GID=$$(id -g) \
-		--build-arg STARTUP_SCRIPTS_SHA=$$(cd .devcontainer/agent && cat agent-entrypoint.sh fix-volume-ownership.sh | sha256sum | cut -d' ' -f1) \
-		-t ros2-agent-workspace-agent:latest \
-		-f .devcontainer/agent/Dockerfile \
-		.devcontainer/agent/
+	@# Single build path (#604): docker_run_agent.sh --build-only stages the
+	@# rosdep manifests, runs `docker build`, and stamps the startup-scripts
+	@# digest. Duplicating any of that here is what let the two paths hash
+	@# different directories and produce a permanent false "stale" warning.
+	@./.agent/scripts/docker_run_agent.sh --build-only
 
 agent-run:
 	@if [ -z "$(ISSUE)" ]; then \
