@@ -290,3 +290,58 @@ def test_unparseable_manifest_exits_one_not_three(monkeypatch, tmp_path, capsys)
     monkeypatch.setattr(vw, "get_overlay_repos", boom)
     assert _run_main(monkeypatch) == 1
     assert "cannot parse core.repos" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# The residual same-class instance: a repo we could not read at all (#609)
+# --------------------------------------------------------------------------
+
+
+SHA = "a" * 40
+
+
+def test_an_unreadable_repo_pinned_to_a_sha_is_not_a_pass(monkeypatch, tmp_path):
+    """`git branch --show-current` and `git rev-parse HEAD` both failing left
+    every arm of the version chain answering from two Nones, and the 40-hex
+    guard on the detached-HEAD arm then recorded nothing at all. A repo whose
+    .git is corrupt validated green — this issue's own defect class, one level
+    in from the enumeration."""
+    configured = [_repo("alpha", version=SHA)]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": None, "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    result, _ = vw.validate_workspace()
+    assert result is ValidationResult.DRIFTED
+
+
+def test_an_unreadable_repo_says_so_rather_than_naming_a_branch(monkeypatch, tmp_path, capsys):
+    """The remedy differs from a version mismatch's, so the report must not
+    describe it as one."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": None, "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    vw.validate_workspace()
+    assert "cannot read git state" in capsys.readouterr().out
+
+
+def test_a_genuinely_detached_repo_pinned_to_a_sha_still_passes(monkeypatch, tmp_path):
+    """The false-RED direction, and the reason the 40-hex guard exists: a repo
+    the manifest pins to a commit is *supposed* to be detached. `git branch
+    --show-current` succeeds and prints nothing there — an empty string, not
+    the None a failed probe returns."""
+    configured = [_repo("alpha", version=SHA)]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": "", "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    monkeypatch.setattr(vw, "get_git_commit", lambda path: SHA)
+    result, _ = vw.validate_workspace()
+    assert result is ValidationResult.PASSED
+
+
+def test_a_detached_repo_pinned_to_a_branch_is_still_drift(monkeypatch, tmp_path):
+    """The other side of that guard: detached where a *branch* was configured
+    is real drift, and stayed detectable through the restructure."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": "", "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    monkeypatch.setattr(vw, "get_git_commit", lambda path: SHA)
+    result, _ = vw.validate_workspace()
+    assert result is ValidationResult.DRIFTED

@@ -273,6 +273,23 @@ def validate_workspace(verbose=False):
         current_branch = actual.get("branch")
         current_commit = get_git_commit(actual["path"])
 
+        # Both probes failed on a directory that has a .git — the repo is
+        # there and we could not read it at all. Every arm below then answers
+        # from two Nones, and with a 40-hex `expected` the chain recorded
+        # nothing, so an unreadable repo passed validation. The residual
+        # instance of this issue's own defect class, one level in (#609).
+        if current_commit is None and current_branch is None:
+            version_mismatches.append(
+                {
+                    "name": name,
+                    "type": "unreadable",
+                    "expected": expected,
+                    "actual": "cannot read git state (corrupt .git?)",
+                    "path": actual["path"],
+                }
+            )
+            continue
+
         # Improved version check: handle branches, tags, and commit SHAs
         # Try to resolve expected version to a commit SHA
         try:
@@ -303,9 +320,13 @@ def validate_workspace(verbose=False):
                             "path": actual["path"],
                         }
                     )
-        elif current_branch is None and expected_commit is None:
-            # Detached HEAD but expected version couldn't be resolved
-            # Only flag if expected looks like a branch name (not a SHA)
+        elif not current_branch and expected_commit is None:
+            # Detached HEAD (`git branch --show-current` succeeds and prints
+            # nothing, so the branch reads as "" — `is None` here meant a
+            # *failed* probe, which is now caught above) and an expected
+            # version we could not resolve. Only flag if expected looks like a
+            # branch name, not a SHA: a repo pinned to a SHA is legitimately
+            # detached, and flagging it would be a false red.
             if expected and not (
                 len(expected) == 40 and all(c in "0123456789abcdef" for c in expected.lower())
             ):
