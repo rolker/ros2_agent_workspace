@@ -90,18 +90,50 @@ single monolithic prompt:
    would be needed. This is strictly rarer than today's whole-diff check
    (a lone 40k-token hunk is a different, worse problem than a 40k-token
    diff), so the guarantee gets *stronger*, not weaker.
-5. **Per-chunk request**: send each chunk through the existing
+5. **Per-chunk `num_ctx` sizing (closes the KV-cache gap flagged in Plan
+   Review).** The chunking in steps 1-4 only shrinks *prompt content* — it
+   does nothing to VRAM unless the per-request `options.num_ctx` actually
+   shrinks too. Ollama/llama.cpp sizes the KV-cache buffer to the
+   *requested* `num_ctx`, not to tokens actually consumed
+   (`local_review.sh:224` currently sends the single global `NUM_CTX` on
+   every request, chunked or not — verified by reading the `build_body()`
+   function). So this step is a **required code change**, not a
+   side-effect of chunking:
+   - For each chunk, after estimating its tokens the same way the
+     whole-diff estimate works today (`${#CHUNK_PROMPT} / 3 + headroom`),
+     pick that request's `num_ctx` from a small set of fixed buckets
+     (e.g. `8192 16384 24576 32768`, ordered ascending) — the smallest
+     bucket that is `>= chunk_estimated_tokens`, capped at
+     `LOCAL_REVIEW_NUM_CTX` (which remains the hard ceiling / overflow
+     guard, see step 4 above). Fixed buckets (not a value computed to the
+     token) avoid a distinct KV-cache allocation shape per request while
+     still landing most single-file chunks well under the 32768 default.
+   - The `ANSWER_HEADROOM` constant (today `12288`, sized for
+     `qwen3.5:35b`'s observed ~7k-token reasoning on a 100-line diff) is
+     itself close to the smallest useful bucket, so it must be re-measured
+     for whichever candidate model item 3 selects — a smaller model that
+     reasons in fewer tokens lets smaller buckets be viable, which is the
+     actual mechanism that makes the item-3 headroom numbers real rather
+     than aspirational. Record the measured value in
+     `.agent/knowledge/local_model_sizing.md` (item 5).
+   - This makes the item-3 candidate table's VRAM-headroom numbers
+     accurate to what the code actually requests, instead of assuming a
+     "modest" `num_ctx` that no commit set. See item 3 for the redone
+     arithmetic and the general method for re-deriving it on other
+     hardware.
+6. **Per-chunk request**: send each chunk through the existing
    `build_body`/`send_request` machinery (reasoning retry, timeout, HTTP-code
-   handling, `keep_alive` — see item 4 below) unchanged, with the prompt
-   template noting "reviewing chunk N of M — file `<path>`" so the model
-   doesn't need cross-chunk context it doesn't have.
-6. **Per-chunk failure stays loud**: if any chunk times out, gets a non-200,
+   handling, `keep_alive` — see item 4 below) with `num_ctx` from step 5
+   substituted per-request, and the prompt template noting "reviewing chunk
+   N of M — file `<path>`" so the model doesn't need cross-chunk context it
+   doesn't have.
+7. **Per-chunk failure stays loud**: if any chunk times out, gets a non-200,
    or fails the truncation/`done_reason` checks, the whole review aborts
    with that chunk's specific error — a file that failed to review is never
    silently dropped from the findings list. (No partial-results-on-error
    mode; that would let a failure masquerade as "no findings" for the
    skipped file.)
-7. **Synthesis = deterministic merge, not a second LLM call.** Concatenate
+8. **Synthesis = deterministic merge, not a second LLM call.** Concatenate
    each chunk's returned findings under a `### <file path>` sub-heading and
    renumber findings 1..N globally in the final `## Local Adversarial
    (<model>)` output. Chunks are non-overlapping by file, so cross-chunk
@@ -111,6 +143,22 @@ single monolithic prompt:
    manual review of chunked output shows real cross-chunk noise (e.g. the
    same systemic issue re-reported once per file in a way that drowns out
    distinct findings).
+9. **Document the cross-file blind spot as a known v1 limitation
+   (closes the Plan Review suggestion).** Per-file (and per-hunk) chunking
+   means the model reviewing chunk N never sees any other chunk — it
+   cannot catch a defect that spans files or depends on a caller/callee
+   relationship split across chunks (e.g. a signature change in file A
+   whose now-mismatched caller sits in file B; an invariant maintained in
+   one file and broken in another). This is a systematic blind spot, not
+   an edge case, and it is distinct from the duplicate-finding cost
+   discussed in step 8. State it explicitly in two places so a reader of
+   a chunked review's "No findings" output does not mistake silence for
+   an all-clear on cross-file defects: (a) the `local_review.sh` header
+   comment block, next to the existing chunking/env-var documentation,
+   and (b) `.agent/knowledge/local_model_sizing.md` (item 5), framed as a
+   known limitation of the chunked-review mode specifically — 5f's
+   cross-file blind spot does not affect `review-code`'s other specialists,
+   which retain full-repo/full-diff context.
 
 This item does not depend on which model ships as default and should be
 usable today with `qwen3.5:35b` too (it just makes each request smaller and
@@ -136,24 +184,51 @@ reaches into the operator's machine-wide Ollama config (matches the existing
 ### 3. Model tag selection (this-host tuning — Commit 3, after empirical check)
 
 **Budget arithmetic** (8 GB VRAM total budget; ~0.5 GB reserved for
-CUDA/driver overhead → ~7.5 GB usable for weights + KV cache):
+CUDA/driver overhead → ~7.5 GB usable for weights + KV cache).
 
-| Tag | Weights | Headroom after weights | Fits fully GPU-resident? |
-|---|---|---|---|
-| `qwen3.5:35b` (current default) | 23 GB | negative | No — CPU spill (today's OOM path) |
-| `qwen3.5:9b-q4_K_M` | 6.6 GB | ~0.9 GB for KV cache + overhead | Tight — only viable with `OLLAMA_KV_CACHE_TYPE=q8_0` and a modest per-chunk `num_ctx` (chunking from item 1 makes this plausible: a single file + prompt scaffold, not an 88k-token diff) |
-| `qwen3.5:4b-q8_0` | 5.3 GB | ~2.2 GB for KV cache + overhead | Yes, comfortably, even at default `f16` KV cache |
-| `qwen3.5:4b` | 3.4 GB | ~4.1 GB | Yes, most headroom |
-| `qwen3.5:2b` / `qwen3.5:0.8b` | 2.7 GB / 1.0 GB | large | Yes, but quality risk — not carried forward as primary candidates given 5f's adversarial-review role |
+**Arithmetic method** (so it can be re-derived on different hardware or a
+different model tag, rather than trusted as a fixed table):
+
+1. `weights_GB` — read from the registry (`ollama show <tag>`) or measured
+   VRAM at load; this is the only number in the table below actually
+   sourced from the registry.
+2. `kv_bytes_per_token = 2 (K and V) × num_layers × num_kv_heads ×
+   head_dim × bytes_per_element` — read `num_layers`, `num_kv_heads`,
+   `head_dim` from `ollama show <tag> --verbose` (or the GGUF metadata)
+   for the *specific candidate tag*, not assumed from a different model
+   size in the same family. `bytes_per_element` is 2 for the default
+   `f16` KV cache (`OLLAMA_KV_CACHE_TYPE` unset — item 4 is not applied by
+   this plan) or 1 for `q8_0` (only relevant if item 4's drop-in is later
+   approved and applied).
+3. `kv_GB(num_ctx) = kv_bytes_per_token × num_ctx / 2^30`.
+4. `headroom_GB(num_ctx) = 7.5 − weights_GB − kv_GB(num_ctx)`.
+
+The `num_ctx` plugged into step 3/4 is **not** the 32768 default — it is
+the per-chunk bucket item 1 step 5 will actually request for that
+candidate (bucket set `8192 16384 24576 32768`, chosen from the
+candidate's measured `ANSWER_HEADROOM` + a typical single-file chunk's
+token count). This is the specific gap the Plan Review flagged: without
+item 1 step 5's code change, every request — chunked or not — would still
+request the 32768 default and the table below would be arithmetic fiction.
+
+| Tag | Weights | `num_ctx` assumed (bucket, from item 1 step 5) | Headroom after weights + KV cache | Fits fully GPU-resident? |
+|---|---|---|---|---|
+| `qwen3.5:35b` (current default) | 23 GB | 32768 (no per-chunk shrink helps — weights alone exceed budget) | negative | No — CPU spill (today's OOM path) |
+| `qwen3.5:9b-q4_K_M` | 6.6 GB | 16384 (smallest bucket ≥ measured headroom + typical single-file chunk, pending item 3 step 1's measurement) | ~0.9 GB, **order-of-magnitude — exact `kv_bytes_per_token` for this tag not yet read off `ollama show --verbose`; this is a placeholder pending step 1 of the empirical check, not a verified number** | Tight — only clears the gate if the measured KV-cache size at bucket 16384 actually fits; disqualified outright if not, per the standing "smaller model that runs beats a bigger one that OOMs" rule |
+| `qwen3.5:4b-q8_0` | 5.3 GB | 16384 (same bucket reasoning as above, smaller model → likely shorter reasoning → plausibly fits the 8192 bucket instead, to be confirmed) | ~2.2 GB at 16384, more if 8192 clears | Yes, comfortably, even at default `f16` KV cache |
+| `qwen3.5:4b` | 3.4 GB | 16384 (same bucket reasoning) | ~4.1 GB | Yes, most headroom |
+| `qwen3.5:2b` / `qwen3.5:0.8b` | 2.7 GB / 1.0 GB | 8192-16384 | large | Yes, but quality risk — not carried forward as primary candidates given 5f's adversarial-review role |
 
 The arithmetic above is a **first-pass filter**, not the acceptance gate —
 weights-on-disk size isn't the same as loaded VRAM footprint (context
 buffers, CUDA graph memory, batch buffers add overhead the registry number
-doesn't capture). The gate is `ollama ps` after a real chunked request:
-`PROCESSOR` column must read `100% GPU` (no `/CPU` split) and `journalctl -k`
-must show no OOM kill across a full review round — this is acceptance
-criterion 1/2 verbatim, applied per-candidate during selection, not just
-post-hoc.
+doesn't capture), and the `num_ctx` bucket assumptions above are themselves
+estimates pending the measurement in the empirical check's step 1 below. The
+gate is `ollama ps`
+after a real chunked request: `PROCESSOR` column must read `100% GPU` (no
+`/CPU` split) and `journalctl -k` must show no OOM kill across a full
+review round — this is acceptance criterion 1/2 verbatim, applied
+per-candidate during selection, not just post-hoc.
 
 **Candidates carried to the empirical check**: `qwen3.5:4b-q8_0` (primary —
 fits with headroom to spare even without the KV-cache-type change) and
@@ -163,7 +238,18 @@ measurably worse and `9b` clears the VRAM gate at chunked, non-88k-token
 
 **Empirical quality check (planted-defect diff)**:
 
-1. Construct a synthetic diff fixture in
+1. **Measure, per candidate, before scoring quality**: run each candidate
+   (`qwen3.5:9b-q4_K_M`, `qwen3.5:4b-q8_0`) through `local_review.sh` on a
+   single representative file-sized chunk and record (a) its actual
+   reasoning-token count (replaces the `qwen3.5:35b`-derived
+   `ANSWER_HEADROOM=12288` assumption for that candidate), (b) the
+   `num_ctx` bucket item 1 step 5 selects for that chunk, and (c) `ollama
+   ps`'s reported VRAM/`PROCESSOR` split at that bucket. This is what
+   turns the item-3 table's placeholder headroom numbers into verified
+   ones — fill in the table (or note the correction) before proceeding to
+   recall scoring, since a candidate that fails this step is disqualified
+   before spending time on steps 2-4 below.
+2. Construct a synthetic diff fixture in
    `.agent/scripts/tests/fixtures/local_review_planted_defects.diff`
    (new file) embedding a fixed, enumerated set of known defects
    spanning the categories `local_review.sh`'s own prompt asks for: an
@@ -173,23 +259,25 @@ measurably worse and `9b` clears the VRAM gate at chunked, non-88k-token
    defect list (file, line, what it is) in a companion
    `local_review_planted_defects.md` so scoring is objective, not
    re-adjudicated each run.
-2. Run each candidate model through `local_review.sh` (post-chunking) against
-   the fixture, on the dev host, with `journalctl -k` monitored for OOM.
-3. Score recall (planted defects the model actually flagged, matched by file
+3. Run each candidate model through `local_review.sh` (post-chunking, with
+   per-chunk `num_ctx` from item 1 step 5) against the fixture, on the dev
+   host, with `journalctl -k` monitored for OOM.
+4. Score recall (planted defects the model actually flagged, matched by file
    + approximate line) and false-positive rate (findings that don't
    correspond to a planted defect — informational only, not a gate, since a
    real defect-finder legitimately surfaces things we didn't plant).
-4. Selection rule: prefer the smaller/faster candidate (`4b-q8_0`) unless its
+5. Selection rule: prefer the smaller/faster candidate (`4b-q8_0`) unless its
    recall is materially worse than `9b-q4_K_M`'s (no fixed numeric bar is set
    here — this is a judgment call for whoever runs the check, recorded with
    its reasoning, not a pass/fail threshold invented in advance). A model
    that OOMs during the check is disqualified regardless of recall — "smaller
    model that runs beats a bigger one that's OOM-killed" is the standing
    principle from the issue.
-5. Record the result (chosen tag, recall/false-positive counts, VRAM
-   behavior observed) in `.agent/knowledge/local_model_sizing.md` (new file
-   — see item 5) — not just progress.md, since this is a reusable pattern
-   for any 8GB-class dev host, not a one-off decision log entry.
+6. Record the result (chosen tag, measured `ANSWER_HEADROOM` and `num_ctx`
+   bucket from step 1, recall/false-positive counts, VRAM behavior
+   observed) in `.agent/knowledge/local_model_sizing.md` (new file — see
+   item 5) — not just progress.md, since this is a reusable pattern for
+   any 8GB-class dev host, not a one-off decision log entry.
 
 Change `MODEL="${LOCAL_REVIEW_MODEL:-qwen3.5:35b}"` (`local_review.sh:76`) to
 the chosen tag, and update the header doc comment's default-model reference
@@ -231,11 +319,19 @@ New file `.agent/knowledge/local_model_sizing.md` capturing:
 - The VRAM budget arithmetic method (weights + KV cache + ~0.5 GB overhead,
   gated by `ollama ps` PROCESSOR=100%GPU + no-OOM, not registry size alone)
   as a reusable pattern for any 8GB-class (or other VRAM-constrained) dev
-  host — this failure mode will recur.
+  host — this failure mode will recur. Include the step-by-step method from
+  item 3 (`kv_bytes_per_token` from `ollama show --verbose`, bucket-based
+  `num_ctx` selection, `headroom_GB` formula) so it is re-derivable for a
+  future model tag or a different VRAM budget, not just the specific
+  numbers measured for this host.
 - The chosen model tag and why, plus the planted-defect recall/false-positive
-  numbers from item 3's check.
+  numbers and the measured `ANSWER_HEADROOM`/`num_ctx` bucket from item 3's
+  check.
 - Whether the `OLLAMA_KV_CACHE_TYPE` drop-in was needed/applied, and on which
   host(s), for reproducing the state on a rebuild.
+- The known v1 limitation from item 1 step 9: per-file/per-hunk chunking
+  cannot see cross-file or caller/callee-dependent defects — "no findings"
+  from a chunked 5f run is not a clean bill of health for those cases.
 
 Add the new `setup_ollama_kv_cache.sh` script (if item 4's script is written)
 to `AGENTS.md`'s script reference table, per the consequences map — new
@@ -262,8 +358,8 @@ scripts belong there.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/local_review.sh` | Chunking (split/per-chunk-budget/merge), per-request `keep_alive`, new default model tag, updated header doc comments |
-| `.agent/scripts/tests/test_local_review.sh` (new) | Hermetic tests for chunking + keep_alive (see below) |
+| `.agent/scripts/local_review.sh` | Chunking (split/per-chunk-budget/merge), **per-chunk `num_ctx` bucket sizing**, per-request `keep_alive`, new default model tag, updated header doc comments (env vars, `num_ctx`/`ANSWER_HEADROOM` rationale, **cross-file blind-spot limitation note**) |
+| `.agent/scripts/tests/test_local_review.sh` (new) | Hermetic tests for chunking + **per-chunk `num_ctx` bucket selection** + keep_alive (see below) |
 | `.agent/scripts/tests/fixtures/local_review_planted_defects.diff` (new) | Synthetic diff with known planted defects, for the empirical quality check |
 | `.agent/scripts/tests/fixtures/local_review_planted_defects.md` (new) | Enumerated defect list + line numbers, for objective scoring |
 | `.agent/knowledge/local_model_sizing.md` (new) | VRAM sizing method, chosen tag + rationale, quality-check result, drop-in status |
@@ -279,7 +375,7 @@ scripts belong there.
 | Enforcement over documentation | The drop-in, if needed, ships as an idempotent script, not a runbook step. |
 | Capture decisions, not just implementations | New `.agent/knowledge/local_model_sizing.md` records the VRAM arithmetic method, chosen tag rationale, and planted-defect check result — durable, not just a progress.md line that evaporates once the issue closes. |
 | A change includes its consequences | `AGENTS.md` script table updated if the setup script lands; header doc comments in `local_review.sh` updated in the same commits that change the behavior they describe. |
-| Test what breaks | New `test_local_review.sh` covers chunking (split boundaries, per-chunk budget, irreducible-hunk failure, merge/renumbering) and `keep_alive` payload construction — auto-discovered by `run_script_tests.sh`'s glob, no Makefile change needed. |
+| Test what breaks | New `test_local_review.sh` covers chunking (split boundaries, per-chunk budget, per-chunk `num_ctx` bucket selection, irreducible-hunk failure, merge/renumbering) and `keep_alive` payload construction — auto-discovered by `run_script_tests.sh`'s glob, no Makefile change needed. |
 | Workspace vs. project separation | Workspace-only change (`.agent/scripts/`, `.agent/knowledge/`). |
 
 ## ADR Compliance
@@ -298,22 +394,30 @@ scripts belong there.
 | `local_review.sh`'s default model | Header doc comment's default-model reference; `AGENTS.md` script table row | Yes — item 3/5 |
 | Add `setup_ollama_kv_cache.sh` | `AGENTS.md` script reference table | Yes, conditionally — item 5 |
 | Chunking changes what counts as "context overflow" | Loud-failure guard semantics (now per-hunk, not per-diff) | Yes — item 1, explicitly re-derived, not just carried over |
+| Chunking's `num_ctx` becomes per-chunk instead of global | The item-3 VRAM headroom arithmetic (must reflect the actual bucket requested, not the 32768 default) | Yes — item 1 step 5 (code) + item 3 (arithmetic redone against it) |
+| Per-file/per-hunk chunking loses cross-file review context | Documented as a known v1 limitation, not silently shipped | Yes — item 1 step 9, script header + `.agent/knowledge/local_model_sizing.md` |
 | 5f becomes reliable | #590 (make 5f opt-in) re-triage | Yes — item 6, as a follow-up action, not implementation scope |
 
 ## Documentation & Instruction Impact
 
 - **Stale docs** (must land in this PR): `local_review.sh`'s own header
-  comment block (env var list, default model, `num_ctx`/reasoning-headroom
-  rationale) goes stale the moment chunking or the model default changes —
-  update in the same commits, not as an afterthought. `AGENTS.md`'s
+  comment block (env var list, default model, `num_ctx`/`ANSWER_HEADROOM`
+  rationale — now per-chunk-bucket-based, not a single global value) goes
+  stale the moment chunking or the model default changes — update in the
+  same commits, not as an afterthought. The header must also gain the new
+  cross-file-blind-spot limitation note (item 1 step 9) — this is new
+  content the diff itself introduces (chunking didn't exist before), so it
+  lands as part of this PR, not as a proposal. `AGENTS.md`'s
   `local_review.sh` script-table row currently says "default `qwen3.5:35b`"
   — update when item 3 lands.
 - **Agent-instruction candidates** (proposals only — operator decides): a
   `.agent/knowledge/local_model_sizing.md` note (item 5) on sizing local
-  models against VRAM-constrained dev hosts, framed as a reusable pattern
-  for any future 8GB-class (or smaller) host, not just this one. This is a
-  new knowledge doc being proposed, not an existing one being corrected —
-  operator can decline or ask for a different location.
+  models against VRAM-constrained dev hosts — including the re-derivable
+  arithmetic method and the cross-file blind-spot limitation — framed as a
+  reusable pattern for any future 8GB-class (or smaller) host, not just
+  this one. This is a new knowledge doc being proposed, not an existing
+  one being corrected — operator can decline or ask for a different
+  location.
 
 ## Open Questions
 
@@ -323,6 +427,19 @@ scripts belong there.
   review quality? This determines whether item 4 (systemd drop-in) is even
   needed — cannot be answered without running the empirical check on the dev
   host during implementation.
+- Item 3's candidate table's exact headroom numbers are placeholders pending
+  step 1 of the empirical check (reading `kv_bytes_per_token` off `ollama
+  show --verbose` for each candidate tag and measuring its actual reasoning
+  length). If the measured KV-cache size at the selected bucket is larger
+  than the placeholder implies, `9b-q4_K_M` may not clear the gate even with
+  chunking — in which case `4b-q8_0` (or a smaller tag) becomes the only
+  viable candidate, and item 4's drop-in becomes moot regardless of quality
+  preference. Cannot be resolved without running the measurement.
+- The `num_ctx` bucket set (`8192 16384 24576 32768`) in item 1 step 5 is a
+  first proposal, not a measured optimum — it may need adjusting once real
+  per-chunk token counts and reasoning lengths are observed during
+  implementation (e.g. if most single-file chunks cluster well under 8192,
+  a smaller bottom bucket saves more VRAM than proposed here).
 - If the drop-in does turn out to be needed: operator sign-off on applying
   `setup_ollama_kv_cache.sh` is a separate ask at implementation time, not
   covered by approval of this plan.
