@@ -74,40 +74,65 @@ which also reads PR review comments and CI status via `fetch_pr_reviews.sh` /
 `gh api` — data a body file can't supply. Run `triage-reviews` where GitHub read
 auth is available (in-process on the host), not as a body-only container dispatch.
 
-- **in-process** for **quick / cheap phases** — fast, same context root. It
-  spawns the phase via Claude Code's **`Agent` tool**, which exists in the
-  **host** session but **not** inside a headless container. This is precisely
-  why `run-issue` is a *host* orchestrator (see Scope E): run it on the host,
-  where it can fan phases out in-process; it is never itself dispatched into a
-  container. (Non-Claude host runtimes lack the `Agent` tool too — there, drive
-  the phases manually or use `--mode container`.) **Caveat:** an in-process
-  `Agent` phase runs *in the host session*, so its tool calls (edits, commits,
-  `gh`, shell) are subject to the **host's permission policy and can prompt the
-  operator** — phase after phase, edit after edit.
-- **container** for **isolation *and* prompt-free dispatch**. It is headless and
-  self-contained (needs no host `Agent` tool), so its tool calls execute *inside
-  the sandbox* and **never reach the operator's permission prompt** — zero
-  approvals for the dispatched work. That prompt elimination is the biggest
-  practical reason to use it, beyond a clean OS for the review-code fan-out or
-  implementation. **Scope note:** this removes prompts for the *phase's own tool
-  calls* — `run-issue`'s **checkpoints** (publish, PR, merge) are host-enforced
-  operator confirmations and stay that way regardless of dispatch mode. "Out of
-  the approval loop" means the *busywork* approvals, not the deliberate human
-  gates.
+- **in-process** — fast, same context root. It spawns the phase via Claude
+  Code's **`Agent` tool**, which exists in the **host** session but **not**
+  inside a headless container. This is precisely why `run-issue` is a *host*
+  orchestrator (see Scope E): run it on the host, where it can fan phases out
+  in-process; it is never itself dispatched into a container. (Non-Claude host
+  runtimes lack the `Agent` tool too — there, drive the phases manually or use
+  `--mode container`.) **Caveat, and it is the whole basis of the mode choice
+  below:** an in-process `Agent` phase runs *in the host session*, so its tool
+  calls (edits, commits, `gh`, shell) are subject to the **host's permission
+  policy**. Outside auto mode that means it **can prompt the operator** — phase
+  after phase, edit after edit.
+- **container** — headless and self-contained (needs no host `Agent` tool), so
+  its tool calls execute *inside the sandbox*: a clean OS, isolated
+  dependencies, and no route to the host's own caches or credentials. Its tool
+  calls also **never reach the operator's permission prompt**, which matters
+  when the host session is not in auto mode. **Scope note:** whatever the mode,
+  `run-issue`'s **checkpoints** (publish, PR, merge) are host-enforced operator
+  confirmations and stay that way. "Out of the approval loop" means the
+  *busywork* approvals, not the deliberate human gates.
 
-**Choosing a mode (#545).** **Lean toward `container`** for phases that do many
-tool calls (implement / address-findings / the review-code fan-out) or whenever
-keeping the operator **out of the approval loop** matters — combined with the
-background-dispatch guidance below, that gives a fully hands-off, prompt-free
-phase. Use **`in-process`** for quick/cheap phases where the prompt cost is
-already low and the lower overhead wins, or when container auth isn't set up
-(`dispatch_subagent.sh --check`, #532). Container isn't free: it pays a launch
-cost, and the prompt elimination is itself a **safety tradeoff** — the
-dispatched agent runs with broad tool access under a long-lived token, so the
-**sandbox boundary (not per-call approval) is what contains it**. That's an
-acceptable trade for trusted first-party phases, but it *is* the safeguard you're
-relying on — keep it in mind before dispatching anything that processes
-untrusted input.
+**Choosing a mode (#607).** **Check the host session's permission mode first —
+it decides the default.** In Claude Code, auto mode is shown in the session's
+own status/permission-mode indicator (and is toggled from the same place).
+
+- **Auto mode active → default to `in-process`.** Under auto mode the host
+  approves the routine tool calls a phase makes, so the prompt cost that used to
+  argue for containers is not there to pay. Observed, not assumed: the #604
+  lifecycle ran all seven phases in-process under auto mode — `review-issue`,
+  `plan-task`, `review-plan`, implementation, two `review-code` rounds and two
+  `address-findings` passes — with no operator approvals for the dispatched
+  work. In-process also keeps what the container path gives up: host GitHub
+  auth, host-built layer installs, the local-model review specialist, and the
+  `Agent` tool itself.
+- **Cannot confirm auto mode is active → the container-leaning guidance is in
+  force.** This is the fail-safe direction on purpose. If you are unsure, or you
+  are on a non-Claude runtime with no `Agent` tool, or the operator has
+  permission prompts enabled, prefer **`container`** for phases that do many
+  tool calls (implement / address-findings / the review-code fan-out) — that is
+  the case #545 was written for, and it has not gone away.
+- **Choose `container` regardless of mode when isolation is the actual
+  requirement**: anything processing untrusted input, or work needing a clean
+  dependency environment. Use `in-process` regardless when a phase needs
+  something the sandbox lacks — GitHub read auth (`triage-reviews`), the host
+  Ollama endpoint, or further `Agent`-tool fan-out.
+
+Container isn't free: it pays a launch cost, it cannot see host-built layer
+installs, and it has no GitHub auth of its own (`--context-file`, #552). Check
+`dispatch_subagent.sh --check` (#532) before relying on it.
+
+**What contains a dispatched agent — in either mode.** Neither mode puts a human
+behind each tool call, so be clear about what does the containing. In a
+**container**, the sandbox boundary is the *whole* of it: the dispatched agent
+runs with broad tool access under a long-lived token, and nothing else stands
+between it and the work. That is an acceptable trade for trusted first-party
+phases — and it is exactly why untrusted input belongs there rather than
+in-process. **In-process under auto mode**, containment is the host's permission
+policy and allowlist, the worktree the phase is confined to, and the
+`run-issue` checkpoints, which survive regardless of mode. Auto mode removed the
+*prompts*; it did not remove the need to know which of these is holding.
 
 **Dispatch container phases in the *background* so the host stays available.**
 A synchronous (foreground) container dispatch blocks the host's turn for the
