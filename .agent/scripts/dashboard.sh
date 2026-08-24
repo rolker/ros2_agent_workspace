@@ -170,10 +170,16 @@ if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
     # them to the same empty answer (#609).
     python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null
     VALIDATE_RC=$?
+    # Only 1 is drift. `*)` used to claim it for anything non-zero, so an
+    # argparse usage error (2), a missing python3 (127) and an unhandled
+    # traceback (1 with no output) all reported "Workspace drift detected" and
+    # sent the operator to `make validate` for a problem `make validate` does
+    # not have. Naming the code is what makes the remedy actionable (#609).
     case "$VALIDATE_RC" in
         0) check_pass "Workspace matches .repos configuration" ;;
+        1) check_warn "Workspace drift detected. Run: make validate" ;;
         3) check_warn "No repos configured — nothing validated. Run: make setup-all" ;;
-        *) check_warn "Workspace drift detected. Run: make validate" ;;
+        *) check_warn "Could not validate the workspace (validate_workspace.py exit $VALIDATE_RC). Run: python3 .agent/scripts/validate_workspace.py" ;;
     esac
 fi
 

@@ -30,7 +30,7 @@ run_with_rc() {
     printf '#!/usr/bin/env python3\nimport sys\nsys.exit(%s)\n' "$1" \
         > "$sandbox/.agent/scripts/validate_workspace.py"
     bash "$sandbox/.agent/scripts/dashboard.sh" --quick 2>&1 \
-        | grep -iE "\.repos configuration|drift detected|nothing validated" || true
+        | grep -iE "\.repos configuration|drift detected|nothing validated|could not validate" || true
 }
 
 check() {
@@ -62,15 +62,25 @@ else
     pass_count=$((pass_count + 1))
 fi
 
-# An unexpected code must still be surfaced, not silently treated as a pass.
-out=$(run_with_rc 4)
-if [[ "$out" == *"Workspace matches"* || -z "$out" ]]; then
-    echo "  ❌ an unexpected exit code must not read as a pass"
-    fail=1
-else
-    echo "  ✅ an unexpected exit code falls through to the drift warning"
-    pass_count=$((pass_count + 1))
-fi
+# An unexpected code must be surfaced — and NOT as drift. argparse's 2, a
+# missing python3 (127) and an unhandled traceback are not "the workspace has
+# drifted", and `make validate` is not their remedy (#609).
+for rc in 2 4 127; do
+    out=$(run_with_rc "$rc")
+    if [[ "$out" == *"Workspace matches"* || -z "$out" ]]; then
+        echo "  ❌ exit $rc must not read as a pass"
+        fail=1
+    elif [[ "$out" == *"drift detected"* ]]; then
+        echo "  ❌ exit $rc must not be reported as drift"
+        fail=1
+    elif [[ "$out" == *"exit $rc"* ]]; then
+        echo "  ✅ exit $rc is surfaced by name, not as drift"
+        pass_count=$((pass_count + 1))
+    else
+        echo "  ❌ exit $rc was not surfaced with its code (got: $out)"
+        fail=1
+    fi
+done
 
 echo ""
 if [ "$fail" -eq 0 ]; then
