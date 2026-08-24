@@ -44,7 +44,8 @@ that citation as-is in both target files — do not "correct" it to #604-only.
      Code's auto mode). Under auto mode, in-process `Agent`-tool sub-agents
      run prompt-free too, so the prompt-volume argument for containers
      doesn't apply. *(The plan said "no new detection mechanism"; the shipped
-     text does name the tell the deciding agent reads — see note 2 — because
+     text does name the tell the deciding agent reads — see Implementation Notes
+     — because
      an unstated condition is one no reader can evaluate.)*
    - For a session **not** in auto mode (default Claude Code permission
      mode, or a non-Claude host runtime without an `Agent` tool), keep the
@@ -53,7 +54,7 @@ that citation as-is in both target files — do not "correct" it to #604-only.
    - Reframe container's remaining case as **isolation or dependency
      environment**, not prompt volume: untrusted input, and a clean
      OS/dependency set for implementation.
-     *(Superseded during implementation — see note 3 below: the
+     *(Superseded during implementation — see Implementation Notes: the
      sandbox-boundary paragraph was rewritten, not kept "content unchanged",
      and now covers both dispatch paths. The `review-code` fan-out was also
      removed from the container list — it needs the `Agent` tool and the host
@@ -64,7 +65,7 @@ that citation as-is in both target files — do not "correct" it to #604-only.
    - Do **not** touch the `--context-file` limitation paragraphs or the
      background-dispatch / freshness-gate paragraphs below the section — both
      orthogonal per the issue's non-goals, and both left alone.
-     *(Fence redrawn during implementation — see note 1 below: the
+     *(Fence redrawn during implementation — see Implementation Notes: the
      in-process/container bullet definitions were originally fenced off too,
      but they carried three statements this change falsifies, so both bullets
      were rewritten.)*
@@ -79,16 +80,21 @@ that citation as-is in both target files — do not "correct" it to #604-only.
    prompt volume would otherwise be a problem. Keep the three neighbouring
    bullets (background dispatch, no filesystem-wide search scope, the
    exit-137 free-RAM gate) unchanged — orthogonal per the issue's scope.
-   *(One addition beyond the named bullet: the `# Container (…)` code-block
-   comment ~25 lines above it, the same retired advice in miniature — see
-   scope additions.)*
+   *(Two additions beyond the named bullet, both landed: the `# Container (…)`
+   code-block comment ~25 lines above it — the same retired advice in
+   miniature, invisible to the plan's consequences grep because it contains
+   neither "prompt-free" nor "permission prompt" — and the file's own
+   `#545` → `#607` citation, so a reader arriving here first sees the rule was
+   reversed deliberately. A widened search — `implementation-heavy`, bare
+   `--mode container`, "lean toward", "prefer container" — found no further
+   surfaces.)*
 
 3. **Third file: `.claude/skills/review-plan/SKILL.md`.** The plan originally
    said "no other files"; two additions landed there, both operator-approved:
    the `--mode container` recommendation for implementation work (L~451) now
    points at the new default, and the self-review-detection heuristic was
    fixed to key on *how the reviewer was invoked* rather than on the shared
-   `**By**` identity string (see scope additions below).
+   `**By**` identity string (rationale in Implementation Notes).
 
    Still out of scope and untouched: the adapter files
    (`.github/copilot-instructions.md`,
@@ -158,7 +164,7 @@ that citation as-is in both target files — do not "correct" it to #604-only.
 
 Single PR, three files, prose-only edits (the third,
 `.claude/skills/review-plan/SKILL.md`, was added during implementation by
-operator decision — see Approach step 3 and the scope additions below).
+operator decision — see Approach step 3 and the Implementation Notes).
 
 
 ## Implementation Notes
