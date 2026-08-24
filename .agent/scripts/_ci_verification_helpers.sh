@@ -214,3 +214,45 @@ ci_local_attestation_status() {
     esac
     return 1
 }
+
+# ci_local_push_attestation <repo_path>
+#
+# ADR-0018 decision 5: publish the attestation that authorized a merge, so the
+# evidence does not live only on the merging machine.
+#   return 0 → published, or already published (echoes a one-line explanation)
+#   return 1 → push failed (echoes the reason, git's own stderr included)
+#
+# A bare `git push origin refs/notes/ci-local` fails in BOTH normal states:
+#   * the note was read from ORIGIN (fetched into a scratch ref), so there is no
+#     local refs/notes/ci-local to push — git errors "src refspec does not
+#     match any", and a caller that reports "the evidence exists only on this
+#     machine" is telling the operator something false;
+#   * origin's notes ref holds records this checkout never fetched (git does NOT
+#     fetch refs/notes by default), so the push is rejected non-fast-forward.
+# So: push only what exists locally, and reconcile with origin first. Notes here
+# are append-only run records, so union (`cat_sort_uniq`) is the correct merge —
+# it never drops a record from either side.
+ci_local_push_attestation() {
+    local repo="$1" scratch err
+    if [[ -z "$repo" ]]; then
+        echo "internal error: ci_local_push_attestation needs <repo_path>"
+        return 1
+    fi
+    if ! git -C "$repo" rev-parse --verify -q "refs/notes/$CI_LOCAL_NOTES_REF" >/dev/null; then
+        echo "attestation was read from origin — it is already published there; nothing to push"
+        return 0
+    fi
+    scratch=$(_ci_local_scratch_ref)
+    if git -C "$repo" fetch -q origin \
+            "+refs/notes/$CI_LOCAL_NOTES_REF:$scratch" 2>/dev/null; then
+        git -C "$repo" -c "core.notesRef=refs/notes/$CI_LOCAL_NOTES_REF" \
+            notes merge -q -s cat_sort_uniq "$scratch" >/dev/null 2>&1 || true
+        git -C "$repo" update-ref -d "$scratch" 2>/dev/null || true
+    fi
+    if err=$(git -C "$repo" push origin "refs/notes/$CI_LOCAL_NOTES_REF" 2>&1); then
+        echo "attestation note pushed"
+        return 0
+    fi
+    echo "could not push refs/notes/ci-local — git said: $(tr '\n' ' ' <<<"$err")"
+    return 1
+}

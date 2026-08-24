@@ -266,6 +266,61 @@ absent="0123456789012345678901234567890123456789"
 add_note "$r" "$absent" "$(note_body 'ci-local: pass' full 'upstream-repo: alpha@1111111111111111111111111111111111111111')"
 assert_verdict "unverifiable upstream coverage rejected" no-attestation "$r" "$absent" "fetch origin"
 
+# ---- publishing the attestation (ADR-0018 decision 5) -----------------------
+echo "Test: note read from origin → nothing to push, and no false 'only on this machine'"
+# The old bare `git push origin refs/notes/ci-local` errored with "src refspec
+# does not match any" here, and the caller then told the operator the evidence
+# existed only on the merging machine while prescribing a command that failed
+# the same way. It is in fact already published.
+read -r clone sha <<<"$(setup_origin_case pushorigin)"
+msg=$(ci_local_push_attestation "$clone"); rc=$?
+{ [[ $rc -eq 0 ]] && grep -qF "already published" <<<"$msg"; } \
+    && ok "origin-sourced note reports already-published" \
+    || bad "origin-sourced push (rc=$rc, msg: $msg)"
+
+echo "Test: local note + origin holding records we never fetched → push succeeds"
+# git does NOT fetch refs/notes by default, so origin's notes ref routinely
+# holds records this checkout has never seen — a bare push is then rejected
+# non-fast-forward. Reconciling with cat_sort_uniq first makes it a fast-forward
+# and keeps BOTH sides' records.
+read -r clone sha <<<"$(setup_origin_case pushdiverged)"
+bare="$TMPROOT/pushdiverged_bare.git"
+# Another machine attests a different commit and pushes it.
+other="$TMPROOT/pushdiverged_other"
+git clone -q "$bare" "$other"
+git -C "$other" "${GIT_ID[@]}" commit -q --allow-empty -m other
+othersha=$(head_of "$other")
+git -C "$other" push -q origin HEAD:refs/heads/other-branch
+# That machine has origin's notes (it fetched them) and appends to them.
+git -C "$other" fetch -q origin '+refs/notes/ci-local:refs/notes/ci-local'
+add_note "$other" "$othersha" "$(note_body 'ci-local: pass' full)"
+git -C "$other" push -q origin refs/notes/ci-local
+# Meanwhile this checkout has its own local record it has not published.
+git -C "$clone" "${GIT_ID[@]}" commit -q --allow-empty -m local
+localsha=$(head_of "$clone")
+git -C "$clone" push -q origin HEAD:refs/heads/local-branch
+add_note "$clone" "$localsha" "$(note_body 'ci-local: pass' full)"
+msg=$(ci_local_push_attestation "$clone"); rc=$?
+{ [[ $rc -eq 0 ]] && grep -qF "pushed" <<<"$msg"; } \
+    && ok "diverged notes ref reconciled and pushed" \
+    || bad "diverged push (rc=$rc, msg: $msg)"
+# Both records must survive the union merge.
+git clone -q "$bare" "$TMPROOT/pushdiverged_verify"
+git -C "$TMPROOT/pushdiverged_verify" fetch -q origin '+refs/notes/ci-local:refs/notes/ci-local'
+{ git -C "$TMPROOT/pushdiverged_verify" notes --ref=ci-local show "$othersha" >/dev/null 2>&1 \
+  && git -C "$TMPROOT/pushdiverged_verify" notes --ref=ci-local show "$localsha" >/dev/null 2>&1; } \
+    && ok "both sides' records survive on origin" \
+    || bad "a record was lost by the reconciliation"
+
+echo "Test: an unreachable origin → push reports the failure, never a false success"
+r=$(new_repo pushfail); s=$(head_of "$r")
+git -C "$r" remote add origin "$TMPROOT/does_not_exist.git"
+add_note "$r" "$s" "$(note_body 'ci-local: pass' full)"
+msg=$(ci_local_push_attestation "$r"); rc=$?
+{ [[ $rc -ne 0 ]] && grep -qF "could not push" <<<"$msg"; } \
+    && ok "push failure surfaced with git's own reason" \
+    || bad "push failure (rc=$rc, msg: $msg)"
+
 echo "Test: missing arguments → no-attestation (never a silent pass)"
 assert_verdict "no args rejected" no-attestation "" "" "internal error"
 

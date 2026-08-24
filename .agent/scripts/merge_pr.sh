@@ -22,11 +22,23 @@
 #                             have registered yet (default 3)
 #   MERGE_PR_SETTLE_SECONDS   delay between those polls (default 10)
 #
+# Exit codes:
+#   0   merged and verified (hosted checks green, or an ADR-0018 full-scope
+#       ci-local attestation on the head), cleaned up, synced
+#   1   refused, or a later step failed (nothing merged unless stated)
+#   2   usage error
+#   42  MERGED WITHOUT VERIFICATION: the repo has no CI at the head and no
+#       ci-local attestation. The merge and cleanup DID happen; the distinct
+#       code exists so this outcome is greppable rather than one stderr line
+#       among many (issue #610). `make merge-pr` surfaces it as "Error 42".
+#
 # Field-mode repos (non-GitHub origin) have no GitHub PR; this script refuses
 # them before any `gh` call (ADR-0011) — they use the field workflow.
 #
 # Steps: resolve → field-mode guard → verify (hosted checks, or an ADR-0018
-#        ci-local attestation when the repo has no CI at all — issue #610) →
+#        full-scope ci-local attestation on the exact head — which satisfies the
+#        gate for a PROJECT repo whether or not the repo has workflows, but
+#        never over a RED hosted signal; issue #610) →
 #        merge (--merge) → remove worktree → delete branches → make sync.
 
 set -eo pipefail
@@ -316,52 +328,184 @@ echo "Merging PR #${PR_NUM}  ($GH_REPO, branch $BRANCH, issue #${ISSUE_NUM:-?})"
 echo "========================================"
 
 # ---- verify before merging --------------------------------------------------
-# Four states, not two (issue #610):
-#   1. checks present            → wait on them, gate on them (unchanged)
-#   2. workflows present but no checks registered → REFUSE (fail closed)
-#   3. project repo, no workflows at the head, full-scope ci-local attestation
-#      on that exact commit → merge on the attestation (ADR-0018 decisions 1/2)
-#   4. project repo, no workflows at the head, no attestation → merge with a
-#      named warning that nothing verified this commit
-# The workspace repo never reaches 3/4: its hosted checks are required
-# (ADR-0018 decision 4).
-ATTESTED=false   # set in state 3; gates the refs/notes/ci-local push below
-# Settle window for state 2, overridable so tests don't sleep.
+# ADR-0018 decision 1 in full (#610): a project-repo PR whose head carries a
+# full-scope `refs/notes/ci-local` attestation satisfies the merge gate WITHOUT
+# waiting for hosted Actions — whether or not the repo also has workflows.
+#
+# PRECEDENCE (the attestation never overrides a red hosted signal; AGENTS.md
+# § Merging: "never merge past a red signal from whichever verification
+# applies"):
+#
+#   hosted checks FAILING              → REFUSE, attestation or not
+#   hosted checks PENDING + attestation → merge on the attestation, no wait
+#   hosted checks PENDING, no attestation → wait on them (unchanged)
+#   hosted checks PASSING              → merge (unchanged)
+#   hosted checks in an UNRECOGNIZED state → wait on them (fail closed)
+#   no checks registered, workflows exist at the head → settle, re-poll, REFUSE
+#   no checks, no workflows, attestation → merge on the attestation
+#   no checks, no workflows, no attestation → merge with a loud warning and
+#                                             exit $MERGE_UNVERIFIED_EXIT
+#
+# The workspace repo never takes any attestation path: its hosted checks are
+# required (ADR-0018 decision 4).
+ATTESTED=false                  # set when a note authorized the merge; gates the
+                                # refs/notes/ci-local push below (decision 5)
+MERGED_UNVERIFIED=false         # set in the no-CI/no-attestation state
+# Distinct exit status for "merged, but nothing verified this commit". The merge
+# and all cleanup still happen; the code makes that outcome greppable in a
+# transcript instead of one stderr line among many. Documented in the usage
+# header above, AGENTS.md § Merge verification, and `make help`.
+MERGE_UNVERIFIED_EXIT=42
+
+# Settle window for the workflows-but-no-checks state, overridable so tests
+# don't sleep. Both reach arithmetic contexts, so validate them as integers —
+# an unvalidated value in `$(( ))`/`[[ -gt ]]` is a command-execution surface.
 SETTLE_ATTEMPTS="${MERGE_PR_SETTLE_ATTEMPTS:-3}"
 SETTLE_SECONDS="${MERGE_PR_SETTLE_SECONDS:-10}"
+for v in SETTLE_ATTEMPTS SETTLE_SECONDS; do
+    if [[ ! "${!v}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: MERGE_PR_${v#SETTLE_} must be a non-negative integer (got '${!v}')." >&2
+        exit 2
+    fi
+done
 
-# Echo the PR's statusCheckRollup length, or exit 1 on a gh/JSON failure.
+# Echo "<count> <state>" for the PR's status checks, or exit 1 on failure.
+#   state ∈ failing | pending | passing | unknown   (count 0 → "0 passing")
+#
 # A FAILED `gh` CALL IS NOT AN EMPTY ARRAY: auth expiry, network loss, and rate
 # limiting must never be classified as "this repo has no CI" — that would merge
 # on a warning when we simply could not see the checks.
-check_rollup_count() {
-    local json rc
+check_rollup_state() {
+    local json rc out
     json=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json statusCheckRollup 2>/dev/null); rc=$?
     if [[ $rc -ne 0 || -z "$json" ]]; then
         echo "ERROR: could not read check status for PR #$PR_NUM ($GH_REPO) — gh failed (auth/network/rate limit?). Not merging." >&2
         exit 1
     fi
-    # `jq -e` distinguishes "parsed, and here is the length" from "input was not
-    # JSON" (jq exits 4 on empty input) — the distinction the classification
-    # depends on.
-    if ! jq -e -r '.statusCheckRollup | length' <<<"$json" 2>/dev/null; then
+    # Classify each entry, then aggregate. A CheckRun carries status/conclusion;
+    # a StatusContext carries state. Anything we do not recognize is "unknown"
+    # and is waited on, never shortcut past. The `type != "array"` guard fails
+    # closed on a gh schema change: `length` alone yields 0 for a MISSING key
+    # exactly as for an empty array, which would look like "no CI".
+    out=$(jq -e -r '
+        def verdict:
+          (.status? // null) as $st
+          | (.conclusion? // null) as $cc
+          | (.state? // null) as $s
+          | if $st != null and ($st | ascii_upcase) != "COMPLETED" then "pending"
+            elif $cc != null then
+              (if (["SUCCESS","NEUTRAL","SKIPPED"] | index($cc | ascii_upcase)) then "pass" else "fail" end)
+            elif $s != null then
+              (($s | ascii_upcase) as $u
+               | if $u == "SUCCESS" or $u == "EXPECTED" then "pass"
+                 elif $u == "PENDING" then "pending"
+                 else "fail" end)
+            else "unknown" end;
+        if (.statusCheckRollup | type) != "array" then error("not an array") else
+          (.statusCheckRollup | map(verdict)) as $v
+          | "\($v | length) " +
+            (if   ($v | map(select(. == "fail"))    | length) > 0 then "failing"
+             elif ($v | map(select(. == "unknown")) | length) > 0 then "unknown"
+             elif ($v | map(select(. == "pending")) | length) > 0 then "pending"
+             else "passing" end)
+        end' <<<"$json" 2>/dev/null) || {
         echo "ERROR: unexpected gh output while reading check status for PR #$PR_NUM ($GH_REPO). Not merging." >&2
         exit 1
+    }
+    echo "$out"
+}
+
+pr_url() { gh pr view "$PR_NUM" -R "$GH_REPO" --json url --jq '.url' 2>/dev/null || echo ""; }
+
+# The checkout that is actually sitting on the PR head — what ci_local.sh must
+# be pointed at. BRANCH_REPO is the MAIN checkout (on the default branch), so
+# naming it in the recourse would attest the wrong commit.
+attest_hint() {
+    local candidate="$REPO_PATH" at=""
+    at=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || echo "")
+    if [[ "$at" == "$HEAD_SHA" ]]; then
+        echo "$SCRIPT_DIR/ci_local.sh $candidate"
+    else
+        echo "$SCRIPT_DIR/ci_local.sh <a checkout of $BRANCH_REPO sitting on $HEAD_SHA>"
     fi
 }
 
 if [[ "$NO_WAIT" == false ]]; then
     echo "  Checking CI status..."
-    ROLLUP_COUNT=$(check_rollup_count) || exit 1
+    # `$( )` runs in a SUBSHELL, so check_rollup_state's `exit 1` on a gh
+    # failure would only kill that subshell — the status must be propagated
+    # explicitly here, or an unreadable check status would fall through as an
+    # empty rollup (the exact fail-open this issue exists to remove).
+    ROLLUP_LINE=$(check_rollup_state) || exit 1
+    read -r ROLLUP_COUNT ROLLUP_STATE <<<"$ROLLUP_LINE"
+    if [[ ! "$ROLLUP_COUNT" =~ ^[0-9]+$ || -z "$ROLLUP_STATE" ]]; then
+        echo "ERROR: could not classify the check status for PR #$PR_NUM ($GH_REPO). Not merging." >&2
+        exit 1
+    fi
 
-    if [[ "$ROLLUP_COUNT" -gt 0 ]]; then
-        # ---- state 1: checks exist — unchanged behavior ----------------------
+    # The head commit: the attestation is keyed on it, and the workflows probe
+    # asks about THIS commit rather than the default branch. Validate it as a
+    # full sha before it is used as both a URL ref and a git revision.
+    HEAD_SHA=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || echo "")
+    if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "ERROR: could not resolve a valid head commit for PR #$PR_NUM ($GH_REPO) — got '${HEAD_SHA:-<empty>}'. Not merging." >&2
+        exit 1
+    fi
+
+    # ADR-0018 decision 4: the workspace repo's hosted checks are required and
+    # no attestation substitutes. Identify it BOTH by path and by GitHub slug —
+    # a workspace worktree created outside `.workspace-worktrees/` would defeat
+    # a path compare alone, and the exemption must not be losable that way.
+    IS_WORKSPACE_REPO=false
+    if [[ "$BRANCH_REPO" == "$ROOT_DIR" ]]; then
+        IS_WORKSPACE_REPO=true
+    else
+        WORKSPACE_SLUG=$(extract_gh_slug "$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || echo "")")
+        [[ -n "$WORKSPACE_SLUG" && "$GH_REPO" == "$WORKSPACE_SLUG" ]] && IS_WORKSPACE_REPO=true
+    fi
+
+    # Is a full-scope ci-local attestation on THIS head available as evidence?
+    # Consulted for project repos in every state that reaches it (ADR-0018
+    # decision 1) — never for the workspace repo, and never to override a red
+    # hosted signal (see gate_on_hosted_checks).
+    attestation_available() {
+        [[ "$IS_WORKSPACE_REPO" == true ]] && return 1
+        ATTEST_VERDICT=$(ci_local_attestation_status "$BRANCH_REPO" "$HEAD_SHA") && return 0
+        return 1
+    }
+
+    # Apply the precedence above to a non-empty rollup. Returns normally when
+    # the gate is satisfied; exits 1 when it is not.
+    gate_on_hosted_checks() {
+        local state="$1" url
+        if [[ "$state" == "failing" ]]; then
+            url=$(pr_url)
+            {
+                echo "ERROR: CI checks failed${url:+ ($url)}."
+                echo "       A ci-local attestation does NOT override a red hosted signal (ADR-0018:"
+                echo "       never merge past a red signal from whichever verification applies)."
+                echo "       Fix the failures and re-run; --no-wait skips verification entirely and is not the answer."
+            } >&2
+            exit 1
+        fi
+        if [[ "$state" == "pending" ]] && attestation_available; then
+            echo "  ✅ $ATTEST_VERDICT (ADR-0018 decision 1) — hosted checks are still pending;"
+            echo "     merging on the attestation without waiting for them."
+            ATTESTED=true
+            return 0
+        fi
+        # passing → returns at once; pending/unknown without an attestation →
+        # the wait we have always done.
         echo "  Waiting for CI..."
         if ! gh pr checks "$PR_NUM" -R "$GH_REPO" --watch --fail-fast; then
-            url=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json url --jq '.url' 2>/dev/null || echo "")
+            url=$(pr_url)
             echo "ERROR: CI checks failed${url:+ ($url)}. Fix and re-run, or pass --no-wait." >&2
             exit 1
         fi
+    }
+
+    if [[ "$ROLLUP_COUNT" -gt 0 ]]; then
+        gate_on_hosted_checks "$ROLLUP_STATE"
     else
         # An empty rollup is AMBIGUOUS. A repo that does have CI presents `[]`
         # when the head was just pushed and Actions has not registered runs
@@ -369,18 +513,13 @@ if [[ "$NO_WAIT" == false ]]; then
         # a suite is queued with no runs. Reading `[]` as "no CI configured"
         # would turn today's fail-CLOSED misreport into a fail-OPEN merge.
         # Resolve it with a positive probe instead of an inference.
-        HEAD_SHA=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || echo "")
-        if [[ -z "$HEAD_SHA" ]]; then
-            echo "ERROR: could not resolve the head commit for PR #$PR_NUM ($GH_REPO) — gh failed. Not merging." >&2
-            exit 1
-        fi
-
-        # Does .github/workflows exist AT THIS COMMIT? 404 => genuinely no CI.
-        # Do NOT use `gh api repos/<repo>/actions/workflows` for this: it
-        # reports total_count: 2 for rolker/mru_transform, a repo with no
-        # workflow files at all, because dynamically-registered Copilot
-        # reviewer workflows appear there. The ?ref= form answers the right
-        # question — whether THIS commit carries CI, not the default branch.
+        #
+        # Does .github/workflows exist AT THIS COMMIT? Do NOT use
+        # `gh api repos/<repo>/actions/workflows`: it reports total_count: 2
+        # for rolker/mru_transform, a repo with no workflow files at all,
+        # because dynamically-registered Copilot reviewer workflows appear
+        # there. The ?ref= form answers the right question — whether THIS
+        # commit carries CI, not the default branch.
         # `VAR=$(cmd)` under `set -e` would abort the script on the 404 that is
         # this probe's most informative answer — capture the status explicitly.
         probe_rc=0
@@ -388,87 +527,113 @@ if [[ "$NO_WAIT" == false ]]; then
         if [[ $probe_rc -eq 0 ]]; then
             HAS_WORKFLOWS=true
         elif grep -qE '(HTTP 404|Not Found)' <<<"$WORKFLOW_PROBE"; then
-            HAS_WORKFLOWS=false
+            # A 404 alone is NOT proof that the path is absent. GitHub returns a
+            # byte-identical 404 for a repo/path the token cannot read
+            # (Contents scope missing) and for a ref it cannot resolve
+            # ("No commit found for the ref" is also a 404 body). A token with
+            # PR read but no Contents read would classify EVERY project repo as
+            # no-CI and merge it on a warning. So confirm positively: list the
+            # repository root at the same ref. If that succeeds, Contents read
+            # works and the ref resolves, so the workflows 404 really does mean
+            # "this commit has no .github/workflows".
+            control_rc=0
+            CONTROL_PROBE=$(gh api "repos/$GH_REPO/contents?ref=$HEAD_SHA" 2>&1) || control_rc=$?
+            if [[ $control_rc -eq 0 ]]; then
+                HAS_WORKFLOWS=false
+            else
+                {
+                    echo "ERROR: cannot tell whether $GH_REPO has CI at $HEAD_SHA."
+                    echo "       .github/workflows returned 404, but so did the repository root at the"
+                    echo "       same ref — so the 404 may mean 'no permission to read contents' or"
+                    echo "       'unknown ref', not 'no workflows'. Not merging on an unreadable probe."
+                    echo "       Check the token's Contents:read scope and that $HEAD_SHA is pushed."
+                    echo "       gh said: $(head -1 <<<"$CONTROL_PROBE")"
+                } >&2
+                exit 1
+            fi
         else
             # A probe we could not run is not a probe that said "no CI".
             echo "ERROR: could not probe .github/workflows for $GH_REPO at $HEAD_SHA (auth/network/rate limit?). Not merging." >&2
-            echo "  gh said: $(head -1 <<<"$WORKFLOW_PROBE")" >&2
+            echo "       gh said: $(head -1 <<<"$WORKFLOW_PROBE")" >&2
             exit 1
         fi
 
-        # The workspace repo is exempt from the ci-local substitution
-        # (ADR-0018 decision 4) — treat it as "has CI" regardless of the probe,
-        # so it can only ever settle-and-refuse, never merge unverified.
-        IS_WORKSPACE_REPO=false
-        [[ "$BRANCH_REPO" == "$ROOT_DIR" ]] && IS_WORKSPACE_REPO=true
-
         if [[ "$HAS_WORKFLOWS" == true || "$IS_WORKSPACE_REPO" == true ]]; then
-            # ---- state 2: CI exists, checks not registered (yet) -------------
+            # ---- CI exists, checks not registered (yet) ----------------------
             # Short settle/re-poll: a registration race resolves in seconds.
+            polls=1                       # the read above was already a poll
             for ((i = 0; i < SETTLE_ATTEMPTS; i++)); do
                 [[ "$SETTLE_SECONDS" -gt 0 ]] && sleep "$SETTLE_SECONDS"
-                ROLLUP_COUNT=$(check_rollup_count) || exit 1
+                ROLLUP_LINE=$(check_rollup_state) || exit 1
+                read -r ROLLUP_COUNT ROLLUP_STATE <<<"$ROLLUP_LINE"
+                [[ "$ROLLUP_COUNT" =~ ^[0-9]+$ ]] || { echo "ERROR: could not classify the check status for PR #$PR_NUM ($GH_REPO). Not merging." >&2; exit 1; }
+                polls=$((polls + 1))
                 [[ "$ROLLUP_COUNT" -gt 0 ]] && break
             done
             if [[ "$ROLLUP_COUNT" -gt 0 ]]; then
-                echo "  Waiting for CI..."
-                if ! gh pr checks "$PR_NUM" -R "$GH_REPO" --watch --fail-fast; then
-                    url=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json url --jq '.url' 2>/dev/null || echo "")
-                    echo "ERROR: CI checks failed${url:+ ($url)}. Fix and re-run, or pass --no-wait." >&2
-                    exit 1
-                fi
+                # Checks appeared during the settle window: gate on them exactly
+                # as if they had been there from the start.
+                gate_on_hosted_checks "$ROLLUP_STATE"
             else
-                url=$(gh pr view "$PR_NUM" -R "$GH_REPO" --json url --jq '.url' 2>/dev/null || echo "")
+                url=$(pr_url)
                 if [[ "$IS_WORKSPACE_REPO" == true ]]; then
                     {
-                        echo "ERROR: no checks have registered yet for PR #$PR_NUM ($GH_REPO)."
-                        echo "  The workspace repo's hosted checks are required (ADR-0018 decision 4) —"
-                        echo "  a ci-local attestation does not substitute here. Wait for Actions to"
-                        echo "  start, then re-run merge-pr.${url:+ ($url)}"
+                        echo "ERROR: no checks have registered yet for PR #$PR_NUM ($GH_REPO) after $polls poll(s)."
+                        echo "       The workspace repo's hosted checks are required (ADR-0018 decision 4) —"
+                        echo "       a ci-local attestation does not substitute here. Wait for Actions to"
+                        echo "       start, then re-run merge-pr.${url:+ ($url)}"
                     } >&2
                 else
                     {
                         echo "ERROR: $GH_REPO has .github/workflows at $HEAD_SHA but no checks have"
-                        echo "  registered for PR #$PR_NUM after $SETTLE_ATTEMPTS poll(s). Either Actions has not"
-                        echo "  started them yet, or every workflow is filtered out for this PR's"
-                        echo "  paths/branches. Not merging: a repo with CI must be verified by it."
-                        echo "  Check the PR's Checks tab${url:+ ($url)}, then re-run merge-pr."
+                        echo "       registered for PR #$PR_NUM after $polls poll(s). Either Actions has not"
+                        echo "       started them yet, or every workflow is filtered out for this PR's"
+                        echo "       paths/branches, or the directory holds no runnable workflow."
+                        echo "       Not merging: a repo with CI must be verified by it."
+                        echo "       Check the PR's Checks tab${url:+ ($url)}, then re-run merge-pr."
                     } >&2
                 fi
                 exit 1
             fi
         else
-            # ---- states 3 and 4: project repo, genuinely no CI at this head --
-            if verdict=$(ci_local_attestation_status "$BRANCH_REPO" "$HEAD_SHA"); then
-                echo "  ✅ $verdict (ADR-0018) — treating as merge verification."
+            # ---- project repo, genuinely no CI at this head ------------------
+            if attestation_available; then
+                echo "  ✅ $ATTEST_VERDICT (ADR-0018) — treating as merge verification."
                 ATTESTED=true
             else
                 {
-                    echo "⚠️  WARNING: $GH_REPO has no CI workflows at $HEAD_SHA and $verdict."
-                    echo "   Merging with NO automated verification."
-                    echo "   To merge on evidence instead: $SCRIPT_DIR/ci_local.sh $BRANCH_REPO"
-                    echo "   on THIS head commit ($HEAD_SHA), then re-run merge-pr. An attestation"
-                    echo "   for an earlier commit does not count — re-run it after every push."
+                    echo "⚠️  WARNING: $GH_REPO has no CI workflows at $HEAD_SHA and ${ATTEST_VERDICT:-no attestation was found}."
+                    echo "    Merging with NO automated verification."
+                    echo "    To merge on evidence instead, run it against a checkout of THIS head:"
+                    echo "      $(attest_hint)"
+                    echo "    then re-run merge-pr. An attestation for an earlier commit does not"
+                    echo "    count — re-run it after every push."
                 } >&2
+                MERGED_UNVERIFIED=true
             fi
         fi
     fi
 fi
 
 # ---- push the attestation that authorized this merge ------------------------
-# ADR-0018 decision 5: notes are pushed at merge time. If the merge is
-# proceeding BECAUSE of a local note, the evidence must not stay on the merging
-# machine. Pushed BEFORE the merge so a push failure is visible while the merge
-# is still in the operator's hands; a failure warns rather than aborts — the
+# ADR-0018 decision 5, delegated to ci_local_push_attestation() (which handles
+# the two states a bare `git push origin refs/notes/ci-local` fails in — see its
+# comment). Pushed BEFORE the merge so a failure is visible while the merge is
+# still in the operator's hands; a failure warns rather than aborts, because the
 # verification itself already happened.
 if [[ "$ATTESTED" == true ]]; then
     echo "  Pushing refs/notes/ci-local (ADR-0018 decision 5)..."
-    if git -C "$BRANCH_REPO" push origin refs/notes/ci-local 2>/dev/null; then
-        echo "  ✅ attestation note pushed"
+    if push_msg=$(ci_local_push_attestation "$BRANCH_REPO"); then
+        echo "  ✅ $push_msg"
     else
-        echo "WARNING: could not push refs/notes/ci-local — the attestation that authorized" >&2
-        echo "  this merge exists only on this machine. Push it manually:" >&2
-        echo "    git -C $BRANCH_REPO push origin refs/notes/ci-local" >&2
+        {
+            echo "WARNING: $push_msg"
+            echo "         The merge proceeds — the verification already happened — but the"
+            echo "         attestation may not be published for anyone else. Retry with:"
+            echo "           git -C $BRANCH_REPO fetch origin '+refs/notes/ci-local:refs/notes/origin-ci-local' &&"
+            echo "           git -C $BRANCH_REPO -c core.notesRef=refs/notes/ci-local notes merge -s cat_sort_uniq refs/notes/origin-ci-local &&"
+            echo "           git -C $BRANCH_REPO push origin refs/notes/ci-local"
+        } >&2
     fi
 fi
 
@@ -478,8 +643,15 @@ echo "  Merging (--merge)..."
 # (--merge) is given — it only prompts when the method is unspecified. (`gh pr
 # merge` has no --yes flag anyway; passing it errors as an unknown flag.) Safe
 # for the headless --pr escape hatch; the banner above is the human gate.
-GIT_EDITOR=true gh pr merge "$PR_NUM" -R "$GH_REPO" --merge || {
-    echo "ERROR: merge failed for PR #$PR_NUM ($GH_REPO)." >&2; exit 1; }
+# --match-head-commit pins the merge to the commit that was actually verified:
+# without it a push landing between the check above and this call would merge a
+# commit nothing attested (gh then refuses with a head-mismatch error).
+GIT_EDITOR=true gh pr merge "$PR_NUM" -R "$GH_REPO" --merge \
+        ${HEAD_SHA:+--match-head-commit "$HEAD_SHA"} || {
+    echo "ERROR: merge failed for PR #$PR_NUM ($GH_REPO)." >&2
+    echo "       (If gh reports a head mismatch, the PR was pushed to after verification —" >&2
+    echo "        re-run merge-pr so the new head is verified too.)" >&2
+    exit 1; }
 echo "  ✅ merged"
 
 # ---- remove worktree (from ROOT, never from inside the worktree) ------------
@@ -530,3 +702,20 @@ echo ""
 echo "========================================"
 echo "✅ Done: PR #${PR_NUM} merged, cleaned up, and synced."
 echo "========================================"
+
+# ---- unverified-merge signal ------------------------------------------------
+# Everything above succeeded, but nothing verified the merged commit. Say so
+# once more where it cannot be lost in the scroll, and exit with a DISTINCT
+# status so the outcome is greppable in a transcript / detectable by a caller.
+if [[ "$MERGED_UNVERIFIED" == true ]]; then
+    {
+        echo ""
+        echo "########################################################################"
+        echo "## MERGED WITHOUT VERIFICATION — PR #${PR_NUM} ($GH_REPO)"
+        echo "##   head $HEAD_SHA has no hosted CI and no ci-local attestation."
+        echo "##   Nothing checked that this commit builds or that its tests pass."
+        echo "##   exit status $MERGE_UNVERIFIED_EXIT (merge-pr's unverified-merge code)"
+        echo "########################################################################"
+    } >&2
+    exit "$MERGE_UNVERIFIED_EXIT"
+fi

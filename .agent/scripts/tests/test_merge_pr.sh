@@ -4,11 +4,12 @@
 #
 # Scope: the deterministic, no-network paths — argument handling, the
 # worktree/issue resolution dispatch (the bug-prone part flagged in the #488
-# plan review), and the field-mode guard (exercised with a stubbed `gh` to prove
-# no GitHub call escapes on a non-GitHub origin). The CI-wait and the actual
-# `gh pr merge` are integration-level and intentionally NOT exercised here —
-# mocking `gh pr checks --watch` / a live merge is drift-prone for little value
-# (same call the upstream merge_pr test made).
+# plan review), the field-mode guard (exercised with a stubbed `gh` to prove no
+# GitHub call escapes on a non-GitHub origin), and — since #610 — the
+# verification classification and its precedence rules, driven end-to-end
+# through a stubbed `gh` (and a stubbed `make` for the one case that runs to
+# completion). A live `gh pr checks --watch` against real Actions remains out
+# of scope.
 #
 # Run: bash .agent/scripts/tests/test_merge_pr.sh
 
@@ -16,6 +17,14 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MERGE_PR="$(cd "$SCRIPT_DIR/.." && pwd)/merge_pr.sh"
 ROOT_DIR="$(git -C "$SCRIPT_DIR" worktree list --porcelain | head -n1 | sed 's/^worktree //')"
+# Fixtures below are created INSIDE the real workspace root (merge_pr.sh only
+# looks for project repos under $ROOT_DIR/layers/main). An empty or wrong
+# ROOT_DIR would make the cleanup `rm -rf` operate on a path built from nothing,
+# so refuse to run at all unless it resolved to a real git worktree root.
+if [[ -z "$ROOT_DIR" || ! -e "$ROOT_DIR/.git" ]]; then
+    echo "FATAL: could not resolve the workspace root (got '${ROOT_DIR:-<empty>}') — refusing to run." >&2
+    exit 1
+fi
 
 PASS=0; FAIL=0
 ok()  { echo "  ✅ $1"; PASS=$((PASS+1)); }
@@ -183,6 +192,20 @@ CI_TESTLAYER="$ROOT_DIR/layers/main/citest_ws"
 ci_stubdir=""
 ci_repo=""
 
+# Never clobber something real: the fixture layer must not already exist.
+if [[ -e "$CI_TESTLAYER" ]]; then
+    echo "FATAL: $CI_TESTLAYER already exists — refusing to run the #610 cases." >&2
+    exit 1
+fi
+cleanup_ci_case() {
+    [[ -n "$CI_TESTLAYER" ]] && rm -rf "$CI_TESTLAYER"
+    [[ -n "$ci_stubdir"  ]] && rm -rf "$ci_stubdir"
+    return 0
+}
+# A failed assertion, an abort, or a Ctrl-C must not leave a fake layer behind
+# inside the real workspace.
+trap cleanup_ci_case EXIT INT TERM
+
 make_ci_stub() {
     ci_stubdir=$(mktemp -d)
     cat >"$ci_stubdir/gh" <<'STUB'
@@ -196,23 +219,38 @@ case "$1 $2" in
             [[ "${STUB_VIEW_FAILS:-0}" == 1 ]] && { echo "gh: auth required" >&2; exit 1; }
             echo "{\"statusCheckRollup\":${STUB_ROLLUP:-[]}}"; exit 0
         fi
-        if [[ "$args" == *headRefOid* ]]; then echo "${STUB_HEAD_SHA:-deadbeef}"; exit 0; fi
+        if [[ "$args" == *headRefOid* ]]; then echo "${STUB_HEAD_SHA:-}"; exit 0; fi
         if [[ "$args" == *--json*url* ]]; then echo "https://example.invalid/pr/1"; exit 0; fi
         echo "{\"number\":1,\"state\":\"OPEN\",\"headRefName\":\"feature/issue-88888\"}"; exit 0 ;;
     "api repos"*|"api "*)
-        case "${STUB_WORKFLOWS:-404}" in
-            listing) echo '[{"name":"validate.yml","type":"file"}]'; exit 0 ;;
-            error)   echo "gh: connection refused" >&2; exit 1 ;;
-            *)       echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+        if [[ "$args" == *".github/workflows"* ]]; then
+            case "${STUB_WORKFLOWS:-404}" in
+                listing) echo '[{"name":"validate.yml","type":"file"}]'; exit 0 ;;
+                error)   echo "gh: connection refused" >&2; exit 1 ;;
+                *)       echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+            esac
+        fi
+        # Control probe: the repository ROOT at the same ref. A 404 here means
+        # the workflows 404 proves nothing (no Contents read, or an unknown ref).
+        case "${STUB_ROOT_CONTENTS:-ok}" in
+            ok) echo '[{"name":"README.md","type":"file"}]'; exit 0 ;;
+            *)  echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
         esac ;;
     "pr checks")
         echo "CHECKS_WATCHED"; exit "${STUB_CHECKS_RC:-0}" ;;
     "pr merge")
-        echo "MERGE_ATTEMPTED"; exit 1 ;;
+        echo "MERGE_ATTEMPTED"; exit "${STUB_MERGE_RC:-1}" ;;
 esac
 echo "UNEXPECTED_GH_CALL: $args" >&2; exit 99
 STUB
     chmod +x "$ci_stubdir/gh"
+    # `make -C <root> sync` runs only in the cases that go all the way to the
+    # end of the script; stub it so no test ever syncs the real workspace.
+    cat >"$ci_stubdir/make" <<'MSTUB'
+#!/bin/bash
+echo "SYNC_STUBBED: $*"
+MSTUB
+    chmod +x "$ci_stubdir/make"
 }
 
 make_ci_repo() {   # a github-origin project repo with one commit
@@ -223,12 +261,20 @@ make_ci_repo() {   # a github-origin project repo with one commit
     git -C "$ci_repo" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m init
 }
 
-cleanup_ci_case() { rm -rf "$CI_TESTLAYER" "$ci_stubdir"; }
+# A full-scope ci-local note on the given commit, in ci_local.sh's format.
+attest_ci_repo() {   # attest_ci_repo <sha>
+    git -C "$ci_repo" -c user.email="t@t" -c user.name="t" notes --ref=ci-local add -m \
+        "ci-local: pass
+repo: citestpkg
+commit: $1
+scope: full
+steps: template" "$1"
+}
 
 # Run merge_pr.sh against the fake project repo with the stub active.
-# GIT_SSH_COMMAND=/bin/false keeps the attested case's `git push origin
-# refs/notes/ci-local` from touching the network (it fails fast into the
-# documented warning path).
+# GIT_SSH_COMMAND=/bin/false keeps every git operation that would reach the
+# network (the attested case's notes fetch/push, the remote branch delete) off
+# the wire — they fail fast into their documented paths.
 run_ci_case() {
     ( cd "$ROOT_DIR" && \
       PATH="$ci_stubdir:$PATH" \
@@ -242,21 +288,30 @@ make_ci_stub; make_ci_repo
 sha=$(git -C "$ci_repo" rev-parse HEAD)
 out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 run_ci_case env)
 { grep -qF "NO automated verification" <<<"$out" \
-  && grep -qF "ci_local.sh" <<<"$out" \
+  && grep -qF "ci_local.sh $ci_repo" <<<"$out" \
   && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
     && ok "third state: named warning naming the recourse, merge proceeds" \
     || bad "third state (out: $(head -3 <<<"$out" | tr '\n' '|'))"
 cleanup_ci_case
 
+echo "Test: the recourse never names a checkout that is not on the PR head (#610)"
+# The bug: it printed `ci_local.sh $BRANCH_REPO` — the MAIN checkout, which sits
+# on the default branch — so following the instruction attests the wrong commit
+# and the re-run still reports no attestation.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+git -C "$ci_repo" -c user.email="t@t" -c user.name="t" commit -q --allow-empty -m moved-on
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 run_ci_case env)
+{ grep -qF "sitting on $sha" <<<"$out" \
+  && ! grep -qF "ci_local.sh $ci_repo" <<<"$out"; } \
+    && ok "recourse points at a checkout of the head, not the default branch" \
+    || bad "recourse path (out: $(head -6 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
 echo "Test: no CI workflows at head + full-scope attestation → merges on the note (#610)"
 make_ci_stub; make_ci_repo
 sha=$(git -C "$ci_repo" rev-parse HEAD)
-git -C "$ci_repo" -c user.email="t@t" -c user.name="t" notes --ref=ci-local add -m \
-"ci-local: pass
-repo: citestpkg
-commit: $sha
-scope: full
-steps: template" "$sha"
+attest_ci_repo "$sha"
 out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 run_ci_case env)
 { grep -qF "full-scope ci-local attestation" <<<"$out" \
   && grep -qF "Pushing refs/notes/ci-local" <<<"$out" \
@@ -322,9 +377,11 @@ echo "Test: workspace repo with an empty rollup → fail-closed (ADR-0018 decisi
 # substitutes. Without this gate the empty-rollup race would warn-and-merge on
 # this very repo — most likely right after a push, which is when it fires.
 make_ci_stub
+WS_SHA=$(printf 'd%.0s' {1..40})
 out=$( cd "$ROOT_DIR" && PATH="$ci_stubdir:$PATH" \
+       GIT_SSH_COMMAND=/bin/false \
        MERGE_PR_SETTLE_ATTEMPTS=1 MERGE_PR_SETTLE_SECONDS=0 \
-       STUB_HEAD_SHA=deadbeef STUB_WORKFLOWS=404 \
+       STUB_HEAD_SHA="$WS_SHA" STUB_WORKFLOWS=404 \
        "$MERGE_PR" --pr 1 --repo-slug workspace 2>&1 )
 { grep -qF "hosted checks are required" <<<"$out" \
   && ! grep -qF "NO automated verification" <<<"$out" \
@@ -333,6 +390,134 @@ out=$( cd "$ROOT_DIR" && PATH="$ci_stubdir:$PATH" \
     || bad "workspace-repo exemption (out: $(head -3 <<<"$out" | tr '\n' '|'))"
 cleanup_ci_case
 
+
+# ---------------------------------------------------------------------------
+# ADR-0018 decision 1, in full (#610): a full-scope attestation satisfies the
+# gate for a PROJECT repo whether or not the repo has workflows — but it never
+# overrides a RED hosted signal ("never merge past a red signal from whichever
+# verification applies"). These pin the precedence.
+# ---------------------------------------------------------------------------
+FAILING_ROLLUP='[{"status":"COMPLETED","conclusion":"FAILURE"}]'
+PENDING_ROLLUP='[{"status":"IN_PROGRESS","conclusion":null}]'
+PASSING_ROLLUP='[{"status":"COMPLETED","conclusion":"SUCCESS"}]'
+
+echo "Test: RED hosted checks + a valid attestation → refuses (#610 precedence)"
+# The case that must never regress: an attestation is not a way past a red
+# signal. If this ever merges, the widening has become a loophole.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+attest_ci_repo "$sha"
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP="$FAILING_ROLLUP" run_ci_case env)
+{ grep -qF "CI checks failed" <<<"$out" \
+  && grep -qF "does NOT override a red hosted signal" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "attestation cannot override red hosted checks" \
+    || bad "red+attestation (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: PENDING hosted checks + a valid attestation → merges without waiting"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+attest_ci_repo "$sha"
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP="$PENDING_ROLLUP" run_ci_case env)
+{ grep -qF "hosted checks are still pending" <<<"$out" \
+  && ! grep -qF "CHECKS_WATCHED" <<<"$out" \
+  && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "attestation satisfies the gate while checks are pending (ADR-0018 d1)" \
+    || bad "pending+attestation (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: PENDING hosted checks, no attestation → waits on them as before"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP="$PENDING_ROLLUP" run_ci_case env)
+{ grep -qF "CHECKS_WATCHED" <<<"$out" && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "pending without evidence still waits" \
+    || bad "pending, no attestation (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: PASSING hosted checks + an attestation → normal merge, no shortcut"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+attest_ci_repo "$sha"
+out=$(STUB_HEAD_SHA="$sha" STUB_ROLLUP="$PASSING_ROLLUP" run_ci_case env)
+{ grep -qF "CHECKS_WATCHED" <<<"$out" && grep -qF "MERGE_ATTEMPTED" <<<"$out" \
+  && ! grep -qF "still pending" <<<"$out"; } \
+    && ok "green checks path unchanged by the widening" \
+    || bad "passing+attestation (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: workspace repo, pending checks → never shortcut (ADR-0018 decision 4)"
+make_ci_stub
+out=$( cd "$ROOT_DIR" && PATH="$ci_stubdir:$PATH" \
+       GIT_SSH_COMMAND=/bin/false \
+       MERGE_PR_SETTLE_ATTEMPTS=1 MERGE_PR_SETTLE_SECONDS=0 \
+       STUB_HEAD_SHA="$(printf 'd%.0s' {1..40})" STUB_ROLLUP="$PENDING_ROLLUP" \
+       "$MERGE_PR" --pr 1 --repo-slug workspace 2>&1 )
+{ grep -qF "CHECKS_WATCHED" <<<"$out" && ! grep -qF "still pending" <<<"$out"; } \
+    && ok "workspace repo always waits on its hosted checks" \
+    || bad "workspace pending (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: a workflows 404 that could be a permission/bad-ref 404 → error, no merge"
+# The 404 for "path absent", "no Contents read", and "unknown ref" are
+# byte-identical. Without the control probe, a token with PR read but no
+# Contents read classifies EVERY project repo as no-CI and merges it.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 STUB_ROOT_CONTENTS=404 run_ci_case env)
+{ grep -qF "cannot tell whether" <<<"$out" \
+  && ! grep -qF "NO automated verification" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "unconfirmable 404 fails closed" \
+    || bad "ambiguous 404 (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: a non-40-hex head sha is rejected before it is used as a ref"
+make_ci_stub; make_ci_repo
+out=$(STUB_HEAD_SHA="deadbeef" STUB_WORKFLOWS=404 run_ci_case env)
+{ grep -qF "could not resolve a valid head commit" <<<"$out" \
+  && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "short/garbage head sha fails closed" \
+    || bad "head-sha validation (out: $(head -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: a non-integer settle knob is rejected (exit 2), nothing merged"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$( cd "$ROOT_DIR" && PATH="$ci_stubdir:$PATH" GIT_SSH_COMMAND=/bin/false \
+       MERGE_PR_SETTLE_ATTEMPTS='1$(touch /tmp/pwned610)' MERGE_PR_SETTLE_SECONDS=0 \
+       STUB_HEAD_SHA="$sha" "$MERGE_PR" --pr 1 --repo-slug citestpkg 2>&1 ); rc=$?
+{ [[ $rc -eq 2 ]] && grep -qF "must be a non-negative integer" <<<"$out" \
+  && [[ ! -e /tmp/pwned610 ]]; } \
+    && ok "settle knobs validated as integers" \
+    || bad "settle knob validation (rc=$rc, out: $(head -2 <<<"$out" | tr '\n' '|'))"
+rm -f /tmp/pwned610
+cleanup_ci_case
+
+echo "Test: merged with nothing verifying it → distinct exit code 42 + banner (#610)"
+# Operator decision: this state stays warn-and-merge (refusing would block the
+# 58% of project repos that have no CI, with no path forward), but it must be
+# impossible to miss in a transcript.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 STUB_MERGE_RC=0 run_ci_case env); rc=$?
+{ [[ $rc -eq 42 ]] \
+  && grep -qF "MERGED WITHOUT VERIFICATION" <<<"$out" \
+  && grep -qF "SYNC_STUBBED" <<<"$out"; } \
+    && ok "unverified merge exits 42 after completing cleanup" \
+    || bad "unverified exit code (rc=$rc, out: $(tail -6 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: a verified merge still exits 0"
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+attest_ci_repo "$sha"
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=404 STUB_MERGE_RC=0 run_ci_case env); rc=$?
+{ [[ $rc -eq 0 ]] && ! grep -qF "MERGED WITHOUT VERIFICATION" <<<"$out"; } \
+    && ok "attested merge exits 0" \
+    || bad "attested exit code (rc=$rc, out: $(tail -4 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
 
 echo ""
 echo "========================================"
