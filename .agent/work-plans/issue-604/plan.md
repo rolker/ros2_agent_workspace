@@ -65,29 +65,34 @@ worktree-scoped nor container-side ownership.
      symlinked sibling).
    - Runs `docker_run_agent.sh --print-mounts` for that worktree and
      collects every mounted `*_ws/{build,install,log}` path.
-   - For each mounted path, asserts it falls under one of the two prefixes
-     `agent-entrypoint.sh` actually chowns: statically greps
-     `agent-entrypoint.sh` for the two loop headers (`"$WORKSPACE_ROOT"/layers/main/*_ws`
-     and `"$WORKTREE_ROOT"/*_ws`) and fails loud if either pattern is absent
-     — this is what would have caught #604: section 4b existing with no
-     matching entrypoint loop.
+   - For each mounted path, asserts it is reached by the ownership loops. The
+     *as-built* check compares the launcher's mounted set against the set the
+     real loops in `fix-volume-ownership.sh` reach (run over the same fixture
+     with `chown` stubbed), **superseding this plan's original grep-for-loop-
+     headers design** — a reformatted loop would have failed that grep for no
+     real reason, while set comparison still fails on a genuinely uncovered
+     mount. This is what would have caught #604: section 4b existing with no
+     matching ownership loop.
    - This is the "every anonymous volume the launcher adds must have a
      corresponding entrypoint chown" invariant from the issue, stated as an
      executable check rather than only in prose.
-   - **A container-side smoke test is included in this PR** (user decision at
+   - **A container-side test is included in this PR** (user decision at
      the plan checkpoint; the review had verified that the deferral premise —
      "no live dispatch harness available" — was false: docker works here and
-     the agent image is built). It runs the *working tree's*
-     `fix-volume-ownership.sh` inside a container over real anonymous volumes
-     and asserts the target uid can then write to them, so it tests the script
-     under review rather than whatever is baked into the image. It skips
-     cleanly when Docker or the image is unavailable, keeping
+     the agent image is built). As built it is end-to-end, not a smoke test of
+     the ownership script alone: it runs the *working tree's*
+     `agent-entrypoint.sh` as the image ENTRYPOINT over real anonymous volumes
+     and probes both mountpoints as the user the entrypoint hands off to. That
+     scope change came from the pre-push review, which mutation-proved the
+     earlier direct-invocation version could not detect #604 — the defect was
+     in the entrypoint's *argument list*, which a direct call bypasses. It
+     skips cleanly with no Docker, no image, or a non-local daemon, keeping
      `run_script_tests.sh` hermetic in CI.
-   - The static layer compares the launcher's mounted set against the set the
-     real ownership loops reach (chown stubbed), rather than grepping the
-     script for loop headers — a reformatted loop then can't cause a mystery
-     failure while a genuinely uncovered mount still fails. Both layers were
-     mutation-checked: deleting the worktree loop reproduces #604 in each.
+   - Both layers are mutation-checked. Deleting loop 2 of
+     `fix-volume-ownership.sh` fails both layers; deleting the
+     `"${WORKTREE_ROOT:-}"` argument at the entrypoint call site — #604 itself
+     — fails the container layer (and, by construction, cannot be seen by the
+     static one).
 4. **Add the scope caveat** to `test_layer_sourcing.sh`'s Check 4 header
    comment (lines 18-25) and its `AGENTS.md` script-table entry (line 582),
    noting explicitly that Check 4 only stats `layers/main/*_ws` on the
@@ -108,10 +113,12 @@ worktree-scoped nor container-side ownership.
 | `.devcontainer/agent/fix-volume-ownership.sh` (new) | Both ownership loops, extracted from the entrypoint so the container smoke test can run them alone. Header records the load-bearing mechanic: an anonymous volume initializes from the image, not the host dir, so only this chown makes it writable. |
 | `.devcontainer/agent/Dockerfile` | `COPY` the new script; add `STARTUP_SCRIPTS_SHA` build arg + `org.ros2-agent.startup-scripts-sha` label. |
 | `.agent/scripts/docker_run_agent.sh` | Correct section 4b's rationale (the host-side mkdir is *not* what makes section 4 work — the entrypoint chown is), and add the launch-time stale-image warning. |
-| `Makefile` | `agent-build` stamps the same `STARTUP_SCRIPTS_SHA`. |
+| `Makefile` | `agent-build` delegates to `docker_run_agent.sh --build-only`. As first written it ran its own `docker build` with an inline copy of the digest formula over a different directory; the review showed that stamps a digest the launcher can never match from a worktree build (a permanent false "stale"). One builder, one formula, one directory. |
 | `.devcontainer/agent/README.md` | Document that startup-script changes need a rebuild, and the warning that detects it. |
 | `.devcontainer/agent/agent-entrypoint.sh` | Call the extracted script; original plan: add second ownership-fix loop for `$WORKTREE_ROOT/*_ws/{build,install,log}`, mirroring the `layers/main` loop and the `[ -d ] && [ ! -L ]` guard from `docker_run_agent.sh` section 4b; comment carries the "anonymous volume inits from image, not host mkdir" rationale. |
-| `.agent/scripts/tests/test_entrypoint_chown_coverage.sh` (new) | `--print-mounts`-driven static invariant check: every worktree/layer `*_ws` mount path the launcher adds has a matching entrypoint chown-loop prefix. |
+| `.agent/scripts/tests/test_entrypoint_chown_coverage.sh` (new) | Two layers: a `--print-mounts`-driven static invariant check (mounted set ⊆ chowned set, plus bad-root and workspace-worktree cases) and a container end-to-end run of the real entrypoint. |
+| `.agent/scripts/tests/test_agent_image_build_paths.sh` (new) | Guards the single build path the staleness marker depends on: `make agent-build` delegates to `--build-only`, the digest has one implementation, the Dockerfile ARG/LABEL name matches what the launcher reads back. |
+| `docs/decisions/0016-runtime-vs-baked-layer-chaining.md` | References cross-reference addendum (ADR-0012) scoping the Check-4 coverage claim in its Consequences — the same overstatement narrowed in the script header and the `AGENTS.md` row. |
 | `.agent/scripts/test_layer_sourcing.sh` | Extend Check 4's header comment (lines 18-25) with a one-line scope caveat: host-side, `layers/main`-only, not container-side. |
 | `AGENTS.md` | Extend the `test_layer_sourcing.sh` script-table row (line 582) with the same scope caveat so the table isn't overstated. |
 
@@ -161,12 +168,18 @@ worktree-scoped nor container-side ownership.
   and `ros2-agent-workspace-agent:latest` is already built. Implemented in
   `test_entrypoint_chown_coverage.sh` layer B, skipping cleanly without Docker.
 
-- **New, found during implementation:** the launcher only builds when the image
+- ~~**New, found during implementation:** the launcher only builds when the image
   is *missing*, so this fix would not have reached anyone with an existing
   image — the container would keep running the baked (broken) entrypoint. Added
   the `STARTUP_SCRIPTS_SHA` label + launch-time staleness warning to close that,
   since a fix that silently doesn't apply is the same failure class the issue is
-  about. Flagged for sign-off as scope added beyond the reviewed plan.
+  about. Flagged for sign-off as scope added beyond the reviewed plan.~~
+  **Resolved at the review checkpoint: the guard stays in this PR**, with its
+  three reviewed defects repaired here rather than split out — the absent-label
+  case now warns (an unmarked image is precisely the pre-#604 population), the
+  two build paths were collapsed into one so the digest cannot disagree with
+  itself, and the digest helper can no longer abort the launcher it is only
+  supposed to warn from.
 
 ## Estimated Scope
 
