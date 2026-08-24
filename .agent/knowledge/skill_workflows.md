@@ -104,7 +104,7 @@ contract and `progress.md` exit contract, then pass it to a fresh sub-agent:
 .agent/scripts/dispatch_subagent.sh --mode in-process --issue <N> --skill <next-skill>
 # → emits a handoff block; paste into a fresh Agent tool call
 
-# Container (use for isolation, or whenever auto mode cannot be confirmed):
+# Container (use for a clean dependency environment, or whenever auto mode cannot be confirmed):
 .agent/scripts/dispatch_subagent.sh --mode container --issue <N> --prompt-file <task.md>
 ```
 
