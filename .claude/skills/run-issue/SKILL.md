@@ -86,8 +86,10 @@ auth is available (in-process on the host), not as a body-only container dispatc
   policy**. Outside auto mode that means it **can prompt the operator** — phase
   after phase, edit after edit.
 - **container** — headless and self-contained (needs no host `Agent` tool), so
-  its tool calls execute *inside the sandbox*: a clean OS, isolated
-  dependencies, and no route to the host's own caches or credentials. Its tool
+  its tool calls execute *inside the sandbox*: a clean OS, isolated dependency
+  state, and its own build artifacts. (It is **not** cut off from the host's
+  files or from every host credential — see *What contains a dispatched agent*
+  below for what the sandbox does and does not hold back.) Its tool
   calls also **never reach the operator's permission prompt**, which matters
   when the host session is not in auto mode. **Scope note:** whatever the mode,
   `run-issue`'s **checkpoints** (publish, PR, merge) are host-enforced operator
@@ -107,10 +109,9 @@ the fail-safe branch, so the new default would never fire in the sessions it was
 written for. And the sentinel string appears verbatim in this document and in
 `.agent/knowledge/skill_workflows.md`, so a naive string match matches the
 guidance you just read — it counts only as an injected `system-reminder` in your
-context, never as a quotation of these docs.
-The operator's permission-mode indicator reports the
-same state, but it is terminal UI rendered for *them* — you cannot see it, so it
-is not the check.
+context, never as a quotation of these docs. The operator's permission-mode
+indicator reports the same state, but it is terminal UI rendered for *them* —
+you cannot see it, so it is not the check.
 
 - **Auto mode active → default to `in-process`.** Under auto mode the host
   approves the routine tool calls a phase makes, so the prompt cost that used to
