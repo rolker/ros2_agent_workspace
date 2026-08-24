@@ -415,20 +415,74 @@ None — every finding was actioned.
 **Lead verification**: full suite green (22 shell suites + 152 pytest); **19 independent mutations against a pristine `git archive` copy, all 19 killed**, including the false-RED direction (promoting dirty / detached-HEAD / wrong-branch to an error each break a named test). The three sites deliberately left alone were re-checked and are correct: `add_remote.py`'s boolean `remote_exists()` falls through to `get_origin_url()` and returns an explicit **error**, not a skip; the default-branch fallback chain is a designed sequence; `_compare_branches`'s log listing only omits detail from a message that already says the branch is behind. GNU make's flattening of any non-zero recipe status to 2 confirmed empirically on this host. `f3c2fae` (the fourth site) **belongs** — without it `process_repo()` still returned "remote not found" for a repo whose `git remote` had failed.
 
 ### Findings
-- [ ] (must-fix) Three new doc lines attribute the script's exit code to a `make` target — the exact false claim this branch disclaims in both new AGENTS.md rows and both new docstrings; `make validate` prints `Error 3` and exits 2 — `Makefile:68`, `.agent/hooks/post-checkout:77`, `.agent/hooks/README.md:16`
-- [ ] (must-fix) `make validate` no longer reaches `test_layer_sourcing.sh` wherever `configs/manifest` is absent (every workspace worktree, every un-bootstrapped clone): `UNCONFIGURED`→3 aborts the two-line recipe, silently retiring ADR-0016's named enforcement path — `Makefile:141-143`, claimed by `AGENTS.md:582` and `docs/decisions/0016-*.md:56,81`
-- [ ] (must-fix) `--json` still drops a repo on a failed probe and exits 0: `_json_report` collapses "remote branch absent" with "`rev-list` failed" into `None` and appends no error; reproduced (remote-tracking-only default branch → rc 128), and `/import-field-changes` reads the gap as "No field changes to import" — `.agent/scripts/pull_remote.py:315-345`
-- [ ] (must-fix) The widening stopped at the per-repo probes; the enumeration layer beneath still reports green over repos never seen — `pull_remote.py` exits 0 with zero repos enumerated where `sync_repos.py` exits 1 in the identical state; `get_overlay_repos` swallows `yaml.YAMLError`; `missing` never makes the run non-zero. **Operator scope call: fix here or file a follow-up and name it in the PR body** — `.agent/scripts/lib/remote_utils.py:188-238`, `.agent/scripts/lib/workspace.py:60-73`
-- [ ] (suggestion) Surviving mutation: dropping `extra_repos` from the PASSED expression passes all 152 tests — orphan-only drift is unasserted — `.agent/scripts/validate_workspace.py:327-331`
-- [ ] (suggestion) Surviving mutation: `remote_name in output.splitlines()` → `in output` passes all tests, and that line is now the sole PRESENT/ABSENT discriminator — `.agent/scripts/lib/remote_utils.py:106`
-- [ ] (suggestion) Surviving mutation: deleting the sync-failure `exit "$POST_MERGE_RC"` passes the whole suite — restores #609 verbatim — `.agent/scripts/merge_pr.sh:437`, `.agent/scripts/tests/test_merge_pr.sh:170-203`
-- [ ] (suggestion) A failed `rev-list` reports a bare `ok / fetched`; `sync_repos.py:272-276` fixed the byte-identical line on this branch — `.agent/scripts/pull_remote.py:100-106`
-- [ ] (suggestion) The `*)` arm reports argparse's 2, a missing `python3` (127) and a traceback as "Workspace drift detected" — `.agent/scripts/dashboard.sh:171-177`
-- [ ] (suggestion) No `Exit status:` docstring block, though behaviour changed — `.agent/scripts/push_remote.py:1-19`; and none in `sync_repos.py`, the script this issue is about
-- [ ] (suggestion) `UNREADABLE_STATE` re-typed as a literal so the two classifications can drift; `_push_args()` omits `set_default_branch`, read at line 161 — `.agent/scripts/push_remote.py:132`, `.agent/scripts/tests/test_remote_probe.py:87-90`
-- [ ] (suggestion) Plan still says "Agent-instruction candidates: none identified"; the pattern now spans four sites in five scripts — propose it as an operator-approved `.agent/knowledge/` candidate — `.agent/work-plans/issue-609/plan.md:206-208`
-- [ ] (suggestion) "Every post-merge failure path exits 3" overstates — the branch-deletion step ends in `|| true` — `AGENTS.md:572`
-- [ ] (suggestion) Files-to-Change table omits four changed files and carries two `validate_workspace.py` rows; Plan Review action items still unchecked — `.agent/work-plans/issue-609/plan.md`, `.agent/work-plans/issue-609/progress.md:172-180,207-211`
-- [ ] (suggestion) Residual same-class instance: both git probes failing plus a 40-hex configured version records no mismatch — `.agent/scripts/validate_workspace.py:284-324`
-- [ ] (suggestion) `--json` fetches the workspace root without a `remote_probe`, so a root with no such remote errors where non-JSON mode benignly skips — contradicts the new `AGENTS.md:575` contract — `.agent/scripts/pull_remote.py:328-334`
-- [ ] (suggestion) Unverifiable from here: `classify_unlocatable_repo`'s required-vs-optional split depends on each field host's `optional_layers.txt` (gitcloud). Check the ccomjhc/echoboats manifests before this reaches gabby/salmon
+- [x] (must-fix) Three new doc lines attribute the script's exit code to a `make` target — the exact false claim this branch disclaims in both new AGENTS.md rows and both new docstrings; `make validate` prints `Error 3` and exits 2 — `Makefile:68`, `.agent/hooks/post-checkout:77`, `.agent/hooks/README.md:16`
+- [x] (must-fix) `make validate` no longer reaches `test_layer_sourcing.sh` wherever `configs/manifest` is absent (every workspace worktree, every un-bootstrapped clone): `UNCONFIGURED`→3 aborts the two-line recipe, silently retiring ADR-0016's named enforcement path — `Makefile:141-143`, claimed by `AGENTS.md:582` and `docs/decisions/0016-*.md:56,81`
+- [x] (must-fix) `--json` still drops a repo on a failed probe and exits 0: `_json_report` collapses "remote branch absent" with "`rev-list` failed" into `None` and appends no error; reproduced (remote-tracking-only default branch → rc 128), and `/import-field-changes` reads the gap as "No field changes to import" — `.agent/scripts/pull_remote.py:315-345`
+- [x] (must-fix) The widening stopped at the per-repo probes; the enumeration layer beneath still reports green over repos never seen — `pull_remote.py` exits 0 with zero repos enumerated where `sync_repos.py` exits 1 in the identical state; `get_overlay_repos` swallows `yaml.YAMLError`; `missing` never makes the run non-zero. **Operator scope call: fix here or file a follow-up and name it in the PR body** — `.agent/scripts/lib/remote_utils.py:188-238`, `.agent/scripts/lib/workspace.py:60-73`
+- [x] (suggestion) Surviving mutation: dropping `extra_repos` from the PASSED expression passes all 152 tests — orphan-only drift is unasserted — `.agent/scripts/validate_workspace.py:327-331`
+- [x] (suggestion) Surviving mutation: `remote_name in output.splitlines()` → `in output` passes all tests, and that line is now the sole PRESENT/ABSENT discriminator — `.agent/scripts/lib/remote_utils.py:106`
+- [x] (suggestion) Surviving mutation: deleting the sync-failure `exit "$POST_MERGE_RC"` passes the whole suite — restores #609 verbatim — `.agent/scripts/merge_pr.sh:437`, `.agent/scripts/tests/test_merge_pr.sh:170-203`
+- [x] (suggestion) A failed `rev-list` reports a bare `ok / fetched`; `sync_repos.py:272-276` fixed the byte-identical line on this branch — `.agent/scripts/pull_remote.py:100-106`
+- [x] (suggestion) The `*)` arm reports argparse's 2, a missing `python3` (127) and a traceback as "Workspace drift detected" — `.agent/scripts/dashboard.sh:171-177`
+- [x] (suggestion) No `Exit status:` docstring block, though behaviour changed — `.agent/scripts/push_remote.py:1-19`; and none in `sync_repos.py`, the script this issue is about
+- [x] (suggestion) `UNREADABLE_STATE` re-typed as a literal so the two classifications can drift; `_push_args()` omits `set_default_branch`, read at line 161 — `.agent/scripts/push_remote.py:132`, `.agent/scripts/tests/test_remote_probe.py:87-90`
+- [x] (suggestion) Plan still says "Agent-instruction candidates: none identified"; the pattern now spans four sites in five scripts — propose it as an operator-approved `.agent/knowledge/` candidate — `.agent/work-plans/issue-609/plan.md:206-208`
+- [x] (suggestion) "Every post-merge failure path exits 3" overstates — the branch-deletion step ends in `|| true` — `AGENTS.md:572`
+- [x] (suggestion) Files-to-Change table omits four changed files and carries two `validate_workspace.py` rows; Plan Review action items still unchecked — `.agent/work-plans/issue-609/plan.md`, `.agent/work-plans/issue-609/progress.md:172-180,207-211`
+- [x] (suggestion) Residual same-class instance: both git probes failing plus a 40-hex configured version records no mismatch — `.agent/scripts/validate_workspace.py:284-324`
+- [x] (suggestion) `--json` fetches the workspace root without a `remote_probe`, so a root with no such remote errors where non-JSON mode benignly skips — contradicts the new `AGENTS.md:575` contract — `.agent/scripts/pull_remote.py:328-334`
+- [x] (suggestion) Unverifiable from here: `classify_unlocatable_repo`'s required-vs-optional split depends on each field host's `optional_layers.txt` (gitcloud). Check the ccomjhc/echoboats manifests before this reaches gabby/salmon
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 15:31 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-609 at `0a8bd3d`
+**Addressed**: `## Local Review (Pre-Push)` — Round 3, 2026-08-24 15:05 -04:00, branch at `a5ddac6` (4 must-fix, 13 suggestions)
+**Commits**: `f548535` `6ab3621` `ea8e36c` `8b20ecf` `1e7df5c` `e2773c2` `1583a41` `87d2916` `0a8bd3d`
+
+All four must-fixes are fixed here, none deferred — including must-fix 4, which
+the operator ruled in scope for this PR rather than a follow-up.
+
+**Verification**: full suite green (23 shell suites + 191 pytest, up from 22 +
+152); `pre-commit` clean on every changed file with no rule suppressed. **13
+independent mutations, all 13 killed**, and the false-RED direction re-checked
+on each of the enumeration changes: making an optional-layer absence red, and
+reverting the detached-HEAD test from `not current_branch` to `is None`, each
+break a named test.
+
+**Field caveat resolved (operator-verified, recorded here so it is not
+re-derived):** the reviewer could not check whether `classify_unlocatable_repo`'s
+required-vs-optional split holds on the field hosts. All three manifest repos on
+this host — `unh_marine_autonomy` (dev), `ccomjhc_project11` (operator/salmon),
+`unh_echoboats_project11` (boat) — carry an **identical** `optional_layers.txt`
+whose only entry is `site`. The split is therefore consistent across every host
+this reaches and will not go permanently red on gabby or salmon.
+
+### Actions
+- [x] (must-fix) Doc lines attributing a script's exit code to a `make` target — `Makefile:68`, `.agent/hooks/post-checkout:77`, `.agent/hooks/README.md:16` — `ea8e36c`. Verified empirically on this host: a recipe exiting 3 prints `Error 3` and returns **2**. `make help` now points at `validate_workspace.py` for the codes; the two hook docs say the sync fails in a worktree by design without promising a code the operator never sees.
+- [x] (must-fix) `make validate` no longer reached `test_layer_sourcing.sh` wherever `configs/manifest` is absent — `Makefile:141-143` — `ea8e36c` + `8b20ecf`. Both checks always run; the first failure's status is what the recipe returns. `test_make_validate.sh` runs the real recipe against stub scripts; reverting to the two plain lines fails its unconfigured and drift checks.
+- [x] (must-fix) `--json` dropped a repo on a failed probe and exited 0 — `.agent/scripts/pull_remote.py` — `6ab3621`. `json_report()` now returns `(entry, error)` and separates three answers the old bare `None` collapsed: the remote has no such branch, the remote is not ahead, and **a probe failed**. The reproduced trigger (a default branch existing only as a remote-tracking ref) is named precisely and separately from a `rev-list` that failed otherwise, from output that is not two integers, and from a `git log` that failed while the remote is known ahead. Seven direct tests plus four through `main()`.
+- [x] (must-fix) The enumeration layer beneath the probes — `lib/remote_utils.py`, `lib/workspace.py` — `f548535` (**operator scope call: fixed here, not deferred**). `get_overlay_repos()` raises `WorkspaceConfigError` instead of printing a parse error and returning the survivors; `find_repo_version()` went through the same shared loader rather than answering `"unknown"`. `iter_repos()` records a zero-repo enumeration as an error, so `pull_remote.py` / `push_remote.py` now exit 1 in the exact state `sync_repos.py` already exited 1 naming `configs/manifest`. The `missing` bucket now counts toward the exit status — routed to a benign `skip` when the layer is optional on this host, through the one `repo_absence_is_allowed()` predicate `sync_repos.py` also classifies on.
+- [x] (suggestion) Orphan-only drift unasserted — `validate_workspace.py:327-331` — `f548535`. Both surviving mutations (dropping `extra_repos`, dropping `version_mismatches`) now fail a named test.
+- [x] (suggestion) `remote_probe`'s exact-line match — `lib/remote_utils.py:106` — `f548535`. `cloud` vs `gitcloud` pinned in both directions.
+- [x] (suggestion) Deleting `merge_pr.sh`'s sync-failure `exit` passed the suite — `.agent/scripts/tests/test_merge_pr.sh` — `1583a41`. Structural check on the branch, since no test reaches past the pre-merge guards by design; deleting line 437 now fails it.
+- [x] (suggestion) A failed `rev-list` reported a bare `ok / fetched` — `pull_remote.py:100-106` — `6ab3621`. Now an error, matching the byte-identical line `sync_repos.py` fixed on this branch.
+- [x] (suggestion) `dashboard.sh`'s `*)` arm called every non-zero code drift — `dashboard.sh:171-177` — `e2773c2`. 1 is drift; 2/127/anything else is surfaced with its code and points at a direct run. Tested for 2, 4 and 127.
+- [x] (suggestion) No `Exit status:` docstring in `push_remote.py` or `sync_repos.py` — `f548535`. Both added, both stating make's flattening.
+- [x] (suggestion) `UNREADABLE_STATE` re-typed as a literal; `_push_args()` omitted `set_default_branch` — `f548535`. Both reason strings moved into `lib/remote_utils.py`, and both scripts now classify `RemoteState` through one shared `classify_remote_state()` helper. The test fixture mirrors the real parser, with a test that reaches the end of `process_repo()` so a wrong fixture cannot pass again.
+- [x] (suggestion) Plan's "Agent-instruction candidates: none identified" — `plan.md` — `0a8bd3d`. Revised: the pattern now spans seven scripts and two shared libs, so the plan **proposes** an `.agent/knowledge/` entry for operator approval (AGENTS.md § Ask First), including its hard half — prefer a benign skip wherever a supported host configuration produces the same signal.
+- [x] (suggestion) "Every post-merge failure path exits 3" overstated — `AGENTS.md:572` — `ea8e36c`. Corrected: the two branch-deletion steps end in `|| true` on purpose, since GitHub's auto-delete-on-merge routinely gets there first.
+- [x] (suggestion) Files-to-Change omissions, duplicate row, unchecked Plan Review items — `0a8bd3d`. Six files added, the duplicate labelled as a continuation, and the five Plan Review actions checked after verifying each on the branch — one of which was **not** in fact done: the plan still claimed `sync_gitbug()` runs unconditionally today. Verified against `main` that both call sites were already gated on `sync_repo()`'s return; the plan now says so.
+- [x] (suggestion) Residual same-class instance in the version chain — `validate_workspace.py:284-324` — `1e7df5c`. Both git probes failing on a directory that has a `.git` is now its own reported mismatch. Also corrected the neighbouring claim in the same chain: `current_branch is None` was commented "Detached HEAD", but `git branch --show-current` succeeds on a detached HEAD and prints nothing — `""`, not `None`. Tested in both directions, including that a SHA-pinned, genuinely detached repo still passes.
+- [x] (suggestion) `--json` fetched the workspace root without a `remote_probe` — `pull_remote.py:328-334` — `6ab3621`. The root now goes through the same probe as every other repo, so a root with no such remote is skipped as the `AGENTS.md` contract says, not reported as a fetch failure.
+- [x] (suggestion) `classify_unlocatable_repo`'s split unverifiable from the review — **verified, no code change**. All three manifests carry an identical `optional_layers.txt` listing only `site`; see the field-caveat note above.
+
+### Consequences handled beyond the listed findings
+- `AGENTS.md`'s `pull_remote.py` / `push_remote.py` / `validate_workspace.py` rows describe the widened contracts, not only the per-repo probe fixes (`87d2916`).
+- `list_overlay_repos.py` gained a `main()` so its CLI arm is testable, and exits 1 naming the file rather than printing `[]` for a manifest that will not parse.
+- Two pylint findings (`too-many-return-statements`, `duplicate-code`) were resolved by restructuring — an `_ahead_behind()` split and the shared `classify_remote_state()` — never by suppression.
+
+### Next step
+`review-code` re-review of `f548535..0a8bd3d`.
