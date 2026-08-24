@@ -38,30 +38,33 @@ that citation as-is in both target files — do not "correct" it to #604-only.
      *conditioned explicitly*: state that the prompt-elimination advantage of
      container dispatch is only decisive when the session is **not** already
      running under a mode that auto-approves routine tool calls (Claude
-     Code's auto mode, referenced the way the surrounding prose already
-     references host-runtime capabilities — no new detection mechanism, just
-     accurate advisory text). Under auto mode, in-process `Agent`-tool
-     sub-agents inherit the auto-approval and run prompt-free too, so the
-     prompt-volume argument for containers doesn't apply.
+     Code's auto mode). Under auto mode, in-process `Agent`-tool sub-agents
+     run prompt-free too, so the prompt-volume argument for containers
+     doesn't apply. *(The plan said "no new detection mechanism"; the shipped
+     text does name the tell the deciding agent reads — see note 2 — because
+     an unstated condition is one no reader can evaluate.)*
    - For a session **not** in auto mode (default Claude Code permission
      mode, or a non-Claude host runtime without an `Agent` tool), keep the
      existing guidance: lean toward `container` for phases that do many
      tool calls, or expect per-call prompts from an in-process fan-out.
    - Reframe container's remaining case as **isolation or dependency
-     environment**, not prompt volume: untrusted input (the sandbox
-     boundary is what contains a dispatched agent — keep this paragraph,
-     content unchanged per the issue's "Non-goals"/explicit instruction),
-     and a clean OS/dependency set for the review-code fan-out or
-     implementation.
+     environment**, not prompt volume: untrusted input, and a clean
+     OS/dependency set for implementation.
+     *(Superseded during implementation — see note 3 below: the
+     sandbox-boundary paragraph was rewritten, not kept "content unchanged",
+     and now covers both dispatch paths. The `review-code` fan-out was also
+     removed from the container list — it needs the `Agent` tool and the host
+     Ollama endpoint, so it cannot be containerized in any mode.)*
    - Update the section heading's inline citation from "(#545)" to
      "(#607)" — record **auto mode** as the reason the advice moved, so a
      future reader sees why, not that it drifted.
-   - Do **not** touch the `--context-file` limitation paragraphs (~L64-74),
-     the in-process/container bullet definitions above the heading
-     (~L76-91) except where the "biggest practical reason" prompt-volume
-     claim needs the same conditioning, or the background-dispatch /
-     freshness-gate paragraphs below (~L112-138) — all orthogonal per the
-     issue's non-goals.
+   - Do **not** touch the `--context-file` limitation paragraphs or the
+     background-dispatch / freshness-gate paragraphs below the section — both
+     orthogonal per the issue's non-goals, and both left alone.
+     *(Fence redrawn during implementation — see note 1 below: the
+     in-process/container bullet definitions were originally fenced off too,
+     but they carried three statements this change falsifies, so both bullets
+     were rewritten.)*
 
 2. **Rewrite the "Fan-out goes to containers" bullet in
    `skill_workflows.md` § Dispatch Practices (~L131-133).** Replace the
@@ -69,25 +72,36 @@ that citation as-is in both target files — do not "correct" it to #604-only.
    same way as step 1: under auto mode, in-process fan-out is prompt-free
    and preferred (lower launch cost, same context root); reach for container
    fan-out when the work needs OS-level isolation (untrusted input) or a
-   clean dependency environment, or when the session is not running auto
-   mode and prompt volume would otherwise be a problem. Keep the three
-   neighbouring bullets (background dispatch, no filesystem-wide search
-   scope, the exit-137 free-RAM gate) unchanged — orthogonal per the issue's
-   scope.
+   clean dependency environment, or when auto mode cannot be confirmed and
+   prompt volume would otherwise be a problem. Keep the three neighbouring
+   bullets (background dispatch, no filesystem-wide search scope, the
+   exit-137 free-RAM gate) unchanged — orthogonal per the issue's scope.
+   *(One addition beyond the named bullet: the `# Container (…)` code-block
+   comment ~25 lines above it, the same retired advice in miniature — see
+   scope additions.)*
 
-3. **No other files.** Confirmed in the Issue Review (`Consequences`
-   section) that no adapter file (`.github/copilot-instructions.md`,
-   `.agent/instructions/gemini-cli.instructions.md`) duplicates this advice,
-   so no cascade edit is needed. `dispatch_subagent.sh` itself is explicitly
-   out of scope per the issue's Non-goals (no `--mode` default change, no
-   tooling change) — this is a documentation-only PR.
+3. **Third file: `.claude/skills/review-plan/SKILL.md`.** The plan originally
+   said "no other files"; two additions landed there, both operator-approved:
+   the `--mode container` recommendation for implementation work (L~451) now
+   points at the new default, and the self-review-detection heuristic was
+   fixed to key on *how the reviewer was invoked* rather than on the shared
+   `**By**` identity string (see scope additions below).
+
+   Still out of scope and untouched: the adapter files
+   (`.github/copilot-instructions.md`,
+   `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`,
+   `CLAUDE.md`) carry no mode-choice rationale — verified, no cascade edit
+   needed. `dispatch_subagent.sh` itself stays out per the issue's Non-goals
+   (no `--mode` default change, no tooling change) — this remains a
+   documentation-only PR.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.claude/skills/run-issue/SKILL.md` | Rewrite "Choosing a mode" (~L92-110): in-process default conditioned on auto mode; container reframed to isolation/dependency-environment; citation `(#545)` → `(#607)`. |
-| `.agent/knowledge/skill_workflows.md` | Rewrite the "Fan-out goes to containers" bullet (~L131-133) in § Dispatch Practices: same auto-mode-conditioned isolation framing. |
+| `.claude/skills/run-issue/SKILL.md` | Rewrite "Choosing a mode": in-process default conditioned on auto mode (tell = the injected `While auto mode is active:` system reminder, which the agent can actually read); container reframed to isolation/dependency-environment; the in-process/container bullet definitions above it re-conditioned; the containment paragraph rewritten to cover both dispatch paths accurately; citation `(#545)` → `(#607)`. |
+| `.agent/knowledge/skill_workflows.md` | Rewrite the "Fan-out goes to containers" bullet in § Dispatch Practices with the same auto-mode-conditioned isolation framing, plus the `# Container (…)` code-block comment ~25 lines above it; carries its own `#545` → `#607` citation. |
+| `.claude/skills/review-plan/SKILL.md` | Added during implementation (operator-approved): align the `--mode container` recommendation for implementation work with the new default, and fix the self-review-detection heuristic to key on invocation rather than the shared `**By**` identity string. |
 
 ## Principles Self-Check
 
@@ -98,7 +112,7 @@ that citation as-is in both target files — do not "correct" it to #604-only.
 | Capture decisions, not just implementations | The rewrite itself records *why* the advice moved (auto mode) inline in the prose, at the same fidelity #545 was captured (also prose-only, no ADR). Consistent with precedent. |
 | A change includes its consequences | Addressed directly: the `(#545)` → `(#607)` citation update in `run-issue/SKILL.md` is step 1's last bullet, closing the Issue Review's flagged gap. |
 | Primary framework first, portability where free | This is the core content fix from the Issue Review: the new default is explicitly conditioned on Claude Code auto mode being active, not stated as an unconditional default. Non-auto-mode sessions and non-Claude host runtimes (already called out in the existing text as lacking an `Agent` tool) keep the container-leaning guidance instead of being silently exposed to prompt floods. |
-| Only what's needed | Two files, two targeted sections, no touching `dispatch_subagent.sh`, no deprecating containers — matches the issue's Non-goals exactly. |
+| Only what's needed | Three files (two target files plus one operator-approved folded-in fix), no touching `dispatch_subagent.sh`, no deprecating containers — matches the issue's Non-goals exactly. |
 | Improve incrementally | Single PR, prose-only, scoped edits. |
 | Test what breaks | N/A — advisory prose, no enforced logic; nothing to unit test. Verification is a read-through in review-plan / review-code confirming the conditioning language is unambiguous. |
 | Workspace vs. project separation | Both target files are workspace infra (`.claude/skills/`, `.agent/knowledge/`) — correct repo, no project-repo crossover. |
@@ -139,7 +153,9 @@ that citation as-is in both target files — do not "correct" it to #604-only.
 
 ## Estimated Scope
 
-Single PR, two files, prose-only edits.
+Single PR, three files, prose-only edits (the third,
+`.claude/skills/review-plan/SKILL.md`, was added during implementation by
+operator decision — see Approach step 3 and the scope additions below).
 
 
 ## Implementation notes (plan sync)
@@ -160,9 +176,13 @@ shipped differs from the plan above in four ways, all review-driven:
 2. **The auto-mode condition names its tell and fails safe.** The plan
    conditioned the new default on auto mode while declining to say how a reader
    determines which case they are in — but the reader *is* the agent choosing.
-   The text now names the observable (the Claude Code session's
-   permission-mode indicator) and states the fallback explicitly: *cannot
-   confirm auto mode → the container-leaning guidance is in force*. The
+   The text now names an observable the *agent* can read — the
+   `While auto mode is active:` system reminder auto mode injects into the
+   session's own context — and states the fallback explicitly: *cannot
+   confirm auto mode → the container-leaning guidance is in force*. (An
+   earlier draft named the operator's permission-mode indicator; that is
+   terminal UI the agent cannot see, so the condition would never have
+   evaluated true. Corrected during pre-push review.) The
    asymmetry is deliberate, since an uncertain reader must not land on the
    prompt-flooding branch #545 existed to prevent.
 
@@ -172,10 +192,18 @@ shipped differs from the plan above in four ways, all review-driven:
    container — incoherent once the surrounding advice says to choose container
    for untrusted input. It is now affirmative, every clause of the reasoning
    preserved, and it covers the mirror case the plan missed entirely: what
-   contains an in-process phase under auto mode (host permission policy and
-   allowlist, worktree confinement, and the checkpoints that survive regardless
-   of mode). Auto mode removed the prompts, not the need to know what is
-   holding.
+   contains an in-process phase under auto mode. That answer was verified
+   against source rather than reasoned from plausibility, and it is *less*
+   than an earlier draft claimed — auto mode is exactly what stands the host
+   permission policy down; `.claude/settings.json` has an `allow` array and no
+   `deny` anywhere, so the allowlist refuses nothing; and the worktree scoping
+   is convention, not a boundary (`dispatch_subagent.sh`'s own header:
+   "convention-only (no enforcement, per ADR-0004/0005)"). What actually
+   differs is that in-process hands the phase the *host's credentials*, the
+   property `.devcontainer/agent/README.md` leads with; the checkpoints survive
+   but gate publication after the fact. Stated plainly, the gap strengthens
+   rather than weakens the case for containers on untrusted input, and the
+   original's residual caution is kept.
 
 4. **The claim is grounded in observation, not asserted mechanism.** Rather
    than stating that in-process `Agent` sub-agents inherit the session
@@ -194,8 +222,10 @@ Scope additions:
   above the bullet the plan did rewrite, and invisible to the plan's
   consequences grep because it contains neither "prompt-free" nor "permission
   prompt". The widened search (`implementation-heavy`, bare `--mode container`,
-  "lean toward", "prefer container") found no further surfaces;
-  `review-plan/SKILL.md:435` already reads "isolation-worthy" and stays.
+  "lean toward", "prefer container") found no further surfaces.
+  `review-plan/SKILL.md`'s implementation-dispatch block already read
+  "isolation-worthy", but still recommended `--mode container` with no
+  reference to the new default; it was aligned during the pre-push review pass.
 - **`skill_workflows.md` now carries the #545 → #607 citation** so a reader
   arriving at the knowledge file first learns the rule was reversed
   deliberately (review suggestion 7 / issue proposal item 3).
