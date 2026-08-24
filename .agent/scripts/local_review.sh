@@ -58,11 +58,21 @@
 #                         than the old whole-diff request, but a chunked
 #                         review makes several of them in sequence.)
 #   LOCAL_REVIEW_NUM_CTX  context-window CEILING in tokens (default: 32768).
-#                         Per-chunk requests ask for the smallest bucket
-#                         from 8192/16384/24576/32768 that fits the chunk,
-#                         capped at this value; buckets at or below the
-#                         answer headroom are dropped as unreachable, and
-#                         this ceiling is always itself a bucket. The
+#                         Per-chunk requests ask for the smallest rung of
+#                         the ladder 8192/16384/24576/32768 that fits the
+#                         chunk, capped at this value. Rungs at or below
+#                         the answer headroom are filtered out as
+#                         unreachable (the headroom alone would fill
+#                         them), and this ceiling is always itself a rung.
+#                         AT THE SHIPPED DEFAULTS (headroom 16384) ONLY
+#                         24576 AND 32768 ARE REACHABLE — the 8192 and
+#                         16384 rungs are filtered out, and the ladder is
+#                         only wider than two rungs for a model terse
+#                         enough to run a smaller headroom. So the
+#                         per-chunk sizing buys ~25% off the minimum
+#                         allocation (32768 -> 24576), not a large factor;
+#                         the dominant VRAM win in #605 was the model
+#                         itself (23 GB -> 5.3 GB of weights). The
 #                         script fails loud, with the size it needed, when
 #                         even a single indivisible line would overflow
 #                         this — Ollama would otherwise truncate silently.
