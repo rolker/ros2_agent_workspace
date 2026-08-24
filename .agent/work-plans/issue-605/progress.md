@@ -1,0 +1,122 @@
+---
+issue: 605
+---
+
+# Issue #605 — Local Model Adversarial Specialist (5f) cannot run on the dev host: 35b model vs 8GB VRAM, and diffs exceed num_ctx
+
+## Issue Review
+**Status**: complete
+**When**: 2026-08-23 10:00 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5 (1M context))
+
+**Issue**: #605
+**Comment**: (best-effort post follows this entry; not recorded inline)
+**Scope verdict**: needs-more-detail
+
+### Scope Assessment
+
+**Well-scoped?** Mostly — the diagnosis (two failure modes, in direct
+tension) is precise and evidence-backed. The four proposed changes are all
+plausibly necessary, and AGENTS.md's filing discipline favors bundling
+related changes into one PR with atomic commits, so keeping this as one
+issue is fine. But two of the four items are structurally different from
+the other two and the plan should treat them that way:
+
+- Item 2 (chunk large diffs in `local_review.sh`) is a **host-independent
+  correctness fix** — no `num_ctx` on any single-GPU box swallows an 88k-token
+  diff. It belongs in this repo's script regardless of which model ships as
+  default.
+- Items 1, 3, 4 (model default, `OLLAMA_KV_CACHE_TYPE`, `OLLAMA_KEEP_ALIVE`)
+  are **this-host tuning** for an 8GB-VRAM box. `local_review.sh`'s model/URL
+  are already env-overridable per-operator (`LOCAL_REVIEW_MODEL`,
+  `LOCAL_REVIEW_URL`), which is the right layer for host-specific defaults —
+  but item 3 (see below) proposes reaching past that into systemd, which is
+  a different kind of change with different approval needs.
+
+Recommend the plan keep chunking as its own atomic commit(s) so it lands
+even if the host-tuning discussion runs long, and call out in the plan
+which of the 4 items are "generically correct" vs. "true for this operator's
+current hardware" (a second dev host with more VRAM would want different
+defaults for 1/3/4 but the same chunking).
+
+**Right repo?** Yes — `.agent/scripts/local_review.sh` is a workspace-repo
+script; this is workspace infra, not project content.
+
+**Dependencies**: Directly related to #585 (container Ollama reachability)
+and #590 (make 5f opt-in), both currently open. See Recommendations below —
+the issue's framing that #585 is "downstream of this" is not quite right and
+should be corrected before or during planning.
+
+### Principle Alignment
+
+| Principle | Status | Notes |
+|---|---|---|
+| Only what's needed | Watch | 4 changes bundled under one acceptance list; recommend the plan sequence them as separable atomic commits (see Scope Assessment) so a partial land (e.g. chunking merges, host-tuning stalls on operator sign-off) still leaves the workspace better off. |
+| Human control and transparency | Action needed | Item 3 (`OLLAMA_KV_CACHE_TYPE`) needs a systemd drop-in under `/etc` on the operator's own dev workstation. AGENTS.md's hard "Never" on host administration is explicitly scoped to *remote/field* hosts (salmon, gabby, boats) — this dev host isn't covered by that hard stop. But it's still an unattended host-level `/etc` change with sudo, so it should not be applied without the operator's explicit, specific approval (not inferred from approving the issue/plan in general) at plan or implementation time. The plan should also check whether Ollama's `/api/chat` `options` accept a per-request KV-cache-type override (mirroring how the issue already scopes `keep_alive` per-request specifically to avoid a global host change) — if so, item 3 could avoid the systemd drop-in entirely. |
+| Enforcement over documentation | Watch | Acceptance criteria say the host-level change should be "documented so a rebuilt or second dev host can be brought to the same state." Prefer an idempotent setup script (e.g. under `.agent/scripts/`, run manually with the operator's consent) over prose-only documentation, consistent with this principle — flag as a plan-time choice, not a blocker. |
+| Capture decisions, not just implementations | Watch | The empirical model-quality check (planted-defects spot-check) is exactly the kind of decision that should leave a record — an ADR is probably overkill for a model-tag choice, but the plan should say where the spot-check result and chosen tag's rationale get written down (progress.md entry, or a short note in `.agent/knowledge/`) so it doesn't evaporate once #605 closes. |
+| A change includes its consequences | OK | Acceptance criteria already cover verification (no OOM, chunking exercised, quality spot-check, host-change documented). |
+| Test what breaks | OK | Chunking and context-overflow handling are exactly the kind of edge-case logic worth a regression test in `local_review.sh`'s own test coverage (if any exists — plan should check) rather than only manual verification. |
+| Workspace vs. project separation | OK | Workspace-only change. |
+
+### ADR Applicability
+
+| ADR | Triggered | Notes |
+|---|---|---|
+| 0001 — Adopt ADRs | No | Model-tag/tuning choice is operational, not architectural; a progress.md/knowledge-note record (see above) is proportionate. |
+| 0004/0005 — Enforcement hierarchy | Watch | If item 3 becomes a documented manual step rather than a script, note that this is documentation without enforcement (drift risk on a rebuilt host) — acceptable given it's a one-time host config, but worth a line in the plan. |
+| 0009 — Python packaging | No | Not applicable — no Python packages installed here. |
+
+### Consequences
+
+- `local_review.sh`'s doc comment block (env var descriptions, the
+  `qwen3.5:35b` default reference, the `num_ctx`/reasoning-headroom
+  rationale) will need updating if items 1/2/3/4 land — the script's own
+  header currently documents the exact tension this issue describes, so it
+  is effectively the spec and must move in lockstep with the code.
+  `AGENTS.md`'s script reference table only needs an update if the script's
+  external usage/flags change (chunking should stay internal, so this is
+  likely a no-op — verify at plan time).
+- If a new setup script is added for the systemd drop-in, add it to
+  `AGENTS.md`'s script reference table per the consequences map.
+- Consider proposing a `.agent/knowledge/` note on sizing local models
+  against VROM-constrained dev hosts (per "Implementation surfaces a
+  reusable pattern" in the consequences map) — this failure mode will recur
+  on any 8GB-class box, not just this one.
+
+### Recommendations
+
+- Correct the issue's dependency framing before/while planning: #605 fixes
+  capacity/context on the *current dispatch path* (5f run directly against
+  `localhost:11434` from the host or an in-process agent). #585 is about
+  *container-dispatched* reviews reaching the host's Ollama at all over
+  Docker's bridge network — a pure connectivity problem, unaffected by
+  model size or `num_ctx`. Fixing #605 does not fix #585; they are
+  independent, not root-cause/downstream. The plan should scope #605 as
+  fixing the non-container path and leave #585 open on its own merits.
+- #590 (make 5f opt-in) is the one genuinely resolved by #605 succeeding:
+  if the acceptance criteria are met (5f completes without OOM, on
+  PR-#350-scale diffs, with a checked quality floor), #590's premise — 5f
+  is unhelpfully slow/unreliable so it should default off — goes away.
+  Recommend the plan for #605 explicitly re-triage #590 at the end (close
+  as superseded, or re-scope to "opt-in only on hosts where the 5f
+  preflight can't confirm capacity") rather than leaving both open issues
+  making opposite default-on/off arguments indefinitely.
+- Before committing to a default model tag, the plan should also record
+  *why* the chosen tag's context headroom is sufficient for chunked
+  per-file passes (chunking changes what "big enough context" means — a
+  smaller model with a smaller context might be fine per-chunk even though
+  it couldn't hold the full 88k-token diff).
+- Verify whether `local_review.sh` currently has any automated tests; if
+  the chunking logic is nontrivial (per-file pass + synthesis step), it
+  should get direct test coverage rather than relying only on the
+  acceptance-criteria manual exercise against a real large diff.
+
+### Actions
+- [ ] Sequence the four proposed changes as separable atomic commits: chunking (host-independent correctness) vs. model default / KV-cache-type / keep-alive (host-specific tuning).
+- [ ] Get explicit operator sign-off before applying the `OLLAMA_KV_CACHE_TYPE` systemd drop-in specifically (host-level `/etc` change with sudo); check first whether a per-request API option can avoid the host change entirely.
+- [ ] Prefer an idempotent setup script over prose-only documentation for the host-level change, if the operator approves making it.
+- [ ] Record the planted-defects quality spot-check result and chosen model tag's rationale somewhere durable (progress.md or `.agent/knowledge/`).
+- [ ] Correct the issue's "#585 is downstream of this" framing — #605 and #585 are independent problems (context/capacity vs. container networking); do not treat #605 as blocking or resolving #585.
+- [ ] Re-triage #590 once #605's acceptance criteria are met — likely close as superseded rather than leaving both default-on and default-off issues open.
+- [ ] Verify `local_review.sh`'s existing test coverage and add tests for the chunking logic, not just manual verification against a real diff.
