@@ -121,5 +121,16 @@ USER root
 COPY --chmod=755 agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
 COPY --chmod=755 fix-volume-ownership.sh /usr/local/bin/fix-volume-ownership.sh
 
+# Staleness marker for the baked startup scripts (#604). docker_run_agent.sh
+# only builds when the image is MISSING, so an image built before a change to
+# agent-entrypoint.sh / fix-volume-ownership.sh keeps running the old copy —
+# which is how a fix to either can silently fail to reach an existing user.
+# The launcher stamps the current scripts' combined hash here at build time and
+# compares it at every launch, warning when they diverge. Empty when built by a
+# bare `docker build` (no --build-arg), which the launcher reads as "unknown"
+# and does not warn about.
+ARG STARTUP_SCRIPTS_SHA=""
+LABEL org.ros2-agent.startup-scripts-sha="$STARTUP_SCRIPTS_SHA"
+
 ENTRYPOINT ["agent-entrypoint.sh"]
 CMD ["claude", "--dangerously-skip-permissions"]

@@ -10,7 +10,7 @@ happen inside, pushes and PR creation happen from the host via the push gateway.
 # 1. Create worktree on the host (before container launch)
 .agent/scripts/worktree_create.sh --issue 42 --type workspace
 
-# 2. Build the agent image (first time only, or after Dockerfile changes)
+# 2. Build the agent image (first time only, or after Dockerfile/startup-script changes)
 make agent-build
 
 # 3. Launch the container
@@ -36,6 +36,14 @@ make agent-build
 # Or directly
 .agent/scripts/docker_run_agent.sh --issue <N> --build
 ```
+
+The launcher only builds automatically when the image is **missing**, so a
+change to `agent-entrypoint.sh` or `fix-volume-ownership.sh` does not reach an
+existing image on its own — the container keeps running the baked copies. Both
+build paths stamp the scripts' combined hash into the image
+(`org.ros2-agent.startup-scripts-sha`), and `docker_run_agent.sh` compares it at
+every launch and warns when it has drifted (#604). Rebuild when you see that
+warning.
 
 The image is based on `ros:jazzy-perception` and includes:
 - ROS 2 Jazzy dev tools, rosdep, vcstool

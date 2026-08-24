@@ -282,6 +282,7 @@ agent-build:
 	docker build \
 		--build-arg USER_UID=$$(id -u) \
 		--build-arg USER_GID=$$(id -g) \
+		--build-arg STARTUP_SCRIPTS_SHA=$$(cd .devcontainer/agent && cat agent-entrypoint.sh fix-volume-ownership.sh | sha256sum | cut -d' ' -f1) \
 		-t ros2-agent-workspace-agent:latest \
 		-f .devcontainer/agent/Dockerfile \
 		.devcontainer/agent/

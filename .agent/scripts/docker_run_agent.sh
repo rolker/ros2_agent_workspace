@@ -305,11 +305,44 @@ echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
 
 DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
 
+# Combined hash of the startup scripts baked into the image (#604). Stamped
+# into the image at build time and compared at launch: `docker build` is only
+# triggered when the image is MISSING, so without this an image built before a
+# change to either script keeps running the old copy — exactly how a fix to
+# agent-entrypoint.sh can silently fail to reach an existing user. Hashed by
+# content in a fixed order from DOCKERFILE_DIR, so the digest is independent of
+# the checkout path.
+STARTUP_SCRIPTS_LABEL="org.ros2-agent.startup-scripts-sha"
+startup_scripts_sha() {
+    (cd "$DOCKERFILE_DIR" && cat agent-entrypoint.sh fix-volume-ownership.sh) \
+        | sha256sum | cut -d' ' -f1
+}
+
+# Warn (never block) when the running image's baked startup scripts differ from
+# the working tree's. An empty/absent label means the image predates the label
+# or was built by a bare `docker build` — unknown, not stale, so stay quiet.
+warn_if_startup_scripts_stale() {
+    local baked current
+    baked="$(docker image inspect "$IMAGE_NAME:$IMAGE_TAG" \
+        --format "{{index .Config.Labels \"$STARTUP_SCRIPTS_LABEL\"}}" 2>/dev/null || true)"
+    [ -n "$baked" ] || return 0
+    current="$(startup_scripts_sha)"
+    [ "$baked" != "$current" ] || return 0
+    echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG was built from older startup scripts." >&2
+    echo "   agent-entrypoint.sh / fix-volume-ownership.sh have changed since." >&2
+    echo "   The container will run the BAKED copies. Rebuild to pick them up:" >&2
+    echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
+}
+
 # --print-mounts is a Docker-free dry run: skip the image existence check
 # (a docker call) so the mount logic can be exercised without a daemon.
 if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME:$IMAGE_TAG not found — building..."
     BUILD_IMAGE=true
+fi
+
+if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
+    warn_if_startup_scripts_stale
 fi
 
 if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
@@ -332,6 +365,7 @@ if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     docker build \
         --build-arg USER_UID="$(id -u)" \
         --build-arg USER_GID="$(id -g)" \
+        --build-arg STARTUP_SCRIPTS_SHA="$(startup_scripts_sha)" \
         -t "$IMAGE_NAME:$IMAGE_TAG" \
         -f "$DOCKERFILE_DIR/Dockerfile" \
         "$DOCKERFILE_DIR"
