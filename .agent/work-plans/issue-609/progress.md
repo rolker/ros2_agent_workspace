@@ -119,3 +119,16 @@ Makefile target are workspace infrastructure, not project content.
 - [ ] Add tests for `sync_repos.py`'s new accumulation/exit-code logic (all-success, real failure, benign skip, `sync_gitbug` gating)
 - [ ] Decide whether `merge_pr.sh` needs a distinct message for "sync failed after successful merge/cleanup" given `set -eo pipefail`
 - [ ] Optionally note exit-code semantics in `AGENTS.md`'s `sync_repos.py` script-table entry
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-24 12:19 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-609/plan.md` at `c1d0805`
+**Branch**: feature/issue-609 at `c1d0805`
+**Phases**: single
+
+### Open questions
+- [ ] Confirm the `merge_pr.sh` messaging approach (step 5): catch `make sync`'s exit code and print a distinct "merged and cleaned up, but sync failed" warning banner while still exiting non-zero, instead of letting `set -eo pipefail` abort the script with no closing banner
+- [ ] Should the tri-state `SyncOutcome` enum live in `sync_repos.py` or move to `lib/`? Plan defaults to local unless review disagrees
