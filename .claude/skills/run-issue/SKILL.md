@@ -130,15 +130,42 @@ installs, and it has no GitHub auth of its own (`--context-file`, #552). Check
 `dispatch_subagent.sh --check` (#532) before relying on it.
 
 **What contains a dispatched agent — in either mode.** Neither mode puts a human
-behind each tool call, so be clear about what does the containing. In a
-**container**, the sandbox boundary is the *whole* of it: the dispatched agent
-runs with broad tool access under a long-lived token, and nothing else stands
-between it and the work. That is an acceptable trade for trusted first-party
-phases — and it is exactly why untrusted input belongs there rather than
-in-process. **In-process under auto mode**, containment is the host's permission
-policy and allowlist, the worktree the phase is confined to, and the
-`run-issue` checkpoints, which survive regardless of mode. Auto mode removed the
-*prompts*; it did not remove the need to know which of these is holding.
+behind each tool call, so be accurate about what does the containing. The two
+modes are not close, and the honest comparison does not favour in-process.
+
+In a **container**, the sandbox boundary is the *whole* of it, and it is real:
+a separate filesystem, isolated dependency state, no route to the host's caches,
+and — the property `.devcontainer/agent/README.md` leads with — **no host
+credentials inside**. A container run that goes wrong cannot push, cannot open a
+PR, and cannot reach anything the host is logged into.
+
+**In-process, markedly less contains the phase**, and none of the mechanisms you
+might reach for actually hold:
+
+- The host **permission policy** is not a guardrail here — auto mode is
+  precisely what stands it down; that is the whole premise of preferring
+  in-process.
+- The **allowlist** refuses nothing. `.claude/settings.json` carries a
+  `permissions.allow` array and there is no `deny` list anywhere in this
+  workspace's settings. An allowlist pre-approves; it does not deny.
+- The **worktree does not confine anything.** The scoping is prose in the
+  handoff, not a boundary — `dispatch_subagent.sh` says so in its own header
+  ("convention-only (no enforcement, per ADR-0004/0005)"), and the in-process
+  mode line in `skill_workflows.md` reads "no filesystem isolation".
+- The phase runs with **the host's own credentials** — GitHub auth included.
+  That is exactly the capability the sandbox withholds, and it is the real
+  difference between the modes.
+
+What genuinely survives is `run-issue`'s **checkpoints** (publish, PR, merge).
+They are host-enforced and mode-independent, but they gate *publication after
+the phase has already run* — they catch a bad result, not a bad act.
+
+So keep the sandbox in mind as what it is: **it *is* the safeguard you are
+relying on — think before dispatching anything that processes untrusted input
+outside it.** Auto mode retired the *prompt cost* of in-process dispatch, not
+the containment gap; if anything, stating the gap plainly strengthens the case
+for containers on untrusted input. Choose in-process because the phase needs
+host resources and you trust its input — never because it is contained.
 
 **Dispatch container phases in the *background* so the host stays available.**
 A synchronous (foreground) container dispatch blocks the host's turn for the
