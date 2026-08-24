@@ -55,12 +55,24 @@ if [ -n "$WORKTREE_ROOT" ] && [ ! -d "$WORKTREE_ROOT" ]; then
 fi
 
 # Chown one build/install/log mountpoint, creating it if docker did not.
+#
+# The recursive chown is non-fatal by design — a populated artifact tree can
+# hold entries this pass cannot touch, and aborting there would strand the
+# remaining workspaces. But it is NOT silent: a failure here leaves exactly
+# #604's signature (root-owned volume, EACCES from colcon much later, no
+# diagnostic), so say which path failed and name the usual cause. Under a
+# rootless or userns-remapped daemon the container's root is not the volume's
+# owner and every chown fails — that is the case this warning exists for.
 fix_ws_dir() {
     local ws_dir="$1" subdir target
     for subdir in build install log; do
         target="$ws_dir/$subdir"
         if [ -d "$target" ]; then
-            chown -R "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null || true
+            if ! chown -R "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null; then
+                echo "WARNING: $(basename "$0"): chown failed for $target" >&2
+                echo "         The agent may hit 'Permission denied' building there (#604)." >&2
+                echo "         Usual cause: a rootless / userns-remapped Docker daemon." >&2
+            fi
         else
             mkdir -p "$target"
             chown "$TARGET_UID:$TARGET_GID" "$target"
