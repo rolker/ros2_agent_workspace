@@ -268,7 +268,12 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 # Check status relative to upstream
                 # Assuming upstream is 'origin'
                 s_success, s_msg = run_git_cmd(repo_path, ["status", "-sb"], dry_run)
-                if s_success and "behind" in s_msg:
+                if not s_success:
+                    # The fetch itself succeeded, so this is not a failed sync —
+                    # but a bare "✅ Fetched." would imply we checked whether the
+                    # branch is behind when we could not (#609).
+                    print("     ✅ Fetched (could not read ahead/behind status).")
+                elif "behind" in s_msg:
                     print(
                         "     ⚠️  Branch is behind remote."
                         " Run 'git merge' or 'git rebase' manually."
