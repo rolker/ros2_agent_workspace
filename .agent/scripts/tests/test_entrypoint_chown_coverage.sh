@@ -205,6 +205,25 @@ else
     pass "a non-existent worktree root fails loud"
 fi
 
+# ---------- A4. Entrypoint call site passes BOTH roots (hermetic) ----------
+# Layer B proves the call site end-to-end, but it SKIPs without a local Docker
+# daemon and image — on the CI runner, always — and run_script_tests.sh
+# suppresses passing output, so that SKIP is invisible. Re-deleting the
+# "${WORKTREE_ROOT:-}" argument (#604 exactly) would then merge green.
+#
+# This assertion is the always-runs floor under that one argument. It does NOT
+# replace layer B: this only reads the call site, while layer B proves the whole
+# chain (ownership loops, privilege drop, real anonymous volumes) actually
+# works. Keep both.
+call_site=$(sed -e ':a' -e '/\\$/{N;s/\\\n/ /;ba' -e '}' "$ENTRYPOINT_SH" \
+    | grep -E '^"\$OWNERSHIP_SH"' || true)
+if printf '%s' "$call_site" | grep -qF '$WORKSPACE_ROOT' \
+   && printf '%s' "$call_site" | grep -qF 'WORKTREE_ROOT'; then
+    pass "entrypoint invokes fix-volume-ownership.sh with BOTH roots"
+else
+    fail "entrypoint call site does not pass both roots (this is #604): ${call_site:-<call not found>}"
+fi
+
 # ---------- B. Container-side end-to-end ----------
 # Skips cleanly when Docker or the agent image is unavailable, keeping
 # run_script_tests.sh hermetic in CI.
