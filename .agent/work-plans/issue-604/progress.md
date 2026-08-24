@@ -299,9 +299,9 @@ verified for the mechanism they changed and not for the block they left behind.
 That is the class of residue to watch when addressing these.
 
 ### Findings
-- [ ] (must-fix, Copilot; lineage: R2 suggestion 5, partially fixed at 18ba230) The mkdir branch's `chown` is unguarded under `set -e`, so it aborts where the sibling recursive `chown` warns — contradicting the function's own "non-fatal by design … under a rootless or userns-remapped daemon every chown fails, that is the case this warning exists for" comment eight lines above. The entrypoint calls this script unguarded under `set -euo pipefail`, so the abort is a container that refuses to start with a bare `chown: Operation not permitted` and no context; in the documented `docker exec -u 0` recovery path it strands every workspace after the failing one — the exact harm the recursive branch's comment says it is avoiding. Reachability is narrow and should be stated honestly: the launcher mkdir -p's and mounts all three subdirs (sections 4/4b), so under a normal launch `[ -d "$target" ]` is always true and this branch is not taken. It is taken in the standalone recovery invocation, in layer A of the coverage test, and for any `*_ws` whose subdir appeared after the launcher's scan. Not impossible, so not dismissible. Fix: mirror lines 71-75 — `if ! mkdir -p "$target" || ! chown …; then` warn with the path and the rootless/userns cause, and continue. Guard the `mkdir` too, which Copilot did not mention but has the same abort behaviour on a read-only mount — `.devcontainer/agent/fix-volume-ownership.sh:77-78`
-- [ ] (suggestion, Copilot; lineage: R2 must-fix 2, partially fixed at f427244) The recovery block's `"$ROS2_AGENT_WORKSPACE_ROOT"` / `"$WORKTREE_ROOT"` expand in the **host** shell, where the launcher never sets them — the launcher passes them into the container (`docker_run_agent.sh:696-697`), not out to the caller. Copy-paste therefore passes two empty strings. Rated suggestion, not must-fix, on a deliberate distinction from its round-2 predecessor: that one failed **silently** (the chown no-oped through `2>/dev/null || true`), whereas this one fails **loud** — the root validation added this round catches it with `ERROR: workspace root is not a directory:` — and the next sentence already tells the operator to substitute the real paths. Still worth fixing in this round, since the roots are readable from the container the command already targets: `"$(docker exec <container> printenv ROS2_AGENT_WORKSPACE_ROOT)"` and the same for `WORKTREE_ROOT`. Adjust the following sentence, which would then be describing a substitution the command no longer needs — `.devcontainer/agent/README.md:330-338`
-- [ ] (suggestion, Copilot) Inverted failure message: the branch fires when `--print-mounts` exits **non-zero**, but prints `FAIL: --print-mounts exits 0`. Confirmed against the file's own conventions — every other failure-only message here is a problem statement (`could not read IMAGE_NAME…`, `fixture produced no *_ws anonymous volumes…`), and the one assertion-phrased message (line 166) has a paired `pass` at 168 that makes it read correctly. Line 129 has no `pass` twin, so the assertion phrasing has nothing to disambiguate it. Fix: `fail "--print-mounts exited non-zero (rc=$?, out=$mount_out)"`, capturing `rc` before the `[` overwrites `$?` — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:129`
+- [x] (must-fix, Copilot; lineage: R2 suggestion 5, partially fixed at 18ba230) The mkdir branch's `chown` is unguarded under `set -e`, so it aborts where the sibling recursive `chown` warns — contradicting the function's own "non-fatal by design … under a rootless or userns-remapped daemon every chown fails, that is the case this warning exists for" comment eight lines above. The entrypoint calls this script unguarded under `set -euo pipefail`, so the abort is a container that refuses to start with a bare `chown: Operation not permitted` and no context; in the documented `docker exec -u 0` recovery path it strands every workspace after the failing one — the exact harm the recursive branch's comment says it is avoiding. Reachability is narrow and should be stated honestly: the launcher mkdir -p's and mounts all three subdirs (sections 4/4b), so under a normal launch `[ -d "$target" ]` is always true and this branch is not taken. It is taken in the standalone recovery invocation, in layer A of the coverage test, and for any `*_ws` whose subdir appeared after the launcher's scan. Not impossible, so not dismissible. Fix: mirror lines 71-75 — `if ! mkdir -p "$target" || ! chown …; then` warn with the path and the rootless/userns cause, and continue. Guard the `mkdir` too, which Copilot did not mention but has the same abort behaviour on a read-only mount — `.devcontainer/agent/fix-volume-ownership.sh:77-78`
+- [x] (suggestion, Copilot; lineage: R2 must-fix 2, partially fixed at f427244) The recovery block's `"$ROS2_AGENT_WORKSPACE_ROOT"` / `"$WORKTREE_ROOT"` expand in the **host** shell, where the launcher never sets them — the launcher passes them into the container (`docker_run_agent.sh:696-697`), not out to the caller. Copy-paste therefore passes two empty strings. Rated suggestion, not must-fix, on a deliberate distinction from its round-2 predecessor: that one failed **silently** (the chown no-oped through `2>/dev/null || true`), whereas this one fails **loud** — the root validation added this round catches it with `ERROR: workspace root is not a directory:` — and the next sentence already tells the operator to substitute the real paths. Still worth fixing in this round, since the roots are readable from the container the command already targets: `"$(docker exec <container> printenv ROS2_AGENT_WORKSPACE_ROOT)"` and the same for `WORKTREE_ROOT`. Adjust the following sentence, which would then be describing a substitution the command no longer needs — `.devcontainer/agent/README.md:330-338`
+- [x] (suggestion, Copilot) Inverted failure message: the branch fires when `--print-mounts` exits **non-zero**, but prints `FAIL: --print-mounts exits 0`. Confirmed against the file's own conventions — every other failure-only message here is a problem statement (`could not read IMAGE_NAME…`, `fixture produced no *_ws anonymous volumes…`), and the one assertion-phrased message (line 166) has a paired `pass` at 168 that makes it read correctly. Line 129 has no `pass` twin, so the assertion phrasing has nothing to disambiguate it. Fix: `fail "--print-mounts exited non-zero (rc=$?, out=$mount_out)"`, capturing `rc` before the `[` overwrites `$?` — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:129`
 
 ### False positives
 - None. All three Copilot comments were verified against the local files and hold.
@@ -313,3 +313,51 @@ That is the class of residue to watch when addressing these.
 Three open findings, one must-fix → `address-findings`. All three are localized
 mechanical edits (one shell branch, one docs command block, one message string)
 with no design question outstanding; a re-review should be cheap.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 09:37 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-604 at `a0b19cf`
+**PR**: #606
+**Addressed**: `## Integrated Review` (2026-08-24 09:31 -04:00, PR #606 at `7831658`) — all 3 open findings, none deferred
+**Commits**: `ac12582`, `4ba00ad`, `a0b19cf`
+
+### Actions
+- [x] (must-fix) `fix_ws_dir()`'s create-then-chown branch now warns and continues instead of aborting under `set -e`. Both calls are guarded, not just the `chown`: `mkdir -p` fails the same way on a read-only/unwritable mount, and the triage explicitly asked for it. Each carries its own cause line (unwritable mount vs. rootless/userns daemon) so the warning names the right suspect — `.devcontainer/agent/fix-volume-ownership.sh:76-92` (`ac12582`)
+- [x] (suggestion) The README recovery block now reads every argument back out of the container via `docker exec … printenv` instead of expanding `$ROS2_AGENT_WORKSPACE_ROOT` / `$WORKTREE_ROOT` in the host shell, where the launcher never sets them. The `<container>` placeholder — repeated in four spots and not runnable as written — is replaced by a `c=$(docker ps --filter name=^/ros2-agent- …)` lookup, verified against the launcher's actual `CONTAINER_PREFIX`. The trailing sentence, which described a substitution the command no longer needs, is rewritten to explain *why* everything is read from the container, keeping the banner paths as the manual fallback — `.devcontainer/agent/README.md:327-349` (`4ba00ad`)
+- [x] (suggestion) `--print-mounts` failure message is now a problem statement with the real rc, captured into `mount_rc` before `[` overwrites `$?` — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:127-132` (`a0b19cf`)
+
+### Sibling-scan (the round-2/round-3 incomplete-fix pattern)
+The triage flagged that two of three findings were residue from fixing one call
+site and leaving its sibling. Each fix here was scanned for the same shape:
+
+- **fix-volume-ownership.sh** — swept for other unguarded mutating calls under
+  `set -euo pipefail`. There are none; `mkdir`/`chown` in `fix_ws_dir()` were the
+  only two, and both are now guarded. The two root validations (lines 45-55) abort
+  deliberately and are asserted by test A3.
+- **README** — the sibling `ls -ld "$WORKTREE_ROOT"/*_ws/build/` in the block above
+  runs *inside* the `--shell` session, where the launcher does export the variable,
+  so it is correct as written and was left alone.
+- **coverage test** — audited every `fail` message in the file for the same inverted
+  phrasing. Line 129 was the only assertion-phrased failure-only message; the one
+  other assertion-phrased message (line 166/171) has a paired `pass`, and all the
+  rest are already problem statements.
+
+### Verification
+- `bash .agent/scripts/tests/test_entrypoint_chown_coverage.sh` — 10 passed, 0 failed.
+  Layer B ran for real (local Docker + image present), mounting the working tree's
+  `fix-volume-ownership.sh` over the baked copy, so the guarded branch was exercised
+  container-side without an image rebuild. The shared
+  `ros2-agent-workspace-agent:latest` tag was not rebuilt or overwritten.
+- `bash .agent/scripts/tests/run_script_tests.sh` — all 21 shell tests + 73 pytest tests green.
+- Mutation checks:
+  - `--print-mounts` forced non-zero (bogus flag) ⇒ `FAIL: --print-mounts exited
+    non-zero (rc=1, out=…)`, correctly worded, then reverted.
+  - Unwritable `a_ws` fixture with a following `b_ws`: pre-fix script (`HEAD:`) aborts
+    `rc=1` and never reaches `b_ws`; post-fix warns three times, exits `rc=0`, and
+    `b_ws/{build,install,log}` are still created — the strand-the-rest harm is gone.
+  - `docker ps --filter name=^/ros2-agent-` verified to match a container of that
+    prefix (throwaway alpine container, removed).
+- Pre-commit hooks (incl. shellcheck) passed on all three commits; no `--no-verify`.
