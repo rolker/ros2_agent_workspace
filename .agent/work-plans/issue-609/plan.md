@@ -50,10 +50,13 @@ tri-state outcome instead of widening the boolean.
 2. **Gate `sync_gitbug()` on `SYNCED` only** (not "not FAILED") — a
    `SKIPPED` repo (e.g. deliberately dirty) should not run git-bug sync
    either, since that's arguably still "the repo wasn't touched this run."
-   Verify this matches current behavior's *intent* (today `sync_gitbug()`
-   runs unconditionally due to the `True`-everywhere bug) — call this out
-   explicitly since it's a small behavior tightening beyond the literal
-   bug fix, not just a bugfix-neutral refactor. Both call sites in `main()`
+   **Corrected at plan review** (the original text here claimed
+   `sync_gitbug()` runs unconditionally today — it does not): `sync_repo()`
+   already early-returns `False` for a dirty tree, a detached HEAD and an
+   unresolvable path, and both call sites are already gated on that return.
+   The only behaviour this step changes is that git-bug stops running after
+   a *failed* pull/fetch — which is the bug fix, not a tightening beyond it.
+   Both call sites in `main()`
    (root repo ~248, per-overlay-repo ~281) change from
    `if sync_repo(...):` to `if sync_repo(...) == SyncOutcome.SYNCED:`.
 
@@ -160,7 +163,7 @@ tri-state outcome instead of widening the boolean.
 | `AGENTS.md` | Exit-code semantics for the `sync_repos.py`, `pull_remote.py`, `push_remote.py` and `validate_workspace.py` script-table rows |
 | `.agent/scripts/pull_remote.py` | Scope widening — tri-state `is_dirty()` / `get_current_branch()`; `_check_pull_preconditions()` returns an (status, message) problem so an unreadable tree or git state is an `error` (exit 1), not a `skip`; the same carve-out in `_fetch_into_branch()` and in the `--json` arm |
 | `.agent/scripts/tests/test_pull_remote.py` | New — classification driven through `process_repo()`, the entry point `iter_repos` calls |
-| `.agent/scripts/validate_workspace.py` | Scope widening — three-state `ValidationResult` + `EXIT_CODES`; zero configured repos is `UNCONFIGURED` (exit 3), not a pass; `--fix` gated on drift and its re-validation result no longer discarded |
+| `.agent/scripts/validate_workspace.py` (cont.) | Scope widening — three-state `ValidationResult` + `EXIT_CODES`; zero configured repos is `UNCONFIGURED` (exit 3), not a pass; an unparseable `.repos` file is **1**, not 3; a repo whose git state cannot be read is its own reported mismatch; `--fix` gated on drift and its re-validation result no longer discarded |
 | `.agent/scripts/tests/test_validate_workspace.py` | New — outcome classification and exit status, stubbed at the `get_overlay_repos` / `get_actual_repos` seams |
 | `.agent/scripts/dashboard.sh` | Consequence of the above — the validation check reads the exit code three ways instead of pass/fail |
 | `.agent/scripts/tests/test_dashboard_validate_status.sh` | New — runs the real `dashboard.sh` against a stub validate script for each exit code |
@@ -168,6 +171,12 @@ tri-state outcome instead of widening the boolean.
 | `.agent/scripts/push_remote.py` | Consequence — an unreadable repo is an `error`, not a "remote not found" skip |
 | `.agent/scripts/tests/test_remote_probe.py` | New — the shared probe, the `OSError` guard, and `push_remote.py`'s consumption of both |
 | `.agent/scripts/tests/test_net_retry.py` | Check for `sync_repo` return-value assertions that need updating for the enum change (no changes expected if it only checks `run_network_cmd`/`sync_gitbug` call routing, but verify) |
+| `.agent/scripts/list_overlay_repos.py` | Round 3 — given a `main()` so the CLI arm is testable; exits 1 naming the file instead of printing `[]` for a manifest that will not parse |
+| `.agent/scripts/tests/test_make_validate.sh` | Round 3, new — runs the real `make validate` recipe against stub scripts; pins that `test_layer_sourcing.sh` runs whatever `validate_workspace.py` returns |
+| `.agent/hooks/post-checkout` | Round 3 — the worktree message no longer promises an exit code that `make sync` never returns |
+| `.agent/hooks/README.md` | Round 3 — same correction, and says the sync fails naming `configs/manifest` |
+| `Makefile` | Round 3 — `make help`'s `validate` line attributes the codes to the script, not to `make`; the `validate` recipe runs both checks and returns the first failure |
+| `.agent/scripts/tests/test_merge_pr.sh` | Round 3 — structural check that the sync-failure branch actually exits (deleting that `exit` had passed the whole suite) |
 
 ## Principles Self-Check
 
@@ -202,10 +211,28 @@ tri-state outcome instead of widening the boolean.
   (includes git-bug)" with no exit-code semantics — this becomes
   inaccurate once the fix ships (a caller could reasonably assume exit 0
   always meant success, which will no longer be true). Step 7 updates it.
-- **Agent-instruction candidates** (proposals only): none identified —
-  the tri-state pattern (real-failure vs. benign-skip) is local to this
-  script's domain (dirty/detached-HEAD guards), not a generalizable
-  workspace convention worth promoting to `.agent/knowledge/`.
+- **Agent-instruction candidates** (proposals only): **revised after the
+  operator widened the scope.** The original judgement — "local to this
+  script's domain" — no longer holds: the same defect now has named fixes in
+  `sync_repos.py`, `pull_remote.py` (including its `--json` arm),
+  `push_remote.py`, `validate_workspace.py`, `dashboard.sh`, `merge_pr.sh`
+  and the shared `lib/remote_utils.py` + `lib/workspace.py`, across both the
+  per-repo probes and the enumeration above them. That is a workspace
+  convention, and it is worth **proposing** (operator approval required, per
+  AGENTS.md § Ask First) as an `.agent/knowledge/` entry along the lines of
+  *"a probe that failed is not a benign answer"*:
+    - a failed `git status` is not a clean tree; a failed `git branch
+      --show-current` is not a detached HEAD; a failed `git remote` is not an
+      absent remote; a failed `rev-list` is not "up to date";
+    - an empty enumeration is not "everything passed" — reporting over a list
+      nothing looked at is a stronger false claim than the bare success line
+      it replaces;
+    - and the counterweight, which is the hard half: prefer a benign skip
+      wherever a *supported host configuration* produces the same signal (the
+      optional-layer rule), because a false red that operators learn to ignore
+      is worse than the false green it removed.
+  Not filed as an issue here — the plan-first rule is that instruction
+  changes are proposed to the operator, not made as a side effect.
 
 ## Open Questions
 
