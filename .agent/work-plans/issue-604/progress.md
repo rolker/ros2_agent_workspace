@@ -72,3 +72,15 @@ message; it's a subtle Docker mechanic that's easy to re-break.
 - [ ] Add the second `chown` loop to `.devcontainer/agent/agent-entrypoint.sh` for `$WORKTREE_ROOT/*_ws/{build,install,log}`, mirroring section 4b's `[ -d ] && [ ! -L ]` guard.
 - [ ] Add regression coverage for the mount↔chown pairing (prefer the `--print-mounts`-driven invariant check as the low-cost option in this PR; container-side smoke test may follow as a separate issue if out of scope here).
 - [ ] Consider a one-line scope caveat on `test_layer_sourcing.sh`'s header/AGENTS.md table entry noting it does not cover worktree-scoped or container-side ownership, so the next regression in this area isn't assumed-caught again.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-23 23:20 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-604/plan.md` at `59e8244`
+**Branch**: feature/issue-604 at `59e8244`
+**Phases**: single
+
+### Open questions
+- [ ] Should the container-side smoke test (write into `build/` as the dropped `ros` user, requires a live Docker dispatch harness) be added in this PR instead of deferred as a follow-up, given #602 -> #604 is the second time this area shipped without regression coverage?
