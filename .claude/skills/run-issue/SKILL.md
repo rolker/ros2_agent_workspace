@@ -260,19 +260,22 @@ reach for one at a time — each does less than its name suggests:
   still the right lens — documentation is its weakest layer, and this scoping
   is documentation.)
 - The phase runs with **the host's own credentials** — GitHub *write* auth
-  included. That is exactly the capability the sandbox withholds, and it is the
-  real difference between the modes.
+  included. That is exactly the capability the sandbox is configured to
+  withhold, and it is the real difference between the modes.
 
 What genuinely survives is `run-issue`'s **checkpoints** (publish, PR, merge).
 They are host-enforced and mode-independent, but they gate *publication after
 the phase has already run* — they catch a bad result, not a bad act.
 
-So keep the sandbox in mind as what it is: **it *is* the safeguard you are
-relying on — think before dispatching anything that processes untrusted input
-outside it.** Auto mode retired the *prompt cost* of in-process dispatch, not
-the containment gap; if anything, stating the gap plainly strengthens the case
-for containers on untrusted input. Choose in-process because the phase needs
-host resources and you trust its input — never because it is contained.
+So keep the sandbox in mind as what it is: **not a wall around untrusted input,
+but the one arrangement in which a phase that goes wrong reaches neither GitHub
+write auth nor the host's machine state.** Auto mode retired the *prompt cost*
+of in-process dispatch, not that difference — so think before running a phase
+in-process on input you have reason to distrust. But stated plainly the
+difference is about credentials and machine state, not containment: against
+untrusted input what you rely on in **either** mode is the data fence. Choose
+in-process because the phase needs host resources and you trust its input —
+never because it is contained.
 
 **Dispatch container phases in the *background* so the host stays available.**
 A synchronous (foreground) container dispatch blocks the host's turn for the
