@@ -14,6 +14,17 @@ Usage:
 
 Prerequisites:
     Remotes must already exist in each repo. Use add_remote.py for one-time setup.
+
+Exit status:
+    0  every repo was fetched/merged, or deliberately skipped (dirty tree,
+       detached HEAD, off the default branch, remote not configured).
+    1  at least one repo errored: a failed fetch/merge, or a working tree or
+       git state that could not be read at all. A probe that failed is not a
+       benign answer — see is_dirty()/get_current_branch() (#609).
+    2  argparse usage error.
+
+    `make pull-remote` reports GNU make's own 2 for any non-zero recipe status,
+    so branch on these codes only when calling the script directly.
 """
 
 import argparse
@@ -36,16 +47,41 @@ from remote_utils import (  # noqa: E402
 )
 
 
+# Reasons for a repo whose git state could not be read at all. These are
+# "error", never "skip": a probe that failed is not a benign answer, and
+# reporting it as one is what let a failed run exit 0 (#609).
+UNREADABLE_TREE = "cannot read working tree (corrupt .git, or not a repo)"
+UNREADABLE_STATE = "cannot read git state (not a repo, or corrupt .git)"
+
+
 def is_dirty(repo_path):
-    """Check if the repo has uncommitted changes."""
+    """Check if the repo has uncommitted changes.
+
+    Returns True (dirty), False (clean), or None when `git status` itself
+    failed. The three cases must stay distinct: a working tree we could not
+    read is NOT a clean one. The old `success and bool(output)` reported
+    exactly that, and this script is where it costs the most — `--pull`
+    *merges* on this answer, so an unreadable working tree with real
+    uncommitted changes would have been merged into (#609).
+    """
     success, output, _ = run_git(repo_path, ["status", "--porcelain"])
-    return success and bool(output)
+    if not success:
+        return None
+    return bool(output)
 
 
 def get_current_branch(repo_path):
-    """Get the current branch name."""
+    """Get the current branch name.
+
+    Returns the branch name, or "" on a genuine detached HEAD (the command
+    succeeded and printed nothing), or None when the git command itself failed
+    (not a repo, corrupt .git). Callers MUST distinguish those two: "" is a
+    benign skip, None is a repo we cannot read at all (#609).
+    """
     success, output, _ = run_git(repo_path, ["branch", "--show-current"])
-    return output if success and output else None
+    if not success:
+        return None
+    return output
 
 
 def _compare_branches(repo_path, branch, remote_ref):
@@ -108,24 +144,40 @@ def _fetch_and_report(repo_path, remote_name, version, dry_run):
 
 
 def _check_pull_preconditions(repo_path, version):
-    """Check if repo is ready for a merge. Returns (branch, skip_reason)."""
-    if is_dirty(repo_path):
-        return None, "uncommitted changes — skipping merge"
+    """Check if repo is ready for a merge. Returns (branch, problem).
+
+    `problem` is None when the repo is ready to merge, otherwise a
+    (status, message) pair ready to return from process_repo(). "skip" is for
+    a benign, operator-visible reason that leaves the repo deliberately alone
+    (dirty tree, detached HEAD, off the default branch); "error" is for a git
+    state we could not read, which must not be reported as a benign skip and
+    must make the run exit non-zero (#609).
+    """
+    dirty = is_dirty(repo_path)
+    if dirty is None:
+        return None, ("error", UNREADABLE_TREE)
+    if dirty:
+        return None, ("skip", "uncommitted changes — skipping merge")
 
     branch = get_default_branch(repo_path, version)
     current = get_current_branch(repo_path)
     if current is None:
-        return None, "detached HEAD — skipping merge"
+        # The git command itself failed. NOT the same as a detached HEAD:
+        # collapsing the two reported a repo we cannot read as a benign skip,
+        # and the run still exited 0 (#609).
+        return None, ("error", UNREADABLE_STATE)
+    if not current:
+        return None, ("skip", "detached HEAD — skipping merge")
     if current != branch:
-        return None, f"not on default branch (on '{current}', expected '{branch}')"
+        return None, ("skip", f"not on default branch (on '{current}', expected '{branch}')")
     return branch, None
 
 
 def _fetch_and_pull(repo_path, remote_name, version, dry_run):
     """Fetch and merge from remote. Returns (status, message)."""
-    branch, skip_reason = _check_pull_preconditions(repo_path, version)
-    if skip_reason:
-        return "skip", skip_reason
+    branch, problem = _check_pull_preconditions(repo_path, version)
+    if problem:
+        return problem
 
     # Fetch
     success, _, err = run_git_network(repo_path, ["fetch", remote_name], dry_run)
@@ -148,6 +200,10 @@ def _fetch_into_branch(repo_path, remote_name, version, target_branch, dry_run):
     """Fetch and update a local branch from the remote. Returns (status, message)."""
     # git branch -f fails if the target branch is currently checked out
     current = get_current_branch(repo_path)
+    if current is None:
+        # We cannot tell whether target_branch is checked out, so we cannot
+        # know that `git branch -f` is safe here (#609).
+        return "error", UNREADABLE_STATE
     if current == target_branch:
         return "skip", (
             f"branch '{target_branch}' is currently checked out — "
