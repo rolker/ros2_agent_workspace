@@ -195,6 +195,25 @@ else
         || bad "post-merge 'exit 1' would read as 'safe to retry' a landed merge: $stray"
 fi
 
+# Deleting the `exit "$POST_MERGE_RC"` from the sync-failure branch passed the
+# whole suite: the banner still printed, and the script fell off the end with
+# the status of the last echo — 0. That restores #609 verbatim, in the one path
+# this issue is named for. The branch is asserted structurally because it is not
+# reachable here (every test stops at a pre-merge guard, by design).
+echo "Test: the sync-failure branch ends by exiting, not by falling through"
+banner_line=$(grep -n 'but the repo sync FAILED' "$MERGE_PR" | cut -d: -f1)
+if [[ -z "$banner_line" ]]; then
+    bad "could not locate the sync-failure banner — the structural check has no anchor"
+else
+    tail_after=$(awk -v start="$banner_line" 'NR>start' "$MERGE_PR")
+    # The first `exit` after the banner must be the post-merge code, and it must
+    # come before the enclosing `fi` closes the branch.
+    first_exit=$(grep -m1 -E '^\s*(exit|fi)\b' <<<"$tail_after")
+    [[ "$first_exit" =~ exit[[:space:]]+\"?\$POST_MERGE_RC ]] \
+        && ok "sync failure exits \$POST_MERGE_RC before the branch closes" \
+        || bad "sync-failure branch reaches '${first_exit:-end of file}' before any exit — a failed sync would return 0"
+fi
+
 # The `cd` back to the workspace root runs after the merge under `set -e`.
 echo "Test: the post-merge cd to the workspace root is guarded, not left to set -e"
 grep -qE '^cd "\$ROOT_DIR" \|\|' "$MERGE_PR" \
