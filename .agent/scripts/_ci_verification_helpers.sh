@@ -13,11 +13,27 @@
 # legitimate signal is guarded, so sourcing this into a strict script is safe.
 
 CI_LOCAL_NOTES_REF="ci-local"
-# Scratch ref for the fetch fallback. NEVER fetch onto refs/notes/ci-local
+# Scratch ref PREFIX for the fetch fallback. NEVER fetch onto refs/notes/ci-local
 # itself: that would risk clobbering a local, not-yet-pushed attestation
 # ci_local.sh just wrote (it treats the ref as append-only; the read side must
 # too).
-CI_LOCAL_SCRATCH_REF="refs/notes/ci-local-merge-check"
+#
+# The full name is built PER CALL (`_ci_local_scratch_ref`), not fixed: the
+# operator runs several agent sessions at once, and with a constant name a
+# concurrent merge_pr.sh in the same repo deletes the ref mid-fetch (both the
+# up-front delete and the post-use cleanup), so an ATTESTED head reads as
+# unattested and falls through to the merge-with-no-verification state
+# (reproduced 10/10 before this fix). Repo-local refs are shared between the
+# main checkout and all its worktrees, so "same repo" includes them.
+CI_LOCAL_SCRATCH_REF_PREFIX="refs/notes/ci-local-merge-check"
+
+# Unique-per-invocation scratch ref name. $$ alone is not enough (a subshell
+# inherits it, and PIDs recycle); $RANDOM and a nanosecond stamp make a
+# collision between concurrent runs vanishingly unlikely.
+_ci_local_scratch_ref() {
+    printf '%s-%s-%s-%s' "$CI_LOCAL_SCRATCH_REF_PREFIX" "$$" \
+        "${RANDOM}${RANDOM}" "$(date +%s%N 2>/dev/null || echo 0)"
+}
 
 # Parse an upstream.repos YAML blob (on stdin) into one repository key per line.
 # Same parse shape ci_local.sh uses (yaml.safe_load over the `repositories`
@@ -71,6 +87,16 @@ _ci_local_note_accepts() {
             local entry missing=false
             while IFS= read -r entry; do
                 [[ -z "$entry" ]] && continue
+                # The entry name is interpolated into a REGEX below, so it must
+                # be a literal. ci_local.sh validates entry names with this same
+                # `^[A-Za-z0-9_-]+$` rule producer-side; re-validate here on the
+                # consumer side, because a note is evidence we are about to
+                # merge on: an entry of `.*` would otherwise satisfy
+                # completeness with any single upstream-repo line.
+                if [[ ! "$entry" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                    missing=true
+                    continue
+                fi
                 # `upstream-repo: <dir>@<sha>` — one line per upstream.repos
                 # entry. A record missing any entry does not describe the
                 # environment that was actually verified (ADR-0018 / #577).
@@ -122,13 +148,15 @@ ci_local_attestation_status() {
         # interrupted run makes the next fetch fail non-fast-forward, which
         # would yield a false "no attestation" — i.e. a merge on a warning
         # instead of on evidence.
-        git -C "$repo" update-ref -d "$CI_LOCAL_SCRATCH_REF" 2>/dev/null || true
+        local scratch_ref
+        scratch_ref=$(_ci_local_scratch_ref)
+        git -C "$repo" update-ref -d "$scratch_ref" 2>/dev/null || true
         if git -C "$repo" fetch -q origin \
-                "+refs/notes/$CI_LOCAL_NOTES_REF:$CI_LOCAL_SCRATCH_REF" 2>/dev/null; then
-            note=$(git -C "$repo" notes --ref="$CI_LOCAL_SCRATCH_REF" show "$head_sha" 2>/dev/null || true)
+                "+refs/notes/$CI_LOCAL_NOTES_REF:$scratch_ref" 2>/dev/null; then
+            note=$(git -C "$repo" notes --ref="$scratch_ref" show "$head_sha" 2>/dev/null || true)
             [[ -n "$note" ]] && ref_used="origin"
         fi
-        git -C "$repo" update-ref -d "$CI_LOCAL_SCRATCH_REF" 2>/dev/null || true
+        git -C "$repo" update-ref -d "$scratch_ref" 2>/dev/null || true
     fi
 
     if [[ -z "$note" ]]; then
@@ -140,25 +168,38 @@ ci_local_attestation_status() {
     # the caller passes the owning repo's MAIN checkout, typically sitting on
     # the default branch, so its working-tree file may not be the PR head's.
     # Read it at the head commit. Unlike the note lookup, `git show` needs the
-    # commit object locally; when it is absent we cannot verify completeness and
-    # must NOT pass by default.
+    # commit object locally; when it is absent (after one targeted fetch) we
+    # cannot verify completeness and must NOT pass by default — whether or not
+    # the note happens to carry upstream-repo: lines.
     local upstream_entries=""
     local head_present=false
     git -C "$repo" cat-file -e "${head_sha}^{commit}" 2>/dev/null && head_present=true || true
-    if [[ "$head_present" == true ]]; then
-        if git -C "$repo" cat-file -e "${head_sha}:upstream.repos" 2>/dev/null; then
-            upstream_entries=$(git -C "$repo" show "${head_sha}:upstream.repos" 2>/dev/null \
-                | _ci_local_upstream_entries || true)
-            if [[ -z "$upstream_entries" ]]; then
-                echo "upstream.repos at ${head_sha:0:12} could not be parsed — refusing to treat the note as evidence"
-                return 1
-            fi
-        fi
-    elif grep -q '^upstream-repo: ' <<<"$note"; then
-        # The note says this repo has upstream sources, but we cannot read
-        # upstream.repos at the head to check the coverage is complete.
-        echo "note for ${head_sha:0:12} records upstream-repo entries but the commit is not local — run 'git -C $repo fetch origin' and re-run"
+    if [[ "$head_present" == false ]]; then
+        # One targeted fetch of the commit itself (not a full remote fetch) —
+        # the usual reason it is missing is that the PR head was pushed from
+        # another checkout.
+        git -C "$repo" fetch -q --no-tags origin "$head_sha" 2>/dev/null || true
+        git -C "$repo" cat-file -e "${head_sha}^{commit}" 2>/dev/null && head_present=true || true
+    fi
+    if [[ "$head_present" == false ]]; then
+        # FAIL CLOSED, unconditionally. An earlier revision only refused when
+        # the note ITSELF carried `upstream-repo:` lines — the exact inverse of
+        # this guard's intent: a note that omits them is precisely the note that
+        # cannot be trusted to have covered a repo whose head declares
+        # upstream.repos, because the file we would check that against is
+        # unreadable. Absent the head commit we cannot know whether
+        # upstream.repos exists at it, so the #577 completeness rule cannot be
+        # evaluated at all and the note is not merge evidence.
+        echo "commit ${head_sha:0:12} is not in $repo (fetch attempted) — upstream.repos completeness (ADR-0018 #577) cannot be checked, so the note is not valid evidence; run 'git -C $repo fetch origin' and re-run"
         return 1
+    fi
+    if git -C "$repo" cat-file -e "${head_sha}:upstream.repos" 2>/dev/null; then
+        upstream_entries=$(git -C "$repo" show "${head_sha}:upstream.repos" 2>/dev/null \
+            | _ci_local_upstream_entries || true)
+        if [[ -z "$upstream_entries" ]]; then
+            echo "upstream.repos at ${head_sha:0:12} could not be parsed — refusing to treat the note as evidence"
+            return 1
+        fi
     fi
 
     if reason=$(_ci_local_note_accepts "$note" "$upstream_entries"); then

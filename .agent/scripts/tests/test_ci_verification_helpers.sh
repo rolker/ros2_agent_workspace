@@ -185,17 +185,78 @@ after=$(git -C "$clone" rev-parse refs/notes/ci-local)
 
 echo "Test: leftover scratch ref from an interrupted run → still attested"
 # Regression guard: without the forced refspec + up-front delete, a stale
-# refs/notes/ci-local-merge-check makes the fetch fail non-fast-forward, and the
-# helper would report a FALSE 'no attestation' — merging on a warning instead of
-# on evidence.
+# scratch ref makes the fetch fail non-fast-forward, and the helper would report
+# a FALSE 'no attestation' — merging on a warning instead of on evidence.
+# (Per-call ref names now also make a leftover unlikely; the forced refspec is
+# still the guard that makes it harmless.)
 read -r clone sha <<<"$(setup_origin_case leftover)"
 git -C "$clone" "${GIT_ID[@]}" commit -q --allow-empty -m unrelated
 unrelated=$(head_of "$clone")
-git -C "$clone" "${GIT_ID[@]}" notes --ref=ci-local-merge-check add -m "stale junk" "$unrelated"
+planted=()
+for stale in refs/notes/ci-local-merge-check "$(_ci_local_scratch_ref)"; do
+    git -C "$clone" "${GIT_ID[@]}" notes --ref="$stale" add -m "stale junk" "$unrelated"
+    planted+=("$stale")
+done
 assert_verdict "stale scratch ref does not break the fetch" attested "$clone" "$sha"
-git -C "$clone" rev-parse --verify -q refs/notes/ci-local-merge-check >/dev/null \
-    && bad "scratch ref left behind after the call" \
-    || ok "scratch ref cleaned up after the call"
+# Every scratch ref still present must be one we planted — the helper must
+# leave none of its own behind.
+leftover=$(git -C "$clone" for-each-ref --format='%(refname)' "$CI_LOCAL_SCRATCH_REF_PREFIX*" \
+    | grep -vxF "$(printf '%s\n' "${planted[@]}")" || true)
+[[ -z "$leftover" ]] \
+    && ok "per-call scratch ref cleaned up after the call" \
+    || bad "a scratch ref was left behind: $leftover"
+
+echo "Test: concurrent lookups in one repo do not sabotage each other"
+# The scratch ref name must be PER CALL. With a constant name, a second
+# merge_pr.sh running in the same repo deletes the ref mid-fetch and the first
+# one reports a false 'no attestation' — i.e. an ATTESTED PR falls through to
+# merge-with-no-verification. The operator runs several agent sessions at once.
+read -r clone sha <<<"$(setup_origin_case concurrent)"
+conc_fail=0
+for _ in 1 2 3 4 5; do
+    ( ci_local_attestation_status "$clone" "$sha" >"$TMPROOT/conc_a.txt" ) & pa=$!
+    ( ci_local_attestation_status "$clone" "$sha" >"$TMPROOT/conc_b.txt" ) & pb=$!
+    wait "$pa" || conc_fail=$((conc_fail+1))
+    wait "$pb" || conc_fail=$((conc_fail+1))
+done
+[[ $conc_fail -eq 0 ]] \
+    && ok "10/10 concurrent lookups still attested" \
+    || bad "$conc_fail of 10 concurrent lookups lost the attestation"
+
+echo "Test: head commit absent + note WITHOUT upstream-repo lines → no-attestation"
+# The hole this closes: completeness was only enforced when the note itself
+# carried upstream-repo lines, so a note that omitted them skipped the #577
+# rule entirely and attested — the inverse of the guard's intent. Absent the
+# head commit, upstream.repos cannot be read at all, so nothing is checkable.
+r=$(new_repo absent_head_plain)
+absent2="0123456789012345678901234567890123456789"
+add_note "$r" "$absent2" "$(note_body 'ci-local: pass' full)"
+assert_verdict "head-absent note without upstream lines rejected" no-attestation "$r" "$absent2" "cannot be checked"
+
+echo "Test: 'pass' and 'scope: full' split across two records → no-attestation"
+# Each appended record describes ONE run. A pass in one and full scope in
+# another never together describe a full-scope passing run.
+r=$(new_repo split_records); s=$(head_of "$r")
+add_note "$r" "$s" "$(note_body 'ci-local: pass' partial)"
+append_note "$r" "$s" "$(note_body 'ci-local: fail' full)"
+assert_verdict "cross-record pass/scope split rejected" no-attestation "$r" "$s"
+
+echo "Test: a regex-metacharacter upstream.repos key cannot satisfy completeness"
+# `${entry}` is interpolated into a grep -E pattern; an entry of `.*` would
+# otherwise be matched by any single upstream-repo line.
+r=$(new_repo upstream_regex)
+cat > "$r/upstream.repos" <<'YAML'
+repositories:
+  ".*":
+    type: git
+    url: https://example.invalid/x.git
+    version: main
+YAML
+git -C "$r" add -A && git -C "$r" "${GIT_ID[@]}" commit -q -m upstream
+s=$(head_of "$r")
+add_note "$r" "$s" "$(note_body 'ci-local: pass' full \
+    'upstream-repo: alpha@1111111111111111111111111111111111111111')"
+assert_verdict "regex-metacharacter entry rejected" no-attestation "$r" "$s" "upstream-repo"
 
 echo "Test: note claims upstream-repo but the commit isn't local → no-attestation"
 # We cannot read upstream.repos at that commit, so completeness is unverifiable;
