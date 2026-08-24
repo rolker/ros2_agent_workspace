@@ -97,3 +97,168 @@ review ran; it is not a citation error. The plan leaves that citation as-is.
 
 ### Open questions
 - [ ] No open questions — plan is review-plan-ready.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-08-24 09:33 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-607/plan.md` at `8dd6e01`
+**PR**: PR-less (`--issue` mode; no plan PR pushed)
+**Verdict**: changes-requested
+
+Note on independence: the `## Plan Authored` entry's `**By**` agent-name portion
+("Claude Code Agent") matches this reviewer's `$AGENT_NAME`, which would trigger
+the skill's self-review annotation — but that heuristic collides in this
+workspace because every dispatched agent shares one `$AGENT_NAME`. This is a
+separate fresh-context sub-agent on a different model (plan: Sonnet; review:
+Opus), so the annotation is deliberately omitted as a false positive.
+
+### Evaluation
+
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | Two files, prose-only, matches the issue's non-goals; no tooling change. |
+| Issue alignment | Needs work | Covers proposal items 1 and 2; item 3 ("record auto mode as the reason") lands only in `run-issue/SKILL.md`, not in `skill_workflows.md`. |
+| File targeting | Needs work | Misses a third stale surface inside `skill_workflows.md` itself (~L102-107). |
+| Consequences | Needs work | The consequences grep keyed on "prompt-free"/"permission prompt" and so could not have found the stale line, which uses neither phrase. |
+| Documentation & instruction impact | Good | Section present and non-silent; candidates correctly framed as "None — this change *is* the instruction update". |
+| Principle alignment | Needs work | "A change includes its consequences" — the plan's own do-not-touch fence preserves text the change makes false. "Never document from assumptions" — the load-bearing inheritance claim is asserted, not evidenced. |
+| ADR compliance | Good | Agree ADR not required (parity with #545's prose-only precedent); 0003 and 0015 correctly assessed. |
+| ROS conventions | N/A | Workspace instruction files only. |
+
+### Findings
+
+1. **[File targeting / Consequences]** — `.agent/knowledge/skill_workflows.md`
+   ~L102-107 (§ Sub-agent dispatch, the two-line code-block comment) reads
+   `# In-process (fast; no filesystem isolation):` and
+   `# Container (isolation; use for implementation-heavy phases):`. The second
+   comment is the retired advice in miniature: implementation-heavy phases are
+   exactly the class (`implement` / `address-findings`) the new default
+   reassigns to in-process. Left as-is, the file contradicts itself ~25 lines
+   apart. Add it to step 2's edit list. Note *why* the plan's consequences
+   grep missed it: it searched "prompt-free" / "permission prompt", and this
+   line contains neither — worth widening the check to the phrase
+   "implementation-heavy" and to bare `--mode container` occurrences before
+   declaring the surface list closed.
+
+2. **[Principle alignment — a change includes its consequences]** — Step 1's
+   "do not touch the in-process/container bullet definitions (~L76-91)" fence
+   is drawn in the wrong place: it protects three statements the change
+   falsifies.
+   - L77 heads the in-process bullet `**in-process** for **quick / cheap
+     phases**` — a scoping label that directly contradicts "in-process is the
+     default".
+   - L83-86's `**Caveat:** an in-process Agent phase … can prompt the operator
+     — phase after phase, edit after edit` is stated unconditionally; under
+     the new text it is true only outside auto mode and must carry the same
+     condition.
+   - L87 heads the container bullet `**container** for **isolation *and*
+     prompt-free dispatch**`, and the "biggest practical reason" claim the
+     plan does carve out actually spans L90-92 — partly outside the L76-91
+     range the fence names. Redraw the fence: the whole L77-96 bullet pair is
+     in scope; the genuinely orthogonal material is the `--context-file`
+     paragraphs above and the background/freshness paragraphs below.
+
+3. **[Principle alignment — safety reasoning]** — Step 1 instructs that the
+   sandbox-boundary paragraph (L104-110) be kept "content unchanged" while the
+   surrounding recommendation is inverted. As written today that paragraph is a
+   *caution against* reaching for container ("keep it in mind before dispatching
+   anything that processes untrusted input") — because its job was to temper
+   "Lean toward `container`". Bolted onto text that now says *choose* container
+   for untrusted input, the two read as contradictory advice about the same
+   case. The reasoning survives the flip, but the hinge does not: rewrite it to
+   the affirmative form — when you dispatch untrusted input to a container, the
+   sandbox boundary is the *whole* of your containment, because the dispatched
+   agent runs with broad tool access under a long-lived token and no per-call
+   human check sits behind it. Preserve every clause of the reasoning; change
+   only what it is warning you about.
+
+4. **[Principle alignment — safety reasoning, mirror case]** — The plan attaches
+   the safety note only to the container path, which under the new default is
+   the *rare* path. Nothing in the plan says what contains an in-process phase
+   running under auto mode — which is likewise a broad-tool-access agent
+   executing without per-call approval, contained by neither a sandbox nor the
+   operator's eye, but by the host permission policy/allowlist, the worktree,
+   and the surviving `run-issue` checkpoints. Without a sentence to that effect
+   the rewritten section reads as "auto mode removed the prompts", from which a
+   future agent may infer "…so the risk went away too". The issue asserts that
+   auto mode removes the *prompt* premise; it does not claim the containment
+   reasoning transfers. Add the one-sentence statement of what does the
+   containing on the new default path.
+
+5. **[Issue alignment / documentation accuracy]** — The conditioning is
+   unactionable as specified: the plan writes the advice as conditional on auto
+   mode while explicitly declining to say how a reader determines which case it
+   is in ("no new detection mechanism"). The reader here *is* the agent making
+   the choice. There is a cheap observable tell — the Claude Code host session
+   carries an auto-mode indicator (the Issue Review corroborated exactly this
+   from the orchestrator's own session) — and the text should name it. Two
+   wording requirements: (a) state the tell; (b) make the fallback fail-safe —
+   "if you cannot confirm auto mode is active, the container-leaning guidance is
+   in force." As drafted the headline is the in-process default, so an uncertain
+   reader lands on the prompt-flooding branch, which is the asymmetry #545
+   existed to prevent.
+
+6. **[Documentation accuracy]** — "in-process `Agent`-tool sub-agents inherit
+   the session's permission mode" is the load-bearing premise of the whole
+   change and is stated as a mechanism claim about Claude Code internals that
+   this workspace cannot verify from source (the Issue Review verified that auto
+   mode *exists*, not that it is inherited). Real evidence does exist and is
+   better: the issue's own #604 lifecycle — seven phases driven in-process under
+   auto mode, zero prompts for the dispatched work. Frame the new text on that
+   observed behaviour rather than on an asserted inheritance rule, per AGENTS.md
+   "never document from assumptions".
+
+7. **[Issue alignment — suggestion]** — The issue's proposal item 3 asks that
+   auto mode be recorded as the reason the advice moved. The plan does this only
+   in `run-issue/SKILL.md` (via the `(#545)` → `(#607)` citation swap).
+   `skill_workflows.md` would carry the new rule with no trace of why it
+   changed. Add a short parenthetical citation there too — a reader arriving at
+   the knowledge file first should not have to find the skill file to learn the
+   rule was reversed deliberately.
+
+8. **[Scope — suggestion, non-blocking]** — Two surfaces were checked and are
+   correctly *not* in scope; record them so review-code does not re-litigate:
+   `.claude/skills/review-plan/SKILL.md:435` already says "`--mode container`
+   for **isolation-worthy** implementation work" (already keyed on isolation,
+   consistent with the new framing), and `.devcontainer/agent/README.md:21`
+   describes the container's own no-prompt property (a true statement about the
+   container, not mode-choice advice). `presentations/raising-agents/slides.md:308`
+   is a delivered-talk record, not live guidance — leave it.
+
+**Confirmed accurate**: the plan's handling of the `#606` citation is correct —
+#606 is an OPEN PR ("Chown the dispatched worktree's anonymous volumes, and
+guard the mount-to-chown pairing") fixing OPEN issue #604. Verified with `gh`
+during this review. Leave the citation untouched, as the plan says.
+
+### Summary
+
+Structurally the plan is right — correct files, correct scope, correct non-goals,
+and it already absorbed the Issue Review's central content fix. But the
+deliverable here *is* wording, and three of the four wording judgements are
+underspecified in ways that would ship a self-contradicting document: a stale
+line left standing inside one of the two target files, a do-not-touch fence that
+preserves text the change falsifies, a safety paragraph told to stay verbatim
+while its subject inverts, and a conditional with no way for the reader to
+resolve which branch applies to them. All are cheap to fix at plan level.
+
+### Recommended Actions
+
+- [ ] Add `skill_workflows.md` ~L102-107's code-block comments to step 2's edit list (finding 1).
+- [ ] Redraw step 1's do-not-touch fence to include the full L77-96 bullet pair (finding 2).
+- [ ] Rewrite the sandbox-boundary paragraph's hinge to the affirmative, preserving every clause of its reasoning (finding 3).
+- [ ] Add a sentence stating what contains an in-process phase under auto mode (finding 4).
+- [ ] Name the auto-mode tell and make the fallback fail-safe ("cannot confirm → container guidance is in force") (finding 5).
+- [ ] Ground the prompt-free claim in the observed #604 lifecycle rather than an asserted inheritance mechanism (finding 6).
+- [ ] Carry a `(#607)` reason-citation into `skill_workflows.md` as well (finding 7).
+
+### Findings
+- [ ] (must-fix) Third stale surface: `skill_workflows.md` ~L102-107 "Container (isolation; use for implementation-heavy phases)" left contradicting the new rule — `plan.md:66-75`
+- [ ] (must-fix) Do-not-touch fence preserves falsified text (L77 "quick/cheap phases", L83-86 unconditional Caveat, L87 container heading) — `plan.md:59-63`
+- [ ] (must-fix) Safety paragraph kept "content unchanged" while its subject inverts; hinge must move to the affirmative — `plan.md:50-55`
+- [ ] (must-fix) New default path has no containment statement — safety note attached only to the now-rare container path — `plan.md:50-55`
+- [ ] (must-fix) Auto-mode conditioning gives the reader no tell and no fail-safe fallback direction — `plan.md:37-49`
+- [ ] (suggestion) Permission-mode inheritance asserted as mechanism; ground it in the observed #604 lifecycle instead — `plan.md:12-15`
+- [ ] (suggestion) Record the auto-mode reason in `skill_workflows.md` too, not only in `run-issue/SKILL.md` — `plan.md:66-75`
+- [ ] (suggestion) Record review-plan/SKILL.md:435 and .devcontainer README as checked-and-out-of-scope so review-code need not re-litigate — `plan.md:76-80`
