@@ -249,3 +249,46 @@ conflation, and the test isolation seams. Everything else is refinement.
 - Tri-state classification of the four core cases is sound and genuinely tested; `test_net_retry.py` is unaffected (asserts nothing on `sync_repo`'s return).
 - Commit hygiene: 8 commits, correct agent identity, atomic, no issue-closing keywords.
 - Both settled operator decisions honoured: `merge_pr.sh` handling is in this PR, and `SyncOutcome` stays in `sync_repos.py`.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 14:01 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-609 at `a5ad33d`
+**Addressed**: `## Local Review (Pre-Push)` (2026-08-24 13:43 -04:00, branch at `41e708c`) — Round 1, 5 must-fix + 9 suggestions
+**Commits**: 6e41984 3afbed7 178b63f e7eb6ea b6895d2 48ef21b fb1644a 6198735 e8ffae7 a5ad33d 
+
+All 14 findings actioned; none deferred. The two false-signal defects on
+either side of this PR's own signal were fixed first, and each fix was
+mutation-checked rather than assumed.
+
+### Actions
+- [x] (must-fix) Root workspace repo's outcome untested in every `main()` test — two tests now pin its FAILED and SKIPPED paths (including that git-bug does not run after its failed pull); `test_outcomes_are_all_truthy` removed as a language invariant that survived the same mutation — `.agent/scripts/tests/test_sync_repos.py`
+- [x] (must-fix) `is_dirty()` false green — now returns True/False/**None**, and an unreadable working tree is FAILED, not clean; `run_git_cmd()` also catches `OSError` so an unreadable repo dir is a per-repo failure instead of an un-summarised crash — `.agent/scripts/sync_repos.py:106-124,205-215`
+- [x] (must-fix) `exit "$sync_status"` propagated make's 2 (the usage-error code) — reserved `SYNC_FAILED_RC=3` for "merged and cleaned up, sync failed", all four exit codes documented in the script header, and `AGENTS.md`'s `merge_pr.sh` row now carries the contract — `.agent/scripts/merge_pr.sh`, `AGENTS.md`
+- [x] (must-fix) `path not resolved` → FAILED made `make sync` permanently red where an optional layer is legitimately absent — split into optional-layer-not-set-up (SKIPPED), required-layer-not-set-up (FAILED, naming `setup_layers.sh`), and repo-missing-inside-an-imported-layer (FAILED). `optional_layers.txt` parsing moved to `lib/workspace.py` and shared with `validate_workspace.py` — `.agent/scripts/sync_repos.py`, `.agent/scripts/lib/workspace.py`
+- [x] (must-fix) Empty repo list reported a quantified all-clear — no enumerable repos is now a named failure (`configs/manifest: no repositories configured`) — `.agent/scripts/sync_repos.py`
+- [x] (suggestion) Generic `"sync failed"` reason — `sync_repo()` returns `SyncResult(outcome, reason)`; every failure path supplies its own cause and the summary prints it — `.agent/scripts/sync_repos.py`
+- [x] (suggestion) `test_outcomes_are_all_truthy` asserted a language invariant — removed; the root call-site tests guard the trap instead
+- [x] (suggestion) Success-summary counts unasserted (M11) — both success tests now assert the full summary line
+- [x] (suggestion) `git status -sb` failing still printed `✅ Fetched.` — **settled by fixing**: it now says `✅ Fetched (could not read ahead/behind status).` and stays SYNCED, since the fetch itself succeeded
+- [x] (suggestion) `run_git_cmd` caught only `CalledProcessError` — `OSError` is now reported rather than killing the run mid-way
+- [x] (suggestion) Failure banner on stdout — moved to stderr, with the leading blank/rule lines inside the same redirected block
+- [x] (suggestion) Plan-sync — `preflight_repo()` extraction + its pylint rationale recorded, a Local-Review corrections section added, and the `test_merge_pr.sh` consequences row **closed** with the reason it cannot reach the sync tail — `.agent/work-plans/issue-609/plan.md`
+- [x] (suggestion) git-bug failures never tallied — ADR-0010's graceful-degradation rationale now recorded at `sync_gitbug()`; the `AGENTS.md` row lists every FAILED and SKIPPED cause — `.agent/scripts/sync_repos.py`, `AGENTS.md`
+- [x] (suggestion) Plain offline error not a retried transient signature — an off-network host now reports `remote unreachable (pull): …` instead of 35 identical pull failures — `.agent/scripts/sync_repos.py`
+
+### Verification
+- `run_script_tests.sh` green: 21 shell tests, 98 pytest (25 in `test_sync_repos.py`, up from 14).
+- `pre-commit` clean on every changed file (shellcheck, black, flake8, pylint) — **no lint rule suppressed**: `sync_repo()`'s pre-sync guards stay in `preflight_repo()`, and the test stub became a probe table with one `fails` set to stay under the argument/return limits.
+- **The three mutations that survived Round 1 now fail**: root call site reverted to `if sync_repo(...)`; root FAILED demoted to SKIPPED; synced/skipped counts dropped from the success summary. Each new behaviour was also mutation-checked in both directions — `is_dirty()` back to `success and bool(output)`, and both an over- and under-permissive optional-layer rule, each break a named test.
+- **Live check of the false red**: a dry run of this branch's code against the host's real 35 repos (via a mirrored root) reports `35 synced`; removing `site_ws` from that mirror yields `34 synced, 1 skipped` with `optional layer 'site' is not set up` and no failure. A dry run from a workspace worktree now exits 1 saying no repos could be enumerated, instead of `1 synced … 0 failures`.
+
+### Deferred actions
+None — every finding was actioned.
+
+### Notes for the re-review
+- `sync_repo()`'s return type changed from `SyncOutcome` to `SyncResult(outcome, reason)`; both are truthy, so the truthiness trap is unchanged in kind — the enum docstring says so and the call-site tests now enforce it.
+- `make sync` run from a *workspace worktree* (no `configs/manifest`) now exits 1 by design. `merge_pr.sh` is unaffected: its `ROOT_DIR` is the main worktree, so the manifest is always present there.
+- Observed but **not** actioned (outside this issue's scope, no finding): `validate_workspace.py` prints `✅ Workspace validation PASSED` with 0 configured repos in the same no-manifest situation — the same false-all-clear class, in a different script.
