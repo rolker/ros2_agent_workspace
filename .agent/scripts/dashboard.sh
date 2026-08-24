@@ -163,11 +163,18 @@ fi
 
 # Configuration validation
 if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
-    if python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null; then
-        check_pass "Workspace matches .repos configuration"
-    else
-        check_warn "Workspace drift detected. Run: make validate"
-    fi
+    # Branch on the exit code, not just pass/fail: 3 means the script could not
+    # compare anything because no repos are configured (un-bootstrapped clone,
+    # or a workspace worktree, which has no configs/manifest symlink). That is
+    # not drift, and telling the operator to "run make validate" there sends
+    # them to the same empty answer (#609).
+    python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null
+    VALIDATE_RC=$?
+    case "$VALIDATE_RC" in
+        0) check_pass "Workspace matches .repos configuration" ;;
+        3) check_warn "No repos configured — nothing validated. Run: make setup-all" ;;
+        *) check_warn "Workspace drift detected. Run: make validate" ;;
+    esac
 fi
 
 # Lock status

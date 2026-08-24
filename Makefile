@@ -65,7 +65,7 @@ help:
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
-	@echo "  validate      - Validate workspace config (CI-oriented, pass/fail)"
+	@echo "  validate      - Validate workspace config (CI-oriented; 0 match / 1 drift / 3 nothing configured)"
 	@echo ""
 	@echo "Remote sync:"
 	@echo "  add-remote REMOTE=<name> URL_PREFIX=<prefix> - Add remote to all repos"

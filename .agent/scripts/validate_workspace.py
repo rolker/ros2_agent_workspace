@@ -11,11 +11,27 @@ configured in the .repos files. It checks:
 
 Usage:
     python3 validate_workspace.py [--fix] [--verbose]
+
+Exit status:
+    0  workspace matches the configuration.
+    1  drift: repos missing, orphaned, or on the wrong version.
+    2  argparse usage error.
+    3  nothing to validate — no repos are configured at all (configs/manifest
+       missing or empty). Previously this printed a green "validation PASSED"
+       and exited 0: with nothing to compare against, every check trivially
+       held (#609). It is a distinct code from 1 because it is not drift —
+       the workspace is un-bootstrapped, and the remedy is `make setup-all`,
+       not `--fix`. 3 rather than 2 because argparse owns 2.
+
+    `make validate` reports GNU make's own 2 for any non-zero recipe status,
+    so branch on these codes only when calling the script directly (as
+    dashboard.sh does).
 """
 
 import os
 import sys
 import argparse
+import enum
 import subprocess
 from pathlib import Path
 
@@ -25,6 +41,35 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 from workspace import get_workspace_root, get_overlay_repos, get_optional_layers
+
+
+class ValidationResult(enum.Enum):
+    """What a validation run could conclude (#609).
+
+    Three states, not two, because "nothing was compared" is not a pass.
+    UNCONFIGURED is reported when no repos are configured at all, which the
+    old boolean could only express as True — `not (missing or extra or
+    mismatched)` is vacuously true over an empty configuration, so an
+    un-bootstrapped clone or a workspace worktree printed
+    "✅ Workspace validation PASSED!" and exited 0.
+
+    Beware: every Enum member is truthy, so a caller left as
+    `if validate_workspace(...)` would treat DRIFTED and UNCONFIGURED as a
+    pass. Compare against members explicitly.
+    """
+
+    PASSED = "passed"
+    DRIFTED = "drifted"
+    UNCONFIGURED = "unconfigured"
+
+
+# Process exit status per result. 3 (not 2) for UNCONFIGURED: argparse already
+# exits 2 for a usage error, and a caller cannot tell the two apart.
+EXIT_CODES = {
+    ValidationResult.PASSED: 0,
+    ValidationResult.DRIFTED: 1,
+    ValidationResult.UNCONFIGURED: 3,
+}
 
 
 def get_actual_repos(workspace_root):
@@ -167,6 +212,22 @@ def validate_workspace(verbose=False):
     # Convert list to dict for easy lookup
     config_repos = {item["name"]: item for item in configured_list}
 
+    if not config_repos:
+        # No .repos file was found at all — configs/manifest is missing or
+        # empty (an un-bootstrapped clone, or a workspace *worktree*, which has
+        # no manifest symlink). Every check below is vacuously true over an
+        # empty configuration, so this used to print the same green PASSED as a
+        # fully validated workspace (#609). Mirrors sync_repos.py's handling of
+        # the same state, down to the remedy.
+        print("=" * 60)
+        print("Workspace Validation Results")
+        print("=" * 60)
+        print("❌ No repositories are configured — nothing to validate.")
+        print("   configs/manifest is missing or empty. Run `make setup-all`")
+        print("   (or run `make validate` from the main workspace tree, not a worktree).")
+        print("=" * 60)
+        return ValidationResult.UNCONFIGURED, []
+
     # Identify repos from optional layers (allowed to be missing)
     optional_layers = get_optional_layers(root)
     optional_repos = get_optional_repo_names(configured_list, optional_layers)
@@ -263,7 +324,11 @@ def validate_workspace(verbose=False):
             )
 
     # Print results
-    is_valid = not (missing_repos or extra_repos or version_mismatches)
+    result = (
+        ValidationResult.PASSED
+        if not (missing_repos or extra_repos or version_mismatches)
+        else ValidationResult.DRIFTED
+    )
 
     print("=" * 60)
     print("Workspace Validation Results")
@@ -298,7 +363,7 @@ def validate_workspace(verbose=False):
                 print(f"     at {item['path']}")
         print()
 
-    if is_valid:
+    if result is ValidationResult.PASSED:
         print("✅ Workspace validation PASSED!")
     else:
         print("❌ Workspace validation FAILED")
@@ -307,7 +372,7 @@ def validate_workspace(verbose=False):
 
     print("=" * 60)
 
-    return is_valid, missing_repos
+    return result, missing_repos
 
 
 def fix_workspace(missing_repos, verbose=False):
@@ -428,18 +493,23 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
-    is_valid, missing = validate_workspace(args.verbose)
+    result, missing = validate_workspace(args.verbose)
 
-    if not is_valid and args.fix and missing:
+    # --fix only imports missing repos, which is only meaningful for drift.
+    # UNCONFIGURED is not fixable this way: with no .repos files there is
+    # nothing to import from, so it exits 3 and points at `make setup-all`.
+    if result is ValidationResult.DRIFTED and args.fix and missing:
         print("\nFixing workspace...")
         if fix_workspace(missing, args.verbose):
             print("Fix complete. Re-validating...")
-            validate_workspace(args.verbose)
+            # Take the re-validation's answer. Discarding it (as this did)
+            # meant a successful --fix still exited 1 on the stale result.
+            result, _ = validate_workspace(args.verbose)
         else:
             print("Fix encountered errors.")
             sys.exit(1)
 
-    sys.exit(0 if is_valid else 1)
+    sys.exit(EXIT_CODES[result])
 
 
 if __name__ == "__main__":
