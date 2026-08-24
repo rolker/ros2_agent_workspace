@@ -69,6 +69,9 @@ jobs:
       # Runs .agent/scripts/tests/ (shell via bash, python via pytest). These are
       # hermetic (temp git sandboxes, stubbed gh, no network/ROS), so no build or
       # workspace setup is needed — just git (preinstalled on the runner) + pytest.
+      # One test (test_entrypoint_chown_coverage.sh) has an opt-in container
+      # layer that needs a LOCAL Docker daemon and the agent image; it skips
+      # cleanly here, so this step stays hermetic (#604).
       - name: Run script tests
         run: make test-scripts
 

@@ -275,16 +275,16 @@ generate-skills:
 # --- Agent container targets ---
 
 agent-build:
-	@set -e; \
-	STAGE_DIR="$(CURDIR)/.devcontainer/agent/.rosdep-manifests"; \
-	trap 'rm -rf "$$STAGE_DIR"' EXIT; \
-	./.agent/scripts/stage_rosdep_manifests.sh "$(CURDIR)" "$$STAGE_DIR"; \
-	docker build \
-		--build-arg USER_UID=$$(id -u) \
-		--build-arg USER_GID=$$(id -g) \
-		-t ros2-agent-workspace-agent:latest \
-		-f .devcontainer/agent/Dockerfile \
-		.devcontainer/agent/
+	@# Single build path (#604): docker_run_agent.sh --build-only stages the
+	@# rosdep manifests, runs `docker build`, and stamps the startup-scripts
+	@# digest. Duplicating any of that here is what let the two paths hash
+	@# different directories and produce a permanent false "stale" warning.
+	@#
+	@# The build resolves the MAIN workspace root even when run from a
+	@# worktree — that is the tree the launcher mounts and hashes. So a
+	@# worktree edit to agent-entrypoint.sh / fix-volume-ownership.sh is NOT
+	@# baked until it is merged; the build prints a notice when that applies.
+	@./.agent/scripts/docker_run_agent.sh --build-only
 
 agent-run:
 	@if [ -z "$(ISSUE)" ]; then \

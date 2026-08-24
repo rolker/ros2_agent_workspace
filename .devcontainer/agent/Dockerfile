@@ -119,5 +119,21 @@ RUN rosdep update
 # via setpriv (no setuid bits — compatible with --security-opt no-new-privileges)
 USER root
 COPY --chmod=755 agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
+COPY --chmod=755 fix-volume-ownership.sh /usr/local/bin/fix-volume-ownership.sh
+
+# Staleness marker for the baked startup scripts (#604). docker_run_agent.sh
+# only builds when the image is MISSING, so an image built before a change to
+# agent-entrypoint.sh / fix-volume-ownership.sh keeps running the old copy —
+# which is how a fix to either can silently fail to reach an existing user.
+# The launcher stamps the current scripts' combined hash here at build time and
+# compares it at every launch, warning when they diverge. Empty when built by a
+# bare `docker build` (no --build-arg) — and the launcher WARNS about an empty
+# or absent label rather than staying quiet: every image without a marker was
+# built before this marker existed (or outside the single build path), and that
+# is exactly the population still carrying the pre-#604 entrypoint. Build via
+# `make agent-build` / `docker_run_agent.sh --build-only` to get a marked image.
+ARG STARTUP_SCRIPTS_SHA=""
+LABEL org.ros2-agent.startup-scripts-sha="$STARTUP_SCRIPTS_SHA"
+
 ENTRYPOINT ["agent-entrypoint.sh"]
 CMD ["claude", "--dangerously-skip-permissions"]

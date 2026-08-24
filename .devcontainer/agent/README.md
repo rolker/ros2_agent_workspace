@@ -10,7 +10,8 @@ happen inside, pushes and PR creation happen from the host via the push gateway.
 # 1. Create worktree on the host (before container launch)
 .agent/scripts/worktree_create.sh --issue 42 --type workspace
 
-# 2. Build the agent image (first time only, or after Dockerfile changes)
+# 2. Build the agent image (first time only; also after editing the Dockerfile
+#    or the startup scripts — only the latter drift is detected for you)
 make agent-build
 
 # 3. Launch the container
@@ -36,6 +37,26 @@ make agent-build
 # Or directly
 .agent/scripts/docker_run_agent.sh --issue <N> --build
 ```
+
+The launcher only builds automatically when the image is **missing**, so a
+change to `agent-entrypoint.sh` or `fix-volume-ownership.sh` does not reach an
+existing image on its own — the container keeps running the baked copies. The
+build stamps those two scripts' combined hash into the image
+(`org.ros2-agent.startup-scripts-sha`), and `docker_run_agent.sh` compares it at
+every launch, warning when it has drifted **or when the image carries no marker
+at all** — an unmarked image predates the check and most likely bakes an older
+entrypoint (#604). The warning never blocks the launch; rebuild when you see it.
+
+Only the two startup scripts are hashed. Other changes to the image — the
+Dockerfile, the baked rosdep set — are **not** detected; rebuild deliberately
+after those.
+
+`make agent-build` delegates to `docker_run_agent.sh --build-only`, which is the
+single build path: one digest formula over one directory, so the launcher can
+never read a freshly built image as stale. Note that the launcher resolves the
+**main workspace root** even when invoked from inside a worktree, so a worktree's
+edits to the startup scripts are not what gets baked — merge them, or build from
+a checkout whose main tree carries them.
 
 The image is based on `ros:jazzy-perception` and includes:
 - ROS 2 Jazzy dev tools, rosdep, vcstool
@@ -76,11 +97,17 @@ slower and the image larger; launches are much faster. The bake is best-effort:
 a dep that can't resolve at build time is logged and falls through to the
 launch-time install path rather than failing the build.
 
-> Build through `docker_run_agent.sh --build` or `make agent-build` — both
-> stage the manifests first (via `.agent/scripts/stage_rosdep_manifests.sh`).
-> A **manual** `docker build .devcontainer/agent/` that bypasses those wrappers
-> has no `.rosdep-manifests/` and the `COPY` step will fail; stage first with
-> `./.agent/scripts/stage_rosdep_manifests.sh "$PWD"` if you must build by hand.
+> Build through `docker_run_agent.sh --build` / `--build-only`, or
+> `make agent-build`, which delegates to `--build-only`. That build block is the
+> single build path (#604): it is the only caller of
+> `.agent/scripts/stage_rosdep_manifests.sh`, and the only thing that stamps the
+> startup-scripts staleness marker.
+>
+> A **manual** `docker build .devcontainer/agent/` bypasses both. It has no
+> `.rosdep-manifests/`, so the `COPY` step fails; and even after staging by
+> hand it passes no `--build-arg STARTUP_SCRIPTS_SHA`, leaving an image whose
+> marker is empty — which the launcher warns about at every launch until it is
+> rebuilt through the real path. Don't build by hand.
 >
 > The baked deps are a snapshot of whatever layers are checked out at build
 > time, so the image is **not** project-agnostic at runtime — it's a local,
@@ -260,21 +287,68 @@ If files inside the container are owned by a different user:
 ```bash
 # Rebuild with your UID
 make agent-build
-# Or:
-docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) \
-    -t ros2-agent-workspace-agent:latest .devcontainer/agent/
 ```
+
+`make agent-build` already passes your `USER_UID`/`USER_GID` — it delegates to
+`docker_run_agent.sh --build-only`, which reads them from `id -u` / `id -g`.
+
+Do **not** substitute a bare `docker build` here. It is not the single build
+path (#604): it stages no rosdep manifests, and it passes no
+`--build-arg STARTUP_SCRIPTS_SHA`, so the image is stamped with an empty
+startup-scripts marker — which the launcher warns about at *every* launch, with
+no way to clear it short of rebuilding through the real path.
 
 ### Volume ownership issues
 
-The entrypoint automatically fixes ownership of anonymous volumes (build/install/log).
-If you see permission errors during `colcon build`, check that the entrypoint ran:
+The launcher declares anonymous volumes over every `build/install/log` directory
+in **two** places: `layers/main/*_ws` and the dispatched worktree's own `*_ws`.
+Docker initializes each from the *image* at that path — not from the host
+directory bind-mounted underneath it — so every one comes up empty and
+`root:root` regardless of what the host did. `fix-volume-ownership.sh`, run by
+the entrypoint as root before it drops privileges, chowns both sets to the
+target user. Missing the second set was [#604](https://github.com/rolker/ros2_agent_workspace/issues/604):
+the agent could build in `layers/main` but not in its own worktree.
+
+So a `Permission denied` from `colcon build` points at that chown. Check which
+directory it is — a worktree path and a `layers/main` path implicate different
+loops:
 
 ```bash
 # Debug: run with shell to inspect
 .agent/scripts/docker_run_agent.sh --issue <N> --shell
-ls -la layers/main/core_ws/build/
+ls -ld layers/main/core_ws/build/           # loop 1
+ls -ld "$WORKTREE_ROOT"/*_ws/build/         # loop 2 (the #604 gap)
 ```
+
+The `--shell` session above is the dropped-privilege `ros` user (the entrypoint
+hands off via `setpriv`), the image ships no `sudo`, and the container runs with
+`--security-opt no-new-privileges:true` — so the chown cannot be re-run from
+inside that session. Re-run it from the **host**, as root in the same container:
+
+```bash
+# Host, in a second terminal while the --shell session is still up.
+# The launcher prints the name on its "Container:" line; this finds it again.
+# With several agent containers up, name it explicitly instead.
+c=$(docker ps --filter name=^/ros2-agent- --format '{{.Names}}' | head -1)
+docker exec -u 0 "$c" \
+    /usr/local/bin/fix-volume-ownership.sh \
+    "$(docker exec "$c" id -u ros)" \
+    "$(docker exec "$c" id -g ros)" \
+    "$(docker exec "$c" printenv ROS2_AGENT_WORKSPACE_ROOT)" \
+    "$(docker exec "$c" printenv WORKTREE_ROOT)"
+```
+
+Every argument is read back out of the container, because none of it exists in
+the host shell: the launcher *passes* `ROS2_AGENT_WORKSPACE_ROOT` and
+`WORKTREE_ROOT` into the container, it does not export them to its caller, so
+expanding them host-side would hand the script two empty strings. (The same two
+paths are also printed in the container's startup banner and the `Using
+worktree:` line if you would rather paste them literally.)
+
+A root-owned volume with an image that predates the fix is the likely cause —
+check for the staleness warning at launch and rebuild. `bash
+.agent/scripts/tests/test_entrypoint_chown_coverage.sh` reproduces the whole
+chain locally.
 
 ### Git worktree path errors
 
