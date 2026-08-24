@@ -40,18 +40,49 @@ If the file doesn't exist or `field_remote` is missing, stop with:
 Run from the workspace root:
 
 ```bash
-python3 .agent/scripts/pull_remote.py --remote <field_remote> --json
+python3 .agent/scripts/pull_remote.py --remote <field_remote> --json \
+    >/tmp/field_report.json 2>/tmp/field_report.err
+echo "exit: $?"
 ```
 
-This fetches all repos and outputs a JSON array of repos with remote-ahead
-commits, including: repo name, path, default branch, ahead/behind counts,
-diverged flag, and commit list.
+This fetches all repos and writes a JSON array to **stdout**. Every entry
+carries an explicit `state`:
 
-If the result is empty, report "No field changes to import" and stop.
+| `state` | Meaning | What this skill does |
+|---------|---------|----------------------|
+| `ahead` | The field remote carries commits this checkout does not. Entry also has repo name, path, default branch, ahead/behind counts, `diverged`, `commits`, and `commits_truncated` (the commit list caps at 50). | Import it — step 3. |
+| `no-local-branch` | The default branch exists only as a remote-tracking ref — what `vcs import` leaves for a SHA- or tag-pinned manifest entry — so **no comparison was possible**. A normal, supported workspace state, not a failure. | Do **not** claim it is clean. Report it in the summary and tell the operator to check the branch out if that repo needs reconciling. |
+
+**An empty array does not mean "nothing to import" on its own.** Check all
+three signals before concluding anything:
+
+1. **Exit status.** `0` means every repo was actually compared. **Non-zero
+   means at least one repo was never compared** — a failed fetch, a git probe
+   that failed, a repo configured with no checkout in a required layer, a
+   `.repos` file that would not parse, or an enumeration that produced no repos
+   at all (running from a workspace *worktree* does this: there is no
+   `configs/manifest`, so the report is `[]` and every repo is invisible).
+2. **stderr.** Each such repo is printed as its own `ERROR: <repo>: <reason>`
+   line. The JSON on stdout is then a **partial** report, not a complete one.
+3. **The `state` of each entry**, per the table above.
+
+So:
+
+- **Exit 0 and an empty array** — and only this — is "No field changes to
+  import". Report it and stop.
+- **Non-zero exit**: **stop and surface the `ERROR:` lines to the operator by
+  name.** Never report "no field changes to import" over a report that is
+  missing repos — a field hotfix that never reconciles to GitHub, reported
+  green, is the failure this whole path exists to prevent (#609). Import any
+  `ahead` entries the partial report *did* contain if the operator says to
+  proceed, but say plainly which repos went unchecked and why.
+- **Exit 0 with only `no-local-branch` entries** is not "nothing to import"
+  either — it is "nothing was compared in those repos". Report them.
 
 ### 3. For each repo with changes
 
-Process repos sequentially.
+Process the `state: ahead` entries sequentially. `no-local-branch` entries carry
+no commit list and are reported in step 4, not imported.
 
 **First, check for an in-flight deployment (bundling path).** Before the
 default import-issue/PR flow below, check whether *this repo* already has a
@@ -179,6 +210,21 @@ Output a table:
 | <name> | <N> | Yes/No | #<N> | #<N> | Clean / <N> findings |
 ```
 
+Then, and **never silently omitted**, the repos that were *not* compared —
+every `ERROR:` line from stderr and every `no-local-branch` entry:
+
+```markdown
+### Not checked (no conclusion drawn)
+
+| Repo | Why | Remedy |
+|------|-----|--------|
+| <name> | probe failed: <reason from stderr> | <what the reason says to do> |
+| <name> | no local `<branch>` — pinned manifest entry | `git -C <path> checkout <branch>` if this repo needs reconciling |
+```
+
+If this section is empty, say so explicitly ("all configured repos were
+compared") rather than leaving its absence to be read as coverage.
+
 ## Guidelines
 
 - **Never edit in the main tree** — all fixes go through worktrees
@@ -193,5 +239,8 @@ Output a table:
   (default flow) or **merge** it (bundling path). Cherry-pick rewrites SHAs and
   diverges origin from the field remote, forcing a force-push at the next
   reconcile (#495 gap 7)
+- **An absence is never evidence** — a repo missing from the report was not
+  found clean, it was not checked. Read the exit status and the `ERROR:`
+  lines before drawing any conclusion from an empty result (#609)
 - **This skill does not resync gitcloud** — after PRs merge, use
   `push_remote.py` manually to update gitcloud
