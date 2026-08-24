@@ -292,9 +292,17 @@ echo ""
 
 # Layer repositories
 if command -v vcs &> /dev/null; then
-    EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+    EXPECTED_REPOS_ERR=""
+    if ! EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>&1); then
+        # The enumeration failed (a .repos file that will not parse). Emptying
+        # EXPECTED_REPOS turns the Untracked check off *silently*, so every
+        # repo on disk reads as tracked — the same absence-means-clean
+        # inference #609 exists to stop, one consumer down.
+        EXPECTED_REPOS_ERR=$(echo "$EXPECTED_REPOS" | tr '\n' ' ')
         EXPECTED_REPOS=""
+        echo "⚠️  Could not read the configured repo list — untracked-repo detection is OFF for this run."
+        echo "   ${EXPECTED_REPOS_ERR}"
+        echo ""
     fi
 
     for ws_dir in "$LAYERS_DIR"/*; do
@@ -355,6 +363,8 @@ if command -v vcs &> /dev/null; then
                         if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
                             status_str="${status_str:+$status_str, }Untracked"
                         fi
+                    elif [ -n "$EXPECTED_REPOS_ERR" ]; then
+                        status_str="${status_str:+$status_str, }Tracking unknown (repo list unreadable)"
                     fi
 
                     if [ "$status_str" != "" ]; then
@@ -470,8 +480,17 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "Install: \`sudo apt install jq\`"
         echo ""
     else
-        # Build repo list
-        REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+        # Build repo list. The enumeration's exit status is read before its
+        # output is piped into jq: `... 2>/dev/null | jq` discards both the
+        # status and the reason, and the GitHub section then reports a clean
+        # PR/issue table over however many repos survived — or none (#609).
+        REPO_JSON=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>&1) || {
+            echo "⚠️  Could not read the configured repo list — the tables below cover only the workspace repo."
+            echo "   $(echo "$REPO_JSON" | tr '\n' ' ')"
+            echo ""
+            REPO_JSON="[]"
+        }
+        REPOS=$(echo "$REPO_JSON" | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
         ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
         if [ -n "$ROOT_REPO" ]; then
             REPOS=$(echo -e "$ROOT_REPO\n$REPOS")
