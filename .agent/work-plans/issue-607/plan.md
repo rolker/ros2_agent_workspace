@@ -140,3 +140,65 @@ that citation as-is in both target files — do not "correct" it to #604-only.
 ## Estimated Scope
 
 Single PR, two files, prose-only edits.
+
+
+## Implementation notes (plan sync)
+
+Written after `review-plan` returned `changes-requested` (5 must-fix, 3
+suggestions) and the operator ruled at the plan checkpoint. What actually
+shipped differs from the plan above in four ways, all review-driven:
+
+1. **The do-not-touch fence was redrawn.** The plan fenced off the
+   in-process/container bullet definitions (~L76-91). The review showed that
+   fence protected three statements the change falsifies — the `for quick /
+   cheap phases` scoping label, the unconditional prompt-flood Caveat, and the
+   `for isolation *and* prompt-free dispatch` bullet heading (with the "biggest
+   practical reason" claim spanning L90-92, partly outside the named range).
+   Both bullets were rewritten; the genuinely orthogonal `--context-file` and
+   background/freshness paragraphs were left alone.
+
+2. **The auto-mode condition names its tell and fails safe.** The plan
+   conditioned the new default on auto mode while declining to say how a reader
+   determines which case they are in — but the reader *is* the agent choosing.
+   The text now names the observable (the Claude Code session's
+   permission-mode indicator) and states the fallback explicitly: *cannot
+   confirm auto mode → the container-leaning guidance is in force*. The
+   asymmetry is deliberate, since an uncertain reader must not land on the
+   prompt-flooding branch #545 existed to prevent.
+
+3. **The safety reasoning was rewritten for both paths** (operator decision at
+   the plan checkpoint). The plan said keep the sandbox-boundary paragraph
+   "content unchanged", but that paragraph was a *caution against* reaching for
+   container — incoherent once the surrounding advice says to choose container
+   for untrusted input. It is now affirmative, every clause of the reasoning
+   preserved, and it covers the mirror case the plan missed entirely: what
+   contains an in-process phase under auto mode (host permission policy and
+   allowlist, worktree confinement, and the checkpoints that survive regardless
+   of mode). Auto mode removed the prompts, not the need to know what is
+   holding.
+
+4. **The claim is grounded in observation, not asserted mechanism.** Rather
+   than stating that in-process `Agent` sub-agents inherit the session
+   permission mode — a claim about Claude Code internals this workspace cannot
+   verify from source — the text cites the observed #604 lifecycle: seven
+   phases in-process under auto mode with no approvals for the dispatched work.
+
+Scope additions:
+
+- **Third stale surface** (review finding 1): the `# Container (isolation; use
+  for implementation-heavy phases):` code-block comment in
+  `skill_workflows.md` ~L102-107 — the retired advice in miniature, ~25 lines
+  above the bullet the plan did rewrite, and invisible to the plan's
+  consequences grep because it contains neither "prompt-free" nor "permission
+  prompt". The widened search (`implementation-heavy`, bare `--mode container`,
+  "lean toward", "prefer container") found no further surfaces;
+  `review-plan/SKILL.md:435` already reads "isolation-worthy" and stays.
+- **`skill_workflows.md` now carries the #545 → #607 citation** so a reader
+  arriving at the knowledge file first learns the rule was reversed
+  deliberately (review suggestion 7 / issue proposal item 3).
+- **`.claude/skills/review-plan/SKILL.md` self-review heuristic** (operator
+  decision to fold in): it compared `$AGENT_NAME` against the plan author, but
+  every dispatched agent shares one `$AGENT_NAME`, so it matched on every
+  review and destroyed the signal it carries. Now keyed on whether the plan was
+  authored in the same context, with the shared-identity trap stated so it is
+  not reintroduced.
