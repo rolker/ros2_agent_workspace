@@ -207,9 +207,13 @@ reach for one at a time — each does less than its name suggests:
 
 - The host **permission policy** is stood down for exactly the calls at issue:
   auto mode approves the routine ones, which is the whole premise of preferring
-  in-process. It is not off altogether — `ask` rules and the `PreToolUse` hooks
-  wired in `.claude/settings.json` still fire — but routine edits, commits and
-  shell calls go through unprompted.
+  in-process. Nothing in the tracked baseline claws that back.
+  `.claude/settings.json` defines **no** `ask` rules at all (the ones on this
+  machine live in the untracked `.claude/settings.local.json` — next bullet), and
+  exactly **one** `PreToolUse` hook: matcher `AskUserQuestion`, invoked
+  `… || true`, warn-only by design (`AGENTS.md:585` — "never blocks"). It cannot
+  match an edit, a commit or a shell call at all. Routine edits, commits and
+  shell calls go through unprompted, and nothing tracked prompts on them.
 - The **allowlist** refuses nothing. The tracked baseline every host gets,
   `.claude/settings.json`, carries a `permissions.allow` array and **no** `deny`
   key; neither does `~/.claude/settings.json`. An allowlist pre-approves; it
