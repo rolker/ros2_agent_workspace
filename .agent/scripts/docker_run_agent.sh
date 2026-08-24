@@ -210,6 +210,52 @@ if [ "$SHELL_MODE" = true ] && [ "$DISPATCH_MODE" = true ]; then
     exit 1
 fi
 
+# ---------- Resolve the worktree (fail fast) ----------
+# Deliberately ahead of the credential read and the image build: a bad or
+# missing --issue must error in under a second, not after a 10-minute rosdep
+# bake. --build-only has no worktree at all, so it skips this entirely.
+WORKTREE_PATH=""
+WORKTREE_MATCHES=0
+MATCHED=()
+if [ "$BUILD_ONLY" = false ]; then
+    if [ -n "$REPO_SLUG" ]; then
+        # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>) — no
+        # glob, no cross-repo issue-# collision (#526).
+        candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
+        if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
+    else
+        for candidate in \
+            "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
+            "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
+            if [ -d "$candidate" ]; then
+                MATCHED+=("$candidate")
+                WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+                [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+            fi
+        done
+    fi
+
+    if [ -z "$WORKTREE_PATH" ]; then
+        echo "ERROR: No worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')}." >&2
+        echo "Create one first:" >&2
+        echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
+        exit 1
+    fi
+    if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+        # FAIL LOUD (#526) — was warn-and-proceed; multiple repos can share an issue
+        # number and guessing the first match ran a container against the wrong repo.
+        {
+            echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
+            echo "       Disambiguate with --repo-slug <slug>. Candidates:"
+            printf '         %s\n' "${MATCHED[@]}"
+        } >&2
+        exit 1
+    fi
+
+    WORKTREE_ID="$(basename "$WORKTREE_PATH")"
+    echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
+fi
+
 # ---------- Subscription token (file fallback) ----------
 # CLAUDE_CODE_OAUTH_TOKEN is the long-lived subscription token from
 # `claude setup-token`. Prefer an already-exported env var; otherwise read it
@@ -391,47 +437,6 @@ fi
 if [ "$BUILD_ONLY" = true ]; then
     exit 0
 fi
-
-# Find worktree for this issue
-WORKTREE_PATH=""
-WORKTREE_MATCHES=0
-MATCHED=()
-if [ -n "$REPO_SLUG" ]; then
-    # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>) — no
-    # glob, no cross-repo issue-# collision (#526).
-    candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
-    if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
-else
-    for candidate in \
-        "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
-        "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
-        if [ -d "$candidate" ]; then
-            MATCHED+=("$candidate")
-            WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
-            [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
-        fi
-    done
-fi
-
-if [ -z "$WORKTREE_PATH" ]; then
-    echo "ERROR: No worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')}." >&2
-    echo "Create one first:" >&2
-    echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
-    exit 1
-fi
-if [ "$WORKTREE_MATCHES" -gt 1 ]; then
-    # FAIL LOUD (#526) — was warn-and-proceed; multiple repos can share an issue
-    # number and guessing the first match ran a container against the wrong repo.
-    {
-        echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
-        echo "       Disambiguate with --repo-slug <slug>. Candidates:"
-        printf '         %s\n' "${MATCHED[@]}"
-    } >&2
-    exit 1
-fi
-
-WORKTREE_ID="$(basename "$WORKTREE_PATH")"
-echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
 
 # ---------- Generate mount arguments ----------
 
