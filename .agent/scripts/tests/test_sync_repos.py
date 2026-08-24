@@ -28,7 +28,7 @@ sys.path.insert(0, str(SCRIPTS_DIR / "lib"))
 import pytest  # noqa: E402
 
 import sync_repos  # noqa: E402
-from sync_repos import SyncOutcome  # noqa: E402
+from sync_repos import SyncOutcome, locate_repo  # noqa: E402
 
 
 # --------------------------------------------------------------------------
@@ -197,6 +197,55 @@ def test_run_git_cmd_reports_oserror_instead_of_raising(monkeypatch, tmp_path):
 
 def test_missing_path_is_failed(tmp_path):
     assert sync_repos.sync_repo(tmp_path / "nope", "r").outcome is SyncOutcome.FAILED
+
+
+# --------------------------------------------------------------------------
+# locate_repo() path resolution
+# --------------------------------------------------------------------------
+
+
+def test_locate_repo_prefers_the_layer_path(tmp_path):
+    root = tmp_path
+    expected = root / "layers" / "main" / "core_ws" / "src" / "a"
+    expected.mkdir(parents=True)
+    path, tried = locate_repo(root, {"name": "a", "source_file": "core.repos"})
+    assert path == expected
+    assert tried == [str(expected)]
+
+
+def test_locate_repo_falls_back_to_a_relative_explicit_path(tmp_path):
+    """`path` is how list_overlay_repos points at a repo that does not live at
+    layers/main/<layer>_ws/src/<name>. Dropping this fallback would report a
+    present repo as unlocatable — since #609 that is a hard FAILED, so the
+    fallback is now load-bearing for the exit status."""
+    root = tmp_path
+    (root / "layers" / "main" / "core_ws" / "src").mkdir(parents=True)
+    elsewhere = root / "vendor" / "a"
+    elsewhere.mkdir(parents=True)
+    path, tried = locate_repo(root, {"name": "a", "source_file": "core.repos", "path": "vendor/a"})
+    assert path == elsewhere
+    assert len(tried) == 2
+
+
+def test_locate_repo_falls_back_to_an_absolute_explicit_path(tmp_path):
+    """An absolute `path` is used as given, not re-rooted under the workspace."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    elsewhere = tmp_path / "outside" / "a"
+    elsewhere.mkdir(parents=True)
+    path, _ = locate_repo(root, {"name": "a", "source_file": "core.repos", "path": str(elsewhere)})
+    assert path == elsewhere
+
+
+def test_locate_repo_reports_every_path_it_tried(tmp_path):
+    """Nothing found: the caller needs both candidates for its message."""
+    root = tmp_path
+    path, tried = locate_repo(root, {"name": "a", "source_file": "core.repos", "path": "vendor/a"})
+    assert path is None
+    assert tried == [
+        str(root / "layers" / "main" / "core_ws" / "src" / "a"),
+        str(root / "vendor" / "a"),
+    ]
 
 
 # --------------------------------------------------------------------------
