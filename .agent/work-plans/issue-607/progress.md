@@ -81,3 +81,19 @@ than trusting them:
 - [ ] Condition the new "in-process is the default" guidance on the operator's session actually running in Claude Code auto mode — state the fallback (container, or "expect prompts") for non-auto-mode sessions and non-Claude host runtimes, so the rewrite doesn't silently reintroduce the prompt-flood problem #545 solved.
 - [ ] Update the inline `(#545)` issue citation in `run-issue/SKILL.md`'s "Choosing a mode" heading to point at this issue.
 - [ ] Correct the citation in the issue body itself (or in the resulting doc text) from "#604 / #606" to "#604" for the root-owned-volume fix — `#606` does not appear in git history.
+
+**Correction (from plan-task, 2026-08-24)**: the #606 action item above is
+superseded — #606 is an open PR (fixing #604) created by the host after this
+review ran; it is not a citation error. The plan leaves that citation as-is.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-24 09:31 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-607/plan.md` at `8dd6e01`
+**Branch**: feature/issue-607 at `8dd6e01`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
