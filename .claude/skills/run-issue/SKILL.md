@@ -187,9 +187,12 @@ write auth and machine state, not access to your files.
 A **container** contains real things, but fewer than "sandbox" suggests, so name
 them precisely. It isolates the **OS and dependency state** and the **build
 artifacts** (each layer workspace's `build/`/`install`/`log` is an anonymous
-volume, not the host's). And — the property `.devcontainer/agent/README.md`
-leads with — **no GitHub credentials enter**: a container run that goes wrong
-cannot push and cannot open a PR.
+volume, not the host's). And it withholds GitHub **write** auth: a container run
+that goes wrong cannot push and cannot open a PR. Not *all* GitHub credentials —
+`.devcontainer/agent/README.md:3-5` states the absolute ("No GitHub credentials
+enter the container"), and the optional read-only token below contradicts it; the
+sentence it *leads* with, "container filesystem isolation as the security
+boundary", is the framing this paragraph corrects.
 
 What it does **not** isolate is the workspace itself.
 `docker_run_agent.sh:509` bind-mounts the **entire workspace root read-write at
@@ -232,9 +235,9 @@ reach for one at a time — each does less than its name suggests:
   contract*, a different subject. ADR-0004/0005's enforcement hierarchy is
   still the right lens — documentation is its weakest layer, and this scoping
   is documentation.)
-- The phase runs with **the host's own credentials** — GitHub auth included.
-  That is exactly the capability the sandbox withholds, and it is the real
-  difference between the modes.
+- The phase runs with **the host's own credentials** — GitHub *write* auth
+  included. That is exactly the capability the sandbox withholds, and it is the
+  real difference between the modes.
 
 What genuinely survives is `run-issue`'s **checkpoints** (publish, PR, merge).
 They are host-enforced and mode-independent, but they gate *publication after
