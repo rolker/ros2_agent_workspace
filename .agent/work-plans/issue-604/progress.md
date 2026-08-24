@@ -123,3 +123,40 @@ flagged; its factual references check out against source. Two things should be
 settled before implementation: cross-reference the corrective rationale at the
 misleading section-4b comment itself, and re-take the deferred container smoke
 test decision now that Docker and the agent image are confirmed available here.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-24 00:02 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-604 at `96ad78b`
+**Mode**: pre-push
+**Depth**: Deep (reason: 660 lines / 11 files; privilege-drop + permissions surface; AGENTS.md governance trigger)
+**Must-fix**: 6 | **Suggestions**: 12
+**Round**: 1 | **Ship**: continue — a mutation-proven gap in the new regression test plus three defects inside the unreviewed stale-image guard warrant another read
+
+### Findings
+- [ ] (must-fix) Regression test cannot detect #604 being reintroduced: deleting the `"${WORKTREE_ROOT:-}"` argument still yields 5 passed / 0 failed (mutation-verified by the lead) — the entrypoint call site is never exercised by either layer — `.devcontainer/agent/agent-entrypoint.sh:40`
+- [ ] (must-fix) Absent label reads as "unknown, stay quiet", but the no-label population is exactly the pre-#604 images with the broken entrypoint; verified the local 2-month-old image has an empty label, so it will never warn — `.agent/scripts/docker_run_agent.sh:322-328`
+- [ ] (must-fix) The two build paths hash different roots (`make agent-build` cwd-relative vs launcher `$ROOT_DIR` rewound out of worktrees); verified digests differ, so a worktree build causes a permanent false "stale" warning. Formula also duplicated with nothing asserting agreement — `Makefile:285` / `.agent/scripts/docker_run_agent.sh:317`
+- [ ] (must-fix) `startup_scripts_sha` contradicts its "warn (never block)" contract: no `|| true` on `current=` aborts the launcher under `set -euo pipefail` (reproduced); one missing script stamps a well-formed but wrong digest instead of the empty-means-quiet path — `.agent/scripts/docker_run_agent.sh:316-319,329`
+- [ ] (must-fix) `docker_run_agent.sh` script-table row not updated for the new staleness warning, though the consequences map requires it — `AGENTS.md:561`
+- [ ] (must-fix) ADR still carries the same overstated Check-4 coverage claim this PR narrows elsewhere; ADR-0012 permits a cross-reference addendum — `docs/decisions/0016-runtime-vs-baked-layer-chaining.md:80-82`
+- [ ] (suggestion) Hardcoded uid/gid 1000 while the image's `ros` user comes from `--build-arg USER_UID`; derive via `id -u ros` — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:177,179`
+- [ ] (suggestion) Layer B's real `docker run` breaks the suite's advertised hermeticity and fails spuriously on a remote/rootless daemon (host bind mount resolves on the daemon's filesystem) — `.agent/scripts/tests/run_script_tests.sh:9-10`, `.github/workflows/validate.yml:66-68`
+- [ ] (suggestion) Empty `mounted` set prints a reassuring PASS alongside the FAIL; exit early instead — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:85-87,119-126`
+- [ ] (suggestion) Contradictory comments: "chown/mkdir are stubbed" vs the next comment saying mkdir runs for real — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:90,96-98`
+- [ ] (suggestion) Neither layer exercises the baked image copies; add a label-vs-baked-scripts digest assertion — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:27-34,163-166`
+- [ ] (suggestion) `IMAGE` string duplicated from the launcher; a rename silently degrades layer B to permanent skip rather than failure — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:25`
+- [ ] (suggestion) Fixture models only a layer worktree; the workspace-worktree "clean no-op" claim is asserted by comment only — `.agent/scripts/tests/test_entrypoint_chown_coverage.sh:45-52`
+- [ ] (suggestion) Neither root argument validated: a stale/typo'd `WORKTREE_ROOT` makes loop 2 a silent no-op that reproduces #604 with no diagnostic — `.devcontainer/agent/fix-volume-ownership.sh:58,70`
+- [ ] (suggestion) Unguarded call under `set -e` dies with an opaque exit 127 on an image predating the script; a one-line existence check makes it actionable — `.devcontainer/agent/agent-entrypoint.sh:39-40`
+- [ ] (suggestion) Volume-ownership troubleshooting section is pre-#604 (no mention of the worktree's own `*_ws` or `fix-volume-ownership.sh`) — `.devcontainer/agent/README.md:276-285`
+- [ ] (suggestion) "after Dockerfile/startup-script changes" overstates the marker, which hashes only the two scripts — `.devcontainer/agent/README.md:13`
+- [ ] (suggestion) Plan step 3 still describes the superseded grep-for-loop-headers test design (contradicted later in the same section), and no `## Implementation` entry exists in the timeline — `.agent/work-plans/issue-604/plan.md:56`
+
+### Notes
+- Static analysis clean (shellcheck --severity=warning via pre-commit). Full `run_script_tests.sh` suite green (20 shell + 73 pytest), including the container smoke layer.
+- Local Adversarial (qwen3.5:35b) returned 2 uncorroborated findings; both discarded on spot-check — bash resolves EXIT traps by name at execution time, and macOS/BSD `sha256sum` portability is not a target environment for a Linux/Docker toolchain.
+- Process: `plan.md:171-176` flags the stale-image guard as scope beyond the reviewed plan and requests sign-off. That sign-off is still outstanding, and must-fix 2/3/4 all live inside that scope — dropping the guard to its own issue is a legitimate alternative to fixing it here.
