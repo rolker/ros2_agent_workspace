@@ -87,7 +87,9 @@ Options:
   --print-mounts        Dry run: print the docker -v mount arguments that would
                         be used and exit, without building the image or running
                         a container. Requires no Docker daemon or auth; used by
-                        tests/test_docker_run_mount_args.sh.
+                        tests/test_docker_run_mount_args.sh. Combined with
+                        --build or --build-only it reports what WOULD be built
+                        and builds nothing.
   -h, --help            Show this help
 
 Prerequisites:
@@ -393,6 +395,14 @@ fi
 
 if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
     warn_if_startup_scripts_stale
+fi
+
+if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = true ]; then
+    # --print-mounts is a Docker-free dry run, so it must not build. Say so
+    # rather than skipping in silence: `--build-only --print-mounts` would
+    # otherwise be a wordless rc-0 no-op, and this is the form the build-path
+    # test uses to exercise the parse without touching the real :latest tag.
+    echo "[dry run] --print-mounts: would build $IMAGE_NAME:$IMAGE_TAG from $DOCKERFILE_DIR (no build performed)"
 fi
 
 if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then

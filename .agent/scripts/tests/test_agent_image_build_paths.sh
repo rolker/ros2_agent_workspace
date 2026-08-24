@@ -75,12 +75,20 @@ else
 fi
 
 # --build-only must parse without --issue and short-circuit before any worktree
-# lookup. Paired with --print-mounts it needs no Docker daemon.
+# lookup. Paired with --print-mounts it needs no Docker daemon: --print-mounts
+# reports what WOULD be built and builds nothing, so this never touches the real
+# :latest tag. Assert that dry-run line — without it, a future edit that drops
+# --print-mounts here would silently start running real builds from a test.
 FIX_ROOT="$(mktemp -d /tmp/build_paths.XXXXXX)"
 trap 'rm -rf "$FIX_ROOT"' EXIT
 mkdir -p "$FIX_ROOT/layers/main/nav_ws"
 if out=$(DRA_ROOT_DIR_OVERRIDE="$FIX_ROOT" "$DRA" --build-only --print-mounts 2>&1); then
     pass "--build-only exits 0 without --issue (no worktree required)"
+    if printf '%s\n' "$out" | grep -q '^\[dry run\] --print-mounts: would build '; then
+        pass "--build-only --print-mounts reports the build it skipped"
+    else
+        fail "--build-only --print-mounts produced no dry-run line (silent no-op): $out"
+    fi
 else
     fail "--build-only without --issue failed: $out"
 fi
