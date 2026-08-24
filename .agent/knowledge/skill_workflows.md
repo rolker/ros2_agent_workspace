@@ -169,8 +169,10 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   (`triage-reviews` needs both), no host Ollama endpoint, and no `Agent` tool for
   further fan-out, so a phase needing any of those runs in-process. Host-built layer installs are a weaker case — a container *can*
   rebuild the layers, it just pays for them. (Containers have no GitHub *write*
-  auth ever, and read auth only when the optional read-only token is configured
-  — `docker_run_agent.sh` forwards it as `-e GH_TOKEN`. Be precise about the
+  auth, and read auth only when the optional read-only token is configured
+  — `docker_run_agent.sh` forwards it as `-e GH_TOKEN`; read-only-ness is a
+  convention of that token's filename, not a scope the script validates
+  (`docker_run_agent.sh:651-665`). Be precise about the
   rest of the boundary: the sandbox holds back the OS/dependency state and
   GitHub write auth, **not** the host workspace tree, which is bind-mounted
   read-write — see `run-issue/SKILL.md` § How phases are dispatched, *What
