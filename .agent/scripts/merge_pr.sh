@@ -25,13 +25,21 @@
 #
 # Exit codes:
 #   0  merged, cleaned up and synced
-#   1  failed before/at the merge — nothing irreversible happened, safe to retry
+#   1  failed BEFORE the merge — nothing irreversible happened, safe to retry
 #   2  usage error (bad or missing arguments)
-#   3  MERGE COMPLETE, post-merge `make sync` failed (#609). The merge, worktree
-#      removal and branch deletion have all happened and must NOT be retried;
-#      re-run `make sync` alone. Deliberately not 2 — make reports 2 for a
-#      failed recipe, and 2 is this script's usage-error code, so propagating it
-#      would tell a caller "you invoked me wrong" about a finished merge.
+#   3  MERGE COMPLETE, a post-merge step failed (#609). Every such path exits 3:
+#      the worktree-removal refusal, a failed `cd` back to the workspace root,
+#      and a failed post-merge `make sync`. The merge has already landed and must
+#      NOT be retried — each banner names the one command that finishes cleanup.
+#      Deliberately not 1: 1 promises "nothing irreversible happened", and a
+#      post-merge failure reported as 1 invites retrying a completed merge.
+#      Deliberately not 2 either — make reports 2 for a failed recipe, and 2 is
+#      this script's usage-error code, so propagating it would tell a caller
+#      "you invoked me wrong" about a finished merge.
+#
+#   Through `make merge-pr` the code 3 is NOT visible: GNU make reports its own
+#   2 for any non-zero recipe status, which is this script's usage-error code.
+#   Callers that branch on the exit code must invoke this script directly.
 
 set -eo pipefail
 
@@ -40,9 +48,10 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     return 1 2>/dev/null || exit 1
 fi
 
-# Exit code for "the merge finished, the post-merge sync did not" — see the
-# Exit codes block above (#609).
-SYNC_FAILED_RC=3
+# Exit code for "the merge finished, a post-merge step did not" — see the
+# Exit codes block above (#609). Shared by every post-merge failure path so the
+# documented contract for 1 ("nothing irreversible happened") stays true.
+POST_MERGE_RC=3
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=.agent/scripts/_worktree_helpers.sh
@@ -347,7 +356,18 @@ echo "  ✅ merged"
 # is already merged at this point, so if removal fails we ABORT before
 # branch-deletion/sync rather than leave a forced, partial-cleanup state — and
 # print the exact commands to finish cleanup once the worktree is resolved.
-cd "$ROOT_DIR"
+# `set -e` would abort here bannerless on a failed cd, and exit 1 — the code
+# that promises nothing irreversible happened, about an already-merged PR (#609).
+cd "$ROOT_DIR" || {
+    {
+        echo "ERROR: cannot cd to workspace root $ROOT_DIR."
+        echo "  PR #$PR_NUM is already MERGED. Finish cleanup by hand from the workspace root:"
+        echo "    $SCRIPT_DIR/worktree_remove.sh --issue ${ISSUE_NUM:-<N>} --repo-slug ${REPO_SLUG:-workspace}"
+        echo "    git -C $BRANCH_REPO branch -D $BRANCH && git -C $BRANCH_REPO push origin --delete $BRANCH"
+        echo "    make -C $ROOT_DIR sync"
+    } >&2
+    exit "$POST_MERGE_RC"
+}
 # Gate on whether resolution actually found a worktree (HAVE_WORKTREE) rather
 # than reconstructing the worktree dir name — worktree_create/worktree_remove
 # sanitize the slug (e.g. `my-pkg` → `issue-my_pkg-N`), so a reconstructed path
@@ -368,7 +388,8 @@ if [[ "$HAVE_WORKTREE" == true && -n "$ISSUE_NUM" ]]; then
             echo "    git -C $BRANCH_REPO branch -D $BRANCH && git -C $BRANCH_REPO push origin --delete $BRANCH"
             echo "    make -C $ROOT_DIR sync"
         } >&2
-        exit 1
+        # Not 1: the merge has landed, so this is a post-merge failure (#609).
+        exit "$POST_MERGE_RC"
     fi
     echo "  ✅ worktree removed"
 else
@@ -399,7 +420,7 @@ if [ "$sync_status" -eq 0 ]; then
     echo "========================================"
 else
     # The failure banner goes to stderr like every other failure block here, and
-    # the script exits SYNC_FAILED_RC rather than propagating $sync_status: that
+    # the script exits POST_MERGE_RC rather than propagating $sync_status: that
     # is make's code (2 for a failed recipe), which collides with this script's
     # usage-error code. rc=2 read as "invoked wrong" invites retrying a merge
     # that already happened and cannot be undone (#609).
@@ -410,8 +431,8 @@ else
         echo "   (make exit ${sync_status}). The merge is complete and needs no retry."
         echo "   See the sync output above for which repos are stale, then re-run:"
         echo "       make sync"
-        echo "   (merge_pr.sh exits ${SYNC_FAILED_RC} for this case.)"
+        echo "   (merge_pr.sh exits ${POST_MERGE_RC} for this case.)"
         echo "========================================"
     } >&2
-    exit "$SYNC_FAILED_RC"
+    exit "$POST_MERGE_RC"
 fi

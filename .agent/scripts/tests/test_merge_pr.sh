@@ -167,19 +167,39 @@ out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
 { [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
     && ok "conflicting --issue/--pr rejected" || bad "conflicting flags (rc=$rc, out: $(head -1 <<<"$out"))"
 
-# The post-merge sync failure path itself is not reachable here (every test
+# The post-merge failure paths themselves are not reachable here (every test
 # stops at a pre-merge guard, by design — see the scope note at the top), but
-# its exit code is a contract: it must not collide with the usage-error code
+# their exit code is a contract: it must not collide with the usage-error code
 # asserted above, or an agent reads a finished, irreversible merge as "invoked
 # wrong" and retries it (#609).
-echo "Test: post-merge sync-failure exit code is distinct from usage/generic errors"
-sync_rc=$(sed -n 's/^SYNC_FAILED_RC=\([0-9]\+\).*/\1/p' "$MERGE_PR")
-{ [[ -n "$sync_rc" ]] && [[ "$sync_rc" -ne 0 ]] && [[ "$sync_rc" -ne 1 ]] && [[ "$sync_rc" -ne 2 ]]; } \
-    && ok "SYNC_FAILED_RC=$sync_rc is reserved (not 0/1/2)" \
-    || bad "SYNC_FAILED_RC must be a non-zero code other than 1 (generic) or 2 (usage); got '${sync_rc:-unset}'"
+echo "Test: post-merge failure exit code is distinct from usage/generic errors"
+post_rc=$(sed -n 's/^POST_MERGE_RC=\([0-9]\+\).*/\1/p' "$MERGE_PR")
+{ [[ -n "$post_rc" ]] && [[ "$post_rc" -ne 0 ]] && [[ "$post_rc" -ne 1 ]] && [[ "$post_rc" -ne 2 ]]; } \
+    && ok "POST_MERGE_RC=$post_rc is reserved (not 0/1/2)" \
+    || bad "POST_MERGE_RC must be a non-zero code other than 1 (generic) or 2 (usage); got '${post_rc:-unset}'"
 { ! grep -q 'exit "\$sync_status"' "$MERGE_PR"; } \
     && ok "make's exit code is not propagated verbatim" \
     || bad "merge_pr.sh propagates make's exit code (2 collides with its usage error)"
+
+# Code 1 is documented as "nothing irreversible happened". That is only true if
+# NO path after `gh pr merge` exits 1 — the worktree-removal refusal used to,
+# and `set -e` on the `cd` back to the workspace root would too (#609).
+echo "Test: no post-merge path exits 1 (the 'safe to retry' code)"
+merge_line=$(grep -n '^GIT_EDITOR=true gh pr merge' "$MERGE_PR" | cut -d: -f1)
+if [[ -z "$merge_line" ]]; then
+    bad "could not locate the 'gh pr merge' line — the post-merge scan has no anchor"
+else
+    stray=$(awk -v start="$merge_line" 'NR>start && /^[[:space:]]*exit 1([[:space:];]|$)/ {print NR": "$0}' "$MERGE_PR")
+    [[ -z "$stray" ]] \
+        && ok "every post-merge failure path exits $post_rc, not 1" \
+        || bad "post-merge 'exit 1' would read as 'safe to retry' a landed merge: $stray"
+fi
+
+# The `cd` back to the workspace root runs after the merge under `set -e`.
+echo "Test: the post-merge cd to the workspace root is guarded, not left to set -e"
+grep -qE '^cd "\$ROOT_DIR" \|\|' "$MERGE_PR" \
+    && ok "cd \$ROOT_DIR has an explicit failure branch" \
+    || bad "cd \$ROOT_DIR is unguarded — set -e would abort bannerless with exit 1"
 
 echo ""
 echo "========================================"
