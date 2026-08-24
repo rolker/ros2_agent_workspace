@@ -154,6 +154,9 @@ tri-state outcome instead of widening the boolean.
 | `.agent/scripts/sync_repos.py` | Tri-state `SyncOutcome` enum; `sync_repo()` returns it with explicit returns on the two failure prints; `main()` accumulates `FAILED` entries (including unresolved-path skips) and the two `sync_gitbug()` call sites gate on `== SyncOutcome.SYNCED`; outcome-aware summary + `sys.exit(1)` on any failure |
 | `.agent/scripts/tests/test_sync_repos.py` | New — all-success, real-failure, benign-skip, unresolved-path, `sync_gitbug`-gating, mixed-run cases |
 | `.agent/scripts/merge_pr.sh` | Post-merge `make sync` call captures its exit status instead of relying on bare `set -e`; distinct warning banner + propagated non-zero exit on sync failure, vs. today's implicit crash-looking abort |
+| `.agent/scripts/lib/workspace.py` | Added during implementation — new shared `get_optional_layers()`, extracted so `sync_repos.py` and `validate_workspace.py` decide "this layer may be absent" from one parser (byte-compatible with `setup_layers.sh`'s `is_optional_layer()`) instead of two |
+| `.agent/scripts/validate_workspace.py` | Added during implementation — switched from its own optional-layer parsing to the shared helper; behaviour unchanged (a repo in an optional layer stays allowed-missing) |
+| `.agent/scripts/tests/test_workspace_lib.py` | Added during implementation — pins the shared parser's comment/blank handling, its missing-file `set()`, and its agreement with `setup_layers.sh` |
 | `AGENTS.md` | One-clause addition to the `sync_repos.py` script-table row noting exit-code semantics |
 | `.agent/scripts/tests/test_net_retry.py` | Check for `sync_repo` return-value assertions that need updating for the enum change (no changes expected if it only checks `run_network_cmd`/`sync_gitbug` call routing, but verify) |
 
@@ -274,7 +277,9 @@ trustworthy, plus three more must-fixes and nine suggestions.
   red on a supported host. Three cases are now distinguished: optional layer
   absent → SKIPPED; required layer absent → FAILED, naming `setup_layers.sh`;
   repo missing inside an imported layer → FAILED, "path not resolved". A
-  *required* repo that cannot be located still fails, as designed.
+  *required* repo that cannot be located still fails, as designed. (Round 2
+  narrowed the middle case — see below: the carve-out is keyed on the layer
+  being optional, not on the layer directory being absent.)
 - **The root workspace repo's outcome was untested.** No `main()` test keyed an
   outcome on `ros2_agent_workspace`, so reverting its call site to the
   truthiness trap left all 14 tests green — on the repo `merge_pr.sh` merges
@@ -326,11 +331,72 @@ After the Local Review round:
   optional-layer rule, each break a named test.
 - **Live, not inferred**: a dry run against this host's real 35 repos through a
   mirrored root reports `35 synced`; removing `site_ws` from that mirror turns
-  it into `34 synced, 1 skipped` with `optional layer 'site' is not set up`,
-  and no failure — confirming the false red is gone on the exact configuration
+  it into `34 synced, 1 skipped` with an optional-layer skip (Round 2 reworded
+  the message), and no failure — confirming the false red is gone on the exact configuration
   that produced it.
+
+## Review-driven corrections (Local Review pre-push Round 2, `d3d93d0`)
+
+Round 2 verdict was changes-requested with **Ship: recommended** — four
+mechanical must-fixes, no reopened design question.
+
+- **The no-repos remedy named a target that does not exist.** It printed
+  ``Run `make setup``` on the one path an operator reaches from an
+  un-bootstrapped clone or a worktree; the target is `setup-all`
+  (`make -n setup` → "No rule to make target 'setup'"). Corrected.
+- **The exit-code contract was false about code 1.** Both the `merge_pr.sh`
+  header and the `AGENTS.md` row promised `1 = failed before the merge, nothing
+  irreversible happened`, while the worktree-removal refusal exited 1 *after*
+  `gh pr merge` had landed — the exact misread code 3 was reserved to prevent,
+  left uncovered on the sibling path. Every post-merge failure now exits 3:
+  the worktree-removal refusal, the post-merge `make sync`, and the `cd` back to
+  the workspace root, which `set -e` would otherwise have aborted bannerless
+  with 1. `SYNC_FAILED_RC` is renamed `POST_MERGE_RC` for the widened meaning,
+  and `test_merge_pr.sh` now asserts that no path after `gh pr merge` exits 1
+  and that the `cd` is explicitly guarded.
+- **Code 3 is invisible through the advertised entry point.** GNU make reports
+  its own 2 for any non-zero recipe status (verified: a recipe of `exit 3`
+  yields make rc=2), so `make merge-pr` surfaces a completed-merge failure as
+  exactly the usage-error code, and `make sync` returns 2 rather than the
+  documented 1. Both `AGENTS.md` rows and the script header now state what each
+  entry point actually returns and steer exit-code-sensitive callers to the
+  scripts directly.
+- **The optional-layer carve-out was gated on the layer directory existing.**
+  `setup_layers.sh` exits 0 in two states that leave the directory in place: a
+  *partially* imported optional layer (it deletes the directory only when it
+  created it that run) and a host with no `vcs` (empty `src`, "Setup complete").
+  Both went permanently red — the false red the design's own docstring calls
+  worse than the false green it removes — and both disagreed with
+  `validate_workspace.py`, which allows any repo in an optional layer to be
+  missing while now sharing the same parser. The carve-out is now keyed on the
+  layer being optional, full stop; the corresponding test is flipped and the
+  docstring's one-branch claim about `setup_layers.sh` corrected.
+- **Suggestions actioned**: `.agent/hooks/post-checkout` and
+  `.agent/hooks/README.md` no longer promise `make sync` works inside a
+  workspace worktree (`configs/manifest` is gitignored there, so since this
+  change it is a named exit 1); the three mutation survivors are closed —
+  `locate_repo`'s explicit-path fallback (relative, absolute, and
+  tried-paths cases) and the shared parser's comment-stripping and
+  missing-file paths, the latter checked against `setup_layers.sh`'s own
+  `is_optional_layer()` rather than a restatement of it; this plan re-synced
+  with the two files the work added.
+- **Deliberately not widened**: the same `success and bool(output)` false green
+  in `pull_remote.py:42` and the 0-repo all-clear in `validate_workspace.py` are
+  the same defect class at different entry points, tracked as a separate
+  follow-up rather than folded into a diff that has had three review rounds.
+
+**Round 2 verification**: 106 pytest cases green across
+`.agent/scripts/tests/` (29 in `test_sync_repos.py`, 4 in the new
+`test_workspace_lib.py`), `test_merge_pr.sh` 20/20. Each new behaviour
+mutation-checked in both directions: gating the optional-layer carve-out on the
+directory again, and skipping unconditionally, each break a named test; so do
+reverting the post-merge exit to 1, unguarding the `cd`, dropping the parser's
+`#`-strip or blank-skip, returning a non-empty set for a missing file, and
+deleting `locate_repo`'s explicit-path fallback.
 
 ## Estimated Scope
 
-Single PR. Two files change behavior (`sync_repos.py`, `merge_pr.sh`),
-one file gains a new test module, `AGENTS.md` gets a one-line doc update.
+Single PR. Two files change behavior (`sync_repos.py`, `merge_pr.sh`), a third
+(`validate_workspace.py`) moves to a shared helper in `lib/workspace.py`, two
+new test modules are added, and `AGENTS.md` plus the two hook docs get doc
+updates.
