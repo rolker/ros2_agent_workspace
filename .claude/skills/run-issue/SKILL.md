@@ -97,10 +97,18 @@ auth is available (in-process on the host), not as a body-only container dispatc
 **Choosing a mode (#607).** **The host session's permission mode decides the
 default — and you, the dispatching agent, are the one who has to read it.** The
 signal you can actually observe is in your own context, not on the operator's
-screen: while Claude Code auto mode is active, the session injects a
-system reminder that opens `While auto mode is active:` into every turn. If that
-reminder is present in this context, auto mode is active; if it is absent, treat
-auto mode as unconfirmed. The operator's permission-mode indicator reports the
+screen: when Claude Code auto mode is active, the session injects a
+`system-reminder` opening `While auto mode is active:` **once**, attached to an
+early tool result — it does **not** recur turn after turn. So check the *whole*
+context, not just the current turn: present anywhere in this session ⇒ auto mode
+is active; absent from the entire context ⇒ treat auto mode as unconfirmed. Two
+traps. A per-turn check answers "absent" on almost every turn and drops you onto
+the fail-safe branch, so the new default would never fire in the sessions it was
+written for. And the sentinel string appears verbatim in this document and in
+`.agent/knowledge/skill_workflows.md`, so a naive string match matches the
+guidance you just read — it counts only as an injected `system-reminder` in your
+context, never as a quotation of these docs.
+The operator's permission-mode indicator reports the
 same state, but it is terminal UI rendered for *them* — you cannot see it, so it
 is not the check.
 
