@@ -327,15 +327,23 @@ inside that session. Re-run it from the **host**, as root in the same container:
 
 ```bash
 # Host, in a second terminal while the --shell session is still up.
-# `docker ps` gives the container name (prefix: ros2-agent-).
-docker exec -u 0 <container> \
-    /usr/local/bin/fix-volume-ownership.sh "$(docker exec <container> id -u ros)" \
-    "$(docker exec <container> id -g ros)" \
-    "$ROS2_AGENT_WORKSPACE_ROOT" "$WORKTREE_ROOT"
+# The launcher prints the name on its "Container:" line; this finds it again.
+# With several agent containers up, name it explicitly instead.
+c=$(docker ps --filter name=^/ros2-agent- --format '{{.Names}}' | head -1)
+docker exec -u 0 "$c" \
+    /usr/local/bin/fix-volume-ownership.sh \
+    "$(docker exec "$c" id -u ros)" \
+    "$(docker exec "$c" id -g ros)" \
+    "$(docker exec "$c" printenv ROS2_AGENT_WORKSPACE_ROOT)" \
+    "$(docker exec "$c" printenv WORKTREE_ROOT)"
 ```
 
-Substitute the workspace and worktree paths the launcher used (they are printed
-in the container's startup banner and the `Using worktree:` line).
+Every argument is read back out of the container, because none of it exists in
+the host shell: the launcher *passes* `ROS2_AGENT_WORKSPACE_ROOT` and
+`WORKTREE_ROOT` into the container, it does not export them to its caller, so
+expanding them host-side would hand the script two empty strings. (The same two
+paths are also printed in the container's startup banner and the `Using
+worktree:` line if you would rather paste them literally.)
 
 A root-owned volume with an image that predates the fix is the likely cause —
 check for the staleness warning at launch and rebuild. `bash
