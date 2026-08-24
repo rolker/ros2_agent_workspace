@@ -124,8 +124,12 @@ trap cleanup EXIT
 make_fixture "$ROOT" "$SLUG" "$ISSUE"
 
 mount_out=$(DRA_ROOT_DIR_OVERRIDE="$ROOT" "$DRA" --issue "$ISSUE" --repo-slug "$SLUG" --print-mounts 2>&1)
-if [ $? -ne 0 ]; then
-    fail "--print-mounts exits 0 (out=$mount_out)"
+mount_rc=$?
+# Capture rc before the [ overwrites $?, and phrase the message as the problem
+# it reports — this branch is failure-only, with no paired pass to disambiguate
+# an assertion-phrased one.
+if [ "$mount_rc" -ne 0 ]; then
+    fail "--print-mounts exited non-zero (rc=$mount_rc, out=$mount_out)"
 fi
 
 # Every mounted anonymous volume under the fixture that looks like a layer
