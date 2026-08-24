@@ -138,6 +138,8 @@ zero; it is environment diversity.
   repo**: rejected — decision 4; the workspace repo's hosted checks are
   cheap and provide unique clean-room value.
 
+## References
+
 ### Addendum (cross-reference, per [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md))
 
 - Issue [#610](https://github.com/rolker/ros2_agent_workspace/issues/610) —
@@ -145,6 +147,8 @@ zero; it is environment diversity.
   attestation before merging") described the state at the time this ADR was
   written; that check has since landed, along with decision 5's note push at
   merge time. `AGENTS.md` § "Merge verification (ADR-0018)" describes the
-  current `merge_pr.sh` behavior, including the case this ADR never covered —
-  a repo with neither hosted checks nor an attestation. This note is
-  navigational only; the Decision and Consequences text above is unchanged.
+  current `merge_pr.sh` behavior: the precedence between a hosted-check signal
+  and an attestation (including the attestation-plus-*red* case this ADR never
+  addresses), and the case it never covered — a repo with neither hosted checks
+  nor an attestation. This note is navigational only; the Decision and
+  Consequences text above is unchanged.

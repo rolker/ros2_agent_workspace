@@ -445,11 +445,17 @@ bootstrap confirmation). `CI` is also recognized for CI environments.
   skips worktree cleanup).
 - **Gate on the applicable CI verification**: for the **workspace repo**,
   never merge while hosted checks are red or pending. For **project
-  repos**, a full-scope `ci-local` attestation satisfies the gate without
-  waiting for hosted Actions (see Merge verification below / ADR-0018) —
-  but never merge past a *red* signal from whichever verification applies.
-  Either way, a poll loop that breaks on failure must not fall through to
-  the merge command.
+  repos**, a full-scope `ci-local` attestation on the PR's exact head
+  satisfies the gate without waiting for hosted Actions — whether or not
+  the repo also has workflows — but **never merge past a *red* signal**
+  from whichever verification applies: failing hosted checks refuse the
+  merge no matter what attestation exists. Either way, a poll loop that
+  breaks on failure must not fall through to the merge command.
+  `merge_pr.sh` enforces all of this itself; the states, the precedence,
+  and the one case where it **merges on a warning with nothing verifying
+  the commit** (exit status `42`) are in
+  [Merge verification (ADR-0018)](#merge-verification-adr-0018) below —
+  read it before assuming the gate is unconditional.
 - **Green CI is not review**: never merge a PR the user hasn't
   content-reviewed — doubly so for strategic documents (roadmaps, ADRs,
   instruction files).
@@ -459,39 +465,58 @@ bootstrap confirmation). `CI` is also recognized for CI environments.
 
 ### Merge verification (ADR-0018)
 
-Project-repo PRs may merge on a **full-scope local CI attestation** instead of
-waiting for hosted Actions: run `.agent/scripts/ci_local.sh <project_repo_path>` on the PR
-head, verify `git notes --ref=ci-local show <head-sha>` reports `ci-local: pass`
-with `scope: full`, and push `refs/notes/ci-local` to origin at merge time.
-Partial/dirty/`--no-attest` runs don't satisfy the gate. Hosted CI on project
-repos remains a mirror/backstop — triage its post-merge failures. The
-**workspace repo is exempt**: its hosted checks stay required. See
+A project-repo PR may merge on a **full-scope local CI attestation** instead of
+waiting for hosted Actions: run `.agent/scripts/ci_local.sh <project_repo_path>`
+on a checkout sitting on **the PR head**, verify
+`git notes --ref=ci-local show <head-sha>` reports `ci-local: pass` with
+`scope: full`, and push `refs/notes/ci-local` to origin at merge time.
+Partial/dirty/`--no-attest` runs don't satisfy the gate, and an attestation on
+an ancestor is not evidence for the head — re-run after every push. Hosted CI on
+project repos remains a mirror/backstop; triage its post-merge failures. The
+**workspace repo is exempt**: its hosted checks stay required and no attestation
+substitutes. See
 [ADR-0018](docs/decisions/0018-local-first-ci-verification.md).
 
-`merge_pr.sh` performs this check itself, classifying the PR into one of four
-states (#610) — it no longer reports every non-zero `gh pr checks` as "CI
-checks failed":
+`merge_pr.sh` performs the check itself (#610) — it no longer reports every
+non-zero `gh pr checks` as "CI checks failed". What it does, in precedence
+order:
 
-1. **Checks present** → wait on them and gate on them, as always.
-2. **Workflows exist at the PR head but no checks have registered** → short
-   re-poll, then **refuse**. An empty check rollup is ambiguous (head just
-   pushed, `paths:`-filtered workflow that didn't match, queued suite) and a
-   repo with CI must be verified by it. The **workspace repo always lands
-   here** rather than in 3/4 — its hosted checks are required (ADR-0018
-   decision 4) and no attestation substitutes.
-3. **Project repo, no `.github/workflows` at the head, full-scope `ci-local`
-   attestation on that exact commit** → merge on the attestation, and
-   `refs/notes/ci-local` is pushed at merge time (decision 5).
-4. **Project repo, no workflows at the head, no attestation** → the merge
-   **proceeds with a loud warning** that nothing verified this commit. This
-   is the honest third state: not a failure, not silent. To merge on evidence
-   instead, run `ci_local.sh` on **that** head commit and re-run merge-pr —
-   an attestation for an earlier commit does not count. Do not reach for
-   `--no-wait`: it skips verification entirely.
+| At the PR head | merge-pr does |
+|---|---|
+| Hosted checks **failing** | **Refuses** — an attestation never overrides a red signal |
+| Hosted checks **pending/queued** + full-scope attestation (project repo) | Merges on the attestation, **without waiting** (ADR-0018 decision 1) |
+| Hosted checks **pending/queued**, no attestation | Waits on them, gates on the result |
+| Hosted checks **passing** | Merges, as always |
+| Check state **unrecognized** (gh schema change) | Waits on them — fail closed, never shortcut |
+| **Workflows exist** at the head but no checks registered | Short re-poll, then **refuses**. An empty rollup is ambiguous (head just pushed, `paths:`-filtered workflow that didn't match, queued suite, a workflows dir with nothing runnable) and a repo with CI must be verified by it. The **workspace repo always lands here** rather than on any attestation path (ADR-0018 decision 4). |
+| **No workflows** at the head (project repo) + full-scope attestation | Merges on the attestation; `refs/notes/ci-local` is published at merge time (decision 5) |
+| **No workflows** at the head (project repo), no attestation | **Merges with a loud warning** that nothing verified this commit, and exits **`42`** (see below) |
+
+**Exit `42` — merged with no verification available.** 26 of 45 project repos
+have no CI workflow at all, so refusing this state would block them with no path
+forward; the merge proceeds on a warning. Because "merged, and nothing checked
+this commit" must not read like an ordinary success, merge-pr ends such a run
+with a banner and the distinct exit status `42` (`make merge-pr` surfaces it as
+`Error 42`). Treat a `42` as a merge that still owes verification: get CI or a
+`ci_local.sh` attestation onto that repo. Exit `0` means verified, `1` refused
+or a step failed, `2` a usage error.
+
+**Precedence beyond the ADR.** ADR-0018 decision 1 says an attestation lets a
+project-repo PR merge "without waiting for hosted Actions", and decision 3 calls
+hosted CI on project repos "a mirror and backstop — never a blocker". Read
+literally, decision 3 would also permit merging past *failing* hosted checks;
+the ADR never addresses attestation-plus-red directly. The workspace rule above
+("never merge past a red signal") settles it the other way, and that is what
+`merge_pr.sh` implements: **red hosted checks refuse, attestation or not.**
+Decision 3's "never a blocker" applies to *post-merge* hosted failures and to
+*waiting*, not to merging past a failure you can already see.
 
 A failed `gh` call (auth, network, rate limit) is an **error**, never "no CI
 configured" — merge-pr refuses rather than merging on a warning it could not
-substantiate.
+substantiate. The same applies to the `.github/workflows` probe: a 404 is
+believed only when the repository root at the same ref reads back, since GitHub
+returns an identical 404 for a path the token may not read and for a ref it
+cannot resolve.
 
 ## Documentation Accuracy
 
@@ -594,8 +619,8 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/gitbug_helpers.sh` | Shared git-bug lookup helpers **(source)** |
 | `.agent/scripts/revert_feature.sh` | Revert all commits for an issue |
 | `.agent/scripts/sync_repos.py` | Sync all workspace repositories (includes git-bug) |
-| `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`). Verifies first via the four-state classification in [Merge verification](#merge-verification-adr-0018) (#610), consulting `refs/notes/ci-local` and pushing it when it authorized the merge |
-| `.agent/scripts/_ci_verification_helpers.sh` | `ci_local_attestation_status <repo> <sha>` — is there a full-scope `ci-local` attestation on that exact commit (ADR-0018 decisions 1/2 + the #577 `upstream.repos` completeness rule)? Sourced by `merge_pr.sh` **(source)** |
+| `.agent/scripts/merge_pr.sh` | Merge a PR + remove worktree + delete branches + `make sync` (worktree/issue-keyed; also `make merge-pr`). Verifies first via the precedence table in [Merge verification](#merge-verification-adr-0018) (#610): red hosted checks always refuse; a full-scope `refs/notes/ci-local` attestation on the exact head satisfies the gate for a project repo (published at merge time); a merge with nothing verifying it exits `42` |
+| `.agent/scripts/_ci_verification_helpers.sh` | `ci_local_attestation_status <repo> <sha>` — is there a full-scope `ci-local` attestation on that exact commit (ADR-0018 decisions 1/2 + the #577 `upstream.repos` completeness rule)? — and `ci_local_push_attestation <repo>`, which publishes it (decision 5), reconciling with origin's notes ref first. Sourced by `merge_pr.sh` **(source)** |
 | `.agent/scripts/add_remote.py` | Add a named remote to all repos (one-time setup) |
 | `.agent/scripts/push_remote.py` | Push to a named remote across all repos |
 | `.agent/scripts/pull_remote.py` | Fetch/pull from a named remote across all repos (`--json` for structured output) |

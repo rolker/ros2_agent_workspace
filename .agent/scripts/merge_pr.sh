@@ -15,7 +15,10 @@
 #                                             # per-repo); use "workspace" for the
 #                                             # workspace repo.
 # Options:
-#   --no-wait    skip the pre-merge verification entirely (use when CI is known green)
+#   --no-wait    skip ALL pre-merge verification — the hosted-check wait, the
+#                ci-local attestation lookup, AND its publication. Nothing is
+#                checked and nothing is recorded; use only when the head is
+#                already known green.
 #
 # Env (verification tuning; see the "verify before merging" block):
 #   MERGE_PR_SETTLE_ATTEMPTS  re-polls when a repo has workflows but no checks

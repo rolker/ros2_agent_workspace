@@ -62,6 +62,18 @@ PR head.
 
 ## Approach
 
+> **Scope widened after local review round 1 (operator decision).** The plan
+> below consults the `ci-local` attestation only for a repo with *no workflows
+> at all*. The operator decided to implement **ADR-0018 decision 1 in full**: a
+> project-repo PR with a valid full-scope attestation on the exact head
+> satisfies the merge gate whether or not the repo also has workflows. The
+> precedence that widening rides on — **red hosted checks refuse regardless of
+> any attestation**; pending-plus-attestation merges without waiting; pending
+> without one still waits; passing is unchanged — is implemented in
+> `merge_pr.sh` and documented in `AGENTS.md` § Merge verification, which also
+> records that ADR-0018's own text does not settle the attestation-plus-red
+> case. Read the states below with that widening applied.
+
 ### 1. Replace the CI-wait block with an explicit classification step
 
 Before deciding whether to call `gh pr checks --watch`, query the PR once:
@@ -162,17 +174,25 @@ exposing `ci_local_attestation_status <repo_path> <head_sha>`:
   worktree shares its ref store with `BRANCH_REPO` (the main project
   checkout), so a note `ci_local.sh` wrote inside the feature worktree is
   *already visible* here — the common case needs no fetch at all.
-- **Fallback fetch uses a forced refspec and a trapped scratch ref.**
+- **Fallback fetch uses a forced refspec and a per-call scratch ref.**
   (must-fix 4) If no local note matches, best-effort fetch from `origin`
   into a scratch ref rather than onto `refs/notes/ci-local` (which could
   clobber a local, not-yet-pushed attestation — `ci_local.sh` treats the
   ref as append-only, and the read side must too):
 
   ```bash
-  git -C "$repo" update-ref -d refs/notes/ci-local-merge-check 2>/dev/null || true
-  trap 'git -C "$repo" update-ref -d refs/notes/ci-local-merge-check 2>/dev/null || true' RETURN
-  git -C "$repo" fetch -q origin '+refs/notes/ci-local:refs/notes/ci-local-merge-check'
+  scratch=$(_ci_local_scratch_ref)   # per invocation: prefix + PID + RANDOM + ns
+  git -C "$repo" update-ref -d "$scratch" 2>/dev/null || true
+  git -C "$repo" fetch -q origin "+refs/notes/ci-local:$scratch"
+  # ... read the note ...
+  git -C "$repo" update-ref -d "$scratch" 2>/dev/null || true
   ```
+
+  **As shipped** (local review round 1): the `trap ... RETURN` became an
+  explicit delete after use, and the scratch ref name is built **per call**
+  rather than being a constant — with a constant name a concurrent
+  `merge_pr.sh` in the same repo deletes the ref mid-fetch and an *attested*
+  PR falls through to merge-with-no-verification (reproduced 10/10).
 
   The `+` and the up-front delete are both load-bearing: the reviewer
   reproduced (rc=1) a leftover scratch ref from an interrupted run making
@@ -230,9 +250,16 @@ For a **project repo** whose probe returned 404 (genuinely no CI):
 
   and proceed. (Review suggestion: the recourse line is the point. Without
   it, the operator's next move is `--no-wait` — the blunt flag this whole
-  issue exists to stop people reaching for. `--no-wait` keeps its one
-  existing meaning, skip the wait when CI is known green, and is orthogonal
-  to this block, which only runs when `--no-wait` is *not* passed.)
+  issue exists to stop people reaching for.)
+
+  **As shipped** (local review round 1): the recourse names a checkout that
+  is actually *on* the head commit, never `BRANCH_REPO` (the main checkout,
+  which sits on the default branch — following that would attest the wrong
+  commit). `--no-wait`'s meaning did widen: it now skips the attestation
+  lookup and its publication as well as the hosted-check wait, and both the
+  script header and `make help` say so. And this state now exits **42** with
+  a banner (operator decision): it stays warn-and-merge, but must be
+  greppable in a transcript.
 
 The `no checks reported on` stderr string is not parsed anywhere in the new
 code. It only ever appeared because `gh pr checks --watch` was being called
