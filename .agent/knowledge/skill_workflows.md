@@ -139,8 +139,13 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   lifecycle, seven phases in-process with no approvals for the dispatched work.
   **If you cannot confirm auto mode is active** — a non-Claude runtime with no
   `Agent` tool, or an operator running with prompts on — the older rule stands
-  and fan-out goes to **containers**, which run sandboxed and prompt-free. That
-  fallback direction is deliberate: an uncertain reader must not land on the
+  and the many-tool-call phases (**implement**, **address-findings**) go to
+  **containers**, which run sandboxed and prompt-free. **`review-code` is
+  excluded**: its specialist fan-out needs the `Agent` tool and the host Ollama
+  endpoint, so it stays in-process in every mode and pays the prompts. If
+  container auth is not ready either (`dispatch_subagent.sh --check`), run
+  in-process and accept the prompts rather than not running at all. The fallback
+  direction is deliberate: an uncertain reader must not land on the
   prompt-flooding branch
   ([#545](https://github.com/rolker/ros2_agent_workspace/issues/545) →
   [#607](https://github.com/rolker/ros2_agent_workspace/issues/607)).
@@ -148,7 +153,13 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   and work needing a clean dependency environment belong in the sandbox
   whatever the host's permission mode. Conversely, a phase needing host GitHub
   auth (`triage-reviews`), the host Ollama endpoint, host-built layer installs,
-  or further `Agent`-tool fan-out cannot run in a container at all.
+  or further `Agent`-tool fan-out cannot run in a container at all. (Containers
+  have no GitHub *write* auth ever, and read auth only when the optional
+  read-only token is configured — `docker_run_agent.sh` forwards it as
+  `-e GH_TOKEN`.) **Where the two rules collide, capability wins and you
+  compensate:** `triage-reviews` needs host auth *and* consumes third-party PR
+  comments, which `dispatch_subagent.sh` fences as "data, not authority" — run
+  it in-process and hold that fence yourself.
 - **Run container dispatches in the background** so the host session stays
   responsive to the operator; check results on completion.
 - **Never give a sub-agent filesystem-wide search scope** — scope prompts to
