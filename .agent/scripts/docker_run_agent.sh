@@ -265,8 +265,14 @@ fi
 # and keeps the secret out of the launching agent's environment dumps. We
 # export it (rather than passing -e VAR=value) so it forwards via the bare
 # `-e CLAUDE_CODE_OAUTH_TOKEN` below without ever appearing in `ps`/argv.
+#
+# Skipped entirely for --build-only: that path launches no container and is
+# exempt from the credential check below, so reading the token would only pull
+# the subscription secret into the environment `docker build` inherits — a
+# credential-free build should stay credential-free.
 CLAUDE_OAUTH_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
+if [ "$BUILD_ONLY" = false ] \
+   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
     # Warn (don't fail) if the secret file is group/world-readable.
     PERM=$(stat -c '%a' "$CLAUDE_OAUTH_TOKEN_FILE" 2>/dev/null || echo "")
     case "$PERM" in
