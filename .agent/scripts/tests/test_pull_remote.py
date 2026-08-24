@@ -623,8 +623,15 @@ def _json_main(monkeypatch, tmp_path, **opts):
     else:
         monkeypatch.setattr(pull_remote, "get_optional_layers", lambda root: set())
     monkeypatch.setattr(pull_remote, "json_report", opts.get("report", lambda *a: (None, None)))
+    # `fetch` is an option rather than something the caller installs before
+    # calling: this setattr used to overwrite a stub the test had just
+    # installed, so the workspace-root test below asserted nothing it claimed
+    # (confirmed by mutation — removing the guard it names was killed by an
+    # older test, not by that one).
     monkeypatch.setattr(
-        pull_remote, "run_git_network", lambda repo_path, args, dry_run=False: (True, "", "")
+        pull_remote,
+        "run_git_network",
+        opts.get("fetch", lambda repo_path, args, dry_run=False: (True, "", "")),
     )
     monkeypatch.setattr(
         pull_remote,
@@ -703,11 +710,11 @@ def test_json_mode_skips_a_workspace_root_with_no_such_remote(monkeypatch, tmp_p
     def fetch_fails(repo_path, args, dry_run=False):
         return False, "", "fatal: 'gitcloud' does not appear to be a git repository"
 
-    monkeypatch.setattr(pull_remote, "run_git_network", fetch_fails, raising=True)
     code = _json_main(
         monkeypatch,
         tmp_path,
         repos=[],
+        fetch=fetch_fails,
         probe=lambda repo_path, remote: RemoteState.ABSENT,
     )
     # Exit 1 is from the empty enumeration above, not from the root's fetch.
