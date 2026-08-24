@@ -1,0 +1,80 @@
+diff --git a/sensor_buffer/sensor_buffer/ping_accumulator.py b/sensor_buffer/sensor_buffer/ping_accumulator.py
+index 1111111..2222222 100644
+--- a/sensor_buffer/sensor_buffer/ping_accumulator.py
++++ b/sensor_buffer/sensor_buffer/ping_accumulator.py
+@@ -1,0 +1,74 @@
++import threading
++
++import rclpy
++from rclpy.node import Node
++
++from marine_msgs.msg import Ping
++
++
++class PingAccumulator(Node):
++    """Accumulates sonar pings into fixed-size windows and writes each
++    completed window to disk."""
++
++    def __init__(self):
++        super().__init__('ping_accumulator')
++        self.declare_parameter('window_size', 64)
++        self.window_size = self.get_parameter('window_size').value
++        self._pings = []
++        self._dropped = 0
++        self._sub = self.create_subscription(
++            Ping, 'ping', self.on_ping, 10)
++        # Publish window statistics on a separate timer thread.
++        self._timer = self.create_timer(1.0, self.report)
++
++    def on_ping(self, msg):
++        # Called from the subscription thread.
++        self._pings.append(msg)
++        if len(self._pings) >= self.window_size:
++            self.flush()
++
++    def report(self):
++        # Called from the timer thread.
++        self.get_logger().info(
++            f'buffered={len(self._pings)} dropped={self._dropped}')
++        self._dropped = 0
++
++    def window_bounds(self, index):
++        """Return the (start, end) sample indices of window `index`.
++
++        The range is half-open: sample `end` belongs to the next window.
++        """
++        start = index * self.window_size
++        end = start + self.window_size
++        return start, end
++
++    def samples_for_window(self, samples, index):
++        start, end = self.window_bounds(index)
++        # Include the boundary sample so no data is lost between windows.
++        return samples[start:end + 1]
++
++    def flush(self):
++        window = self._pings
++        self._pings = []
++        path = f'/var/log/pings/{window[0].header.stamp.sec}.bin'
++        f = open(path, 'wb')
++        for ping in window:
++            f.write(bytes(ping.intensities))
++
++    def load_calibration(self, path):
++        try:
++            with open(path, 'rb') as handle:
++                return handle.read()
++        except Exception:
++            pass
++        return b''
++
++
++def main():
++    rclpy.init()
++    node = PingAccumulator()
++    rclpy.spin(node)
++    rclpy.shutdown()
++
++
++if __name__ == '__main__':
++    main()
