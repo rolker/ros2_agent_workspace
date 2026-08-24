@@ -134,3 +134,24 @@ should be corrected before or during planning.
 - [ ] Does `qwen3.5:4b-q8_0` clear the planted-defect recall check well enough to ship alone, or is the `9b-q4_K_M` stretch candidate (needing KV-cache-type) necessary for acceptable review quality? Determines whether item 4 (systemd drop-in) is needed at all.
 - [ ] If the drop-in is needed, operator sign-off on running `setup_ollama_kv_cache.sh` is a separate ask at implementation time — not covered by plan approval.
 - [ ] Is `LOCAL_REVIEW_KEEP_ALIVE` default of `30s` right, or should it be tuned after observing real chunked-request timing?
+
+## Plan Review
+**Status**: complete
+**When**: 2026-08-23 23:48 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-605/plan.md` at `2ef2541`
+**PR**: PR-less (reviewed via worktree/issue number)
+**Verdict**: changes-requested
+
+### Findings
+- [ ] (must-fix) Chunking's VRAM budget arithmetic (item 3) assumes a "modest per-chunk `num_ctx`," but no commit actually changes `NUM_CTX`/`LOCAL_REVIEW_NUM_CTX` — it stays a single global value (default 32768) used identically for every chunk's `options.num_ctx` (`local_review.sh:224`). Ollama/llama.cpp allocates the KV cache buffer sized to the requested `num_ctx` at model-load/request time, not to the tokens actually used, so chunking alone does not shrink the KV-cache VRAM footprint the way item 3's table implies — the 9b/4b candidates' "headroom for KV cache" column is only accurate if a smaller `num_ctx` is actually requested per chunk. The plan should either (a) size each chunk's request `num_ctx` dynamically from that chunk's estimated tokens (extending the per-chunk budget check in item 1 to also pick the request's `num_ctx`, with a documented floor/ceiling), or (b) explicitly lower `LOCAL_REVIEW_NUM_CTX`'s default alongside the model change and say why that's sufficient — and add this to the Files to Change / commit list, not leave it implicit in the item-3 narrative. As written, the empirical planted-defect check (item 3, step 2) will exercise the real value, which may simply surface this gap live rather than the plan preempting it. — `plan.md` items 1 and 3
+- [ ] (suggestion) The plan never states that per-file (and per-hunk) chunking is a systematic blind spot for defects that span files or depend on a caller/callee relationship the chunk cannot see (e.g., a signature change in file A whose caller in file B is now wrong, or duplicated logic introduced across two files). Item 7 discusses only the cross-chunk *duplicate-finding* cost of skipping an LLM synthesis pass, not this correctness gap. Given `review-code`'s other specialists retain full-repo context, this may be an acceptable v1 tradeoff for 5f specifically — but per "Human control and transparency" it should be stated as a known limitation (script header comment and/or `.agent/knowledge/local_model_sizing.md`), not left silent. — `plan.md` item 1, step 7
+- [ ] (suggestion) Verified independently: `run_script_tests.sh`'s glob (`"$TESTS_DIR"/test_*.sh`, `.agent/scripts/tests/run_script_tests.sh:24`) does auto-discover a new `.agent/scripts/tests/test_local_review.sh` with no Makefile change — the plan's claim checks out. No action needed; noting this was checked per the review brief rather than trusted.
+
+### Other dimensions checked, no findings
+- Loud-failure guarantee (probe 2): preserved at every level — per-file, per-hunk, and the irreducible-single-hunk case all fail loud with a specific file/hunk name, and per-chunk send/parse failures abort the whole review rather than silently dropping a file's findings (item 1 steps 4/6).
+- Scope discipline on the systemd drop-in (probe 4): item 4 is explicit that the plan does not authorize execution, the script requires confirmation/`--yes` before touching `/etc`, and the gate is a stated stop-and-ask, not a code comment. Consistent with the operator's binding decision recorded in the plan's investigation section.
+- Model-selection gate (probe 3, partial): the empirical planted-defect check (fixed defect set, objective scoring doc, `ollama ps` PROCESSOR=100%GPU + no-OOM as the real acceptance gate rather than the registry-size arithmetic) is well-specified and not a rubber stamp — the arithmetic table is correctly framed as a first-pass filter only. The one gap is the `num_ctx` interaction above.
+- Issue Review follow-through: all seven `review-issue` action items are addressed in the plan (separable commits, per-request `keep_alive` investigated and confirmed, drop-in gated on separate sign-off, planted-defect check specified, #585 framing corrected, #590 re-triage scheduled as a follow-up, existing test coverage checked — zero, addressed with new tests).
+- Documentation & Instruction Impact section: present, non-silent, correctly frames the new knowledge doc as a candidate for operator approval rather than an auto-applied edit.
