@@ -47,7 +47,10 @@
 #   specialists retain full-diff/full-repo context and are unaffected.
 #
 # Environment:
-#   LOCAL_REVIEW_MODEL    model tag (default: qwen3.5:35b)
+#   LOCAL_REVIEW_MODEL    model tag (default: qwen3.5:4b-q8_0 — 5.3 GB of
+#                         weights, chosen to stay fully GPU-resident on an
+#                         8 GB card; see
+#                         .agent/knowledge/local_model_sizing.md)
 #   LOCAL_REVIEW_URL      Ollama base URL (default: http://localhost:11434)
 #   LOCAL_REVIEW_TIMEOUT  per-request timeout seconds (default: 900; scale
 #                         up for large chunks — reasoning time grows with
@@ -68,15 +71,18 @@
 #                         estimate per chunk.
 #   LOCAL_REVIEW_ANSWER_HEADROOM
 #                         tokens reserved in every request for the model's
-#                         reasoning + answer (default: 12288). This is a
-#                         PER-MODEL value, not a universal constant: the
-#                         default is measured for the default model
-#                         (qwen3.5:35b thinks for ~7k tokens on even a
-#                         100-line diff). A model that reasons in fewer
-#                         tokens should lower it — that is what makes the
-#                         smaller num_ctx buckets reachable and is the
-#                         mechanism by which a right-sized model actually
-#                         saves VRAM. See
+#                         reasoning + answer (default: 16384). This is a
+#                         PER-MODEL value, not a universal constant, and it
+#                         must be MEASURED for a new tag rather than
+#                         assumed to scale with parameter count: the
+#                         default model generated 14835 tokens (thinking +
+#                         answer) on a single ~180-line file, more than
+#                         double qwen3.5:35b's ~7k, so this default is
+#                         higher than the 35b's was. Lowering it for a
+#                         genuinely terser model is what makes the smaller
+#                         num_ctx buckets reachable; raising it is what
+#                         stops a verbose one returning done_reason=length
+#                         with an empty answer. See
 #                         .agent/knowledge/local_model_sizing.md for how to
 #                         measure it for a new tag.
 #   LOCAL_REVIEW_KEEP_ALIVE
@@ -110,6 +116,14 @@
 # CLI's thinking handling can swallow the entire answer (observed with
 # qwen3.5:35b + --hidethinking on ollama 0.32.0), while /api/chat
 # returns thinking and content as separate fields.
+#
+# Why the default model is small: the previous default, qwen3.5:35b, is
+# 23 GB of weights against this class of host's 8 GB card. Ollama spilled
+# ~16 GB to CPU RAM and llama-server was OOM-killed repeatedly, taking
+# unrelated processes with it, so specialist 5f never produced a finding
+# at all. A 4b model that runs fully on the GPU and finds most defects
+# beats a 35b that gets killed and finds none. On a host with more VRAM,
+# set LOCAL_REVIEW_MODEL (and re-measure LOCAL_REVIEW_ANSWER_HEADROOM).
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     echo "Error: This script should be executed, not sourced." >&2
@@ -119,11 +133,11 @@ fi
 
 set -euo pipefail
 
-MODEL="${LOCAL_REVIEW_MODEL:-qwen3.5:35b}"
+MODEL="${LOCAL_REVIEW_MODEL:-qwen3.5:4b-q8_0}"
 BASE_URL="${LOCAL_REVIEW_URL:-http://localhost:11434}"
 TIMEOUT="${LOCAL_REVIEW_TIMEOUT:-900}"
 NUM_CTX="${LOCAL_REVIEW_NUM_CTX:-32768}"
-ANSWER_HEADROOM="${LOCAL_REVIEW_ANSWER_HEADROOM:-12288}"
+ANSWER_HEADROOM="${LOCAL_REVIEW_ANSWER_HEADROOM:-16384}"
 KEEP_ALIVE="${LOCAL_REVIEW_KEEP_ALIVE:-30s}"
 
 BASE_BRANCH=""

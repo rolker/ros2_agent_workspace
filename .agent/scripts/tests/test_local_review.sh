@@ -103,14 +103,16 @@ fi
 
 # --- 2. bucket selection ---------------------------------------------
 
-# With the default 12288 headroom, the 8192 rung is arithmetically
-# unreachable (headroom alone exceeds it) and must be pruned rather than
-# advertised — every bucket the script can print has to be selectable.
+# The shipped default headroom exceeds the 8192 rung, which therefore
+# cannot be selected: the headroom alone would fill it. Such a rung must
+# be pruned rather than advertised — every bucket the script can print has
+# to be selectable. (This is the gap the second plan review caught: with a
+# headroom baked in above the smallest rung, that rung is dead code.)
 out=$(plan "$THREE_FILES")
 if ! echo "$out" | grep -qP '^[0-9]+\t8192\t'; then
-    pass "8192 bucket is not selected at the default 12288 headroom (pruned as unreachable)"
+    pass "a rung below the shipped default headroom is never selected (pruned, not dead)"
 else
-    fail "8192 bucket selected despite a 12288 headroom
+    fail "8192 rung selected despite a larger default headroom
 $out"
 fi
 
