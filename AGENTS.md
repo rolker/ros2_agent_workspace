@@ -555,6 +555,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
 | `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
 | `.agent/scripts/dlog.sh` | Prompt-free, `date`-stamped deployment log appender (`dlog.sh <logfile> <message>`); allowlist once for prompt-free + accurate live-ops logging (#515/#516) |
+| `.agent/scripts/progress_append.sh` | Prompt-free progress.md entry appender + scoped committer (`progress_append.sh [-C <dir>] <N> [--title <t>] < entry.md`); validates the ADR-0013 `## <Entry Type>` heading, creates frontmatter, commits only that file under the agent identity (fails loud if unset); allowlisted in tracked `.claude/settings.json` — the shared baseline; per-machine `.claude/settings.local.json` still layers on top (#594) |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
 | `.agent/scripts/dispatch_subagent.sh` | Dispatch a workflow skill into a fresh-context sub-agent (in-process or container); reads the progress.md exit contract. `--check` runs the container-auth preflight; `--repo-slug <slug>` disambiguates a layer worktree on cross-repo issue-# collision (#526); `--context-file <path>` splices a host-fetched issue/PR body into the handoff so a no-GitHub-auth container phase reads it instead of `gh issue view` — composable with `--skill` (#552); container auth tokens live at `~/.config/ros2-agent/claude-oauth-token` (Claude, from `claude setup-token`) + `~/.config/ros2-agent/gh-readonly-token` (optional GH read-only) |
 | `.agent/scripts/docker_run_agent.sh` | Launch the sandboxed agent container for a worktree; interactive or headless dispatch (`--prompt`/`--prompt-file`, `--model`), reads `CLAUDE_CODE_OAUTH_TOKEN`. `--build` also stages layer `package.xml` manifests into the image build context to bake their rosdep deps (#520) |
@@ -581,6 +582,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/test_layer_sourcing.sh` | Regression guard for runtime layer chaining (ADR-0016 / #559, #566): static no-baked-chain-source check + built-layer overlay precedence + baked-chain purity + mountpoint ownership; run by `make test-scripts` / `make validate` |
 | `.agent/hooks/identity_patterns.py` | Shared agent/human email patterns + agent-branch regex (imported by commit-identity hooks + CI script) |
 | `.agent/hooks/check_pr_authors.py` | CI-callable PR-commit author validator (Mechanism C from issue #468) |
+| `.agent/hooks/check_question_context.py` | Warn-only, always-on `PreToolUse` hook (matcher `AskUserQuestion`, wired in `.claude/settings.json`): nudges when no question opens with a repo-qualified `<repo>#<N>` re-orientation header (#592). Fails safe — any parse/schema error exits 0 silently; never blocks a checkpoint |
 
 ## Layered Architecture
 

@@ -157,6 +157,17 @@ Assess each dimension and assign a verdict (**Good** / **Needs work** / **Concer
 - For each "If we change X, also update Y" — is Y included in the plan?
 - Are there cross-repo consequences not captured?
 
+#### Documentation & instruction impact
+
+- Does the plan include the required `## Documentation & Instruction
+  Impact` section?
+- Is it **non-silent** — either listing the docs this change makes stale
+  (to land in the same PR) and any agent-instruction candidates, or
+  explicitly stating "None — <reason>"? A missing or empty section is a
+  finding: silence is what this section exists to prevent.
+- Are the instruction-update entries framed as **candidates** (operator
+  decides), not edits the plan intends to auto-apply?
+
 #### Principle alignment
 
 - Does the plan align with relevant workspace principles?
@@ -194,6 +205,7 @@ Assess each dimension and assign a verdict (**Good** / **Needs work** / **Concer
 | Issue alignment | ... | ... |
 | File targeting | ... | ... |
 | Consequences | ... | ... |
+| Documentation & instruction impact | ... | ... |
 | Principle alignment | ... | ... |
 | ADR compliance | ... | ... |
 | ROS conventions | ... | N/A for workspace plans |

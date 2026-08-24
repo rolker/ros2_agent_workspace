@@ -434,6 +434,22 @@ ADRs. For each: does the PR comply with the key requirement?
 changes something in the "If you change..." column. Are the corresponding
 "Also update..." items addressed? Mark each as Done or Missing.
 
+**Doc-impact check**: Beyond the map, verify the change carries its
+documentation consequences and check the plan's `## Documentation &
+Instruction Impact` section against the diff. (Tier note: 5b runs at
+Standard and Deep only — a Light-tier diff gets no reviewer-side doc-impact
+check and relies on the plan section plus the review-plan step-4 dimension;
+that is an accepted gap, sized to Light's <50-line no-trigger diffs.)
+
+- If the PR changes package **parameters, topics, or services**, confirm
+  the package README / API docs — and `.agents/review-context.yaml` if it
+  maps them — were updated in the same PR. Stale docs are **Missing**.
+- If implementation **surfaced a reusable pattern or pitfall**, check
+  whether the plan flagged it as an instruction-update candidate. If a
+  pattern clearly worth capturing was missed, raise it as a **candidate**
+  (a proposal for the operator — never an auto-applied edit to
+  `.agent/knowledge/`, `.agents/README.md`, or an instruction file).
+
 **Existing review comments** (post-PR mode only): Check for unresolved
 human and bot comments:
 
@@ -1020,21 +1036,9 @@ no owning worktree exists). Fetch the issue title via:
 gh issue view <N> --repo <owner/repo> --json title --jq '.title'
 ```
 
-For new files, create the parent directory first:
-
-```bash
-mkdir -p .agent/work-plans/issue-<N>
-```
-
-Frontmatter for new files:
-
-```yaml
----
-issue: <N>
----
-
-# Issue #<N> — <issue title>
-```
+File creation (parent dir + frontmatter `issue: <N>` + `# Issue #<N> — <issue
+title>` heading) is handled by `progress_append.sh` below — pass the fetched
+title via `--title`.
 
 Append this step entry. The snippet below shows the post-PR header; in
 pre-push mode change just the header to `## Local Review (Pre-Push)` so
@@ -1072,17 +1076,22 @@ Key points:
 - Use `- [ ]` checkboxes so findings can be checked off as addressed.
 - Include only the one-line summary and location, not the full
   description.
-- Commit progress.md after appending. Run `git add` and `git commit` in
-  the worktree where progress.md was found or created (which may differ
-  from the current working directory):
+- Append **and** commit in one prompt-free step via
+  [`progress_append.sh`](../../../.agent/scripts/progress_append.sh)
+  ([#594](https://github.com/rolker/ros2_agent_workspace/issues/594)) — never
+  inline `cat >>` + `git commit` (both prompt). `-C` targets the worktree
+  where progress.md was found or created (which may differ from the current
+  working directory); the script creates the file with frontmatter if absent,
+  commits only that file, and forms the `progress: <entry type> for #<N>`
+  message from the entry heading:
   ```bash
-  git -C <worktree-path> add .agent/work-plans/issue-<N>/progress.md
-  git -C <worktree-path> \
-      -c user.name="$AGENT_NAME" \
-      -c user.email="$AGENT_EMAIL" \
-      commit -m "progress: local review for #<N>"
+  .agent/scripts/progress_append.sh -C <worktree-path> <N> --title "<issue title>" <<'ENTRY'
+  ## Local Review (Pre-Push)
+  ...the entry as specified above...
+  ENTRY
   ```
-  The per-invocation `-c` overrides are required by
+  Identity comes from `$AGENT_NAME`/`$AGENT_EMAIL` (or `--name`/`--email`);
+  the script fails loud when unset, satisfying
   [AGENTS.md § Agent Commit Identity](../../../AGENTS.md#agent-commit-identity)
   on agent-convention branches.
 - If no issue number was resolved in step 1, skip persistence and note

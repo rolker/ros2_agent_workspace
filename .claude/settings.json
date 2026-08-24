@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.agent/scripts/dispatch_subagent.sh:*)",
+      "Bash(mktemp:*)",
+      "Bash(python3 .agent/scripts/progress_read.py:*)",
+      "Bash(./ui_ws/build.sh:*)",
+      "Bash(./ui_ws/test.sh:*)",
+      "Bash(./core_ws/build.sh:*)",
+      "Bash(./core_ws/test.sh:*)",
+      "Bash(./sensors_ws/build.sh:*)",
+      "Bash(./sensors_ws/test.sh:*)",
+      "Bash(./simulation_ws/build.sh:*)",
+      "Bash(./simulation_ws/test.sh:*)",
+      "Bash(./platforms_ws/build.sh:*)",
+      "Bash(./platforms_ws/test.sh:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(gh run watch:*)",
+      "Bash(.agent/scripts/dashboard.sh:*)",
+      "Bash(ros2 bag info:*)",
+      "Bash(.agent/scripts/worktree_list.sh:*)",
+      "Bash(.agent/scripts/fetch_pr_reviews.sh:*)",
+      "Bash(.agent/scripts/field_mode.sh:*)",
+      "Bash(gh search:*)",
+      "Bash(gh label list:*)",
+      "Bash(journalctl:*)",
+      "Bash(shellcheck:*)",
+      "Bash(flake8:*)",
+      "Bash(source .agent/scripts/setup.bash)",
+      "Bash(source setup.bash)",
+      "Bash(source .agent/scripts/set_git_identity_env.sh:*)",
+      "Bash(source /opt/ros/jazzy/setup.bash)",
+      "Bash(git fetch:*)",
+      "Bash(.agent/scripts/progress_append.sh:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.agent/hooks/check_question_context.py || true"
+          }
+        ]
+      }
+    ]
+  }
+}
