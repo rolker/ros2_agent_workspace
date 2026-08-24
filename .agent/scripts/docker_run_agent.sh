@@ -10,6 +10,7 @@
 #   .agent/scripts/docker_run_agent.sh --issue <N> --build
 #   .agent/scripts/docker_run_agent.sh --issue <N> --shell
 #   .agent/scripts/docker_run_agent.sh --issue <N> --print-mounts
+#   .agent/scripts/docker_run_agent.sh --build-only        (what `make agent-build` runs)
 
 set -euo pipefail
 
@@ -46,6 +47,7 @@ CONTAINER_PREFIX="ros2-agent"
 ISSUE=""
 REPO_SLUG=""           # --repo-slug: disambiguate a layer worktree (issue-<slug>-<N>) (#526)
 BUILD_IMAGE=false
+BUILD_ONLY=false       # --build-only: build the image and exit (no worktree, no container)
 SHELL_MODE=false
 PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
 PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
@@ -60,12 +62,16 @@ Usage: docker_run_agent.sh --issue <N> [OPTIONS]
 Launch a sandboxed agent container for a worktree.
 
 Required:
-  --issue <N>       Issue number (worktree must exist on host)
+  --issue <N>       Issue number (worktree must exist on host).
+                    Not required with --build-only.
 
 Options:
   --repo-slug <slug>    Disambiguate a layer worktree (issue-<slug>-<N>) when
                         multiple repos share the issue number (#526)
   --build               Build/rebuild the Docker image before launch
+  --build-only          Build the image and exit — no worktree, no container.
+                        The single build path: `make agent-build` runs this, so
+                        both entry points bake and stamp identically (#604).
   --shell               Drop into bash instead of Claude Code (debugging)
   --prompt <text>       Dispatch mode: run a headless `claude -p` with this
                         kickoff prompt and exit (non-interactive). Mutually
@@ -116,6 +122,8 @@ while [[ $# -gt 0 ]]; do
             REPO_SLUG="$2"; shift 2 ;;
         --build)
             BUILD_IMAGE=true; shift ;;
+        --build-only)
+            BUILD_IMAGE=true; BUILD_ONLY=true; shift ;;
         --shell)
             SHELL_MODE=true; shift ;;
         --prompt)
@@ -175,12 +183,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "$ISSUE" ]; then
+if [ -z "$ISSUE" ] && [ "$BUILD_ONLY" = false ]; then
     echo "ERROR: --issue <N> is required." >&2
     show_usage >&2
     exit 1
 fi
-if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+if [ -n "$ISSUE" ] && ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
     echo "ERROR: --issue must be a number (got '$ISSUE')." >&2
     exit 1
 fi
@@ -220,6 +228,129 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; t
     esac
     IFS= read -r CLAUDE_CODE_OAUTH_TOKEN < "$CLAUDE_OAUTH_TOKEN_FILE" || true
     export CLAUDE_CODE_OAUTH_TOKEN
+fi
+
+# ---------- Build image (if requested or missing) ----------
+
+DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
+
+# Combined hash of the startup scripts baked into the image (#604). Stamped
+# into the image at build time and compared at launch: `docker build` is only
+# triggered when the image is MISSING, so without this an image built before a
+# change to either script keeps running the old copy — exactly how a fix to
+# agent-entrypoint.sh can silently fail to reach an existing user. Hashed by
+# content in a fixed order from DOCKERFILE_DIR, so the digest is independent of
+# the checkout path.
+#
+# THIS IS THE ONLY IMPLEMENTATION of the digest, and this script is the only
+# build path: `make agent-build` delegates here via --build-only rather than
+# running its own `docker build`. A second formula elsewhere could hash a
+# different directory (a worktree's copy vs. the main tree's) and stamp a
+# digest the launcher would then read as permanently "stale".
+# tests/test_agent_image_build_paths.sh enforces the single build path.
+STARTUP_SCRIPTS_LABEL="org.ros2-agent.startup-scripts-sha"
+STARTUP_SCRIPTS=(agent-entrypoint.sh fix-volume-ownership.sh)
+
+# Print the combined digest, or return 1 printing NOTHING when any script is
+# missing. Returning empty rather than hashing what happens to be there is
+# deliberate: a partial `cat` produces a well-formed but wrong digest, which
+# would read as a confident "stale"/"current" verdict about scripts that
+# aren't even present.
+startup_scripts_sha() {
+    local f
+    for f in "${STARTUP_SCRIPTS[@]}"; do
+        [ -f "$DOCKERFILE_DIR/$f" ] || return 1
+    done
+    (cd "$DOCKERFILE_DIR" && cat "${STARTUP_SCRIPTS[@]}") | sha256sum | cut -d' ' -f1
+}
+
+# Warn (never block) when the image's baked startup scripts are not the ones
+# this checkout would bake. Contract: this function must always succeed — it is
+# called from the main flow under `set -euo pipefail`, so every substitution
+# that can fail carries `|| true` and the function ends with `return 0`.
+#
+# An ABSENT label is warned about too, not treated as "unknown, stay quiet":
+# every image without the label was built before this marker existed, and that
+# is exactly the population carrying the pre-#604 entrypoint. Staying quiet
+# would withhold the warning from precisely the users who need it.
+warn_if_startup_scripts_stale() {
+    local baked current
+    current="$(startup_scripts_sha || true)"
+    if [ -z "$current" ]; then
+        echo "⚠️  Cannot check image startup-script staleness: missing" >&2
+        echo "   ${STARTUP_SCRIPTS[*]} under $DOCKERFILE_DIR." >&2
+        return 0
+    fi
+    baked="$(docker image inspect "$IMAGE_NAME:$IMAGE_TAG" \
+        --format "{{index .Config.Labels \"$STARTUP_SCRIPTS_LABEL\"}}" 2>/dev/null || true)"
+    if [ -z "$baked" ]; then
+        echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG carries no startup-scripts marker." >&2
+        echo "   It predates the marker (#604) or was built by a bare 'docker build'," >&2
+        echo "   so it most likely bakes an OLDER agent-entrypoint.sh. Rebuild:" >&2
+        echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
+        return 0
+    fi
+    if [ "$baked" != "$current" ]; then
+        echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG was built from older startup scripts." >&2
+        echo "   ${STARTUP_SCRIPTS[*]} have changed since." >&2
+        echo "   The container will run the BAKED copies. Rebuild to pick them up:" >&2
+        echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
+    fi
+    return 0
+}
+
+# --print-mounts is a Docker-free dry run: skip the image existence check
+# (a docker call) so the mount logic can be exercised without a daemon.
+if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
+    echo "Image $IMAGE_NAME:$IMAGE_TAG not found — building..."
+    BUILD_IMAGE=true
+fi
+
+if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
+    warn_if_startup_scripts_stale
+fi
+
+if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
+    # The digest must be computable or the image would bake an incomplete
+    # startup path — fail loud rather than stamping a wrong/empty marker.
+    if ! BAKE_SHA="$(startup_scripts_sha)"; then
+        echo "ERROR: cannot build — missing ${STARTUP_SCRIPTS[*]} under $DOCKERFILE_DIR." >&2
+        exit 1
+    fi
+
+    # ---------- Stage layer manifests for the rosdep bake (#520) ----------
+    # The agent image bakes the workspace's layer system-deps at build time so
+    # each launch installs only the delta. The build context (.devcontainer/
+    # agent/) has no layer source — layers/ is gitignored and mounted at
+    # runtime, never copied — so gather just the package.xml manifests here,
+    # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
+    # The gather logic lives in stage_rosdep_manifests.sh (shared with
+    # `make agent-build`) so both build entry points stage identically.
+    STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
+    # Clean the staging dir on any exit from here through the build — including
+    # a `set -e` abort on a failed `docker build` — so it never lingers in the
+    # working tree (workspace-cleanliness rule). Cleared after the build below.
+    trap 'rm -rf "$STAGE_DIR"' EXIT
+    "$SCRIPT_DIR/stage_rosdep_manifests.sh" "$ROOT_DIR" "$STAGE_DIR"
+
+    echo "Building agent image from $DOCKERFILE_DIR..."
+    docker build \
+        --build-arg USER_UID="$(id -u)" \
+        --build-arg USER_GID="$(id -g)" \
+        --build-arg STARTUP_SCRIPTS_SHA="$BAKE_SHA" \
+        -t "$IMAGE_NAME:$IMAGE_TAG" \
+        -f "$DOCKERFILE_DIR/Dockerfile" \
+        "$DOCKERFILE_DIR"
+    echo "Image built: $IMAGE_NAME:$IMAGE_TAG"
+    # Build succeeded — remove the staged manifests and clear the cleanup trap.
+    rm -rf "$STAGE_DIR"
+    trap - EXIT
+fi
+
+# --build-only (what `make agent-build` runs): the image is the whole job —
+# no worktree, no auth, no container.
+if [ "$BUILD_ONLY" = true ]; then
+    exit 0
 fi
 
 # ---------- Validation ----------
@@ -300,80 +431,6 @@ fi
 
 WORKTREE_ID="$(basename "$WORKTREE_PATH")"
 echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
-
-# ---------- Build image (if requested or missing) ----------
-
-DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
-
-# Combined hash of the startup scripts baked into the image (#604). Stamped
-# into the image at build time and compared at launch: `docker build` is only
-# triggered when the image is MISSING, so without this an image built before a
-# change to either script keeps running the old copy — exactly how a fix to
-# agent-entrypoint.sh can silently fail to reach an existing user. Hashed by
-# content in a fixed order from DOCKERFILE_DIR, so the digest is independent of
-# the checkout path.
-STARTUP_SCRIPTS_LABEL="org.ros2-agent.startup-scripts-sha"
-startup_scripts_sha() {
-    (cd "$DOCKERFILE_DIR" && cat agent-entrypoint.sh fix-volume-ownership.sh) \
-        | sha256sum | cut -d' ' -f1
-}
-
-# Warn (never block) when the running image's baked startup scripts differ from
-# the working tree's. An empty/absent label means the image predates the label
-# or was built by a bare `docker build` — unknown, not stale, so stay quiet.
-warn_if_startup_scripts_stale() {
-    local baked current
-    baked="$(docker image inspect "$IMAGE_NAME:$IMAGE_TAG" \
-        --format "{{index .Config.Labels \"$STARTUP_SCRIPTS_LABEL\"}}" 2>/dev/null || true)"
-    [ -n "$baked" ] || return 0
-    current="$(startup_scripts_sha)"
-    [ "$baked" != "$current" ] || return 0
-    echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG was built from older startup scripts." >&2
-    echo "   agent-entrypoint.sh / fix-volume-ownership.sh have changed since." >&2
-    echo "   The container will run the BAKED copies. Rebuild to pick them up:" >&2
-    echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
-}
-
-# --print-mounts is a Docker-free dry run: skip the image existence check
-# (a docker call) so the mount logic can be exercised without a daemon.
-if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
-    echo "Image $IMAGE_NAME:$IMAGE_TAG not found — building..."
-    BUILD_IMAGE=true
-fi
-
-if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
-    warn_if_startup_scripts_stale
-fi
-
-if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
-    # ---------- Stage layer manifests for the rosdep bake (#520) ----------
-    # The agent image bakes the workspace's layer system-deps at build time so
-    # each launch installs only the delta. The build context (.devcontainer/
-    # agent/) has no layer source — layers/ is gitignored and mounted at
-    # runtime, never copied — so gather just the package.xml manifests here,
-    # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
-    # The gather logic lives in stage_rosdep_manifests.sh (shared with
-    # `make agent-build`) so both build entry points stage identically.
-    STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
-    # Clean the staging dir on any exit from here through the build — including
-    # a `set -e` abort on a failed `docker build` — so it never lingers in the
-    # working tree (workspace-cleanliness rule). Cleared after the build below.
-    trap 'rm -rf "$STAGE_DIR"' EXIT
-    "$SCRIPT_DIR/stage_rosdep_manifests.sh" "$ROOT_DIR" "$STAGE_DIR"
-
-    echo "Building agent image..."
-    docker build \
-        --build-arg USER_UID="$(id -u)" \
-        --build-arg USER_GID="$(id -g)" \
-        --build-arg STARTUP_SCRIPTS_SHA="$(startup_scripts_sha)" \
-        -t "$IMAGE_NAME:$IMAGE_TAG" \
-        -f "$DOCKERFILE_DIR/Dockerfile" \
-        "$DOCKERFILE_DIR"
-    echo "Image built: $IMAGE_NAME:$IMAGE_TAG"
-    # Build succeeded — remove the staged manifests and clear the cleanup trap.
-    rm -rf "$STAGE_DIR"
-    trap - EXIT
-fi
 
 # ---------- Generate mount arguments ----------
 
