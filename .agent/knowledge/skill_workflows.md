@@ -146,8 +146,8 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   `address-findings` passes) plus an unentried implementation pass, all
   in-process, with no approvals for the dispatched work.
   **If you cannot confirm auto mode is active** — the reminder is absent from
-  your whole context, or the operator is running with prompts on — the older
-  rule stands and the many-tool-call phases (**implement**,
+  your whole context; that sentinel is the whole test, since the operator's
+  permission mode is not observable to you — the older rule stands and the many-tool-call phases (**implement**,
   **address-findings**) go to **containers**, which run prompt-free. On a
   **non-Claude host runtime** there is no in-process option to weigh at all —
   the `Agent` tool *is* in-process dispatch — so drive the phases manually or

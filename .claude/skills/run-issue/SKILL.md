@@ -129,9 +129,9 @@ you cannot see it, so it is not the check.
   auth, host-built layer installs, the local-model review specialist, and the
   `Agent` tool itself.
 - **Cannot confirm auto mode is active → the container-leaning guidance is in
-  force.** This is the fail-safe direction on purpose. If the auto-mode reminder
-  is absent from your whole context, or the operator has permission prompts
-  enabled, prefer **`container`** for the phases that do many tool calls —
+  force.** This is the fail-safe direction on purpose. The check is the sentinel
+  alone: if the auto-mode reminder is absent from your whole context, prefer
+  **`container`** for the phases that do many tool calls —
   **implement** and **address-findings**. That is the case #545 was written for,
   and it has not gone away.
   - **`review-code` is the exception, not a member of that list.** Its
