@@ -8,6 +8,11 @@
 #                  (test_progress_read.py) and pytest-style (test_build_report_generator.py)
 # Exits non-zero if any test file fails. The tests are hermetic (temp sandboxes,
 # stubbed `gh`, no network, no ROS), so this is safe to run in lightweight CI.
+# One exception, opt-in and self-skipping: test_entrypoint_chown_coverage.sh's
+# container layer runs a real container when a LOCAL Docker daemon and the
+# agent image are both present (the property it tests — how docker initializes
+# an anonymous volume — exists nowhere else). No Docker, no image, or a
+# non-local daemon => it SKIPs, and this suite stays hermetic (#604).
 #
 # PYTHON env var selects the interpreter for pytest (default: python3); it must
 # have pytest installed. Not on PATH — run by absolute path or via `make test-scripts`.

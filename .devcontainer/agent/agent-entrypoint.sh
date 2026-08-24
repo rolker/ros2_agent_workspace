@@ -26,19 +26,26 @@ TARGET_GID="$(id -g "$TARGET_USER")"
 # ---------- 1. Fix anonymous volume ownership ----------
 # Docker creates anonymous volumes as root. Entrypoint runs as root so we
 # can fix ownership directly — no sudo needed.
+#
+# Covers BOTH sets of anonymous volumes docker_run_agent.sh adds: section 4
+# (layers/main/*_ws) and section 4b (the dispatched worktree's own *_ws).
+# Missing the second set is #604 — the launcher mounted them, nothing chowned
+# them, and the dropped-privilege agent could not build in its own worktree.
+# The loops live in fix-volume-ownership.sh so a container-side regression test
+# can run them without the ROS sourcing and rosdep pass below; that script's
+# header explains why the launcher's host-side mkdir cannot substitute for this
+# chown.
 echo "Fixing volume ownership..."
-for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
-    [ -d "$ws_dir" ] || continue
-    for subdir in build install log; do
-        target="$ws_dir/$subdir"
-        if [ -d "$target" ]; then
-            chown -R "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null || true
-        else
-            mkdir -p "$target"
-            chown "$TARGET_UID:$TARGET_GID" "$target"
-        fi
-    done
-done
+OWNERSHIP_SH="/usr/local/bin/fix-volume-ownership.sh"
+if [ ! -x "$OWNERSHIP_SH" ]; then
+    # An image built before this script existed. Without this check `set -e`
+    # aborts on an opaque exit 127; say what is actually wrong instead.
+    echo "ERROR: $OWNERSHIP_SH not found in this image." >&2
+    echo "       The image predates it — rebuild: make agent-build" >&2
+    exit 1
+fi
+"$OWNERSHIP_SH" \
+    "$TARGET_UID" "$TARGET_GID" "$WORKSPACE_ROOT" "${WORKTREE_ROOT:-}"
 
 # ---------- 2. Git identity: intentionally NOT configured here ----------
 # Dispatched agents commit with per-invocation identity literals

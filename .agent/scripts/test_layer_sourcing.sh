@@ -23,6 +23,12 @@
 #      behind the Checks 2-3 built-layer early-exit, because the failure state
 #      (empty root-owned dirs, nothing built) is exactly the one with no built
 #      layers. Reported as Check 4 even though it prints before Checks 2-3.
+#      SCOPE CAVEAT (#604): this checks HOST-side ownership of layers/main
+#      only. It covers neither the dispatched worktree's own *_ws dirs nor
+#      CONTAINER-side anonymous-volume ownership — a host `stat` cannot observe
+#      the latter at all, since docker initializes an anonymous volume from the
+#      image, not from the host dir underneath it. That gap is what let #604
+#      ship; tests/test_entrypoint_chown_coverage.sh covers it.
 #
 # Exit codes: 0 = pass (or skipped), 1 = check failed.
 

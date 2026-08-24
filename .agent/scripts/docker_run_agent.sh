@@ -10,6 +10,7 @@
 #   .agent/scripts/docker_run_agent.sh --issue <N> --build
 #   .agent/scripts/docker_run_agent.sh --issue <N> --shell
 #   .agent/scripts/docker_run_agent.sh --issue <N> --print-mounts
+#   .agent/scripts/docker_run_agent.sh --build-only        (what `make agent-build` runs)
 
 set -euo pipefail
 
@@ -31,10 +32,20 @@ ROOT_DIR="${DRA_ROOT_DIR_OVERRIDE:-$(dirname "$(dirname "$SCRIPT_DIR")")}"
 
 # If running from inside a worktree, resolve to the main workspace root.
 # Worktree directories (.workspace-worktrees/, layers/worktrees/) live there.
+#
+# This rewind governs the image build too, and that is deliberate: the build
+# must bake the same tree the launcher mounts and hashes, or the staleness
+# marker would be stamped from a worktree copy and read as permanently "stale"
+# (#604). The consequence is that a worktree edit to agent-entrypoint.sh /
+# fix-volume-ownership.sh is NOT baked by a build launched from that worktree —
+# INVOKED_FROM_WORKTREE below drives the build-time notice that says so.
+INVOKED_FROM_WORKTREE=false
 if [[ "$ROOT_DIR" == *"/.workspace-worktrees/"* ]]; then
     ROOT_DIR="${ROOT_DIR%%/.workspace-worktrees/*}"
+    INVOKED_FROM_WORKTREE=true
 elif [[ "$ROOT_DIR" == *"/layers/worktrees/"* ]]; then
     ROOT_DIR="${ROOT_DIR%%/layers/worktrees/*}"
+    INVOKED_FROM_WORKTREE=true
 fi
 
 IMAGE_NAME="ros2-agent-workspace-agent"
@@ -46,6 +57,7 @@ CONTAINER_PREFIX="ros2-agent"
 ISSUE=""
 REPO_SLUG=""           # --repo-slug: disambiguate a layer worktree (issue-<slug>-<N>) (#526)
 BUILD_IMAGE=false
+BUILD_ONLY=false       # --build-only: build the image and exit (no worktree, no container)
 SHELL_MODE=false
 PROMPT=""              # kickoff prompt text (dispatch mode); empty → interactive
 PROMPT_SET=false       # tracks whether a prompt source (--prompt/--prompt-file) was given
@@ -60,12 +72,21 @@ Usage: docker_run_agent.sh --issue <N> [OPTIONS]
 Launch a sandboxed agent container for a worktree.
 
 Required:
-  --issue <N>       Issue number (worktree must exist on host)
+  --issue <N>       Issue number (worktree must exist on host).
+                    Not required with --build-only.
 
 Options:
   --repo-slug <slug>    Disambiguate a layer worktree (issue-<slug>-<N>) when
                         multiple repos share the issue number (#526)
   --build               Build/rebuild the Docker image before launch
+  --build-only          Build the image and exit — no worktree, no container.
+                        The single build path: `make agent-build` runs this, so
+                        both entry points bake and stamp identically (#604).
+                        Always builds from the MAIN workspace root, even when
+                        run from a worktree — that is what the launcher mounts
+                        and hashes. A worktree edit to agent-entrypoint.sh /
+                        fix-volume-ownership.sh is therefore NOT baked until it
+                        is merged; the build prints a notice when it applies.
   --shell               Drop into bash instead of Claude Code (debugging)
   --prompt <text>       Dispatch mode: run a headless `claude -p` with this
                         kickoff prompt and exit (non-interactive). Mutually
@@ -81,7 +102,9 @@ Options:
   --print-mounts        Dry run: print the docker -v mount arguments that would
                         be used and exit, without building the image or running
                         a container. Requires no Docker daemon or auth; used by
-                        tests/test_docker_run_mount_args.sh.
+                        tests/test_docker_run_mount_args.sh. Combined with
+                        --build or --build-only it reports what WOULD be built
+                        and builds nothing.
   -h, --help            Show this help
 
 Prerequisites:
@@ -116,6 +139,8 @@ while [[ $# -gt 0 ]]; do
             REPO_SLUG="$2"; shift 2 ;;
         --build)
             BUILD_IMAGE=true; shift ;;
+        --build-only)
+            BUILD_IMAGE=true; BUILD_ONLY=true; shift ;;
         --shell)
             SHELL_MODE=true; shift ;;
         --prompt)
@@ -175,12 +200,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "$ISSUE" ]; then
+if [ -z "$ISSUE" ] && [ "$BUILD_ONLY" = false ]; then
     echo "ERROR: --issue <N> is required." >&2
     show_usage >&2
     exit 1
 fi
-if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+if [ -n "$ISSUE" ] && ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
     echo "ERROR: --issue must be a number (got '$ISSUE')." >&2
     exit 1
 fi
@@ -202,6 +227,52 @@ if [ "$SHELL_MODE" = true ] && [ "$DISPATCH_MODE" = true ]; then
     exit 1
 fi
 
+# ---------- Resolve the worktree (fail fast) ----------
+# Deliberately ahead of the credential read and the image build: a bad or
+# missing --issue must error in under a second, not after a 10-minute rosdep
+# bake. --build-only has no worktree at all, so it skips this entirely.
+WORKTREE_PATH=""
+WORKTREE_MATCHES=0
+MATCHED=()
+if [ "$BUILD_ONLY" = false ]; then
+    if [ -n "$REPO_SLUG" ]; then
+        # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>) — no
+        # glob, no cross-repo issue-# collision (#526).
+        candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
+        if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
+    else
+        for candidate in \
+            "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
+            "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
+            if [ -d "$candidate" ]; then
+                MATCHED+=("$candidate")
+                WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
+                [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
+            fi
+        done
+    fi
+
+    if [ -z "$WORKTREE_PATH" ]; then
+        echo "ERROR: No worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')}." >&2
+        echo "Create one first:" >&2
+        echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
+        exit 1
+    fi
+    if [ "$WORKTREE_MATCHES" -gt 1 ]; then
+        # FAIL LOUD (#526) — was warn-and-proceed; multiple repos can share an issue
+        # number and guessing the first match ran a container against the wrong repo.
+        {
+            echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
+            echo "       Disambiguate with --repo-slug <slug>. Candidates:"
+            printf '         %s\n' "${MATCHED[@]}"
+        } >&2
+        exit 1
+    fi
+
+    WORKTREE_ID="$(basename "$WORKTREE_PATH")"
+    echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
+fi
+
 # ---------- Subscription token (file fallback) ----------
 # CLAUDE_CODE_OAUTH_TOKEN is the long-lived subscription token from
 # `claude setup-token`. Prefer an already-exported env var; otherwise read it
@@ -209,8 +280,14 @@ fi
 # and keeps the secret out of the launching agent's environment dumps. We
 # export it (rather than passing -e VAR=value) so it forwards via the bare
 # `-e CLAUDE_CODE_OAUTH_TOKEN` below without ever appearing in `ps`/argv.
+#
+# Skipped entirely for --build-only: that path launches no container and is
+# exempt from the credential check below, so reading the token would only pull
+# the subscription secret into the environment `docker build` inherits — a
+# credential-free build should stay credential-free.
 CLAUDE_OAUTH_TOKEN_FILE="$HOME/.config/ros2-agent/claude-oauth-token"
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
+if [ "$BUILD_ONLY" = false ] \
+   && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$CLAUDE_OAUTH_TOKEN_FILE" ]; then
     # Warn (don't fail) if the secret file is group/world-readable.
     PERM=$(stat -c '%a' "$CLAUDE_OAUTH_TOKEN_FILE" 2>/dev/null || echo "")
     case "$PERM" in
@@ -236,7 +313,8 @@ fi
 #      reliably refresh inside the sandbox, so it's unreliable for headless
 #      dispatch (works for interactive sessions where a fresh login is at
 #      hand).
-if [ "$PRINT_MOUNTS" = false ] \
+# --build-only never launches a container, so it needs no credentials.
+if [ "$PRINT_MOUNTS" = false ] && [ "$BUILD_ONLY" = false ] \
    && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] \
    && [ ! -f "$HOME/.claude/.credentials.json" ] && [ "$SHELL_MODE" = false ]; then
     echo "ERROR: No authentication found." >&2
@@ -260,50 +338,74 @@ if [ "$DISPATCH_MODE" = true ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z 
     echo "    $CLAUDE_OAUTH_TOKEN_FILE (chmod 600) before dispatching." >&2
 fi
 
-# Find worktree for this issue
-WORKTREE_PATH=""
-WORKTREE_MATCHES=0
-MATCHED=()
-if [ -n "$REPO_SLUG" ]; then
-    # --repo-slug: resolve the layer worktree exactly (issue-<slug>-<N>) — no
-    # glob, no cross-repo issue-# collision (#526).
-    candidate="$ROOT_DIR/layers/worktrees/issue-$REPO_SLUG-$ISSUE"
-    if [ -d "$candidate" ]; then WORKTREE_PATH="$candidate"; WORKTREE_MATCHES=1; MATCHED=("$candidate"); fi
-else
-    for candidate in \
-        "$ROOT_DIR/.workspace-worktrees/issue-workspace-$ISSUE" \
-        "$ROOT_DIR/layers/worktrees/issue-"*"-$ISSUE"; do
-        if [ -d "$candidate" ]; then
-            MATCHED+=("$candidate")
-            WORKTREE_MATCHES=$((WORKTREE_MATCHES + 1))
-            [ -z "$WORKTREE_PATH" ] && WORKTREE_PATH="$candidate"
-        fi
-    done
-fi
-
-if [ -z "$WORKTREE_PATH" ]; then
-    echo "ERROR: No worktree found for issue #$ISSUE${REPO_SLUG:+ (repo-slug '$REPO_SLUG')}." >&2
-    echo "Create one first:" >&2
-    echo "  .agent/scripts/worktree_create.sh --issue $ISSUE --type workspace" >&2
-    exit 1
-fi
-if [ "$WORKTREE_MATCHES" -gt 1 ]; then
-    # FAIL LOUD (#526) — was warn-and-proceed; multiple repos can share an issue
-    # number and guessing the first match ran a container against the wrong repo.
-    {
-        echo "ERROR: $WORKTREE_MATCHES worktrees match issue #$ISSUE — refusing to guess."
-        echo "       Disambiguate with --repo-slug <slug>. Candidates:"
-        printf '         %s\n' "${MATCHED[@]}"
-    } >&2
-    exit 1
-fi
-
-WORKTREE_ID="$(basename "$WORKTREE_PATH")"
-echo "Using worktree: $WORKTREE_PATH (id: $WORKTREE_ID)"
-
 # ---------- Build image (if requested or missing) ----------
 
 DOCKERFILE_DIR="$ROOT_DIR/.devcontainer/agent"
+
+# Combined hash of the startup scripts baked into the image (#604). Stamped
+# into the image at build time and compared at launch: `docker build` is only
+# triggered when the image is MISSING, so without this an image built before a
+# change to either script keeps running the old copy — exactly how a fix to
+# agent-entrypoint.sh can silently fail to reach an existing user. Hashed by
+# content in a fixed order from DOCKERFILE_DIR, so the digest is independent of
+# the checkout path.
+#
+# THIS IS THE ONLY IMPLEMENTATION of the digest, and this script is the only
+# build path: `make agent-build` delegates here via --build-only rather than
+# running its own `docker build`. A second formula elsewhere could hash a
+# different directory (a worktree's copy vs. the main tree's) and stamp a
+# digest the launcher would then read as permanently "stale".
+# tests/test_agent_image_build_paths.sh enforces the single build path.
+STARTUP_SCRIPTS_LABEL="org.ros2-agent.startup-scripts-sha"
+STARTUP_SCRIPTS=(agent-entrypoint.sh fix-volume-ownership.sh)
+
+# Print the combined digest, or return 1 printing NOTHING when any script is
+# missing. Returning empty rather than hashing what happens to be there is
+# deliberate: a partial `cat` produces a well-formed but wrong digest, which
+# would read as a confident "stale"/"current" verdict about scripts that
+# aren't even present.
+startup_scripts_sha() {
+    local f
+    for f in "${STARTUP_SCRIPTS[@]}"; do
+        [ -f "$DOCKERFILE_DIR/$f" ] || return 1
+    done
+    (cd "$DOCKERFILE_DIR" && cat "${STARTUP_SCRIPTS[@]}") | sha256sum | cut -d' ' -f1
+}
+
+# Warn (never block) when the image's baked startup scripts are not the ones
+# this checkout would bake. Contract: this function must always succeed — it is
+# called from the main flow under `set -euo pipefail`, so every substitution
+# that can fail carries `|| true` and the function ends with `return 0`.
+#
+# An ABSENT label is warned about too, not treated as "unknown, stay quiet":
+# every image without the label was built before this marker existed, and that
+# is exactly the population carrying the pre-#604 entrypoint. Staying quiet
+# would withhold the warning from precisely the users who need it.
+warn_if_startup_scripts_stale() {
+    local baked current
+    current="$(startup_scripts_sha || true)"
+    if [ -z "$current" ]; then
+        echo "⚠️  Cannot check image startup-script staleness: missing" >&2
+        echo "   ${STARTUP_SCRIPTS[*]} under $DOCKERFILE_DIR." >&2
+        return 0
+    fi
+    baked="$(docker image inspect "$IMAGE_NAME:$IMAGE_TAG" \
+        --format "{{index .Config.Labels \"$STARTUP_SCRIPTS_LABEL\"}}" 2>/dev/null || true)"
+    if [ -z "$baked" ]; then
+        echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG carries no startup-scripts marker." >&2
+        echo "   It predates the marker (#604) or was built by a bare 'docker build'," >&2
+        echo "   so it most likely bakes an OLDER agent-entrypoint.sh. Rebuild:" >&2
+        echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
+        return 0
+    fi
+    if [ "$baked" != "$current" ]; then
+        echo "⚠️  Image $IMAGE_NAME:$IMAGE_TAG was built from older startup scripts." >&2
+        echo "   ${STARTUP_SCRIPTS[*]} have changed since." >&2
+        echo "   The container will run the BAKED copies. Rebuild to pick them up:" >&2
+        echo "       make agent-build   (or: $0 --issue <N> --build)" >&2
+    fi
+    return 0
+}
 
 # --print-mounts is a Docker-free dry run: skip the image existence check
 # (a docker call) so the mount logic can be exercised without a daemon.
@@ -312,26 +414,77 @@ if [ "$PRINT_MOUNTS" = false ] && ! docker image inspect "$IMAGE_NAME:$IMAGE_TAG
     BUILD_IMAGE=true
 fi
 
+if [ "$BUILD_IMAGE" = false ] && [ "$PRINT_MOUNTS" = false ]; then
+    warn_if_startup_scripts_stale
+fi
+
+# The build always bakes the MAIN workspace's startup scripts, even when
+# launched from a worktree (see the ROOT_DIR rewind above). Say so on every
+# build path, dry run included: editing those scripts in a worktree and running
+# `make agent-build` there would otherwise silently bake the main tree's copies
+# instead — in exactly the workflow this marker exists to protect.
+if [ "$BUILD_IMAGE" = true ] && [ "$INVOKED_FROM_WORKTREE" = true ]; then
+    echo "NOTE: launched from a worktree — baking the MAIN workspace's startup scripts"
+    echo "      from $DOCKERFILE_DIR, not this worktree's copies. Merge worktree edits to"
+    echo "      ${STARTUP_SCRIPTS[*]} before they can be baked."
+fi
+
+if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = true ]; then
+    # --print-mounts is a Docker-free dry run, so it must not build. Say so
+    # rather than skipping in silence: `--build-only --print-mounts` would
+    # otherwise be a wordless rc-0 no-op, and this is the form the build-path
+    # test uses to exercise the parse without touching the real :latest tag.
+    echo "[dry run] --print-mounts: would build $IMAGE_NAME:$IMAGE_TAG from $DOCKERFILE_DIR (no build performed)"
+fi
+
 if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
+    # The digest must be computable or the image would bake an incomplete
+    # startup path — fail loud rather than stamping a wrong/empty marker.
+    if ! BAKE_SHA="$(startup_scripts_sha)"; then
+        echo "ERROR: cannot build — missing ${STARTUP_SCRIPTS[*]} under $DOCKERFILE_DIR." >&2
+        exit 1
+    fi
+
     # ---------- Stage layer manifests for the rosdep bake (#520) ----------
     # The agent image bakes the workspace's layer system-deps at build time so
     # each launch installs only the delta. The build context (.devcontainer/
     # agent/) has no layer source — layers/ is gitignored and mounted at
     # runtime, never copied — so gather just the package.xml manifests here,
     # host-side where layers/ exists, into a staging dir the Dockerfile COPYs.
-    # The gather logic lives in stage_rosdep_manifests.sh (shared with
-    # `make agent-build`) so both build entry points stage identically.
+    # The gather logic lives in stage_rosdep_manifests.sh. This block is its
+    # only caller — `make agent-build` reaches it through --build-only rather
+    # than staging on its own (#604), so there is one gather, not two.
     STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
+
+    # Serialize concurrent builds. STAGE_DIR is a FIXED path — the Dockerfile's
+    # `COPY .rosdep-manifests/` is build-context-relative, so it cannot be
+    # randomized per invocation — and it is removed by the EXIT trap below. Two
+    # builders racing (a dispatch auto-build and `make agent-build`, say) would
+    # otherwise have one delete the other's build context mid-build. The lock
+    # lives in TMPDIR, keyed by user and by the context path, so it pollutes
+    # neither the working tree nor another user's build. (cksum, not sha256sum:
+    # the launcher must carry exactly ONE sha256sum site — the startup-scripts
+    # digest formula — and test_agent_image_build_paths.sh enforces that.)
+    # fd 9 is released when
+    # this process exits. Where flock is unavailable, proceed unserialized
+    # rather than failing the build outright — the race is rare and the
+    # alternative is no build at all.
+    STAGE_LOCK="${TMPDIR:-/tmp}/ros2-agent-build-$(id -u)-$(printf '%s' "$DOCKERFILE_DIR" | cksum | cut -d' ' -f1).lock"
+    if command -v flock >/dev/null 2>&1 && exec 9>"$STAGE_LOCK"; then
+        flock 9 || echo "⚠️  could not acquire $STAGE_LOCK — building unserialized." >&2
+    fi
+
     # Clean the staging dir on any exit from here through the build — including
     # a `set -e` abort on a failed `docker build` — so it never lingers in the
     # working tree (workspace-cleanliness rule). Cleared after the build below.
     trap 'rm -rf "$STAGE_DIR"' EXIT
     "$SCRIPT_DIR/stage_rosdep_manifests.sh" "$ROOT_DIR" "$STAGE_DIR"
 
-    echo "Building agent image..."
+    echo "Building agent image from $DOCKERFILE_DIR..."
     docker build \
         --build-arg USER_UID="$(id -u)" \
         --build-arg USER_GID="$(id -g)" \
+        --build-arg STARTUP_SCRIPTS_SHA="$BAKE_SHA" \
         -t "$IMAGE_NAME:$IMAGE_TAG" \
         -f "$DOCKERFILE_DIR/Dockerfile" \
         "$DOCKERFILE_DIR"
@@ -339,6 +492,12 @@ if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # Build succeeded — remove the staged manifests and clear the cleanup trap.
     rm -rf "$STAGE_DIR"
     trap - EXIT
+fi
+
+# --build-only (what `make agent-build` runs): the image is the whole job —
+# no worktree, no auth, no container.
+if [ "$BUILD_ONLY" = true ]; then
+    exit 0
 fi
 
 # ---------- Generate mount arguments ----------
@@ -408,6 +567,18 @@ done
 #     already-shielded layers/main tree. Inside a workspace worktree no real
 #     *_ws dirs exist, so the loop is a clean no-op. Mirror section 4's
 #     mkdir-as-invoking-user precaution and fail-loud handling (#566).
+#
+#     THE MOUNT IS ONLY HALF THE MECHANISM (#604). The mkdir below is the
+#     #566 precaution about the *host* mountpoint; it has NO effect on the
+#     volume's ownership inside the container, because docker initializes an
+#     anonymous volume from the IMAGE at that path, not from the host dir
+#     underneath it. The volume therefore comes up root-owned, and the
+#     entrypoint chown is what makes it writable by the dropped-privilege
+#     agent. #602 added this loop without the matching chown, and dispatched
+#     agents could not build in their own worktree. ANY new anonymous volume
+#     added here needs a matching loop in
+#     .devcontainer/agent/fix-volume-ownership.sh; that pairing is enforced
+#     by tests/test_entrypoint_chown_coverage.sh.
 for ws_dir in "$WORKTREE_PATH"/*_ws; do
     [ -d "$ws_dir" ] || continue
     [ ! -L "$ws_dir" ] || continue

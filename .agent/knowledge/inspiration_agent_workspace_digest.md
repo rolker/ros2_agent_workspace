@@ -89,7 +89,14 @@ of the surrounding tooling.
   in-house disjoint-lens Claude Adversarial passes (5d); `--copilot`
   adds a true second-vendor read on top when a reviewer judges it worth
   the Premium request. The old Light-tier "resource inversion" no longer
-  applies, since Light no longer auto-runs Copilot.
+  applies, since Light no longer auto-runs Copilot. The in-house Local
+  Model Adversarial pass (step 5f, Ollama via
+  `.agent/scripts/local_review.sh`,
+  [#570](https://github.com/rolker/ros2_agent_workspace/issues/570))
+  followed the same trajectory: originally default-on (quota-free
+  local inference), **now opt-in via `--local`**
+  ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590))
+  — the run is the review's wall-clock long pole on current hardware.
 - **What remains unadopted**: the tmux-orchestrated multi-CLI dispatch
   in `cross_model_review.sh` and the Gemini/Codex specialists. The
   tmux session machinery adds complexity beyond the highest-leverage

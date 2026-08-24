@@ -85,5 +85,13 @@ chains themselves.
 
 - [#559](https://github.com/rolker/ros2_agent_workspace/issues/559) —
   measurement, root-cause analysis, and implementation.
+- [#604](https://github.com/rolker/ros2_agent_workspace/issues/604) —
+  cross-reference addendum ([ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md)),
+  scoping the Check-4 line in Consequences above. That check is **host-side and
+  `layers/main`-only**: it covers neither a dispatched worktree's own `*_ws`
+  dirs nor CONTAINER-side anonymous-volume ownership, which a host `stat`
+  cannot observe at all (docker initializes an anonymous volume from the image,
+  not from the host dir beneath it). That gap is what let #604 ship;
+  `.agent/scripts/tests/test_entrypoint_chown_coverage.sh` covers it.
 - Colcon documentation: `setup.bash` (prefix chain) vs `local_setup.bash`
   (single prefix).
