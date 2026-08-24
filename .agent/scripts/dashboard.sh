@@ -163,11 +163,25 @@ fi
 
 # Configuration validation
 if [ -f "$SCRIPT_DIR/validate_workspace.py" ]; then
-    if python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null; then
-        check_pass "Workspace matches .repos configuration"
-    else
-        check_warn "Workspace drift detected. Run: make validate"
-    fi
+    # Branch on the exit code, not just pass/fail: 3 means the script could not
+    # compare anything because no repos are configured (un-bootstrapped clone,
+    # or a workspace worktree, which has no configs/manifest symlink). That is
+    # not drift, and telling the operator to "run make validate" there sends
+    # them to the same empty answer (#609).
+    python3 "$SCRIPT_DIR/validate_workspace.py" &>/dev/null
+    VALIDATE_RC=$?
+    # Only 1 is drift. `*)` used to claim it for anything non-zero, so an
+    # argparse usage error (2), a missing python3 (127) and an unhandled
+    # traceback (1 with no output) all reported "Workspace drift detected" and
+    # sent the operator to `make validate` for a problem `make validate` does
+    # not have. Naming the code is what makes the remedy actionable (#609).
+    case "$VALIDATE_RC" in
+        0) check_pass "Workspace matches .repos configuration" ;;
+        1) check_warn "Workspace drift detected. Run: make validate" ;;
+        3) check_warn "No repos configured — nothing validated. Run: make setup-all" ;;
+        4) check_warn "A repo's git state could not be read — not drift. Repair or re-clone it: python3 .agent/scripts/validate_workspace.py" ;;
+        *) check_warn "Could not validate the workspace (validate_workspace.py exit $VALIDATE_RC). Run: python3 .agent/scripts/validate_workspace.py" ;;
+    esac
 fi
 
 # Lock status
@@ -279,9 +293,17 @@ echo ""
 
 # Layer repositories
 if command -v vcs &> /dev/null; then
-    EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$EXPECTED_REPOS" ]; then
+    EXPECTED_REPOS_ERR=""
+    if ! EXPECTED_REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay --format names 2>&1); then
+        # The enumeration failed (a .repos file that will not parse). Emptying
+        # EXPECTED_REPOS turns the Untracked check off *silently*, so every
+        # repo on disk reads as tracked — the same absence-means-clean
+        # inference #609 exists to stop, one consumer down.
+        EXPECTED_REPOS_ERR=$(echo "$EXPECTED_REPOS" | tr '\n' ' ')
         EXPECTED_REPOS=""
+        echo "⚠️  Could not read the configured repo list — untracked-repo detection is OFF for this run."
+        echo "   ${EXPECTED_REPOS_ERR}"
+        echo ""
     fi
 
     for ws_dir in "$LAYERS_DIR"/*; do
@@ -314,13 +336,22 @@ if command -v vcs &> /dev/null; then
                         status_str="${status_str:+$status_str, }$sync_status"
                     fi
 
+                    expected_branch=""
+                    expected_rc=0
                     if [ -f "$SCRIPT_DIR/get_repo_info.py" ]; then
-                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null)
+                        expected_branch=$(python3 "$SCRIPT_DIR/get_repo_info.py" "$current_repo" 2>/dev/null) \
+                            || expected_rc=$?
                     else
                         expected_branch="unknown"
                     fi
 
-                    if [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
+                    if [ "$expected_rc" -ne 0 ]; then
+                        # get_repo_info.py refuses to guess when a manifest
+                        # would not parse. "unknown" here would report the
+                        # unreadable manifest as a repo nobody configured, and
+                        # send the operator looking in the wrong place (#609).
+                        status_str="${status_str:+$status_str, }Expected branch unreadable (manifest will not parse)"
+                    elif [ "$expected_branch" != "unknown" ] && [ -n "$expected_branch" ]; then
                         if [ "$branch" != "$expected_branch" ]; then
                             warning="$branch (Want: $expected_branch)"
                             status_str="${status_str:+$status_str, }$warning"
@@ -333,6 +364,8 @@ if command -v vcs &> /dev/null; then
                         if ! echo "$EXPECTED_REPOS" | grep -qx "$current_repo"; then
                             status_str="${status_str:+$status_str, }Untracked"
                         fi
+                    elif [ -n "$EXPECTED_REPOS_ERR" ]; then
+                        status_str="${status_str:+$status_str, }Tracking unknown (repo list unreadable)"
                     fi
 
                     if [ "$status_str" != "" ]; then
@@ -448,8 +481,17 @@ if [ "$SKIP_GITHUB" = false ]; then
         echo "Install: \`sudo apt install jq\`"
         echo ""
     else
-        # Build repo list
-        REPOS=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
+        # Build repo list. The enumeration's exit status is read before its
+        # output is piped into jq: `... 2>/dev/null | jq` discards both the
+        # status and the reason, and the GitHub section then reports a clean
+        # PR/issue table over however many repos survived — or none (#609).
+        REPO_JSON=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>&1) || {
+            echo "⚠️  Could not read the configured repo list — the tables below cover only the workspace repo."
+            echo "   $(echo "$REPO_JSON" | tr '\n' ' ')"
+            echo ""
+            REPO_JSON="[]"
+        }
+        REPOS=$(echo "$REPO_JSON" | jq -r '.[].url' 2>/dev/null | sed 's|https://github.com/||' | sed 's|.git$||' || true)
         ROOT_REPO=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed 's|git@github.com:||' | sed 's|https://github.com/||' | sed 's|.git$||' || true)
         if [ -n "$ROOT_REPO" ]; then
             REPOS=$(echo -e "$ROOT_REPO\n$REPOS")

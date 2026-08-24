@@ -4,11 +4,18 @@ Shared utilities for secondary remote management scripts.
 Used by add_remote.py, push_remote.py, and pull_remote.py.
 """
 
+import enum
 import subprocess
 import sys
 import time
 
-from workspace import get_overlay_repos
+from workspace import (
+    WorkspaceConfigError,
+    get_optional_layers,
+    get_overlay_repos,
+    layer_name_for,
+    repo_absence_is_allowed,
+)
 
 # Error fragments that indicate the remote dropped the connection (typically
 # an upstream firewall rate-limiting rapid successive SSH connections).
@@ -20,6 +27,49 @@ TRANSIENT_ERRORS = (
 )
 
 RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
+
+# Reasons for a repo whose git state could not be read at all. These are
+# "error", never "skip": a probe that failed is not a benign answer, and
+# reporting it as one is what let a failed run exit 0 (#609). They live here,
+# not in each script, so pull_remote.py and push_remote.py cannot classify the
+# same condition under two different names.
+UNREADABLE_TREE = "cannot read working tree (corrupt .git, or not a repo)"
+UNREADABLE_STATE = "cannot read git state (not a repo, or corrupt .git)"
+
+# No .repos file was found at all — configs/manifest is missing or empty (an
+# un-bootstrapped clone, or a workspace *worktree*, which has no manifest
+# symlink). Every configured repo then goes unenumerated, so a "1 repo, 0
+# errors" summary over the workspace root alone is an all-clear about repos
+# nothing looked at. sync_repos.py already exits 1 naming configs/manifest in
+# this exact state; these scripts exited 0 (#609).
+NO_REPOS_ENUMERATED = (
+    "configs/manifest: no repositories configured — nothing but the workspace "
+    "root repo can be reached. Run `make setup-all` (or run from the main "
+    "workspace tree, not a worktree)."
+)
+
+# The bucket iter_repos() records an enumeration failure into. Its own key,
+# not "error": it exits non-zero exactly like one, but it is not a *repo*, and
+# summing it into `total` printed "Summary: 2 repos" over one repo processed —
+# a miscount in the very line the fix exists to make trustworthy (#609).
+ENUMERATION_FAILURE = "enumeration"
+
+
+def no_repos_matched_filter(manifest_filter):
+    """The filter selected no repos — a different problem from an empty workspace.
+
+    `--manifest <typo>` (or any filter matching nothing) used to report
+    NO_REPOS_ENUMERATED: "no repositories configured … Run `make setup-all`".
+    Neither the diagnosis nor the remedy fits a filter that matched nothing,
+    and pointing a bootstrapped workspace at `make setup-all` sends the
+    operator to fix something that is not broken (#609).
+    """
+    return (
+        f"--manifest {manifest_filter}: no configured repository comes from that "
+        "manifest — check the name against `ls configs/manifest/repos/*.repos` "
+        "(pass the name without the .repos suffix)."
+    )
+
 
 # Set once any network operation in this process hits a dropped-connection
 # signature. Callers use this to enable pacing only when the remote is
@@ -69,6 +119,12 @@ def run_git(repo_path, args, dry_run=False):
         return True, result.stdout.strip(), result.stderr.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip(), e.stderr.strip()
+    except OSError as e:
+        # The repo directory itself is unusable (unreadable, vanished mid-run,
+        # a dangling symlink). Without this the exception escapes and kills the
+        # whole run with no summary, stranding every later repo — the same hole
+        # sync_repos.py's run_git_cmd closed (#609).
+        return False, "", f"cannot run git in {repo_path}: {e}"
 
 
 def run_git_network(repo_path, args, dry_run=False):
@@ -77,12 +133,55 @@ def run_git_network(repo_path, args, dry_run=False):
     return retry_transient(run_git, repo_path, args, dry_run)
 
 
-def remote_exists(repo_path, remote_name):
-    """Check if a named remote exists in the repo."""
+class RemoteState(enum.Enum):
+    """What `git remote` could tell us about a named remote (#609).
+
+    UNREADABLE is not ABSENT: the command failing means we could not look, and
+    reporting "remote not configured" for a repo we cannot read is the same
+    false green as a failed `git status` reading as clean. Every member is
+    truthy, so compare against members explicitly.
+    """
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    UNREADABLE = "unreadable"
+
+
+def remote_probe(repo_path, remote_name):
+    """Look for a named remote. Returns a RemoteState."""
     success, output, _ = run_git(repo_path, ["remote"])
     if not success:
-        return False
-    return remote_name in output.splitlines()
+        return RemoteState.UNREADABLE
+    if remote_name in output.splitlines():
+        return RemoteState.PRESENT
+    return RemoteState.ABSENT
+
+
+def classify_remote_state(state, remote_name):
+    """Turn a RemoteState into a (status, message) problem, or None if usable.
+
+    Shared by pull_remote.py and push_remote.py so the two cannot drift on what
+    UNREADABLE means: `git remote` failing means we never learned whether the
+    remote is configured, and reporting that as "remote not found" keeps a repo
+    that was never reached inside a green run (#609). ABSENT is the benign case
+    — most repos legitimately have no secondary remote.
+    """
+    if state is RemoteState.UNREADABLE:
+        return "error", UNREADABLE_STATE
+    if state is RemoteState.ABSENT:
+        return "skip", f"remote '{remote_name}' not found"
+    return None
+
+
+def remote_exists(repo_path, remote_name):
+    """Check if a named remote exists in the repo.
+
+    Boolean view of remote_probe(): an unreadable repo answers False. Kept for
+    add_remote.py, where that is the right answer — it goes on to read the
+    origin URL and reports an explicit error when that fails. Callers that
+    would *skip* on False must use remote_probe() instead.
+    """
+    return remote_probe(repo_path, remote_name) is RemoteState.PRESENT
 
 
 def resolve_repo_path(root_dir, repo):
@@ -143,12 +242,24 @@ def add_common_args(parser):
 
 
 def get_repos(args):
-    """Get the filtered repo list based on parsed args."""
+    """Get the filtered repo list based on parsed args. Returns (repos, empty_reason).
+
+    `empty_reason` is None whenever `repos` is non-empty. When the list is
+    empty it names *why*, because the two causes have different remedies: an
+    unbootstrapped workspace (NO_REPOS_ENUMERATED, `make setup-all`) versus a
+    `--manifest` filter that matched nothing (a mistyped manifest name). The
+    filter is applied after the emptiness question is asked of the *unfiltered*
+    list, so a typo can no longer be diagnosed as an empty workspace (#609).
+    """
     repos = get_overlay_repos(include_underlay=args.include_underlay)
+    if not repos:
+        return [], NO_REPOS_ENUMERATED
     if args.manifest:
         manifest_filter = set(f"{m.strip()}.repos" for m in args.manifest.split(","))
         repos = [r for r in repos if r["source_file"] in manifest_filter]
-    return repos
+        if not repos:
+            return [], no_repos_matched_filter(args.manifest)
+    return repos, None
 
 
 def iter_repos(script_dir, args, process_fn, initial_results):
@@ -161,46 +272,105 @@ def iter_repos(script_dir, args, process_fn, initial_results):
         initial_results: Dict of status -> count to accumulate into.
 
     Returns:
-        The results dict with updated counts. Exits non-zero if errors occurred.
+        The results dict with updated counts.
+
+    The enumeration itself is reported, not assumed (#609): a manifest that
+    could not be parsed, and a run that enumerated no repos at all, both land in
+    the ENUMERATION_FAILURE bucket, which print_summary_and_exit() turns
+    non-zero and counts separately from the repos. A repo
+    configured but absent from disk lands in "missing", which is now also a
+    failure — unless its layer is optional on this host, which is a benign
+    "skip".
     """
     root_dir = script_dir.parent.parent
-    repos = get_repos(args)
     results = dict(initial_results)
+
+    def record(status):
+        results[status] = results.get(status, 0) + 1
+
+    try:
+        repos, empty_reason = get_repos(args)
+    except WorkspaceConfigError as exc:
+        print(f"  error: {exc}")
+        record(ENUMERATION_FAILURE)
+        repos = []
+    else:
+        if empty_reason:
+            print(f"  error: {empty_reason}")
+            record(ENUMERATION_FAILURE)
 
     # Workspace repo itself — detect its default branch rather than hard-coding
     ws_version = get_default_branch(root_dir, None)
     print("ros2_agent_workspace (workspace root)")
     status, msg = process_fn(root_dir, "ros2_agent_workspace", ws_version, args)
     print(f"  {status}: {msg}")
-    results[status] = results.get(status, 0) + 1
+    record(status)
+
+    optional_layers = get_optional_layers(root_dir)
 
     for repo in repos:
+        print(f"{repo['name']}")
         repo_path = resolve_repo_path(root_dir, repo)
         if repo_path is None:
-            print(f"{repo['name']}")
-            print("  missing: could not find local checkout")
-            results["missing"] += 1
+            skip, reason = classify_missing_repo(root_dir, repo, optional_layers)
+            # "missing" is its own bucket so the operator still sees how many
+            # repos had no checkout — but it now counts only the *required*
+            # ones, and print_summary_and_exit() treats it as a failure. An
+            # optional-layer absence is a plain skip and stays green.
+            bucket = "skip" if skip else "missing"
+            print(f"  {bucket}: {reason}")
+            record(bucket)
             continue
 
-        print(f"{repo['name']}")
         status, msg = process_fn(repo_path, repo["name"], repo["version"], args)
         print(f"  {status}: {msg}")
-        results[status] = results.get(status, 0) + 1
+        record(status)
 
     return results
 
 
+def classify_missing_repo(root_dir, repo, optional_layers=None):
+    """A configured repo is not on disk. Returns (is_benign_skip, reason).
+
+    `missing: could not find local checkout` used to be its own summary bucket
+    that print_summary_and_exit() never looked at, so a repo nobody could reach
+    left the run green. It is now a skip only when its layer is optional on this
+    host — otherwise an error (#609).
+    """
+    if optional_layers is None:
+        optional_layers = get_optional_layers(root_dir)
+    layer = layer_name_for(repo)
+    if repo_absence_is_allowed(repo, optional_layers):
+        return True, f"no local checkout — layer '{layer}' is optional on this host"
+    return False, (
+        f"no local checkout and layer '{layer}' is required — "
+        f"run .agent/scripts/setup_layers.sh {layer}"
+    )
+
+
 def print_summary_and_exit(results, labels):
-    """Print a summary line and exit non-zero if there were errors.
+    """Print a summary line and exit non-zero if the run was not clean.
 
     Args:
         results: Dict of status -> count.
         labels: List of (status_key, label_text) pairs for the summary.
+
+    Both "error" and "missing" exit 1. "missing" counting toward the exit status
+    is the point of #609 at the enumeration layer: a configured repo with no
+    checkout was tallied into a bucket the exit status never read, so a run that
+    reached none of the repos still reported success. iter_repos() routes
+    legitimately-absent optional-layer repos to "skip" instead, so this does not
+    turn a supported host red.
     """
-    total = sum(results.values())
+    enumeration_failures = results.get(ENUMERATION_FAILURE, 0)
+    # The enumeration failure is not a repo, so it is not in the repo count —
+    # it is stated separately instead (#609).
+    total = sum(count for key, count in results.items() if key != ENUMERATION_FAILURE)
     parts = [f"{results.get(key, 0)} {label}" for key, label in labels]
+    if enumeration_failures:
+        parts.append(f"{enumeration_failures} enumeration failure(s)")
     print(f"\nSummary: {total} repos — {', '.join(parts)}")
-    if results.get("error", 0) > 0:
+    if results.get("error", 0) > 0 or results.get("missing", 0) > 0 or enumeration_failures:
         sys.exit(1)
 
 

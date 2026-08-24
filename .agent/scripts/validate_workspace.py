@@ -11,11 +11,34 @@ configured in the .repos files. It checks:
 
 Usage:
     python3 validate_workspace.py [--fix] [--verbose]
+
+Exit status:
+    0  workspace matches the configuration.
+    1  drift: repos missing, orphaned, or on the wrong version — or a .repos
+       file that exists but could not be parsed, which leaves every repo it
+       declares unenumerated (#609).
+    2  argparse usage error.
+    4  a repo is on disk and its git state could not be read at all (corrupt
+       .git). Not drift: nothing about the configuration is wrong, and the
+       remedy is to repair or re-clone that checkout, not `--fix` and not
+       `make setup-all`. Reported under its own heading for the same reason
+       (#609).
+    3  nothing to validate — no repos are configured at all (configs/manifest
+       missing or empty). Previously this printed a green "validation PASSED"
+       and exited 0: with nothing to compare against, every check trivially
+       held (#609). It is a distinct code from 1 because it is not drift —
+       the workspace is un-bootstrapped, and the remedy is `make setup-all`,
+       not `--fix`. 3 rather than 2 because argparse owns 2.
+
+    `make validate` reports GNU make's own 2 for any non-zero recipe status,
+    so branch on these codes only when calling the script directly (as
+    dashboard.sh does).
 """
 
 import os
 import sys
 import argparse
+import enum
 import subprocess
 from pathlib import Path
 
@@ -24,7 +47,53 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
-from workspace import get_workspace_root, get_overlay_repos
+from workspace import (
+    WorkspaceConfigError,
+    get_workspace_root,
+    get_overlay_repos,
+    get_optional_layers,
+    repo_absence_is_allowed,
+)
+
+
+class ValidationResult(enum.Enum):
+    """What a validation run could conclude (#609).
+
+    Four states, not two, because "nothing was compared" is not a pass — and
+    the two ways of not comparing have different remedies.
+
+    UNCONFIGURED is reported when no repos are configured at all, which the
+    old boolean could only express as True — `not (missing or extra or
+    mismatched)` is vacuously true over an empty configuration, so an
+    un-bootstrapped clone or a workspace worktree printed
+    "✅ Workspace validation PASSED!" and exited 0.
+
+    UNREADABLE is reported when a repo is on disk and its git state could not
+    be read at all (a corrupt `.git`). That was folded into DRIFTED, which
+    dashboard.sh renders as "Workspace drift detected. Run: make validate" —
+    a corrupt `.git` is not drift, and `make validate` is not its remedy. That
+    is the same conflation the dashboard's exit-code branch was just fixed to
+    stop making, one layer up (#609).
+
+    Beware: every Enum member is truthy, so a caller left as
+    `if validate_workspace(...)` would treat DRIFTED and UNCONFIGURED as a
+    pass. Compare against members explicitly.
+    """
+
+    PASSED = "passed"
+    DRIFTED = "drifted"
+    UNCONFIGURED = "unconfigured"
+    UNREADABLE = "unreadable"
+
+
+# Process exit status per result. 3 (not 2) for UNCONFIGURED: argparse already
+# exits 2 for a usage error, and a caller cannot tell the two apart.
+EXIT_CODES = {
+    ValidationResult.PASSED: 0,
+    ValidationResult.DRIFTED: 1,
+    ValidationResult.UNCONFIGURED: 3,
+    ValidationResult.UNREADABLE: 4,
+}
 
 
 def get_actual_repos(workspace_root):
@@ -142,30 +211,27 @@ def get_git_branch(repo_path):
         return None
 
 
-def get_optional_layers(workspace_root):
-    """Read optional layer names from optional_layers.txt."""
-    optional_file = Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"
-    if not optional_file.exists():
-        return set()
-    layers = set()
-    for line in optional_file.read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line:
-            layers.add(line)
-    return layers
-
-
 def get_optional_repo_names(configured_list, optional_layers):
     """Get repo names that belong to optional layers.
 
     Derives optional repos from the already-parsed configured_list by matching
     each item's source_file against optional layer names, avoiding re-reading
     .repos files independently of get_overlay_repos().
+
+    Decided by the one shared predicate rather than a fourth local copy of the
+    rule: #609 consolidated sync_repos.py and the remote scripts onto
+    repo_absence_is_allowed() precisely "so this and the remote scripts cannot
+    drift", and this was the one caller left re-implementing it. A repo whose
+    source_file is missing or malformed is not optional — layer_name_for()
+    returns "", which is never a declared layer name.
     """
     if not optional_layers:
         return set()
-    optional_files = {f"{layer}.repos" for layer in optional_layers}
-    return {item["name"] for item in configured_list if item.get("source_file") in optional_files}
+    return {
+        item["name"]
+        for item in configured_list
+        if repo_absence_is_allowed({"source_file": item.get("source_file") or ""}, optional_layers)
+    }
 
 
 def validate_workspace(verbose=False):
@@ -179,6 +245,22 @@ def validate_workspace(verbose=False):
     configured_list = get_overlay_repos(include_underlay=True)
     # Convert list to dict for easy lookup
     config_repos = {item["name"]: item for item in configured_list}
+
+    if not config_repos:
+        # No .repos file was found at all — configs/manifest is missing or
+        # empty (an un-bootstrapped clone, or a workspace *worktree*, which has
+        # no manifest symlink). Every check below is vacuously true over an
+        # empty configuration, so this used to print the same green PASSED as a
+        # fully validated workspace (#609). Mirrors sync_repos.py's handling of
+        # the same state, down to the remedy.
+        print("=" * 60)
+        print("Workspace Validation Results")
+        print("=" * 60)
+        print("❌ No repositories are configured — nothing to validate.")
+        print("   configs/manifest is missing or empty. Run `make setup-all`")
+        print("   (or run `make validate` from the main workspace tree, not a worktree).")
+        print("=" * 60)
+        return ValidationResult.UNCONFIGURED, []
 
     # Identify repos from optional layers (allowed to be missing)
     optional_layers = get_optional_layers(root)
@@ -210,6 +292,7 @@ def validate_workspace(verbose=False):
 
     # Check versions
     version_mismatches = []
+    unreadable_repos = []
     for name in set(config_repos.keys()) & set(actual_repos.keys()):
         config = config_repos[name]
         actual = actual_repos[name]
@@ -217,6 +300,26 @@ def validate_workspace(verbose=False):
         expected = config.get("version", "")
         current_branch = actual.get("branch")
         current_commit = get_git_commit(actual["path"])
+
+        # Both probes failed on a directory that has a .git — the repo is
+        # there and we could not read it at all. Every arm below then answers
+        # from two Nones, and with a 40-hex `expected` the chain recorded
+        # nothing, so an unreadable repo passed validation. The residual
+        # instance of this issue's own defect class, one level in (#609).
+        if current_commit is None and current_branch is None:
+            # Its own list, not version_mismatches: printed under "Version
+            # mismatches" it returned DRIFTED, and dashboard.sh renders that as
+            # "Run: make validate" — which is the command that just said this.
+            unreadable_repos.append(
+                {
+                    "name": name,
+                    "type": "unreadable",
+                    "expected": expected,
+                    "actual": "cannot read git state (corrupt .git?)",
+                    "path": actual["path"],
+                }
+            )
+            continue
 
         # Improved version check: handle branches, tags, and commit SHAs
         # Try to resolve expected version to a commit SHA
@@ -248,9 +351,13 @@ def validate_workspace(verbose=False):
                             "path": actual["path"],
                         }
                     )
-        elif current_branch is None and expected_commit is None:
-            # Detached HEAD but expected version couldn't be resolved
-            # Only flag if expected looks like a branch name (not a SHA)
+        elif not current_branch and expected_commit is None:
+            # Detached HEAD (`git branch --show-current` succeeds and prints
+            # nothing, so the branch reads as "" — `is None` here meant a
+            # *failed* probe, which is now caught above) and an expected
+            # version we could not resolve. Only flag if expected looks like a
+            # branch name, not a SHA: a repo pinned to a SHA is legitimately
+            # detached, and flagging it would be a false red.
             if expected and not (
                 len(expected) == 40 and all(c in "0123456789abcdef" for c in expected.lower())
             ):
@@ -276,7 +383,14 @@ def validate_workspace(verbose=False):
             )
 
     # Print results
-    is_valid = not (missing_repos or extra_repos or version_mismatches)
+    # UNREADABLE outranks DRIFTED: "we could not check this repo" is the more
+    # serious answer, and it is the one whose remedy the operator needs first.
+    if unreadable_repos:
+        result = ValidationResult.UNREADABLE
+    elif missing_repos or extra_repos or version_mismatches:
+        result = ValidationResult.DRIFTED
+    else:
+        result = ValidationResult.PASSED
 
     print("=" * 60)
     print("Workspace Validation Results")
@@ -311,16 +425,28 @@ def validate_workspace(verbose=False):
                 print(f"     at {item['path']}")
         print()
 
-    if is_valid:
+    if unreadable_repos:
+        print(f"❌ Repos that could not be read ({len(unreadable_repos)}):")
+        for item in sorted(unreadable_repos, key=lambda x: x["name"]):
+            print(f"   - {item['name']}: {item['actual']}")
+            print(f"     at {item['path']}")
+        print("   This is not drift — the configuration may be fine. Repair or")
+        print("   re-clone these checkouts; `--fix` and `make setup-all` do not")
+        print("   address a corrupt .git.")
+        print()
+
+    if result is ValidationResult.PASSED:
         print("✅ Workspace validation PASSED!")
     else:
         print("❌ Workspace validation FAILED")
+        if result is ValidationResult.UNREADABLE:
+            print("   At least one repo could not be read — see above.")
         if missing_repos:
             print("   Run with --fix to import missing repositories.")
 
     print("=" * 60)
 
-    return is_valid, missing_repos
+    return result, missing_repos
 
 
 def fix_workspace(missing_repos, verbose=False):
@@ -441,18 +567,31 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
-    is_valid, missing = validate_workspace(args.verbose)
+    try:
+        result, missing = validate_workspace(args.verbose)
+    except WorkspaceConfigError as exc:
+        # A manifest we could not parse is not "no repos are configured": the
+        # file is there and declares repos we then never checked. Reporting it
+        # as UNCONFIGURED would point at `make setup-all`, which cannot fix a
+        # syntax error in a .repos file (#609).
+        print(f"❌ Cannot validate: {exc}", file=sys.stderr)
+        sys.exit(EXIT_CODES[ValidationResult.DRIFTED])
 
-    if not is_valid and args.fix and missing:
+    # --fix only imports missing repos, which is only meaningful for drift.
+    # UNCONFIGURED is not fixable this way: with no .repos files there is
+    # nothing to import from, so it exits 3 and points at `make setup-all`.
+    if result is ValidationResult.DRIFTED and args.fix and missing:
         print("\nFixing workspace...")
         if fix_workspace(missing, args.verbose):
             print("Fix complete. Re-validating...")
-            validate_workspace(args.verbose)
+            # Take the re-validation's answer. Discarding it (as this did)
+            # meant a successful --fix still exited 1 on the stale result.
+            result, _ = validate_workspace(args.verbose)
         else:
             print("Fix encountered errors.")
             sys.exit(1)
 
-    sys.exit(0 if is_valid else 1)
+    sys.exit(EXIT_CODES[result])
 
 
 if __name__ == "__main__":

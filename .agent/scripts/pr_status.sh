@@ -43,8 +43,16 @@ discover_repos() {
     fi
 
     # Overlay + underlay repos via list_overlay_repos.py
+    # `|| echo "[]"` turned a failed enumeration into zero repos, and the
+    # triage table below then printed clean over nothing at all — the same
+    # absence-read-as-all-clear this script's own enumeration fix removed one
+    # level up (#609). Say it instead.
     local repo_json
-    repo_json=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>/dev/null || echo "[]")
+    if ! repo_json=$(python3 "$SCRIPT_DIR/list_overlay_repos.py" --include-underlay 2>&1); then
+        echo "⚠️  Could not read the configured repo list — this table covers only the workspace repo." >&2
+        echo "   $(echo "$repo_json" | tr '\n' ' ')" >&2
+        repo_json="[]"
+    fi
     while IFS= read -r url; do
         # Skip non-GitHub URLs — gh CLI is GitHub-only
         if [ -n "$url" ] && [ "$url" != "null" ] && [[ "$url" == *"github.com"* ]]; then

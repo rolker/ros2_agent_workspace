@@ -167,6 +167,90 @@ out=$("$MERGE_PR" --issue 5 --pr 5 --repo-slug workspace 2>&1); rc=$?
 { [[ $rc -eq 2 ]] && grep -qF "mutually exclusive" <<<"$out"; } \
     && ok "conflicting --issue/--pr rejected" || bad "conflicting flags (rc=$rc, out: $(head -1 <<<"$out"))"
 
+# The post-merge failure paths themselves are not reachable here (every test
+# stops at a pre-merge guard, by design — see the scope note at the top), but
+# their exit code is a contract: it must not collide with the usage-error code
+# asserted above, or an agent reads a finished, irreversible merge as "invoked
+# wrong" and retries it (#609).
+echo "Test: post-merge failure exit code is distinct from usage/generic errors"
+post_rc=$(sed -n 's/^POST_MERGE_RC=\([0-9]\+\).*/\1/p' "$MERGE_PR")
+{ [[ -n "$post_rc" ]] && [[ "$post_rc" -ne 0 ]] && [[ "$post_rc" -ne 1 ]] && [[ "$post_rc" -ne 2 ]]; } \
+    && ok "POST_MERGE_RC=$post_rc is reserved (not 0/1/2)" \
+    || bad "POST_MERGE_RC must be a non-zero code other than 1 (generic) or 2 (usage); got '${post_rc:-unset}'"
+{ ! grep -q 'exit "\$sync_status"' "$MERGE_PR"; } \
+    && ok "make's exit code is not propagated verbatim" \
+    || bad "merge_pr.sh propagates make's exit code (2 collides with its usage error)"
+
+# Code 1 is documented as "nothing irreversible happened". That is only true if
+# NO path after `gh pr merge` exits 1 — the worktree-removal refusal used to,
+# and `set -e` on the `cd` back to the workspace root would too (#609).
+echo "Test: no post-merge path exits 1 (the 'safe to retry' code)"
+merge_line=$(grep -n '^GIT_EDITOR=true gh pr merge' "$MERGE_PR" | cut -d: -f1)
+if [[ -z "$merge_line" ]]; then
+    bad "could not locate the 'gh pr merge' line — the post-merge scan has no anchor"
+else
+    stray=$(awk -v start="$merge_line" 'NR>start && /^[[:space:]]*exit 1([[:space:];]|$)/ {print NR": "$0}' "$MERGE_PR")
+    [[ -z "$stray" ]] \
+        && ok "every post-merge failure path exits $post_rc, not 1" \
+        || bad "post-merge 'exit 1' would read as 'safe to retry' a landed merge: $stray"
+fi
+
+# Deleting the `exit "$POST_MERGE_RC"` from the sync-failure branch passed the
+# whole suite: the banner still printed, and the script fell off the end with
+# the status of the last echo — 0. That restores #609 verbatim, in the one path
+# this issue is named for. The branch is asserted structurally because it is not
+# reachable here (every test stops at a pre-merge guard, by design).
+echo "Test: the sync-failure branch ends by exiting, not by falling through"
+banner_line=$(grep -n 'but the repo sync FAILED' "$MERGE_PR" | cut -d: -f1)
+if [[ -z "$banner_line" ]]; then
+    bad "could not locate the sync-failure banner — the structural check has no anchor"
+else
+    tail_after=$(awk -v start="$banner_line" 'NR>start' "$MERGE_PR")
+    # The first `exit` after the banner must be the post-merge code, and it must
+    # come before the enclosing `fi` closes the branch.
+    first_exit=$(grep -m1 -E '^\s*(exit|fi)\b' <<<"$tail_after")
+    [[ "$first_exit" =~ exit[[:space:]]+\"?\$POST_MERGE_RC ]] \
+        && ok "sync failure exits \$POST_MERGE_RC before the branch closes" \
+        || bad "sync-failure branch reaches '${first_exit:-end of file}' before any exit — a failed sync would return 0"
+fi
+
+# The `cd` back to the workspace root runs after the merge under `set -e`.
+echo "Test: the post-merge cd to the workspace root is guarded, not left to set -e"
+grep -qE '^cd "\$ROOT_DIR" \|\|' "$MERGE_PR" \
+    && ok "cd \$ROOT_DIR has an explicit failure branch" \
+    || bad "cd \$ROOT_DIR is unguarded — set -e would abort bannerless with exit 1"
+
+# Same structural argument as the sync branch above, for the other two paths
+# AGENTS.md names as exit 3. Both survived mutation in the Round-4 review:
+# deleting their `exit` left the whole suite green, and the script then carried
+# on past a failed cleanup — or fell off the end returning 0 — after an
+# already-merged PR. Neither branch is reachable here (every test stops at a
+# pre-merge guard, by design), so they are asserted structurally.
+# `closer_re` matches the line that ends the enclosing block. It is a full
+# regex, not a token: the cd branch wraps its banner in an inner `{ ... } >&2`
+# group, so only the *unindented* `}` closes the branch itself.
+assert_exits_after() {
+    local label="$1" anchor="$2" closer_re="$3" line tail_after first
+    line=$(grep -n -- "$anchor" "$MERGE_PR" | head -1 | cut -d: -f1)
+    if [[ -z "$line" ]]; then
+        bad "could not locate '$anchor' — the structural check for $label has no anchor"
+        return
+    fi
+    tail_after=$(awk -v start="$line" 'NR>start' "$MERGE_PR")
+    first=$(grep -m1 -E "^[[:space:]]*exit([[:space:];]|\$)|$closer_re" <<<"$tail_after")
+    if [[ "$first" =~ exit[[:space:]]+\"?\$POST_MERGE_RC ]]; then
+        ok "$label exits \$POST_MERGE_RC before the branch closes"
+    else
+        bad "$label reaches '${first:-end of file}' before any exit — the failure would return 0 or be ignored"
+    fi
+}
+
+echo "Test: the cd-failure branch ends by exiting, not by falling through"
+assert_exits_after "cd-failure branch" "cannot cd to workspace root" "^\}"
+
+echo "Test: the worktree-removal-failure branch ends by exiting, not by falling through"
+assert_exits_after "worktree-removal-failure branch" "worktree removal failed" "^[[:space:]]*fi([[:space:];]|\$)"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"

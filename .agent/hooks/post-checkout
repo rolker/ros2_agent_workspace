@@ -72,7 +72,10 @@ if ln -s ../../layers layers; then
     echo "   ✅ Created: layers -> ../../layers"
     echo ""
     echo "   This worktree now has access to all ROS2 workspace layers."
-    echo "   You can use 'make sync', 'make build', etc. as usual."
+    echo "   You can use 'make build' and the other layer-dependent commands here."
+    echo "   Not 'make sync': configs/manifest is gitignored, so a worktree cannot"
+    echo "   enumerate the configured repos, and the sync fails there by design."
+    echo "   Sync from the main tree."
     echo ""
 else
     echo "   ❌ Failed to create symlink"

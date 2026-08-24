@@ -249,6 +249,58 @@ if (
 ); then pass "--interactive --all-repos rejected"; else fail "--interactive --all-repos rejected"; fi
 echo ""
 
+# ---- Test 7: a failed repo enumeration is reported, not silently emptied ----
+# `|| echo "[]"` turned an unparseable .repos file into zero overlay repos, and
+# the triage table then printed clean over nothing (#609).
+echo "Test 7: a failed repo enumeration is reported, not silently emptied"
+if (
+    setup_test_env "test7"
+
+    cat > "$TEST_ENV_DIR/bin/list_overlay_repos.py" << 'STUBEOF'
+#!/usr/bin/env python3
+import sys
+print("ERROR: cannot parse core.repos: mapping values not allowed here", file=sys.stderr)
+sys.exit(1)
+STUBEOF
+    chmod +x "$TEST_ENV_DIR/bin/list_overlay_repos.py"
+
+    stderr_out=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos --json 2>&1 >/dev/null)
+    stdout_out=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos --json 2>/dev/null)
+
+    if ! echo "$stderr_out" | grep -q "Could not read the configured repo list"; then
+        echo "Enumeration failure was not reported: $stderr_out"
+        exit 1
+    fi
+    if ! echo "$stderr_out" | grep -q "core.repos"; then
+        echo "The reason was not passed through: $stderr_out"
+        exit 1
+    fi
+    # Still valid JSON covering the workspace repo — degraded, not crashed.
+    if ! echo "$stdout_out" | jq . > /dev/null 2>&1; then
+        echo "Output is not valid JSON: $stdout_out"
+        exit 1
+    fi
+
+    exit 0
+); then pass "Failed enumeration reported"; else fail "Failed enumeration reported"; fi
+echo ""
+
+# ---- Test 8: a successful enumeration says nothing (false-RED direction) ----
+echo "Test 8: a successful enumeration prints no warning"
+if (
+    setup_test_env "test8"
+
+    stderr_out=$(bash "$TEST_ENV_DIR/bin/pr_status.sh" --all-repos --json 2>&1 >/dev/null)
+
+    if echo "$stderr_out" | grep -q "Could not read the configured repo list"; then
+        echo "Warned about a healthy enumeration: $stderr_out"
+        exit 1
+    fi
+
+    exit 0
+); then pass "Healthy enumeration is silent"; else fail "Healthy enumeration is silent"; fi
+echo ""
+
 # Summary
 echo "========================================"
 echo "TEST RESULTS"
