@@ -120,7 +120,10 @@ worktree-scoped nor container-side ownership.
 | `.agent/scripts/tests/test_agent_image_build_paths.sh` (new) | Guards the single build path the staleness marker depends on: `make agent-build` delegates to `--build-only`, the digest has one implementation, the Dockerfile ARG/LABEL name matches what the launcher reads back. |
 | `docs/decisions/0016-runtime-vs-baked-layer-chaining.md` | References cross-reference addendum (ADR-0012) scoping the Check-4 coverage claim in its Consequences — the same overstatement narrowed in the script header and the `AGENTS.md` row. |
 | `.agent/scripts/test_layer_sourcing.sh` | Extend Check 4's header comment (lines 18-25) with a one-line scope caveat: host-side, `layers/main`-only, not container-side. |
-| `AGENTS.md` | Extend the `test_layer_sourcing.sh` script-table row (line 582) with the same scope caveat so the table isn't overstated. |
+| `AGENTS.md` | Extend the `test_layer_sourcing.sh` script-table row (line 582) with the same scope caveat so the table isn't overstated. Also record, on the `docker_run_agent.sh` and `stage_rosdep_manifests.sh` rows, that the launcher's build block is the single build path and always resolves the **main** workspace root. |
+| `.agent/scripts/tests/run_script_tests.sh` | Register the two new test scripts in the runner so they execute in `make test-scripts` / CI. |
+| `.github/workflows/validate.yml` | Note in the "Run script tests" step that `test_entrypoint_chown_coverage.sh`'s container layer is opt-in and skips cleanly on the runner, so the step stays hermetic. |
+| `.agent/scripts/stage_rosdep_manifests.sh` | Correct the header's caller count: since `make agent-build` delegates to `--build-only`, the launcher's build block is its only caller, not "both build entry points". |
 
 ## Principles Self-Check
 
