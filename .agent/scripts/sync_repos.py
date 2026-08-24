@@ -345,7 +345,15 @@ def classify_unlocatable_repo(root_dir, repo, optional_layers, tried_paths):
 
 
 def sync_gitbug(repo_path, dry_run=False):
-    """Sync git-bug issues for a repo if git-bug is installed and a bridge is configured."""
+    """Sync git-bug issues for a repo if git-bug is installed and a bridge is configured.
+
+    Deliberately NOT tallied into the run's failure count (#609): git-bug is an
+    optional issue *cache* whose ADR (0010) specifies graceful degradation —
+    "failures warn but don't block", with every consumer falling back to `gh`.
+    `make sync` is answerable for the repositories being current; a bridge that
+    could not reach GitHub leaves no code stale, and failing the run for it
+    would put a red on hosts that never configured a bridge at all.
+    """
     if not shutil.which("git-bug"):
         return
 
