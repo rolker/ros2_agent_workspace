@@ -74,8 +74,21 @@ fix_ws_dir() {
                 echo "         Usual cause: a rootless / userns-remapped Docker daemon." >&2
             fi
         else
-            mkdir -p "$target"
-            chown "$TARGET_UID:$TARGET_GID" "$target"
+            # Same contract as the recursive branch above: warn, do not abort.
+            # This script runs unguarded from the entrypoint under
+            # `set -euo pipefail`, so an unguarded failure here is a container
+            # that refuses to start with a bare error and no context, and in
+            # the `docker exec -u 0` recovery path it strands every workspace
+            # after the failing one.
+            if ! mkdir -p "$target" 2>/dev/null; then
+                echo "WARNING: $(basename "$0"): mkdir failed for $target" >&2
+                echo "         The agent may hit 'Permission denied' building there (#604)." >&2
+                echo "         Usual cause: a read-only or otherwise unwritable mount." >&2
+            elif ! chown "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null; then
+                echo "WARNING: $(basename "$0"): chown failed for $target" >&2
+                echo "         The agent may hit 'Permission denied' building there (#604)." >&2
+                echo "         Usual cause: a rootless / userns-remapped Docker daemon." >&2
+            fi
         fi
     done
 }
