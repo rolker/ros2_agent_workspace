@@ -29,7 +29,13 @@ worktree-scoped nor container-side ownership.
 
 ## Approach
 
-1. **Add the second entrypoint chown loop** in
+1. **Add the second entrypoint chown loop.** *(Implemented with a deviation:
+   both loops moved out of `agent-entrypoint.sh` into a new
+   `.devcontainer/agent/fix-volume-ownership.sh` that the entrypoint calls.
+   Reason: the container-side smoke test the user opted into below has to
+   exercise the ownership step alone — running the full entrypoint would drag
+   in the ROS sourcing and rosdep pass. The loops are otherwise exactly as
+   planned.)* Originally: in
    `.devcontainer/agent/agent-entrypoint.sh`, immediately after the existing
    `layers/main/*_ws` loop (step 1, lines 29-41). Guard on
    `[ -n "${WORKTREE_ROOT:-}" ] && [ -d "$WORKTREE_ROOT" ]` (the var is only
@@ -68,12 +74,20 @@ worktree-scoped nor container-side ownership.
    - This is the "every anonymous volume the launcher adds must have a
      corresponding entrypoint chown" invariant from the issue, stated as an
      executable check rather than only in prose.
-   - A true container-side smoke test (start the sandbox, write into
-     `build/` as the dropped `ros` user) would be the stronger check but
-     needs a live Docker dispatch harness; per the issue's own
-     recommendation and the review's Action 2, that's left as a documented
-     follow-up rather than blocking this PR (noted in Open Questions below
-     in case the user wants it folded in now instead).
+   - **A container-side smoke test is included in this PR** (user decision at
+     the plan checkpoint; the review had verified that the deferral premise —
+     "no live dispatch harness available" — was false: docker works here and
+     the agent image is built). It runs the *working tree's*
+     `fix-volume-ownership.sh` inside a container over real anonymous volumes
+     and asserts the target uid can then write to them, so it tests the script
+     under review rather than whatever is baked into the image. It skips
+     cleanly when Docker or the image is unavailable, keeping
+     `run_script_tests.sh` hermetic in CI.
+   - The static layer compares the launcher's mounted set against the set the
+     real ownership loops reach (chown stubbed), rather than grepping the
+     script for loop headers — a reformatted loop then can't cause a mystery
+     failure while a genuinely uncovered mount still fails. Both layers were
+     mutation-checked: deleting the worktree loop reproduces #604 in each.
 4. **Add the scope caveat** to `test_layer_sourcing.sh`'s Check 4 header
    comment (lines 18-25) and its `AGENTS.md` script-table entry (line 582),
    noting explicitly that Check 4 only stats `layers/main/*_ws` on the
@@ -91,7 +105,12 @@ worktree-scoped nor container-side ownership.
 
 | File | Change |
 |------|--------|
-| `.devcontainer/agent/agent-entrypoint.sh` | Add second ownership-fix loop for `$WORKTREE_ROOT/*_ws/{build,install,log}`, mirroring the `layers/main` loop and the `[ -d ] && [ ! -L ]` guard from `docker_run_agent.sh` section 4b; comment carries the "anonymous volume inits from image, not host mkdir" rationale. |
+| `.devcontainer/agent/fix-volume-ownership.sh` (new) | Both ownership loops, extracted from the entrypoint so the container smoke test can run them alone. Header records the load-bearing mechanic: an anonymous volume initializes from the image, not the host dir, so only this chown makes it writable. |
+| `.devcontainer/agent/Dockerfile` | `COPY` the new script; add `STARTUP_SCRIPTS_SHA` build arg + `org.ros2-agent.startup-scripts-sha` label. |
+| `.agent/scripts/docker_run_agent.sh` | Correct section 4b's rationale (the host-side mkdir is *not* what makes section 4 work — the entrypoint chown is), and add the launch-time stale-image warning. |
+| `Makefile` | `agent-build` stamps the same `STARTUP_SCRIPTS_SHA`. |
+| `.devcontainer/agent/README.md` | Document that startup-script changes need a rebuild, and the warning that detects it. |
+| `.devcontainer/agent/agent-entrypoint.sh` | Call the extracted script; original plan: add second ownership-fix loop for `$WORKTREE_ROOT/*_ws/{build,install,log}`, mirroring the `layers/main` loop and the `[ -d ] && [ ! -L ]` guard from `docker_run_agent.sh` section 4b; comment carries the "anonymous volume inits from image, not host mkdir" rationale. |
 | `.agent/scripts/tests/test_entrypoint_chown_coverage.sh` (new) | `--print-mounts`-driven static invariant check: every worktree/layer `*_ws` mount path the launcher adds has a matching entrypoint chown-loop prefix. |
 | `.agent/scripts/test_layer_sourcing.sh` | Extend Check 4's header comment (lines 18-25) with a one-line scope caveat: host-side, `layers/main`-only, not container-side. |
 | `AGENTS.md` | Extend the `test_layer_sourcing.sh` script-table row (line 582) with the same scope caveat so the table isn't overstated. |
@@ -136,17 +155,22 @@ worktree-scoped nor container-side ownership.
 
 ## Open Questions
 
-- Should the container-side smoke test (start the real sandbox, write into
-  `build/` as the dropped `ros` user) be added in *this* PR instead of
-  deferred, given this is the second time this exact area has shipped
-  without regression coverage (#602 → #604)? Plan defaults to deferring it
-  as a documented follow-up per the issue's own recommendation, but flagging
-  for explicit sign-off since "the permanent solve is five minutes away"
-  language in `AGENTS.md`'s Quality Standard cuts the other way if a live
-  dispatch harness turns out to be readily available.
+- ~~Should the container-side smoke test be added in *this* PR instead of
+  deferred?~~ **Resolved at the plan checkpoint: include it in this PR.** The
+  deferral premise was false — `review-plan` verified docker works on this host
+  and `ros2-agent-workspace-agent:latest` is already built. Implemented in
+  `test_entrypoint_chown_coverage.sh` layer B, skipping cleanly without Docker.
+
+- **New, found during implementation:** the launcher only builds when the image
+  is *missing*, so this fix would not have reached anyone with an existing
+  image — the container would keep running the baked (broken) entrypoint. Added
+  the `STARTUP_SCRIPTS_SHA` label + launch-time staleness warning to close that,
+  since a fix that silently doesn't apply is the same failure class the issue is
+  about. Flagged for sign-off as scope added beyond the reviewed plan.
 
 ## Estimated Scope
 
-Single PR — one entrypoint script change, one new regression test, two doc
-touch-ups (`test_layer_sourcing.sh` comment + `AGENTS.md` row). No package
-interfaces, params, topics, or ROS build changes.
+Single PR — the entrypoint ownership fix (extracted to its own script), one new
+two-layer regression test, the stale-image guard, and three doc touch-ups
+(`test_layer_sourcing.sh` comment, `AGENTS.md` row, devcontainer README). No
+package interfaces, params, topics, or ROS build changes.
