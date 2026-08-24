@@ -77,6 +77,35 @@ def get_overlay_repos(include_underlay=False):
     return repos_list
 
 
+def get_optional_layers(workspace_root=None):
+    """Layer names that are allowed to be absent (configs/manifest/optional_layers.txt).
+
+    setup_layers.sh treats these layers as optional: if `vcs import` fails (a
+    private repo this host has no access to) it removes the layer directory and
+    exits 0. Anything that reports on missing repos must know that, or it flags
+    a supported host configuration as broken.
+
+    Format: one layer name per line; `#` comments and blank lines ignored —
+    kept byte-compatible with setup_layers.sh's is_optional_layer().
+    """
+    if workspace_root is None:
+        workspace_root = get_workspace_root()
+    optional_file = Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"
+    if not optional_file.exists():
+        return set()
+    layers = set()
+    for line in optional_file.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            layers.add(line)
+    return layers
+
+
+def layer_name_for(repo):
+    """The layer a repo record belongs to, from its source .repos file name."""
+    return repo["source_file"][: -len(".repos")] if repo["source_file"].endswith(".repos") else ""
+
+
 def find_repo_version(target_repo):
     """
     Find the version/branch for a specific repository.

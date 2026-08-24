@@ -232,10 +232,17 @@ def skipped_result(reason):
     return sync_repos.SyncResult(SyncOutcome.SKIPPED, reason)
 
 
-def repo_record(name):
+def repo_record(name, layer="core"):
     """A repo record shaped like get_overlay_repos() returns: main() maps
     source_file (`core.repos`) to the workspace dir (`core_ws`)."""
-    return {"name": name, "source_file": "core.repos"}
+    return {"name": name, "source_file": f"{layer}.repos"}
+
+
+def declare_optional(workspace, *layers):
+    """Write a real configs/manifest/optional_layers.txt under the tmp workspace."""
+    manifest = workspace / "configs" / "manifest"
+    manifest.mkdir(parents=True, exist_ok=True)
+    (manifest / "optional_layers.txt").write_text("# comment\n\n" + "\n".join(layers) + "\n")
 
 
 def _run_main(monkeypatch, workspace, repos, outcomes):
@@ -318,6 +325,63 @@ def test_unresolvable_path_is_a_failure(monkeypatch, tmp_path, capsys):
         sync_repos.main()
     assert exc.value.code == 1
     assert "path not resolved" in capsys.readouterr().out
+
+
+def test_absent_optional_layer_is_a_skip_not_a_failure(monkeypatch, tmp_path, capsys):
+    """`site` is listed in optional_layers.txt and setup_layers.sh deletes the
+    layer and exits 0 when its private repos are unreachable. Failing the run
+    for that makes `make sync` permanently red on a supported host — the false
+    red this design calls worse than the false green it removes."""
+    workspace = make_workspace(tmp_path, monkeypatch)
+    declare_optional(workspace, "site")
+    _run_main(monkeypatch, workspace, [repo_record("a")], {})
+    monkeypatch.setattr(
+        sync_repos.list_overlay_repos,
+        "get_overlay_repos",
+        lambda include_underlay=False: [repo_record("a"), repo_record("private", layer="site")],
+    )
+    sync_repos.main()  # no SystemExit: exit 0
+    out = capsys.readouterr().out
+    assert "0 failures" in out
+    assert "2 synced, 1 skipped" in out
+
+
+def test_repo_missing_inside_an_imported_optional_layer_is_a_failure(monkeypatch, tmp_path, capsys):
+    """Optional means "the layer may be absent", not "anything under it may
+    vanish": once the layer is imported, a missing repo is still stale-and-
+    unnoticed."""
+    workspace = make_workspace(tmp_path, monkeypatch)
+    declare_optional(workspace, "site")
+    (workspace / "layers" / "main" / "site_ws" / "src").mkdir(parents=True)
+    _run_main(monkeypatch, workspace, [], {})
+    monkeypatch.setattr(
+        sync_repos.list_overlay_repos,
+        "get_overlay_repos",
+        lambda include_underlay=False: [repo_record("private", layer="site")],
+    )
+    with pytest.raises(SystemExit) as exc:
+        sync_repos.main()
+    assert exc.value.code == 1
+    assert "path not resolved" in capsys.readouterr().out
+
+
+def test_absent_required_layer_fails_and_says_it_is_not_set_up(monkeypatch, tmp_path, capsys):
+    """A required layer that was never imported still fails the run — but names
+    setup as the fix rather than reading as a network problem."""
+    workspace = make_workspace(tmp_path, monkeypatch)
+    declare_optional(workspace, "site")
+    _run_main(monkeypatch, workspace, [], {})
+    monkeypatch.setattr(
+        sync_repos.list_overlay_repos,
+        "get_overlay_repos",
+        lambda include_underlay=False: [repo_record("needed", layer="platforms")],
+    )
+    with pytest.raises(SystemExit) as exc:
+        sync_repos.main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "not set up" in out
+    assert "setup_layers.sh platforms" in out
 
 
 def test_gitbug_runs_only_for_synced_repos(monkeypatch, tmp_path):

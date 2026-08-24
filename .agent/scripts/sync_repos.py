@@ -45,6 +45,7 @@ from remote_utils import (  # noqa: E402
     retry_transient,
     transient_error_seen,
 )
+from workspace import get_optional_layers, layer_name_for  # noqa: E402
 
 # Pace applied to the rest of the run once the remote starts dropping
 # connections (only when --throttle was not given explicitly).
@@ -287,6 +288,62 @@ def sync_repo(repo_path, repo_name, dry_run=False):
     return SyncResult(SyncOutcome.SYNCED)
 
 
+def locate_repo(root_dir, repo):
+    """Find a configured repo's checkout. Returns (path_or_None, tried_paths)."""
+    ws_name = repo["source_file"].replace(".repos", "_ws")
+    candidate = root_dir / "layers" / "main" / ws_name / "src" / repo["name"]
+    tried = [str(candidate)]
+    if candidate.exists():
+        return candidate, tried
+
+    # Fall back to an explicit path if provided by list_overlay_repos.
+    explicit_path = repo.get("path")
+    if explicit_path:
+        explicit_path = Path(explicit_path)
+        if not explicit_path.is_absolute():
+            explicit_path = root_dir / explicit_path
+        tried.append(str(explicit_path))
+        if explicit_path.exists():
+            return explicit_path, tried
+
+    return None, tried
+
+
+def classify_unlocatable_repo(root_dir, repo, optional_layers, tried_paths):
+    """Decide what a repo we cannot find on disk means, and say so (#609).
+
+    A configured repo that is missing from an imported layer is a real failure —
+    "left stale, nobody noticed" is what this issue exists to kill. But a whole
+    layer that was never imported is a different thing:
+
+    - An *optional* layer (configs/manifest/optional_layers.txt) is absent by
+      design on hosts without access to its private repos — setup_layers.sh
+      deletes the layer directory and exits 0. Failing the run for it would make
+      `make sync` permanently red on a supported configuration, which is the
+      false red this design calls worse than the false green it removes.
+    - A *required* layer that is not set up still fails, but says so: the fix is
+      to run setup, not to chase a network problem.
+    """
+    layer = layer_name_for(repo)
+    layer_src = root_dir / "layers" / "main" / f"{layer}_ws" / "src"
+    layer_imported = layer_src.exists()
+
+    if not layer_imported and layer in optional_layers:
+        print(f"  ⚠️  {repo['name']}: optional layer '{layer}' is not set up on this host.")
+        return SyncResult(SyncOutcome.SKIPPED, f"optional layer '{layer}' not set up")
+
+    if not layer_imported:
+        print(f"  ❌ {repo['name']}: layer '{layer}' is not set up ({layer_src} missing).")
+        return SyncResult(
+            SyncOutcome.FAILED,
+            f"layer '{layer}' not set up — run .agent/scripts/setup_layers.sh {layer}",
+        )
+
+    paths_str = ", ".join(tried_paths)
+    print(f"  ❌ {repo['name']}: could not resolve repository path (tried {paths_str}).")
+    return SyncResult(SyncOutcome.FAILED, "path not resolved")
+
+
 def sync_gitbug(repo_path, dry_run=False):
     """Sync git-bug issues for a repo if git-bug is installed and a bridge is configured."""
     if not shutil.which("git-bug"):
@@ -378,37 +435,17 @@ def main():
         root_dir, "ros2_agent_workspace", sync_repo(root_dir, "ros2_agent_workspace", args.dry_run)
     )
 
+    optional_layers = get_optional_layers(root_dir)
+
     for repo in repos:
         throttle()
-        # Determine workspace directory from source file (e.g. core.repos -> core_ws)
-        ws_name = repo["source_file"].replace(".repos", "_ws")
-        candidate_path = root_dir / "layers" / "main" / ws_name / "src" / repo["name"]
-
-        repo_path = None
-        tried_paths = [str(candidate_path)]
-
-        # First, try the conventional workspace layout.
-        if candidate_path.exists():
-            repo_path = candidate_path
-        else:
-            # Fall back to an explicit path if provided by list_overlay_repos.
-            explicit_path = repo.get("path")
-            if explicit_path:
-                explicit_path = Path(explicit_path)
-                if not explicit_path.is_absolute():
-                    explicit_path = root_dir / explicit_path
-                tried_paths.append(str(explicit_path))
-                if explicit_path.exists():
-                    repo_path = explicit_path
-
+        repo_path, tried_paths = locate_repo(root_dir, repo)
         if repo_path is None:
-            paths_str = ", ".join(tried_paths)
-            print(f"  ❌ {repo['name']}: could not resolve repository path (tried {paths_str}).")
-            # A configured repo we cannot even locate is a failure, not a benign
-            # skip — it is precisely the "left stale, nobody noticed" case #609
-            # exists to kill. A layer simply not imported on this host lands
-            # here too, so the reason names it rather than saying "sync failed".
-            failures.append((repo["name"], "path not resolved"))
+            record(
+                None,
+                repo["name"],
+                classify_unlocatable_repo(root_dir, repo, optional_layers, tried_paths),
+            )
             continue
 
         record(repo_path, repo["name"], sync_repo(repo_path, repo["name"], args.dry_run))

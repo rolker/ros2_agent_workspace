@@ -24,7 +24,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
-from workspace import get_workspace_root, get_overlay_repos
+from workspace import get_workspace_root, get_overlay_repos, get_optional_layers
 
 
 def get_actual_repos(workspace_root):
@@ -140,19 +140,6 @@ def get_git_branch(repo_path):
     except Exception as e:
         print(f"Error: Unexpected error getting branch for {repo_path}: {e}", file=sys.stderr)
         return None
-
-
-def get_optional_layers(workspace_root):
-    """Read optional layer names from optional_layers.txt."""
-    optional_file = Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"
-    if not optional_file.exists():
-        return set()
-    layers = set()
-    for line in optional_file.read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line:
-            layers.add(line)
-    return layers
 
 
 def get_optional_repo_names(configured_list, optional_layers):
