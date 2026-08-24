@@ -488,9 +488,9 @@ order:
 | Hosted checks **pending/queued**, no attestation | Waits on them, gates on the result |
 | Hosted checks **passing** | Merges, as always |
 | Check state **unrecognized** (gh schema change) | Waits on them — fail closed, never shortcut |
-| **Workflows exist** at the head but no checks registered | Short re-poll, then **refuses**. An empty rollup is ambiguous (head just pushed, `paths:`-filtered workflow that didn't match, queued suite, a workflows dir with nothing runnable) and a repo with CI must be verified by it. The **workspace repo always lands here** rather than on any attestation path (ADR-0018 decision 4). |
-| **No workflows** at the head (project repo) + full-scope attestation | Merges on the attestation; `refs/notes/ci-local` is published at merge time (decision 5) |
-| **No workflows** at the head (project repo), no attestation | **Merges with a loud warning** that nothing verified this commit, and exits **`42`** (see below) |
+| **Workflows exist** at the head but no checks registered | Short re-poll, then **refuses**. An empty rollup is ambiguous (head just pushed, `paths:`-filtered workflow that didn't match, queued suite) and a repo with CI must be verified by it. The **workspace repo always lands here** rather than on any attestation path (ADR-0018 decision 4). |
+| **No workflow file** at the head — no `.github/workflows`, or a directory holding no `.yml`/`.yaml` — (project repo) + full-scope attestation | Merges on the attestation; `refs/notes/ci-local` is published at merge time (decision 5) |
+| **No workflow file** at the head (project repo), no attestation | **Merges with a loud warning** that nothing verified this commit, and exits **`42`** (see below) |
 
 **Exit `42` — merged with no verification available.** 26 of 45 project repos
 have no CI workflow at all, so refusing this state would block them with no path

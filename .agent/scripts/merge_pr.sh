@@ -528,7 +528,22 @@ if [[ "$NO_WAIT" == false ]]; then
         probe_rc=0
         WORKFLOW_PROBE=$(gh api "repos/$GH_REPO/contents/.github/workflows?ref=$HEAD_SHA" 2>&1) || probe_rc=$?
         if [[ $probe_rc -eq 0 ]]; then
-            HAS_WORKFLOWS=true
+            # The directory EXISTING is not the same as a workflow existing: a
+            # `.github/workflows` holding only a README would otherwise wedge
+            # the repo in the settle-and-refuse state forever, with --no-wait
+            # (which skips verification entirely) the only escape. Require at
+            # least one .yml/.yaml file. Anything we cannot parse counts as
+            # "has workflows" — fail closed.
+            # (Still unresolvable here: a workflow file that can never run for
+            # this PR, e.g. workflow_dispatch-only. That lands in the refuse
+            # state and needs a human call.)
+            if jq -e 'if type == "array"
+                      then any(.[]; (.name // "") | test("\\.ya?ml$"))
+                      else true end' >/dev/null 2>&1 <<<"$WORKFLOW_PROBE"; then
+                HAS_WORKFLOWS=true
+            else
+                HAS_WORKFLOWS=false
+            fi
         elif grep -qE '(HTTP 404|Not Found)' <<<"$WORKFLOW_PROBE"; then
             # A 404 alone is NOT proof that the path is absent. GitHub returns a
             # byte-identical 404 for a repo/path the token cannot read

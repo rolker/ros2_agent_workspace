@@ -225,7 +225,8 @@ case "$1 $2" in
     "api repos"*|"api "*)
         if [[ "$args" == *".github/workflows"* ]]; then
             case "${STUB_WORKFLOWS:-404}" in
-                listing) echo '[{"name":"validate.yml","type":"file"}]'; exit 0 ;;
+                listing)     echo '[{"name":"validate.yml","type":"file"}]'; exit 0 ;;
+                norunnable)  echo '[{"name":"README.md","type":"file"}]'; exit 0 ;;
                 error)   echo "gh: connection refused" >&2; exit 1 ;;
                 *)       echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
             esac
@@ -329,6 +330,17 @@ out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=listing run_ci_case env)
 { grep -qF "no checks have" <<<"$out" && ! grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
     && ok "empty-rollup race stays fail-closed" \
     || bad "empty-rollup race (out: $(head -3 <<<"$out" | tr '\n' '|'))"
+cleanup_ci_case
+
+echo "Test: a .github/workflows holding no workflow file → not 'has CI' (#610)"
+# The directory existing is not a workflow existing; without this the repo
+# wedges in settle-and-refuse forever and --no-wait is the only escape.
+make_ci_stub; make_ci_repo
+sha=$(git -C "$ci_repo" rev-parse HEAD)
+out=$(STUB_HEAD_SHA="$sha" STUB_WORKFLOWS=norunnable run_ci_case env)
+{ grep -qF "NO automated verification" <<<"$out" && grep -qF "MERGE_ATTEMPTED" <<<"$out"; } \
+    && ok "empty workflows dir is not treated as CI" \
+    || bad "empty workflows dir (out: $(head -4 <<<"$out" | tr '\n' '|'))"
 cleanup_ci_case
 
 echo "Test: checks present → watched as before, then merges (#610 leaves this path alone)"
