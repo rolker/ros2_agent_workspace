@@ -312,28 +312,180 @@ Specialists: static analysis (shellcheck --severity=warning clean; `make test-sc
 Verified by mutation, not by reading: the scratch-ref guard is load-bearing (14/1 with the `+` and the up-front delete removed, 15/15 restored); `pass (partial)` cannot match as full scope, and a `ci-local: pass` in one appended record cannot combine with a `scope: full` in another (rejected in both orderings).
 
 ### Findings
-- [ ] (must-fix) `upstream.repos` completeness (#577) is skipped entirely when the head commit object is not local and the note carries no `upstream-repo:` lines — the inverse of the guard's stated intent; found independently by all three reads — `.agent/scripts/_ci_verification_helpers.sh:145-162`
-- [ ] (must-fix) The `.github/workflows` 404 probe cannot distinguish "no CI" from a permission 404 or a bad-ref 404 (`No commit found for the ref`) — a token without Contents read makes every project repo classify as no-CI and merge on a warning; `HEAD_SHA` is also never validated as 40-hex before being used as both a URL ref and a git revision — `.agent/scripts/merge_pr.sh:372-397`
-- [ ] (must-fix) The scratch ref name is a constant, so a concurrent `merge_pr.sh` in the same repo deletes it mid-fetch and the attested PR falls through to the merge-with-no-verification state (reproduced 10/10); use a per-process name — `.agent/scripts/_ci_verification_helpers.sh:20,125-131`
-- [ ] (must-fix) The decision-5 note push fails in both normal states — no local ref when the note came from origin (warning then falsely claims the evidence "exists only on this machine" and prescribes a command that fails identically), and non-fast-forward whenever origin's notes ref has records this checkout never fetched (git never fetches `refs/notes` by default); both verified — `.agent/scripts/merge_pr.sh:463-473`
-- [ ] (must-fix) The state-4 recourse prints `ci_local.sh $BRANCH_REPO` — the main checkout, which sits on the default branch — so following it attests the wrong commit and the re-run still reports no attestation — `.agent/scripts/merge_pr.sh:449-450`
-- [ ] (must-fix) AGENTS.md does not match the script in three places: the standing paragraph still promises attestation "instead of waiting for hosted Actions" while state 1 now always waits; state 2 omits that checks appearing during the re-poll are waited on and gated, not refused; and the § Merging bullets above still describe an unconditional gate with no back-link to the new merge-on-a-warning state — `AGENTS.md:462-490` vs `merge_pr.sh:405-419`
-- [ ] (must-fix) The new merge_pr test cases build fixtures inside the real workspace root with no `trap`, no empty-`ROOT_DIR` guard, and the `--repo-slug workspace` case omits the `GIT_SSH_COMMAND=/bin/false` guard the others carry — a regressed gate would run branch-delete and `make sync` against the real repo — `.agent/scripts/tests/test_merge_pr.sh:18,182-334`
-- [ ] (suggestion) `jq -e '.statusCheckRollup | length'` yields 0 for a missing key as well as an empty array; assert the key is an array so a gh schema change fails closed — `.agent/scripts/merge_pr.sh:347`
-- [ ] (suggestion) `${entry}` is interpolated unescaped into `grep -qE`; an `upstream.repos` key of `.*` satisfies completeness with one line. Apply ci_local.sh's `^[A-Za-z0-9_-]+$` validation on the consumer side — `.agent/scripts/_ci_verification_helpers.sh:77`
-- [ ] (suggestion) `MERGE_PR_SETTLE_ATTEMPTS`/`_SECONDS` reach arithmetic contexts unvalidated (command execution demonstrated via `x[$(...)]`); validate as `^[0-9]+$` — `.agent/scripts/merge_pr.sh:330-331,408-410`
-- [ ] (suggestion) The ADR-0018 decision-4 exemption is a path-string compare; a workspace worktree outside `.workspace-worktrees/` would drop it. Identify the workspace repo by `GH_REPO` slug as well — `.agent/scripts/merge_pr.sh:402-403`
-- [ ] (suggestion) `.github/workflows` existing is not the same as a runnable workflow; a dir holding only a README or a `workflow_dispatch`-only file wedges the repo in state 2 permanently, with `--no-wait` the only escape the docs tell agents not to take — `.agent/scripts/merge_pr.sh:387-391`
-- [ ] (suggestion) `gh pr merge` is not passed `--match-head-commit "$HEAD_SHA"`, so a push landing after the attestation check merges a commit nothing attested — `.agent/scripts/merge_pr.sh:476`
-- [ ] (suggestion) The push warning swallows git's stderr (`2>/dev/null`), so the operator cannot tell non-fast-forward from missing-ref — and the two need different remedies — `.agent/scripts/merge_pr.sh:466`
-- [ ] (suggestion) "after $SETTLE_ATTEMPTS poll(s)" undercounts by one — the initial read at line 355 also polled — `.agent/scripts/merge_pr.sh:432`
-- [ ] (suggestion) Add helper tests for the two cases the mutation work exercised but nothing pins: head-absent with a note that omits `upstream-repo:` lines, and a cross-record `pass`/`scope: full` split — `.agent/scripts/tests/test_ci_verification_helpers.sh`
-- [ ] (suggestion) `Makefile:77` still says "NO_WAIT=1 skips the CI wait"; it now skips the attestation lookup and the note push too — `Makefile:77`
-- [ ] (suggestion) The test file header still says the CI-wait block is "intentionally NOT exercised here", directly above eight cases that exercise it — `.agent/scripts/tests/test_merge_pr.sh:8-11`
-- [ ] (suggestion) The ADR-0018 addendum is a `###` under `## Alternatives considered`, so it renders as an alternative; the ADR-0013 precedent puts it under `## References` — `docs/decisions/0018-local-first-ci-verification.md:141`
-- [ ] (suggestion) AGENTS.md item 4 of a four-state list calls itself "the honest third state" — `AGENTS.md:487`
-- [ ] (suggestion) Sync the plan text with what shipped: the scratch-ref `trap ... RETURN` became an explicit delete, and `--no-wait`'s meaning did widen — `.agent/work-plans/issue-610/plan.md:172-175,233-235`
+- [x] (must-fix) `upstream.repos` completeness (#577) is skipped entirely when the head commit object is not local and the note carries no `upstream-repo:` lines — the inverse of the guard's stated intent; found independently by all three reads — `.agent/scripts/_ci_verification_helpers.sh:145-162`
+- [x] (must-fix) The `.github/workflows` 404 probe cannot distinguish "no CI" from a permission 404 or a bad-ref 404 (`No commit found for the ref`) — a token without Contents read makes every project repo classify as no-CI and merge on a warning; `HEAD_SHA` is also never validated as 40-hex before being used as both a URL ref and a git revision — `.agent/scripts/merge_pr.sh:372-397`
+- [x] (must-fix) The scratch ref name is a constant, so a concurrent `merge_pr.sh` in the same repo deletes it mid-fetch and the attested PR falls through to the merge-with-no-verification state (reproduced 10/10); use a per-process name — `.agent/scripts/_ci_verification_helpers.sh:20,125-131`
+- [x] (must-fix) The decision-5 note push fails in both normal states — no local ref when the note came from origin (warning then falsely claims the evidence "exists only on this machine" and prescribes a command that fails identically), and non-fast-forward whenever origin's notes ref has records this checkout never fetched (git never fetches `refs/notes` by default); both verified — `.agent/scripts/merge_pr.sh:463-473`
+- [x] (must-fix) The state-4 recourse prints `ci_local.sh $BRANCH_REPO` — the main checkout, which sits on the default branch — so following it attests the wrong commit and the re-run still reports no attestation — `.agent/scripts/merge_pr.sh:449-450`
+- [x] (must-fix) AGENTS.md does not match the script in three places: the standing paragraph still promises attestation "instead of waiting for hosted Actions" while state 1 now always waits; state 2 omits that checks appearing during the re-poll are waited on and gated, not refused; and the § Merging bullets above still describe an unconditional gate with no back-link to the new merge-on-a-warning state — `AGENTS.md:462-490` vs `merge_pr.sh:405-419`
+- [x] (must-fix) The new merge_pr test cases build fixtures inside the real workspace root with no `trap`, no empty-`ROOT_DIR` guard, and the `--repo-slug workspace` case omits the `GIT_SSH_COMMAND=/bin/false` guard the others carry — a regressed gate would run branch-delete and `make sync` against the real repo — `.agent/scripts/tests/test_merge_pr.sh:18,182-334`
+- [x] (suggestion) `jq -e '.statusCheckRollup | length'` yields 0 for a missing key as well as an empty array; assert the key is an array so a gh schema change fails closed — `.agent/scripts/merge_pr.sh:347`
+- [x] (suggestion) `${entry}` is interpolated unescaped into `grep -qE`; an `upstream.repos` key of `.*` satisfies completeness with one line. Apply ci_local.sh's `^[A-Za-z0-9_-]+$` validation on the consumer side — `.agent/scripts/_ci_verification_helpers.sh:77`
+- [x] (suggestion) `MERGE_PR_SETTLE_ATTEMPTS`/`_SECONDS` reach arithmetic contexts unvalidated (command execution demonstrated via `x[$(...)]`); validate as `^[0-9]+$` — `.agent/scripts/merge_pr.sh:330-331,408-410`
+- [x] (suggestion) The ADR-0018 decision-4 exemption is a path-string compare; a workspace worktree outside `.workspace-worktrees/` would drop it. Identify the workspace repo by `GH_REPO` slug as well — `.agent/scripts/merge_pr.sh:402-403`
+- [x] (suggestion) `.github/workflows` existing is not the same as a runnable workflow; a dir holding only a README or a `workflow_dispatch`-only file wedges the repo in state 2 permanently, with `--no-wait` the only escape the docs tell agents not to take — `.agent/scripts/merge_pr.sh:387-391`
+- [x] (suggestion) `gh pr merge` is not passed `--match-head-commit "$HEAD_SHA"`, so a push landing after the attestation check merges a commit nothing attested — `.agent/scripts/merge_pr.sh:476`
+- [x] (suggestion) The push warning swallows git's stderr (`2>/dev/null`), so the operator cannot tell non-fast-forward from missing-ref — and the two need different remedies — `.agent/scripts/merge_pr.sh:466`
+- [x] (suggestion) "after $SETTLE_ATTEMPTS poll(s)" undercounts by one — the initial read at line 355 also polled — `.agent/scripts/merge_pr.sh:432`
+- [x] (suggestion) Add helper tests for the two cases the mutation work exercised but nothing pins: head-absent with a note that omits `upstream-repo:` lines, and a cross-record `pass`/`scope: full` split — `.agent/scripts/tests/test_ci_verification_helpers.sh`
+- [x] (suggestion) `Makefile:77` still says "NO_WAIT=1 skips the CI wait"; it now skips the attestation lookup and the note push too — `Makefile:77`
+- [x] (suggestion) The test file header still says the CI-wait block is "intentionally NOT exercised here", directly above eight cases that exercise it — `.agent/scripts/tests/test_merge_pr.sh:8-11`
+- [x] (suggestion) The ADR-0018 addendum is a `###` under `## Alternatives considered`, so it renders as an alternative; the ADR-0013 precedent puts it under `## References` — `docs/decisions/0018-local-first-ci-verification.md:141`
+- [x] (suggestion) AGENTS.md item 4 of a four-state list calls itself "the honest third state" — `AGENTS.md:487`
+- [x] (suggestion) Sync the plan text with what shipped: the scratch-ref `trap ... RETURN` became an explicit delete, and `--no-wait`'s meaning did widen — `.agent/work-plans/issue-610/plan.md:172-175,233-235`
 
 ### For the operator (decisions, not defects)
-- [ ] State 4 is a real loosening: a project repo with no CI and no attestation now merges on a stderr warning where it previously refused (26 of 45 project repos have no workflow file). ADR-0018's Consequences named "warn or refuse" as the open choice, so it is authorized — but it is recorded only in AGENTS.md, and there is no prompt or distinct exit code. Yes/no: is the AGENTS.md paragraph enough, or should state 4 require an explicit flag and/or a superseding ADR?
-- [ ] The attestation is consulted only when a repo has no workflows at all; project repos that do have CI still must wait on hosted Actions. That is narrower than ADR-0018 decision 1 reads. Deliberate scope, or a follow-up?
+- [x] State 4 is a real loosening: a project repo with no CI and no attestation now merges on a stderr warning where it previously refused (26 of 45 project repos have no workflow file). ADR-0018's Consequences named "warn or refuse" as the open choice, so it is authorized — but it is recorded only in AGENTS.md, and there is no prompt or distinct exit code. Yes/no: is the AGENTS.md paragraph enough, or should state 4 require an explicit flag and/or a superseding ADR?
+- [x] The attestation is consulted only when a repo has no workflows at all; project repos that do have CI still must wait on hosted Actions. That is narrower than ADR-0018 decision 1 reads. Deliberate scope, or a follow-up?
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 14:59 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-610 at `e4c6004`
+**Addressed**: `## Local Review (Pre-Push)` (2026-08-24 14:36 -04:00, branch at `f5db667`) — 7 must-fix, 14 suggestions, plus the two operator-decision items
+**Commits**: `4e0b796` (helper fail-open paths), `0beae40` (merge_pr fail-open paths + the ADR-0018 decision-1 widening), `b10e184` (AGENTS.md / ADR addendum / Makefile / plan), `e4c6004` (empty workflows dir is not CI)
+
+### The seven must-fixes
+
+1. **#577 completeness skipped when the head object is absent** — the guard only
+   refused when the *note itself* carried `upstream-repo:` lines, so a note that
+   omitted them bypassed the rule entirely. Now: one targeted `git fetch origin
+   <sha>`, then **fail closed unconditionally** if the commit is still absent —
+   without it, `upstream.repos` at the head is unreadable, so completeness is
+   not evaluable at all.
+2. **The `.github/workflows` 404 could be a permission or bad-ref 404** — the
+   `gh` text is byte-identical for all three. A 404 is now believed only after a
+   **control probe** of the repository root at the same ref reads back; if that
+   also 404s, merge-pr refuses and names both possibilities. `HEAD_SHA` is
+   validated as 40-hex before use as a URL ref and a git revision.
+3. **Constant scratch ref → concurrent runs sabotage each other** — the name is
+   now built per call (prefix + PID + `$RANDOM` + ns). A test runs 10 concurrent
+   lookups in one repo; under the constant name it loses the attestation.
+4. **Decision-5 note push failed in both normal states** — extracted to
+   `ci_local_push_attestation()`, which (a) reports "already published; nothing
+   to push" when there is no local ref because the note came from origin —
+   instead of falsely claiming the evidence exists only on this machine — and
+   (b) reconciles with origin's notes ref (`notes merge -s cat_sort_uniq`,
+   correct for append-only records) before pushing, so the routine
+   non-fast-forward becomes a fast-forward. Failures now quote git's own stderr
+   and prescribe a command that actually works. Three hermetic tests, including
+   one asserting both sides' records survive on origin.
+5. **State-4 recourse named the main checkout** (on the default branch, so
+   following it attests the wrong commit) — it now names a checkout verified to
+   be sitting on the head, and otherwise says explicitly that one is needed.
+6. **AGENTS.md ↔ script mismatches** — § Merge verification is rewritten as a
+   precedence table: no more "instead of waiting" while the code always waited;
+   checks that appear during the settle re-poll are stated to be waited on and
+   gated; the § Merging bullets no longer describe an unconditional gate and
+   link down to it. The ADR-0018 addendum moved under a new `## References`
+   heading so it stops rendering as an alternative considered.
+7. **Test fixtures inside the real workspace root** — added a `trap ... EXIT INT
+   TERM` cleanup, a refusal to run when `ROOT_DIR` does not resolve to a real
+   git root, a refusal to run if the fixture layer already exists, and
+   `GIT_SSH_COMMAND=/bin/false` on the `--repo-slug workspace` case. A `make`
+   stub keeps the one case that runs to completion from syncing the workspace.
+
+### Operator decision A — state 4 stays warn-and-merge, but is visible
+
+Distinct exit status **42** plus a `####`-banner naming the PR, the head, and
+what was not checked. The merge and all cleanup still happen first, so the code
+reports the outcome without changing it. Recorded in the script's usage header
+(a full exit-code table: 0/1/2/42), `AGENTS.md` § Merge verification, the
+Script Reference row, and `make help` (which notes `make merge-pr` surfaces it
+as `Error 42`). Two tests pin it: unverified → 42 after cleanup completes,
+attested → 0.
+
+### Operator decision B — ADR-0018 decision 1 implemented in full
+
+The attestation is now consulted for **every** project-repo PR, not only repos
+with no workflows. The rollup is classified per entry (CheckRun
+`status`/`conclusion`, StatusContext `state`) instead of merely counted, and the
+precedence is explicit in `gate_on_hosted_checks()`:
+
+| At the head | behavior |
+|---|---|
+| failing | **refuse**, attestation or not |
+| pending + full-scope attestation (project repo) | merge on it, no wait |
+| pending, no attestation | wait and gate (unchanged) |
+| passing | merge (unchanged) |
+| unrecognized state | wait — fail closed, never shortcut |
+
+The workspace repo is excluded from every attestation path (decision 4), now
+identified by GitHub slug as well as by path so a worktree outside
+`.workspace-worktrees/` cannot lose the exemption. Five new tests pin the
+precedence; the red-plus-valid-attestation case (which must refuse) is the one
+that would turn the widening into a loophole, and a mutation allowing the
+attestation to answer a red signal fails it.
+
+**Where ADR-0018 does not settle the case — flagged, not chosen silently.**
+Decision 1 says an attestation lets a project-repo PR merge "without waiting for
+hosted Actions" and is silent on *failing* checks; decision 3 calls hosted CI on
+project repos "a mirror and backstop — never a blocker", which read literally
+would permit merging past red. The ADR never addresses attestation-plus-red
+directly. AGENTS.md's standing rule ("never merge past a red signal from
+whichever verification applies") settles it as **refuse**, which is what the
+operator directed and what shipped; `AGENTS.md` § Merge verification states the
+tension and the resolution, and confines decision 3's "never a blocker" to
+post-merge failures and to waiting. If that reading is wrong, the fix is an ADR
+amendment, not a code change.
+
+### Suggestions taken (13 of 14, plus one upgraded)
+
+`statusCheckRollup` must be an array (a missing key no longer reads as an empty
+one); `upstream.repos` entry names re-validated consumer-side against
+`^[A-Za-z0-9_-]+$` so an entry of `.*` cannot satisfy completeness;
+`MERGE_PR_SETTLE_*` validated as integers (a test asserts `1$(touch ...)` cannot
+execute); the workspace repo identified by slug as well as path;
+`--match-head-commit "$HEAD_SHA"` on the merge; git's stderr surfaced on a note
+push failure; the poll count no longer undercounts by one; helper tests added
+for head-absent-without-upstream-lines and the cross-record `pass`/`scope: full`
+split; `Makefile` help and the script header now say `--no-wait` skips the
+attestation lookup and push too; the test-file header no longer claims the CI
+block is unexercised; the ADR addendum moved; the "honest third state" wording
+gone with the rewrite; the plan synced (scratch-ref trap → per-call name,
+recourse path, widened `--no-wait`, and the decision-1 widening).
+
+The fourteenth — a `.github/workflows` directory holding nothing runnable —
+was **fixed rather than documented**: the listing must contain a `.yml`/`.yaml`
+entry, otherwise the repo is treated as having no CI (an unparseable listing
+still counts as CI: fail closed). A `workflow_dispatch`-only file remains
+unresolvable from the listing alone and is left as a human call, said so in the
+code.
+
+### One fail-open found while implementing, not in the review
+
+`check_rollup_state`'s `exit 1` on a `gh` failure ran inside `$( )` — a
+subshell — so it killed only the subshell and the caller carried on with an
+empty classification. The status is now propagated with `|| exit 1` and a
+non-numeric count fails closed. Caught by the existing gh-failure regression
+test, which failed the moment the rewrite landed.
+
+### Verification
+
+- `make test-scripts`, fresh: **22 shell test files ✅, 73 pytest tests passed,
+  0 failures** — `test_merge_pr.sh` **36/36** (was 24) and
+  `test_ci_verification_helpers.sh` **23/23** (was 15).
+- `make validate`, fresh: **PASSED** (all four layer-sourcing checks green,
+  including the Check-3 baked-chain check that warned in the previous round).
+- `shellcheck --severity=warning` clean on both scripts and both test files;
+  pre-commit hooks ran on every commit, no `--no-verify`.
+- **Mutation-checked, 9 guards, each failing under the specific bug it
+  targets**: constant scratch ref (concurrency test 2/10 lost);
+  head-absent fail-open (attests a note it cannot check); dropped entry-name
+  validation (`.*` attests); attestation allowed to answer a red signal;
+  dropped control probe (permission-404 merges); dropped head-sha validation;
+  dropped exit 42; dropped settle validation; gh-failure status not propagated;
+  recourse naming the main checkout; and directory-existence taken as CI. Bare
+  note push mutation fails all three publication tests.
+- Fixtures leave nothing behind: `layers/main/citest_ws` is absent after the
+  run, and the workspace was never synced (the `make` stub logged it instead).
+
+### Actions
+- [x] All 7 must-fix findings closed — `.agent/scripts/_ci_verification_helpers.sh`, `.agent/scripts/merge_pr.sh`, `AGENTS.md`, `.agent/scripts/tests/test_merge_pr.sh`
+- [x] Operator decision A implemented (exit 42 + banner, recorded in the script header, AGENTS.md, the Script Reference row, and `make help`)
+- [x] Operator decision B implemented (ADR-0018 decision 1 in full, with red-refuses precedence explicit in code and AGENTS.md)
+- [x] All 14 suggestions taken (one upgraded from a documented caveat to a fix)
+- [ ] Human content review of the `AGENTS.md` change before merge — it is an instruction file, and the decision-B widening is a policy change riding on a bug-fix branch
+- [ ] Hosted checks must be green before merging this PR (workspace repo, ADR-0018 decision 4)
