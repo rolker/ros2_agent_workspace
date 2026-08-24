@@ -343,12 +343,21 @@ def test_absent_optional_layer_is_a_skip_not_a_failure(monkeypatch, tmp_path, ca
     assert "2 synced, 1 skipped" in out
 
 
-def test_repo_missing_inside_an_imported_optional_layer_is_a_failure(monkeypatch, tmp_path, capsys):
-    """Optional means "the layer may be absent", not "anything under it may
-    vanish": once the layer is imported, a missing repo is still stale-and-
-    unnoticed."""
+def test_repo_missing_from_a_present_optional_layer_is_still_a_skip(monkeypatch, tmp_path, capsys):
+    """A present layer directory does not mean the layer imported completely.
+
+    setup_layers.sh exits 0 leaving a *partially* imported optional layer
+    whenever it did not create the directory that run (`LAYER_DIR_EXISTED=true`
+    — "preserve a previously-cloned layer"), and leaves an empty `src/` with a
+    "Setup complete" message on a host with no `vcs`. Gating the carve-out on
+    the directory would put `make sync` permanently red on both of those
+    supported states — and disagree with validate_workspace.py, which allows any
+    repo in an optional layer to be missing.
+    """
     workspace = make_workspace(tmp_path, monkeypatch)
     declare_optional(workspace, "site")
+    # Layer directory present but empty: the no-`vcs` state, and the shape a
+    # partial import leaves behind.
     (workspace / "layers" / "main" / "site_ws" / "src").mkdir(parents=True)
     _run_main(monkeypatch, workspace, [], {})
     monkeypatch.setattr(
@@ -356,10 +365,12 @@ def test_repo_missing_inside_an_imported_optional_layer_is_a_failure(monkeypatch
         "get_overlay_repos",
         lambda include_underlay=False: [repo_record("private", layer="site")],
     )
-    with pytest.raises(SystemExit) as exc:
-        sync_repos.main()
-    assert exc.value.code == 1
-    assert "path not resolved" in capsys.readouterr().out
+    sync_repos.main()  # no SystemExit: exit 0
+    out = capsys.readouterr().out
+    assert "path not resolved" not in out
+    assert "layer 'site' is optional on this host" in out
+    assert "1 synced, 1 skipped" in out
+    assert "0 failures" in out
 
 
 def test_absent_required_layer_fails_and_says_it_is_not_set_up(monkeypatch, tmp_path, capsys):

@@ -312,27 +312,39 @@ def locate_repo(root_dir, repo):
 def classify_unlocatable_repo(root_dir, repo, optional_layers, tried_paths):
     """Decide what a repo we cannot find on disk means, and say so (#609).
 
-    A configured repo that is missing from an imported layer is a real failure —
-    "left stale, nobody noticed" is what this issue exists to kill. But a whole
-    layer that was never imported is a different thing:
+    A configured repo that is missing from a *required* layer is a real failure —
+    "left stale, nobody noticed" is what this issue exists to kill. A repo from
+    an *optional* layer (configs/manifest/optional_layers.txt) is not:
 
-    - An *optional* layer (configs/manifest/optional_layers.txt) is absent by
-      design on hosts without access to its private repos — setup_layers.sh
-      deletes the layer directory and exits 0. Failing the run for it would make
-      `make sync` permanently red on a supported configuration, which is the
-      false red this design calls worse than the false green it removes.
+    - Optional layers are absent by design on hosts without access to their
+      private repos. setup_layers.sh exits 0 on every such host, but does not
+      always leave the layer directory gone: it removes the directory only when
+      it created it that run (`LAYER_DIR_EXISTED=false` — "preserve a
+      previously-cloned layer"), so a *partially* imported optional layer keeps
+      its `src/` with some repos missing. A host with no `vcs` at all is the same
+      shape: setup_layers.sh `mkdir -p`s an empty `src`, prints "Setup complete"
+      and exits 0. The presence of the layer directory therefore cannot tell
+      "fully imported" from "supported host, repos legitimately absent", so a
+      missing optional repo is a SKIP whether or not the layer directory exists.
+      Gating on the directory instead would turn both of those exit-0 states
+      permanently red — the false red this design calls worse than the false
+      green it removes — and would disagree with validate_workspace.py, which
+      allows any repo in an optional layer to be missing (both now read the
+      layer list through the same parser, so they must agree).
     - A *required* layer that is not set up still fails, but says so: the fix is
       to run setup, not to chase a network problem.
     """
     layer = layer_name_for(repo)
     layer_src = root_dir / "layers" / "main" / f"{layer}_ws" / "src"
-    layer_imported = layer_src.exists()
 
-    if not layer_imported and layer in optional_layers:
-        print(f"  ⚠️  {repo['name']}: optional layer '{layer}' is not set up on this host.")
-        return SyncResult(SyncOutcome.SKIPPED, f"optional layer '{layer}' not set up")
+    if layer in optional_layers:
+        # Not "the layer is not set up" — the layer directory may well exist and
+        # be partially populated; what is true in every case is that this repo is
+        # absent from a layer this host is allowed to be missing repos from.
+        print(f"  ⚠️  {repo['name']}: not present — layer '{layer}' is optional on this host.")
+        return SyncResult(SyncOutcome.SKIPPED, f"absent from optional layer '{layer}'")
 
-    if not layer_imported:
+    if not layer_src.exists():
         print(f"  ❌ {repo['name']}: layer '{layer}' is not set up ({layer_src} missing).")
         return SyncResult(
             SyncOutcome.FAILED,
