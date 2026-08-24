@@ -66,6 +66,10 @@ summarize_and_exit() {
 IMAGE_NAME=$(sed -n 's/^IMAGE_NAME="\([^"]*\)".*/\1/p' "$DRA" | head -1)
 IMAGE_TAG=$(sed -n 's/^IMAGE_TAG="\([^"]*\)".*/\1/p' "$DRA" | head -1)
 IMAGE="$IMAGE_NAME:$IMAGE_TAG"
+# Same reasoning for the staleness-marker label: read the name the launcher
+# actually reads back, so a rename fails here instead of downgrading the
+# digest check to a permanent silent SKIP.
+STARTUP_LABEL=$(sed -n 's/^STARTUP_SCRIPTS_LABEL="\([^"]*\)".*/\1/p' "$DRA" | head -1)
 
 for f in "$OWNERSHIP_SH" "$ENTRYPOINT_SH"; do
     if [ ! -f "$f" ]; then
@@ -75,6 +79,10 @@ for f in "$OWNERSHIP_SH" "$ENTRYPOINT_SH"; do
 done
 if [ -z "$IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ]; then
     fail "could not read IMAGE_NAME/IMAGE_TAG from $DRA (renamed?)"
+    summarize_and_exit
+fi
+if [ -z "$STARTUP_LABEL" ]; then
+    fail "could not read STARTUP_SCRIPTS_LABEL from $DRA (renamed?)"
     summarize_and_exit
 fi
 
@@ -96,7 +104,22 @@ ISSUE=999604
 ROOT="$(mktemp -d /tmp/chown_cov.XXXXXX)"
 STUB_BIN="$(mktemp -d /tmp/chown_stub.XXXXXX)"
 CROOT=""
-cleanup() { rm -rf "$ROOT" "$STUB_BIN" ${CROOT:+"$CROOT"}; }
+# The container-side fixture ($CROOT) is chowned to the IMAGE's `ros` uid, which
+# need not be this user's — when it differs, a plain rm -rf cannot remove it.
+# Hand it back to the invoking user from inside a root container first (the same
+# image, so no extra pull), then remove it. Both steps are best-effort: cleanup
+# must never turn a green run red.
+cleanup() {
+    rm -rf "$ROOT" "$STUB_BIN"
+    if [ -n "$CROOT" ]; then
+        if ! rm -rf "$CROOT" 2>/dev/null; then
+            docker run --rm -u 0 -v "$CROOT:$CROOT" --entrypoint chown "$IMAGE" \
+                -R "$(id -u):$(id -g)" "$CROOT" >/dev/null 2>&1 || true
+            rm -rf "$CROOT" 2>/dev/null || \
+                echo "NOTE: could not remove test fixture $CROOT (left for manual cleanup)" >&2
+        fi
+    fi
+}
 trap cleanup EXIT
 make_fixture "$ROOT" "$SLUG" "$ISSUE"
 
@@ -270,7 +293,13 @@ STUBSETUP
     # tests the working tree's versions, and the container runs the IMAGE'S
     # ENTRYPOINT — so the entrypoint's call into fix-volume-ownership.sh, with
     # its argument list, is part of what is under test.
+    # --security-opt and -w mirror the real launch (docker_run_agent.sh's
+    # `docker run`): no-new-privileges is what forces the setpriv (not setuid)
+    # privilege drop, so without it a setpriv->setuid swap would pass here and
+    # break every real launch.
     e2e_out=$(docker run --rm \
+        --security-opt no-new-privileges:true \
+        -w "$CLWT" \
         -e "ROS2_AGENT_WORKSPACE_ROOT=$CROOT" \
         -e "WORKTREE_ROOT=$CLWT" \
         -v "$CROOT:$CROOT" \
@@ -307,12 +336,14 @@ $e2e_out"
     # the image's label against a digest of its own baked scripts — computed in
     # a container with nothing mounted over them.
     baked_label=$(docker image inspect "$IMAGE" \
-        --format '{{index .Config.Labels "org.ros2-agent.startup-scripts-sha"}}' 2>/dev/null || true)
+        --format "{{index .Config.Labels \"$STARTUP_LABEL\"}}" 2>/dev/null || true)
     if [ -z "$baked_label" ]; then
         skip "baked-scripts digest check (image carries no startup-scripts label)"
     else
+        # 2>/dev/null, not 2>&1: daemon chatter on stderr would be folded into
+        # the value compared against the label and read as a mismatch.
         baked_sha=$(docker run --rm --entrypoint bash "$IMAGE" -c \
-            'cd /usr/local/bin && cat agent-entrypoint.sh fix-volume-ownership.sh | sha256sum | cut -d" " -f1' 2>&1)
+            'cd /usr/local/bin && cat agent-entrypoint.sh fix-volume-ownership.sh | sha256sum | cut -d" " -f1' 2>/dev/null)
         if [ "$baked_sha" = "$baked_label" ]; then
             pass "image label matches a digest of the scripts actually baked into it"
         else
