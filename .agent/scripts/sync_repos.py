@@ -21,6 +21,7 @@ Options:
 
 import sys
 import enum
+import collections
 import math
 import time
 import shutil
@@ -156,9 +157,9 @@ class SyncOutcome(enum.Enum):
     - FAILED — the repo was supposed to sync and did not: the network command
       failed, or the repo is in a state we cannot even read.
 
-    Beware: every Enum member is truthy, so a call site left as
-    `if sync_repo(...)` would silently treat FAILED as success. Compare
-    against members explicitly.
+    Beware: every Enum member is truthy — and so is the SyncResult tuple that
+    carries one — so a call site left as `if sync_repo(...)` would silently
+    treat FAILED as success. Compare `.outcome` against members explicitly.
     """
 
     SYNCED = "synced"
@@ -166,28 +167,58 @@ class SyncOutcome(enum.Enum):
     FAILED = "failed"
 
 
+SyncResult = collections.namedtuple("SyncResult", ["outcome", "reason"], defaults=("",))
+SyncResult.__doc__ = """One repo's outcome plus why (#609).
+
+The reason is what the failure summary prints, so it must name the actual
+cause — "sync failed" for every repo alike tells the operator nothing about
+whether to check the network, the layer setup, or the repo itself.
+"""
+
+# Signatures of "this host has no route to the remote at all". These are NOT
+# the dropped-connection signatures in lib/remote_utils.py (TRANSIENT_ERRORS,
+# which are retried): an offline host fails every repo instantly, and saying so
+# once beats 35 identical "pull failed" lines.
+OFFLINE_SIGNATURES = (
+    "Could not resolve hostname",
+    "Temporary failure in name resolution",
+    "Network is unreachable",
+    "No route to host",
+    "Name or service not known",
+)
+
+
+def describe_network_failure(action, output):
+    """Reason string for a failed pull/fetch, reusing git's own error text."""
+    lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+    detail = lines[0][:200] if lines else "no error output"
+    if any(sig in (output or "") for sig in OFFLINE_SIGNATURES):
+        return f"remote unreachable ({action}): {detail}"
+    return f"{action} failed: {detail}"
+
+
 def preflight_repo(repo_path, dry_run=False):
     """Decide whether a repo can be synced at all.
 
-    Returns (outcome, branch): a SyncOutcome when the repo should not be
-    synced, or (None, branch) when it is ready. Split out from sync_repo() to
-    keep each function's branching legible now that the outcome is tri-state.
+    Returns (result, branch): a SyncResult when the repo should not be synced,
+    or (None, branch) when it is ready. Split out from sync_repo() to keep each
+    function's branching legible now that the outcome is tri-state.
     """
     if not repo_path.exists():
         print(f"  ❌ Path does not exist: {repo_path}")
-        return SyncOutcome.FAILED, None
+        return SyncResult(SyncOutcome.FAILED, "path does not exist"), None
 
     dirty = is_dirty(repo_path, dry_run)
     if dirty is None:
         print("  ❌ Cannot read working tree (corrupt .git, or not a repo).")
-        return SyncOutcome.FAILED, None
+        return SyncResult(SyncOutcome.FAILED, "cannot read working tree"), None
 
     if dirty:
         if dry_run:
             print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:
             print("  ⚠️  Skipping: Uncommitted changes detected.")
-        return SyncOutcome.SKIPPED, None
+        return SyncResult(SyncOutcome.SKIPPED, "uncommitted changes"), None
 
     branch = get_current_branch(repo_path, dry_run)
     if branch is None:
@@ -195,21 +226,21 @@ def preflight_repo(repo_path, dry_run=False):
         # is NOT the same as a detached HEAD, and collapsing the two is how a
         # genuinely broken repo stays silently stale under a green exit (#609).
         print("  ❌ Cannot read git state (not a repo, or corrupt .git).")
-        return SyncOutcome.FAILED, None
+        return SyncResult(SyncOutcome.FAILED, "cannot read git state"), None
     if not branch:
         print("  ⚠️  Skipping: Detached HEAD.")
-        return SyncOutcome.SKIPPED, None
+        return SyncResult(SyncOutcome.SKIPPED, "detached HEAD"), None
 
     return None, branch
 
 
 def sync_repo(repo_path, repo_name, dry_run=False):
-    """Synchronize a single repository. Returns a SyncOutcome (#609)."""
+    """Synchronize a single repository. Returns a SyncResult (#609)."""
     print(f"Checking {repo_name}...")
 
-    outcome, branch = preflight_repo(repo_path, dry_run)
-    if outcome is not None:
-        return outcome
+    result, branch = preflight_repo(repo_path, dry_run)
+    if result is not None:
+        return result
 
     # 2. Sync Logic
     if branch in ["main", "jazzy", "rolling"]:
@@ -224,7 +255,7 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                 print(f"     ✅ Updated:\n{output}")
         else:
             print(f"     ❌ Update failed: {output}")
-            return SyncOutcome.FAILED
+            return SyncResult(SyncOutcome.FAILED, describe_network_failure("pull", output))
 
     else:
         print(f"  On feature branch '{branch}'. Fetching only...")
@@ -246,9 +277,9 @@ def sync_repo(repo_path, repo_name, dry_run=False):
                     print("     ✅ Fetched.")
         else:
             print(f"     ❌ Fetch failed: {output}")
-            return SyncOutcome.FAILED
+            return SyncResult(SyncOutcome.FAILED, describe_network_failure("fetch", output))
 
-    return SyncOutcome.SYNCED
+    return SyncResult(SyncOutcome.SYNCED)
 
 
 def sync_gitbug(repo_path, dry_run=False):
@@ -322,16 +353,18 @@ def main():
     skipped = 0
     failures = []
 
-    def record(repo_path, repo_name, outcome):
+    def record(repo_path, repo_name, result):
         """Tally one repo's outcome, running git-bug only on a real sync."""
         nonlocal synced, skipped
-        if outcome is SyncOutcome.SYNCED:
+        if result.outcome is SyncOutcome.SYNCED:
             synced += 1
             sync_gitbug(repo_path, args.dry_run)
-        elif outcome is SyncOutcome.SKIPPED:
+        elif result.outcome is SyncOutcome.SKIPPED:
             skipped += 1
         else:
-            failures.append((repo_name, "sync failed"))
+            # The reason names the actual cause; the fallback only guards a
+            # future FAILED path that forgets to supply one.
+            failures.append((repo_name, result.reason or "sync failed"))
 
     # Also include the root repo itself. Compare against the member explicitly:
     # every Enum member is truthy, so `if sync_repo(...)` would treat a FAILED

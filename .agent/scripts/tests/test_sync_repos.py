@@ -75,34 +75,62 @@ def _stub_network(monkeypatch, success, output=""):
 def test_successful_pull_is_synced(monkeypatch, tmp_path):
     _stub_git(monkeypatch)
     _stub_network(monkeypatch, True, "Already up to date.")
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.SYNCED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.SYNCED
 
 
 def test_failed_pull_is_failed(monkeypatch, tmp_path):
     """The regression that #609 exists for: this used to return True."""
     _stub_git(monkeypatch)
     _stub_network(monkeypatch, False, "Connection reset by peer")
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.FAILED
 
 
 def test_failed_fetch_on_feature_branch_is_failed(monkeypatch, tmp_path):
     """The feature-branch arm had the same fall-through as the default arm."""
     _stub_git(monkeypatch, branch="feature/issue-1")
     _stub_network(monkeypatch, False, "Connection reset by peer")
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.FAILED
+
+
+def test_failure_reasons_name_the_actual_cause(monkeypatch, tmp_path):
+    """Every FAILED path carries its own reason — the summary prints it, and
+    "sync failed" for all causes alike tells the operator nothing."""
+    repo = make_repo(tmp_path)
+    _stub_git(monkeypatch)
+    _stub_network(monkeypatch, False, "fatal: unable to access ...: 502")
+    assert sync_repos.sync_repo(repo, "r").reason == "pull failed: fatal: unable to access ...: 502"
+    _stub_git(monkeypatch, branch_ok=False)
+    assert sync_repos.sync_repo(repo, "r").reason == "cannot read git state"
+    _stub_git(monkeypatch, dirty=True)
+    assert sync_repos.sync_repo(repo, "r").reason == "uncommitted changes"
+    assert sync_repos.sync_repo(tmp_path / "nope", "r").reason == "path does not exist"
+
+
+def test_offline_failure_is_named_as_unreachable(monkeypatch, tmp_path):
+    """An off-network host fails every repo at once and is not a retried
+    transient signature — say `remote unreachable`, not `pull failed`."""
+    _stub_git(monkeypatch)
+    _stub_network(
+        monkeypatch,
+        False,
+        "ssh: Could not resolve hostname github.com: Name or service not known",
+    )
+    result = sync_repos.sync_repo(make_repo(tmp_path), "r")
+    assert result.outcome is SyncOutcome.FAILED
+    assert result.reason.startswith("remote unreachable (pull):")
 
 
 def test_dirty_tree_is_a_benign_skip(monkeypatch, tmp_path):
     """Must NOT be FAILED — an intentionally dirty repo turning the run red is
     the false-red this design exists to avoid."""
     _stub_git(monkeypatch, dirty=True)
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.SKIPPED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.SKIPPED
 
 
 def test_detached_head_is_a_benign_skip(monkeypatch, tmp_path):
     """`git branch --show-current` succeeds and prints nothing."""
     _stub_git(monkeypatch, branch="")
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.SKIPPED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.SKIPPED
 
 
 def test_unreadable_git_state_is_failed(monkeypatch, tmp_path):
@@ -110,7 +138,7 @@ def test_unreadable_git_state_is_failed(monkeypatch, tmp_path):
     same as a detached HEAD. Collapsing the two leaves a broken repo silently
     stale under a green exit."""
     _stub_git(monkeypatch, branch_ok=False)
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.FAILED
 
 
 def test_unreadable_working_tree_is_failed(monkeypatch, tmp_path):
@@ -119,7 +147,7 @@ def test_unreadable_working_tree_is_failed(monkeypatch, tmp_path):
     index and real uncommitted changes sync-and-report green (#609)."""
     _stub_git(monkeypatch, status_ok=False, dirty=True)
     _stub_network(monkeypatch, True, "Already up to date.")
-    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r").outcome is SyncOutcome.FAILED
 
 
 def test_is_dirty_distinguishes_unreadable_from_clean(monkeypatch, tmp_path):
@@ -147,7 +175,7 @@ def test_run_git_cmd_reports_oserror_instead_of_raising(monkeypatch, tmp_path):
 
 
 def test_missing_path_is_failed(tmp_path):
-    assert sync_repos.sync_repo(tmp_path / "nope", "r") is SyncOutcome.FAILED
+    assert sync_repos.sync_repo(tmp_path / "nope", "r").outcome is SyncOutcome.FAILED
 
 
 def test_outcomes_are_all_truthy():
@@ -175,6 +203,14 @@ def make_workspace(tmp_path, monkeypatch):
     return root
 
 
+def failed_result(reason):
+    return sync_repos.SyncResult(SyncOutcome.FAILED, reason)
+
+
+def skipped_result(reason):
+    return sync_repos.SyncResult(SyncOutcome.SKIPPED, reason)
+
+
 def repo_record(name):
     """A repo record shaped like get_overlay_repos() returns: main() maps
     source_file (`core.repos`) to the workspace dir (`core_ws`)."""
@@ -195,7 +231,9 @@ def _run_main(monkeypatch, workspace, repos, outcomes):
     monkeypatch.setattr(
         sync_repos,
         "sync_repo",
-        lambda path, name, dry_run=False: outcomes.get(name, SyncOutcome.SYNCED),
+        lambda path, name, dry_run=False: outcomes.get(
+            name, sync_repos.SyncResult(SyncOutcome.SYNCED)
+        ),
     )
     gitbug_calls = []
     monkeypatch.setattr(
@@ -222,14 +260,16 @@ def test_a_real_failure_exits_nonzero(monkeypatch, tmp_path, capsys):
         monkeypatch,
         make_workspace(tmp_path, monkeypatch),
         [repo_record("a"), repo_record("b")],
-        {"b": SyncOutcome.FAILED},
+        {"b": failed_result("pull failed: Connection reset by peer")},
     )
     with pytest.raises(SystemExit) as exc:
         sync_repos.main()
     assert exc.value.code == 1
     out = capsys.readouterr().out
     assert "1 failure(s)" in out
-    assert "- b:" in out  # names the repo, not just a count
+    # Names the repo AND the actual cause — "sync failed" for every cause alike
+    # tells the operator nothing about what to check.
+    assert "- b: pull failed: Connection reset by peer" in out
 
 
 def test_benign_skips_alone_exit_zero(monkeypatch, tmp_path, capsys):
@@ -238,7 +278,7 @@ def test_benign_skips_alone_exit_zero(monkeypatch, tmp_path, capsys):
         monkeypatch,
         make_workspace(tmp_path, monkeypatch),
         [repo_record("a"), repo_record("b")],
-        {"a": SyncOutcome.SKIPPED, "b": SyncOutcome.SKIPPED},
+        {"a": skipped_result("uncommitted changes"), "b": skipped_result("detached HEAD")},
     )
     sync_repos.main()
     assert "0 failures" in capsys.readouterr().out
@@ -265,7 +305,7 @@ def test_gitbug_runs_only_for_synced_repos(monkeypatch, tmp_path):
         monkeypatch,
         make_workspace(tmp_path, monkeypatch),
         [repo_record("ok"), repo_record("bad"), repo_record("skip")],
-        {"bad": SyncOutcome.FAILED, "skip": SyncOutcome.SKIPPED},
+        {"bad": failed_result("pull failed: boom"), "skip": skipped_result("detached HEAD")},
     )
     with pytest.raises(SystemExit):
         sync_repos.main()
@@ -279,7 +319,7 @@ def test_mixed_run_counts_every_category(monkeypatch, tmp_path, capsys):
         monkeypatch,
         make_workspace(tmp_path, monkeypatch),
         [repo_record("a"), repo_record("b"), repo_record("c")],
-        {"b": SyncOutcome.SKIPPED, "c": SyncOutcome.FAILED},
+        {"b": skipped_result("detached HEAD"), "c": failed_result("pull failed: boom")},
     )
     with pytest.raises(SystemExit):
         sync_repos.main()
