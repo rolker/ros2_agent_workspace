@@ -14,7 +14,9 @@ Usage:
 
 Exit status:
     0  workspace matches the configuration.
-    1  drift: repos missing, orphaned, or on the wrong version.
+    1  drift: repos missing, orphaned, or on the wrong version — or a .repos
+       file that exists but could not be parsed, which leaves every repo it
+       declares unenumerated (#609).
     2  argparse usage error.
     3  nothing to validate — no repos are configured at all (configs/manifest
        missing or empty). Previously this printed a green "validation PASSED"
@@ -40,7 +42,12 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
-from workspace import get_workspace_root, get_overlay_repos, get_optional_layers
+from workspace import (
+    WorkspaceConfigError,
+    get_workspace_root,
+    get_overlay_repos,
+    get_optional_layers,
+)
 
 
 class ValidationResult(enum.Enum):
@@ -493,7 +500,15 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
-    result, missing = validate_workspace(args.verbose)
+    try:
+        result, missing = validate_workspace(args.verbose)
+    except WorkspaceConfigError as exc:
+        # A manifest we could not parse is not "no repos are configured": the
+        # file is there and declares repos we then never checked. Reporting it
+        # as UNCONFIGURED would point at `make setup-all`, which cannot fix a
+        # syntax error in a .repos file (#609).
+        print(f"❌ Cannot validate: {exc}", file=sys.stderr)
+        sys.exit(EXIT_CODES[ValidationResult.DRIFTED])
 
     # --fix only imports missing repos, which is only meaningful for drift.
     # UNCONFIGURED is not fixable this way: with no .repos files there is

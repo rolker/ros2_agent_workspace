@@ -7,10 +7,45 @@ ROS2 Agent Workspace.
 
 import glob
 import os
-import sys
 from pathlib import Path
 
 import yaml
+
+
+class WorkspaceConfigError(RuntimeError):
+    """A .repos file was found but could not be parsed (#609).
+
+    Every repo that file declares goes unenumerated, so callers that answered
+    "here is the repo list" over the survivors were reporting an all-clear over
+    repos nothing ever looked at. Raising makes the enumeration layer as honest
+    as the per-repo probes above it: a manifest we could not read is an error,
+    never an empty answer.
+    """
+
+
+def _load_repos_file(repo_file):
+    """Parse one .repos file. Returns its `repositories` mapping (possibly empty).
+
+    Raises WorkspaceConfigError if the YAML is malformed. Shared by
+    get_overlay_repos() and find_repo_version() so the two cannot drift on what
+    an unreadable manifest means.
+    """
+    try:
+        with open(repo_file, "r") as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise WorkspaceConfigError(f"cannot parse {os.path.basename(repo_file)}: {e}") from e
+    except OSError as e:
+        raise WorkspaceConfigError(f"cannot read {os.path.basename(repo_file)}: {e}") from e
+    if not data or "repositories" not in data:
+        return {}
+    repositories = data["repositories"]
+    if not isinstance(repositories, dict):
+        raise WorkspaceConfigError(
+            f"cannot parse {os.path.basename(repo_file)}: "
+            f"'repositories' is {type(repositories).__name__}, expected a mapping"
+        )
+    return repositories
 
 
 def get_workspace_root():
@@ -36,6 +71,10 @@ def get_overlay_repos(include_underlay=False):
             - url: Git URL
             - version: Branch/tag/commit
             - source_file: Name of the .repos file
+
+    Raises:
+        WorkspaceConfigError: a .repos file exists but could not be parsed. An
+            unreadable manifest is never reported as "no repos are configured".
     """
     workspace_root = get_workspace_root()
     ignored_files = ["underlay.repos"]
@@ -57,22 +96,18 @@ def get_overlay_repos(include_underlay=False):
         if filename in ignored_files and not include_underlay:
             continue
 
-        with open(repo_file, "r") as f:
-            try:
-                data = yaml.safe_load(f)
-                if not data or "repositories" not in data:
-                    continue
-
-                for name, info in data["repositories"].items():
-                    entry = {
-                        "name": name,
-                        "url": info.get("url", ""),
-                        "version": info.get("version", ""),
-                        "source_file": filename,
-                    }
-                    repos_list.append(entry)
-            except yaml.YAMLError as e:
-                print(f"Error parsing {filename}: {e}", file=sys.stderr)
+        # A malformed manifest raises rather than being printed-and-skipped:
+        # dropping its repos here left every caller reporting success over
+        # repos it never enumerated (#609).
+        for name, info in _load_repos_file(repo_file).items():
+            repos_list.append(
+                {
+                    "name": name,
+                    "url": info.get("url", ""),
+                    "version": info.get("version", ""),
+                    "source_file": filename,
+                }
+            )
 
     return repos_list
 
@@ -106,6 +141,26 @@ def layer_name_for(repo):
     return repo["source_file"][: -len(".repos")] if repo["source_file"].endswith(".repos") else ""
 
 
+def repo_absence_is_allowed(repo, optional_layers):
+    """True if this configured repo is allowed to be missing from disk.
+
+    The one rule both sync_repos.py and the remote scripts classify on: a repo
+    from a layer listed in configs/manifest/optional_layers.txt may legitimately
+    be absent (this host has no access to that layer's private repos, and
+    setup_layers.sh exits 0 having removed or never populated it). A repo from a
+    *required* layer that is not on disk is a real failure — "left stale, nobody
+    noticed" is what #609 exists to kill.
+
+    Deliberately does NOT consider whether the layer directory exists: a
+    partially-imported optional layer keeps its src/, so the directory cannot
+    tell "fully imported" from "supported host, repos legitimately absent".
+    Gating on it would turn a supported configuration permanently red — the
+    false red this design calls worse than the false green it removes.
+    See sync_repos.classify_unlocatable_repo() for the long form.
+    """
+    return layer_name_for(repo) in optional_layers
+
+
 def find_repo_version(target_repo):
     """
     Find the version/branch for a specific repository.
@@ -115,6 +170,9 @@ def find_repo_version(target_repo):
 
     Returns:
         str: Version string (e.g., "jazzy", "main", "feature/foo") or "unknown" if not found
+
+    Raises:
+        WorkspaceConfigError: a .repos file exists but could not be parsed.
     """
     workspace_root = get_workspace_root()
 
@@ -131,18 +189,12 @@ def find_repo_version(target_repo):
             repo_files.extend(glob.glob(os.path.join(d, "*.repos")))
 
     for repo_file in repo_files:
-        with open(repo_file, "r") as f:
-            try:
-                data = yaml.safe_load(f)
-                if not data or "repositories" not in data:
-                    continue
-
-                if target_repo in data["repositories"]:
-                    repo_info = data["repositories"][target_repo]
-                    return repo_info.get("version", "unknown")
-
-            except yaml.YAMLError:
-                continue
+        # Same contract as get_overlay_repos(): a manifest we cannot parse is an
+        # error, not a file that declares nothing. Swallowing it here returned
+        # "unknown", and callers branch a worktree off that answer (#609).
+        repositories = _load_repos_file(repo_file)
+        if target_repo in repositories:
+            return repositories[target_repo].get("version", "unknown")
 
     return "unknown"
 

@@ -16,6 +16,18 @@ Prerequisites:
 
 Environment variables:
     FORGEJO_TOKEN   API token for Forgejo/Gitea (required for --set-default-branch).
+
+Exit status:
+    0  every repo was pushed, or deliberately skipped (remote not configured,
+       or absent from a layer that is optional on this host).
+    1  at least one repo errored: a failed push, a git state that could not be
+       read at all, a configured repo with no checkout in a *required* layer,
+       or an enumeration that produced no repos / an unparseable manifest.
+       A probe that failed is not a benign answer (#609).
+    2  argparse usage error.
+
+    `make push-remote` reports GNU make's own 2 for any non-zero recipe status,
+    so branch on these codes only when calling the script directly.
 """
 
 import argparse
@@ -31,8 +43,8 @@ sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 from remote_utils import (
     add_common_args,
+    classify_remote_state,
     get_default_branch,
-    RemoteState,
     remote_probe,
     run_git,
     run_git_network,
@@ -124,14 +136,12 @@ def set_forgejo_default_branch(repo_path, remote_name, branch, dry_run):
 
 def process_repo(repo_path, repo_name, version, args):
     """Push a single repo to the named remote. Returns (status, message)."""
-    state = remote_probe(repo_path, args.remote)
-    if state is RemoteState.UNREADABLE:
-        # Same false skip as pull_remote's: a repo whose `git remote` failed
-        # was never pushed, and reporting it as "remote not found" kept the
-        # run green (#609).
-        return "error", "cannot read git state (not a repo, or corrupt .git)"
-    if state is RemoteState.ABSENT:
-        return "skip", f"remote '{args.remote}' not found"
+    # Same false skip as pull_remote's: a repo whose `git remote` failed was
+    # never pushed, and reporting it as "remote not found" kept the run green.
+    # Both scripts classify through one shared helper so they cannot drift (#609).
+    problem = classify_remote_state(remote_probe(repo_path, args.remote), args.remote)
+    if problem:
+        return problem
 
     errors = []
     branch = get_default_branch(repo_path, version)

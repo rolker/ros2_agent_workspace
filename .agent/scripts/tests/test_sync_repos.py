@@ -28,7 +28,8 @@ sys.path.insert(0, str(SCRIPTS_DIR / "lib"))
 import pytest  # noqa: E402
 
 import sync_repos  # noqa: E402
-from sync_repos import SyncOutcome, locate_repo  # noqa: E402
+from sync_repos import SyncOutcome, SyncResult, locate_repo  # noqa: E402
+from workspace import WorkspaceConfigError  # noqa: E402
 
 
 # --------------------------------------------------------------------------
@@ -517,3 +518,34 @@ def test_mixed_run_counts_every_category(monkeypatch, tmp_path, capsys):
     out = capsys.readouterr().out
     # 'a' plus the root repo both synced; 'b' skipped; 'c' failed.
     assert "2 synced, 1 skipped" in out
+
+
+# --------------------------------------------------------------------------
+# The enumeration layer: a manifest that will not parse (#609)
+# --------------------------------------------------------------------------
+
+
+def test_unparseable_manifest_is_a_failure_not_an_empty_repo_list(monkeypatch, tmp_path, capsys):
+    """get_overlay_repos() used to print the parse error and return the repos
+    it managed to read, so a broken .repos file produced a green sync over the
+    survivors. It now raises, and main() must land that as a failure rather
+    than as the "configs/manifest is missing" case — the remedy differs:
+    `make setup-all` cannot repair a syntax error."""
+    make_workspace(tmp_path, monkeypatch)
+
+    def boom(include_underlay=False):
+        raise WorkspaceConfigError("cannot parse core.repos: mapping values not allowed")
+
+    monkeypatch.setattr(sync_repos.list_overlay_repos, "get_overlay_repos", boom)
+    monkeypatch.setattr(
+        sync_repos, "sync_repo", lambda path, name, dry_run=False: SyncResult(SyncOutcome.SYNCED)
+    )
+    monkeypatch.setattr(sync_repos, "sync_gitbug", lambda path, dry_run=False: None)
+    with pytest.raises(SystemExit) as exc:
+        sync_repos.main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "cannot parse core.repos" in out
+    assert "Sync complete" not in out
+    # The remedy must not be the un-bootstrapped one.
+    assert "cannot repair a syntax error" in out

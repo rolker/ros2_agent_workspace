@@ -25,9 +25,10 @@ import argparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 
-from workspace import get_overlay_repos
+from workspace import WorkspaceConfigError, get_overlay_repos  # noqa: E402
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser(description="List repositories defined in .repos files")
     parser.add_argument(
         "--include-underlay", action="store_true", help="Include repositories from underlay.repos"
@@ -36,10 +37,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    repos = get_overlay_repos(include_underlay=args.include_underlay)
+    try:
+        repos = get_overlay_repos(include_underlay=args.include_underlay)
+    except WorkspaceConfigError as exc:
+        # Printing `[]` for an unparseable manifest hands every consumer an
+        # empty list that is indistinguishable from "no repos configured" (#609).
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     if args.format == "names":
         for repo in repos:
             print(repo["name"])
     else:
         print(json.dumps(repos, indent=2))
+
+
+if __name__ == "__main__":
+    main()

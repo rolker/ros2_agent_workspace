@@ -9,7 +9,13 @@ import subprocess
 import sys
 import time
 
-from workspace import get_overlay_repos
+from workspace import (
+    WorkspaceConfigError,
+    get_optional_layers,
+    get_overlay_repos,
+    layer_name_for,
+    repo_absence_is_allowed,
+)
 
 # Error fragments that indicate the remote dropped the connection (typically
 # an upstream firewall rate-limiting rapid successive SSH connections).
@@ -21,6 +27,26 @@ TRANSIENT_ERRORS = (
 )
 
 RETRY_BACKOFF = 15  # seconds to wait before retrying a dropped connection
+
+# Reasons for a repo whose git state could not be read at all. These are
+# "error", never "skip": a probe that failed is not a benign answer, and
+# reporting it as one is what let a failed run exit 0 (#609). They live here,
+# not in each script, so pull_remote.py and push_remote.py cannot classify the
+# same condition under two different names.
+UNREADABLE_TREE = "cannot read working tree (corrupt .git, or not a repo)"
+UNREADABLE_STATE = "cannot read git state (not a repo, or corrupt .git)"
+
+# No .repos file was found at all — configs/manifest is missing or empty (an
+# un-bootstrapped clone, or a workspace *worktree*, which has no manifest
+# symlink). Every configured repo then goes unenumerated, so a "1 repo, 0
+# errors" summary over the workspace root alone is an all-clear about repos
+# nothing looked at. sync_repos.py already exits 1 naming configs/manifest in
+# this exact state; these scripts exited 0 (#609).
+NO_REPOS_ENUMERATED = (
+    "configs/manifest: no repositories configured — nothing but the workspace "
+    "root repo can be reached. Run `make setup-all` (or run from the main "
+    "workspace tree, not a worktree)."
+)
 
 # Set once any network operation in this process hits a dropped-connection
 # signature. Callers use this to enable pacing only when the remote is
@@ -106,6 +132,22 @@ def remote_probe(repo_path, remote_name):
     if remote_name in output.splitlines():
         return RemoteState.PRESENT
     return RemoteState.ABSENT
+
+
+def classify_remote_state(state, remote_name):
+    """Turn a RemoteState into a (status, message) problem, or None if usable.
+
+    Shared by pull_remote.py and push_remote.py so the two cannot drift on what
+    UNREADABLE means: `git remote` failing means we never learned whether the
+    remote is configured, and reporting that as "remote not found" keeps a repo
+    that was never reached inside a green run (#609). ABSENT is the benign case
+    — most repos legitimately have no secondary remote.
+    """
+    if state is RemoteState.UNREADABLE:
+        return "error", UNREADABLE_STATE
+    if state is RemoteState.ABSENT:
+        return "skip", f"remote '{remote_name}' not found"
+    return None
 
 
 def remote_exists(repo_path, remote_name):
@@ -195,46 +237,99 @@ def iter_repos(script_dir, args, process_fn, initial_results):
         initial_results: Dict of status -> count to accumulate into.
 
     Returns:
-        The results dict with updated counts. Exits non-zero if errors occurred.
+        The results dict with updated counts.
+
+    The enumeration itself is reported, not assumed (#609): a manifest that
+    could not be parsed, and a run that enumerated no repos at all, both land in
+    the "error" bucket so print_summary_and_exit() turns them non-zero. A repo
+    configured but absent from disk lands in "missing", which is now also a
+    failure — unless its layer is optional on this host, which is a benign
+    "skip".
     """
     root_dir = script_dir.parent.parent
-    repos = get_repos(args)
     results = dict(initial_results)
+
+    def record(status):
+        results[status] = results.get(status, 0) + 1
+
+    try:
+        repos = get_repos(args)
+    except WorkspaceConfigError as exc:
+        print(f"  error: {exc}")
+        record("error")
+        repos = []
+    else:
+        if not repos:
+            print(f"  error: {NO_REPOS_ENUMERATED}")
+            record("error")
 
     # Workspace repo itself — detect its default branch rather than hard-coding
     ws_version = get_default_branch(root_dir, None)
     print("ros2_agent_workspace (workspace root)")
     status, msg = process_fn(root_dir, "ros2_agent_workspace", ws_version, args)
     print(f"  {status}: {msg}")
-    results[status] = results.get(status, 0) + 1
+    record(status)
+
+    optional_layers = get_optional_layers(root_dir)
 
     for repo in repos:
+        print(f"{repo['name']}")
         repo_path = resolve_repo_path(root_dir, repo)
         if repo_path is None:
-            print(f"{repo['name']}")
-            print("  missing: could not find local checkout")
-            results["missing"] += 1
+            skip, reason = classify_missing_repo(root_dir, repo, optional_layers)
+            # "missing" is its own bucket so the operator still sees how many
+            # repos had no checkout — but it now counts only the *required*
+            # ones, and print_summary_and_exit() treats it as a failure. An
+            # optional-layer absence is a plain skip and stays green.
+            bucket = "skip" if skip else "missing"
+            print(f"  {bucket}: {reason}")
+            record(bucket)
             continue
 
-        print(f"{repo['name']}")
         status, msg = process_fn(repo_path, repo["name"], repo["version"], args)
         print(f"  {status}: {msg}")
-        results[status] = results.get(status, 0) + 1
+        record(status)
 
     return results
 
 
+def classify_missing_repo(root_dir, repo, optional_layers=None):
+    """A configured repo is not on disk. Returns (is_benign_skip, reason).
+
+    `missing: could not find local checkout` used to be its own summary bucket
+    that print_summary_and_exit() never looked at, so a repo nobody could reach
+    left the run green. It is now a skip only when its layer is optional on this
+    host — otherwise an error (#609).
+    """
+    if optional_layers is None:
+        optional_layers = get_optional_layers(root_dir)
+    layer = layer_name_for(repo)
+    if repo_absence_is_allowed(repo, optional_layers):
+        return True, f"no local checkout — layer '{layer}' is optional on this host"
+    return False, (
+        f"no local checkout and layer '{layer}' is required — "
+        f"run .agent/scripts/setup_layers.sh {layer}"
+    )
+
+
 def print_summary_and_exit(results, labels):
-    """Print a summary line and exit non-zero if there were errors.
+    """Print a summary line and exit non-zero if the run was not clean.
 
     Args:
         results: Dict of status -> count.
         labels: List of (status_key, label_text) pairs for the summary.
+
+    Both "error" and "missing" exit 1. "missing" counting toward the exit status
+    is the point of #609 at the enumeration layer: a configured repo with no
+    checkout was tallied into a bucket the exit status never read, so a run that
+    reached none of the repos still reported success. iter_repos() routes
+    legitimately-absent optional-layer repos to "skip" instead, so this does not
+    turn a supported host red.
     """
     total = sum(results.values())
     parts = [f"{results.get(key, 0)} {label}" for key, label in labels]
     print(f"\nSummary: {total} repos — {', '.join(parts)}")
-    if results.get("error", 0) > 0:
+    if results.get("error", 0) > 0 or results.get("missing", 0) > 0:
         sys.exit(1)
 
 

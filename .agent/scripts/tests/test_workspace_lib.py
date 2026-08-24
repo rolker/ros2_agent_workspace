@@ -16,7 +16,13 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPTS_DIR / "lib"))
 
-from workspace import get_optional_layers  # noqa: E402
+import pytest  # noqa: E402
+
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+import list_overlay_repos  # noqa: E402
+import workspace  # noqa: E402
+from workspace import WorkspaceConfigError, get_optional_layers  # noqa: E402
 
 
 def write_optional(root, text):
@@ -92,3 +98,127 @@ def _extract_is_optional_layer(path):
     start = next(i for i, line in enumerate(lines) if line.startswith("is_optional_layer()"))
     end = next(i for i in range(start, len(lines)) if lines[i] == "}")
     return "\n".join(lines[start : end + 1])
+
+
+# --------------------------------------------------------------------------
+# A manifest that will not parse is an error, not an empty answer (#609)
+# --------------------------------------------------------------------------
+
+
+def write_manifest(root, filename, text):
+    """Create configs/manifest/repos/<filename> containing exactly `text`."""
+    repos_dir = root / "configs" / "manifest" / "repos"
+    repos_dir.mkdir(parents=True, exist_ok=True)
+    (repos_dir / filename).write_text(text)
+    return root
+
+
+GOOD_MANIFEST = """\
+repositories:
+  alpha:
+    type: git
+    url: git@example:alpha.git
+    version: jazzy
+"""
+
+# Tabs are illegal YAML indentation — the shape a hand-edited .repos file
+# actually takes when it breaks.
+BAD_MANIFEST = "repositories:\n\talpha:\n\t\turl: git@example:alpha.git\n"
+
+
+def test_unparseable_manifest_raises_rather_than_dropping_its_repos(tmp_path, monkeypatch):
+    """get_overlay_repos() printed the parse error and carried on with the
+    repos it *did* read. Every caller then reported an all-clear over repos
+    nothing had enumerated — the enumeration-layer twin of the per-repo false
+    green this issue is about (#609)."""
+    write_manifest(tmp_path, "core.repos", BAD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    with pytest.raises(WorkspaceConfigError) as exc:
+        workspace.get_overlay_repos()
+    assert "core.repos" in str(exc.value)
+
+
+def test_a_readable_manifest_still_enumerates_its_repos(tmp_path, monkeypatch):
+    """The false-RED direction: raising must be reserved for a manifest that
+    genuinely will not parse, or every healthy workspace goes red."""
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    repos = workspace.get_overlay_repos()
+    assert [r["name"] for r in repos] == ["alpha"]
+    assert repos[0]["version"] == "jazzy"
+
+
+def test_a_manifest_with_no_repositories_key_is_not_an_error(tmp_path, monkeypatch):
+    """Also the false-RED direction: an empty or comment-only .repos file is a
+    valid file that declares nothing. Only a *parse failure* is an error."""
+    write_manifest(tmp_path, "core.repos", "# nothing here yet\n")
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    assert workspace.get_overlay_repos() == []
+
+
+def test_a_non_mapping_repositories_key_is_an_error(tmp_path, monkeypatch):
+    """Valid YAML, wrong shape: `repositories:` as a list parses cleanly and
+    then blows up on .items(). Reported as a config error, not a traceback."""
+    write_manifest(tmp_path, "core.repos", "repositories:\n  - alpha\n")
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    with pytest.raises(WorkspaceConfigError):
+        workspace.get_overlay_repos()
+
+
+def test_find_repo_version_raises_on_the_same_manifest(tmp_path, monkeypatch):
+    """find_repo_version() swallowed the identical error and returned
+    "unknown"; worktree_create.sh branches a worktree off that answer."""
+    write_manifest(tmp_path, "core.repos", BAD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    with pytest.raises(WorkspaceConfigError):
+        workspace.find_repo_version("alpha")
+
+
+def test_find_repo_version_still_answers_from_a_good_manifest(tmp_path, monkeypatch):
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    assert workspace.find_repo_version("alpha") == "jazzy"
+    assert workspace.find_repo_version("nope") == "unknown"
+
+
+# --------------------------------------------------------------------------
+# One shared rule for "this repo is allowed to be absent"
+# --------------------------------------------------------------------------
+
+
+def test_absence_is_allowed_only_for_an_optional_layer():
+    """sync_repos.py and the remote scripts must agree; they now decide through
+    this one predicate rather than two copies of the same `in` test."""
+    site = {"name": "r", "source_file": "site.repos"}
+    core = {"name": "r", "source_file": "core.repos"}
+    assert workspace.repo_absence_is_allowed(site, {"site"}) is True
+    assert workspace.repo_absence_is_allowed(core, {"site"}) is False
+    assert workspace.repo_absence_is_allowed(site, set()) is False
+
+
+def test_list_overlay_repos_cli_exits_non_zero_on_an_unparseable_manifest(monkeypatch, capsys):
+    """The CLI wrapper is what shell callers read. Printing `[]` for a manifest
+    it could not parse hands them an empty array indistinguishable from "no
+    repos are configured" (#609)."""
+
+    def boom(include_underlay=False):
+        raise WorkspaceConfigError("cannot parse core.repos: mapping values not allowed")
+
+    monkeypatch.setattr(list_overlay_repos, "get_overlay_repos", boom)
+    monkeypatch.setattr(sys, "argv", ["list_overlay_repos.py"])
+    with pytest.raises(SystemExit) as exc:
+        list_overlay_repos.main()
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert "core.repos" in captured.err
+    assert captured.out.strip() == ""
+
+
+def test_list_overlay_repos_cli_still_prints_a_healthy_manifest(monkeypatch, capsys):
+    """False-RED guard for the arm above."""
+    monkeypatch.setattr(
+        list_overlay_repos, "get_overlay_repos", lambda include_underlay=False: [{"name": "alpha"}]
+    )
+    monkeypatch.setattr(sys, "argv", ["list_overlay_repos.py", "--format", "names"])
+    list_overlay_repos.main()
+    assert capsys.readouterr().out.strip() == "alpha"

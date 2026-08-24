@@ -17,6 +17,18 @@ Options:
                  the remaining repos are automatically paced at 2.0s.
                  Pass a value to force a fixed pace from the start
                  (0 disables pacing entirely, including the adaptive one).
+
+Exit status:
+    0  every repo synced or was deliberately skipped (dirty tree, detached
+       HEAD, or absent from a layer that is optional on this host).
+    1  at least one repo failed: a failed pull/fetch, a repo missing from a
+       required layer, or an enumeration that produced no repos at all
+       (configs/manifest missing, or a manifest that would not parse). Before
+       #609 this printed an unconditional "Sync complete" and exited 0.
+    2  argparse usage error.
+
+    `make sync` reports GNU make's own 2 for any non-zero recipe status, so
+    branch on these codes only when calling the script directly.
 """
 
 import sys
@@ -45,7 +57,12 @@ from remote_utils import (  # noqa: E402
     retry_transient,
     transient_error_seen,
 )
-from workspace import get_optional_layers, layer_name_for  # noqa: E402
+from workspace import (  # noqa: E402
+    WorkspaceConfigError,
+    get_optional_layers,
+    layer_name_for,
+    repo_absence_is_allowed,
+)
 
 # Pace applied to the rest of the run once the remote starts dropping
 # connections (only when --throttle was not given explicitly).
@@ -337,7 +354,9 @@ def classify_unlocatable_repo(root_dir, repo, optional_layers, tried_paths):
     layer = layer_name_for(repo)
     layer_src = root_dir / "layers" / "main" / f"{layer}_ws" / "src"
 
-    if layer in optional_layers:
+    # One shared rule, so this and the remote scripts cannot drift on what an
+    # optional layer means (workspace.repo_absence_is_allowed).
+    if repo_absence_is_allowed(repo, optional_layers):
         # Not "the layer is not set up" — the layer directory may well exist and
         # be partially populated; what is true in every case is that this repo is
         # absent from a layer this host is allowed to be missing repos from.
@@ -425,8 +444,15 @@ def main():
 
     root_dir = SCRIPT_DIR.parent.parent
 
-    # Get repos list using the existing tool
-    repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
+    # Get repos list using the existing tool. A manifest that exists but does
+    # not parse is a failure, not an empty repo list: its repos go unenumerated
+    # exactly as they do when configs/manifest is missing entirely (#609).
+    manifest_error = None
+    try:
+        repos = list_overlay_repos.get_overlay_repos(include_underlay=False)
+    except WorkspaceConfigError as exc:
+        repos = []
+        manifest_error = str(exc)
 
     throttle = make_throttler(args.throttle, args.dry_run)
 
@@ -448,7 +474,11 @@ def main():
             # future FAILED path that forgets to supply one.
             failures.append((repo_name, result.reason or "sync failed"))
 
-    if not repos:
+    if manifest_error:
+        print(f"❌ {manifest_error}")
+        print("   Fix the .repos file; `make setup-all` cannot repair a syntax error.")
+        failures.append(("configs/manifest", manifest_error))
+    elif not repos:
         # No .repos file was found at all — configs/manifest is missing or
         # empty (an un-bootstrapped clone, or a workspace *worktree*, which has
         # no manifest symlink). Every configured repo then goes unenumerated,

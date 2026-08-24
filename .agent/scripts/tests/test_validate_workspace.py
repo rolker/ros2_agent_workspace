@@ -24,6 +24,7 @@ import pytest  # noqa: E402
 
 import validate_workspace as vw  # noqa: E402
 from validate_workspace import ValidationResult  # noqa: E402
+from workspace import WorkspaceConfigError  # noqa: E402
 
 
 def _repo(name, version="jazzy", source_file="core.repos"):
@@ -237,3 +238,55 @@ def test_usage_error_still_exits_two_not_three():
         check=False,
     )
     assert proc.returncode == 2
+
+
+# --------------------------------------------------------------------------
+# Each drift kind independently turns the verdict red
+# --------------------------------------------------------------------------
+
+
+def test_an_orphan_repo_alone_is_drift(monkeypatch, tmp_path):
+    """A repo on disk that no .repos file declares is one of the three things
+    this script exists to find, and it was the only one no test pinned:
+    dropping `extra_repos` from the PASSED expression left the whole suite
+    green. Orphans are how a repo someone cloned by hand — or one deleted from
+    the manifest and never removed — goes unnoticed."""
+    configured = [_repo("alpha")]
+    actual = {
+        "alpha": {"path": str(tmp_path / "alpha"), "branch": "jazzy", "context": "core_ws"},
+        "stray": {"path": str(tmp_path / "stray"), "branch": "jazzy", "context": "core_ws"},
+    }
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    result, _ = vw.validate_workspace()
+    assert result is ValidationResult.DRIFTED
+    assert _run_main(monkeypatch) == 1
+
+
+def test_a_version_mismatch_alone_is_drift(monkeypatch, tmp_path):
+    """The third kind, pinned for the same reason as the orphan above."""
+    configured = [_repo("alpha", version="jazzy")]
+    actual = {"alpha": {"path": str(tmp_path / "alpha"), "branch": "main", "context": "core_ws"}}
+    _stub(monkeypatch, tmp_path, configured, actual=actual)
+    result, _ = vw.validate_workspace()
+    assert result is ValidationResult.DRIFTED
+
+
+# --------------------------------------------------------------------------
+# The enumeration layer: a manifest that will not parse (#609)
+# --------------------------------------------------------------------------
+
+
+def test_unparseable_manifest_exits_one_not_three(monkeypatch, tmp_path, capsys):
+    """A .repos file that exists but does not parse is not "no repos are
+    configured": the file is there and declares repos that then went
+    unchecked. Reporting UNCONFIGURED would point at `make setup-all`, which
+    cannot fix a syntax error — and dashboard.sh branches on exactly these
+    codes."""
+
+    def boom(include_underlay=False):
+        raise WorkspaceConfigError("cannot parse core.repos: mapping values not allowed")
+
+    monkeypatch.setattr(vw, "get_workspace_root", lambda: str(tmp_path))
+    monkeypatch.setattr(vw, "get_overlay_repos", boom)
+    assert _run_main(monkeypatch) == 1
+    assert "cannot parse core.repos" in capsys.readouterr().err
