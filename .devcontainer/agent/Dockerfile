@@ -127,8 +127,11 @@ COPY --chmod=755 fix-volume-ownership.sh /usr/local/bin/fix-volume-ownership.sh
 # which is how a fix to either can silently fail to reach an existing user.
 # The launcher stamps the current scripts' combined hash here at build time and
 # compares it at every launch, warning when they diverge. Empty when built by a
-# bare `docker build` (no --build-arg), which the launcher reads as "unknown"
-# and does not warn about.
+# bare `docker build` (no --build-arg) — and the launcher WARNS about an empty
+# or absent label rather than staying quiet: every image without a marker was
+# built before this marker existed (or outside the single build path), and that
+# is exactly the population still carrying the pre-#604 entrypoint. Build via
+# `make agent-build` / `docker_run_agent.sh --build-only` to get a marked image.
 ARG STARTUP_SCRIPTS_SHA=""
 LABEL org.ros2-agent.startup-scripts-sha="$STARTUP_SCRIPTS_SHA"
 
