@@ -94,6 +94,12 @@ def run_git_cmd(repo_path, cmd_args, dry_run=False):
         return True, result.stdout.strip()
     except subprocess.CalledProcessError as e:
         return False, e.stderr.strip()
+    except OSError as e:
+        # The repo directory itself is unusable (unreadable, vanished mid-run,
+        # a dangling symlink). Without this the exception escapes and kills the
+        # whole run with no summary — loud, but it strands every later repo and
+        # contradicts SyncOutcome.FAILED's "a state we cannot even read" (#609).
+        return False, f"cannot run git in {repo_path}: {e}"
 
 
 def run_network_cmd(repo_path, cmd_args, dry_run=False):
@@ -104,11 +110,20 @@ def run_network_cmd(repo_path, cmd_args, dry_run=False):
 
 
 def is_dirty(repo_path, dry_run=False):
-    """Check if repo has uncommitted changes."""
+    """Check if repo has uncommitted changes.
+
+    Returns True (dirty), False (clean), or None when `git status` itself
+    failed. The three cases must stay distinct: a working tree we could not
+    read is NOT a clean one, and folding it into False let a repo with a
+    corrupt index and real uncommitted changes classify as SYNCED — the exact
+    false green #609 exists to remove.
+    """
     # Dirty check is a read-only operation, always execute regardless of dry_run
     # but we need to call run_git_cmd without dry_run flag to actually execute
     success, output = run_git_cmd(repo_path, ["status", "--porcelain"], dry_run=False)
-    return success and bool(output)
+    if not success:
+        return None
+    return bool(output)
 
 
 def get_current_branch(repo_path, dry_run=False):
@@ -162,7 +177,12 @@ def preflight_repo(repo_path, dry_run=False):
         print(f"  ❌ Path does not exist: {repo_path}")
         return SyncOutcome.FAILED, None
 
-    if is_dirty(repo_path, dry_run):
+    dirty = is_dirty(repo_path, dry_run)
+    if dirty is None:
+        print("  ❌ Cannot read working tree (corrupt .git, or not a repo).")
+        return SyncOutcome.FAILED, None
+
+    if dirty:
         if dry_run:
             print("  ⚠️  (Dry run) Would skip: Uncommitted changes detected.")
         else:

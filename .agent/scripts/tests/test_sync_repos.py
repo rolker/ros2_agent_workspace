@@ -49,11 +49,13 @@ def make_repo(tmp_path):
     return d
 
 
-def _stub_git(monkeypatch, *, dirty=False, branch="jazzy", branch_ok=True):
+def _stub_git(monkeypatch, *, dirty=False, branch="jazzy", branch_ok=True, status_ok=True):
     """Stub the read-only git probes sync_repo() makes before syncing."""
 
     def fake_run_git_cmd(repo_path, cmd_args, dry_run=False):
         if cmd_args[:1] == ["status"]:
+            if not status_ok:
+                return False, "fatal: index file corrupt"
             return True, "M file.txt" if dirty else ""
         if cmd_args[:1] == ["branch"]:
             return (True, branch) if branch_ok else (False, "not a git repository")
@@ -109,6 +111,39 @@ def test_unreadable_git_state_is_failed(monkeypatch, tmp_path):
     stale under a green exit."""
     _stub_git(monkeypatch, branch_ok=False)
     assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+
+
+def test_unreadable_working_tree_is_failed(monkeypatch, tmp_path):
+    """`git status --porcelain` failing means the working tree could not be
+    read — NOT that it is clean. Treating it as clean let a repo with a corrupt
+    index and real uncommitted changes sync-and-report green (#609)."""
+    _stub_git(monkeypatch, status_ok=False, dirty=True)
+    _stub_network(monkeypatch, True, "Already up to date.")
+    assert sync_repos.sync_repo(make_repo(tmp_path), "r") is SyncOutcome.FAILED
+
+
+def test_is_dirty_distinguishes_unreadable_from_clean(monkeypatch, tmp_path):
+    """The three states must stay distinct at the helper level too."""
+    repo = make_repo(tmp_path)
+    _stub_git(monkeypatch, dirty=False)
+    assert sync_repos.is_dirty(repo) is False
+    _stub_git(monkeypatch, dirty=True)
+    assert sync_repos.is_dirty(repo) is True
+    _stub_git(monkeypatch, status_ok=False)
+    assert sync_repos.is_dirty(repo) is None
+
+
+def test_run_git_cmd_reports_oserror_instead_of_raising(monkeypatch, tmp_path):
+    """An unreadable repo dir raises OSError, not CalledProcessError. Letting it
+    escape kills the run mid-way with no summary and strands every later repo."""
+
+    def boom(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(sync_repos.subprocess, "run", boom)
+    success, output = sync_repos.run_git_cmd(make_repo(tmp_path), ["status", "--porcelain"])
+    assert success is False
+    assert "cannot run git" in output
 
 
 def test_missing_path_is_failed(tmp_path):
