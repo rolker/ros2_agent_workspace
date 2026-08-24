@@ -11,6 +11,22 @@ Usage:
     python3 add_remote.py --remote gitcloud --url-prefix git@gitcloud:field/ --dry-run
 
 After setup, use push_remote.py / pull_remote.py for ongoing sync.
+
+Exit status (shared with push_remote.py / pull_remote.py through
+lib/remote_utils.run_script):
+    0  the remote was added everywhere, or deliberately skipped (already
+       present, no origin URL to derive from, or a repo absent from a layer
+       that is optional on this host).
+    1  at least one repo errored, or the **enumeration** itself failed: no
+       repos configured at all (missing `configs/manifest` — e.g. run from a
+       worktree), a `.repos` file that will not parse, or a configured repo
+       with no checkout in a *required* layer. This script is the one most
+       likely to run *before* every layer is imported, and a run that reached
+       none of the repos used to report success (#609).
+    2  argparse usage error.
+
+    `make add-remote` reports GNU make's own 2 for any non-zero recipe status,
+    so branch on these codes only when calling the script directly.
 """
 
 import argparse
