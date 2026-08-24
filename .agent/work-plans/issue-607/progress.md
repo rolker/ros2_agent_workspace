@@ -486,3 +486,68 @@ left alone.
 ### Checks
 Pre-commit hooks ran clean on all thirteen commits (`--no-verify` never used).
 Prose-only diff — no package tests apply. Worktree clean; nothing pushed.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-24 10:50 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-607 at `b33e250`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching instruction files other agents read as authority; +201/-49 prose across two skill files, one knowledge file and the plan)
+**Must-fix**: 4 | **Suggestions**: 7
+**Round**: 3 | **Ship**: continue — must-fix is flat at 4, not falling, and one of them is a *new* factual inversion the fix pass introduced while asserting the round-2 review was wrong; but the cheaper convergence path is a merge + targeted re-check, not a fourth full round (see Convergence)
+
+Specialists: static analysis (no linter profile for `.md`; no trailing whitespace or over-long added lines; worktree clean), governance, plan drift, Claude Adversarial x2 (Lens A + Lens B, fresh-context sub-agents). Copilot off (default). **Local Adversarial (5f) did not run, and could not have**: on current `main` it is opt-in via `--local` (#590) and was not passed — and the model is absent anyway, the Ollama server answers but `/api/tags` returns `{"models":[]}` and `ollama list` is empty, so `qwen3.5:35b` is not pulled on this host.
+
+### Findings
+- [ ] (must-fix) The 5f default is inverted in both files, and the round-2 review it overruled was right: on current `main` `review-code/SKILL.md:45-47,104-106,152-158,750-752` make 5f **opt-in via `--local`, off by default** (#590, merged into `main` as `0d0aebf`), with `--no-local` a deprecated no-op. `430a18c` verified against the branch's stale copy of that file and shipped "on by default; `--no-local` opts out" into both. Cross-pass confirmed (Lens A + Lens B + lead). Fix: "specialist 5f (opt-in via `--local`) cannot run there at all — no host Ollama endpoint"; the `Agent`-tool reason already carries the exception — `.claude/skills/run-issue/SKILL.md:140-141`, `.agent/knowledge/skill_workflows.md:154-155`
+- [ ] (must-fix) Citations are verified against two different baselines and one ships wrong. `review-code/SKILL.md:333-335` resolves only in the branch's stale copy; on `main` those lines are the static-analysis linter table and the sequential-fallback sentence is at **343-346**. The `docker_run_agent.sh` citations are the mirror image — correct against `main`, ~160 lines off against the branch's own copy. Root cause: the branch does not contain `main` (`git merge-base --is-ancestor main HEAD` fails; `main` has moved through #590/#594/#602/#604 since the base), which is also what produced the finding above. Fix: merge `main` first (required before push regardless), then re-resolve every citation against the merged tree. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:139`
+- [ ] (must-fix) The in-process bullet whose job is to deflate residual containment re-inflates it: "`ask` rules and the `PreToolUse` hooks wired in `.claude/settings.json` still fire". That file defines **no** `ask` rules (they are in the untracked `.claude/settings.local.json`, as the very next bullet says) and exactly **one** `PreToolUse` hook — matcher `AskUserQuestion`, invoked `… || true`, warn-only by design (`AGENTS.md:585`: "never blocks") and unable to match an Edit/Bash/commit call at all. Cross-pass confirmed (Lens B + lead) — `.claude/skills/run-issue/SKILL.md:209-211`
+- [ ] (must-fix) "**no GitHub credentials enter**" is contradicted nine lines later by its own citation (`-e GH_TOKEN` forwarded at `docker_run_agent.sh:690`), by the container bullet at `:175-177`, and by the knowledge file's mirror, which correctly says *write* auth. Same absolute again at `:230-231` ("GitHub auth included … exactly the capability the sandbox withholds") and `skill_workflows.md:166-167` ("simply does not have host GitHub auth"). Fix: say **write** auth consistently in both files; and re-attribute the README claim, which leads with "container filesystem isolation as the security boundary" (`.devcontainer/agent/README.md:3`) — the framing this same paragraph refutes — not with the credential property. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:189-191,230-231`, `.agent/knowledge/skill_workflows.md:166-167`
+- [ ] (suggestion) "skips itself with a one-line notice … and **silently** dropping the cross-model pass" contradicts itself inside one sentence: `review-code/SKILL.md:797` and the report/progress templates (`:891,949,968-975,994`) all emit `Local Adversarial skipped: <reason>`. Drop "silently" — `.claude/skills/run-issue/SKILL.md:143-144`
+- [ ] (suggestion) "only when `--context-file` is passed, **i.e. only on the container path**" — the gloss is false: `--context-file` is orthogonal to `--mode` (`dispatch_subagent.sh:312-317`), and `CONTEXT_SECTION` is spliced into the handoff at `:461-463`, before the mode branch, so an in-process dispatch that passes it gets the fence too. The knowledge file's sibling sentence stops at "only on the `--context-file` path" and is correct; delete the gloss — `.claude/skills/run-issue/SKILL.md:167-168`
+- [ ] (suggestion) The fence-loss enumeration reads as exhaustive but names two phases; `plan-task/SKILL.md:36` and `review-plan/SKILL.md:112` both fetch `comments`, and post-PR `review-code/SKILL.md:256` fetches `comments,reviews`. Generalize the heading (the bullet's closing sentence already does) rather than listing phases — `.claude/skills/run-issue/SKILL.md:165-172`
+- [ ] (suggestion) "only `.agent/` is re-mounted `:ro`" omits that `.agent/scratchpad` is punched back read-write over it (`docker_run_agent.sh:515` on `main`) — `.claude/skills/run-issue/SKILL.md:196`
+- [ ] (suggestion) "no GitHub *write* auth **ever**" is stronger than the script: `docker_run_agent.sh:651-665` takes `AGENT_GH_TOKEN` as an explicit override ahead of the `gh-readonly-token` file and validates no scopes — read-only is a filename convention, not an enforced property. Drop "ever" — `.agent/knowledge/skill_workflows.md:170-172`
+- [ ] (suggestion) Off-by-one: the quoted handoff sentence begins at `dispatch_subagent.sh:468` ("…dispatched for **issue #$ISSUE**. Work only"); cite `:468-469` — `.claude/skills/run-issue/SKILL.md:221`
+- [ ] (suggestion) Two unchanged neighbours in the same file now disagree with the new text: `:48` still says "A container dispatch **has no GitHub read auth**" against the new `:175-177`; and `:344` cites `review-code/SKILL.md:864-866, 872` for the post-PR `## Local Review` heading, which lives at `:1029-1036` — `864-872` is the ship-verdict block this PR edits. Both cheap to close in the same pass — `.claude/skills/run-issue/SKILL.md:48,344`
+
+### Verified, not flagged
+- **The auto-mode tell now works as specified, confirmed firsthand.** In this dispatched sub-agent the `While auto mode is active:` reminder was injected **once**, attached to the first tool result, and did not recur across ~25 subsequent tool calls — so "present anywhere in the whole context" is the check that works and the per-turn form would indeed have failed. I later read both files containing the sentinel verbatim and could still tell the injection from the quotations, so the second trap is stated correctly too. One nit only: the doc asserts it is a `system-reminder`; it arrived without a visible tag, so the tag is not itself verifiable from inside — the discriminator the doc already gives (injected session text, never file content you read) is the one that carries.
+- **The container containment paragraph now verifies clause by clause against `main`**, apart from must-fix 4 and the scratchpad nuance: bind mount at `:509`, worktrees at `:596-597`, `.agent:ro` at `:512`, §6 `:599-616`, `CLAUDE_CODE_OAUTH_TOKEN` at `:688`, `GH_TOKEN` at `:690`, anonymous `build`/`install`/`log` volumes at `:528-546`.
+- **The allowlist and worktree bullets are exact**: 31 `allow` entries and no `deny` in `.claude/settings.json`; no `permissions` key at all in `~/.claude/settings.json`; the untracked local `ask` list is precisely `merge_pr.sh` (three forms), `gh pr merge`, `make merge-pr`, `tmux send-keys`. The ADR-0004/0005 disambiguation added in `052cc0b` is correct — the script header's "convention-only" sentence is about the exit contract.
+- **The #604 evidence holds**: nine `##` entries, three `## Implementation` entries each carrying an `**Addressed**` field (address-findings), and the implementation pass unentried between `## Plan Review` and the first `## Local Review (Pre-Push)`.
+- **The `review-plan` heuristic fix is sound**: `$AGENT_NAME` is a framework-level constant (`set_git_identity_env.sh:110,134`), so the name comparison could never discriminate; the invocation-based test is one a reader can apply — I applied it to myself.
+- **Consequence sweep clean**: no other file in `.claude/`, `.agent/`, `AGENTS.md`, `CLAUDE.md`, `docs/decisions/` still carries the retired "containers for prompt-free dispatch" rule.
+- Commit identity correct on all 32 commits (`Claude Code Agent <roland+claude-code@ccom.unh.edu>`); tree clean; nothing pushed.
+- Left alone as instructed: the `#606` citation (real, merged as `a00193c`), the safety reasoning covering both dispatch paths, and the `review-plan` fix staying in this PR.
+
+### Governance
+
+| Principle | Verdict | Notes |
+|---|---|---|
+| Human control and transparency | Concern | Third consecutive round with a false containment clause in the same paragraph — this time understating credential exposure ("no GitHub credentials enter") and overstating the in-process residual guards. Both mislead the agent deciding where untrusted-input work goes. |
+| Documentation accuracy (verify against source) | Concern | The fix pass's "every citation re-checked, all verified" is not sound: half were checked against `main`, half against the branch's stale copies, and the 5f claim was inverted by trusting the stale copy over the review. |
+| A change includes its consequences | Concern | `.devcontainer/agent/README.md:3` still leads with the "filesystem isolation as the security boundary" framing this PR disproves, and is cited as authority for it; `run-issue/SKILL.md:48` now contradicts the new text. |
+| Capture decisions, not just implementations | Pass | Rationale recorded inline in both files with the #545 → #607 lineage; the plan's Implementation Notes are rationale-only per `plan-task` rule 2 (round-2 finding closed). |
+| Enforcement over documentation | Watch | Advisory prose only, as #545 was; `dispatch_subagent.sh` requires an explicit `--mode`, so there is no default to enforce. |
+| Only what's needed / Improve incrementally | Pass | Prose-only, three files plus the plan; the third is operator-approved. |
+| Test what breaks | N/A | No enforced logic. |
+| Primary framework first, portability where free | Pass | The non-Claude-runtime case now gets its own bullet and an executable instruction (round-2 must-fix 3 genuinely closed). |
+
+| ADR | Triggered | Compliant | Notes |
+|---|---|---|---|
+| 0001 — Adopt ADRs | Watch, not required | Yes | Parity with #545's prose-only precedent. |
+| 0004 / 0005 — Enforcement hierarchy | Yes | Yes | Now cited only as the lens, with the misattribution corrected. |
+| 0013 — progress.md vocabulary | Yes | Yes | Entry types correct throughout. |
+| 0015 — Dispatch handoff context contract | Yes | Concern | The fence's condition is described correctly but glossed as container-only (suggestion 2), and the exposed-phase list is short (suggestion 3). |
+
+### Round-2 closure check
+- Genuinely closed: must-fix 2 (the tell — verified firsthand, see above); must-fix 3 (non-Claude runtime split into its own bullet with an executable instruction); must-fix 4 (worktree citation + ADR disambiguation); suggestions 6, 7 (partially — see must-fix 3 here), 8, 9, 10, 11, 12, 13, 14.
+- Closed in form, not in substance: must-fix 1 (container half rewritten and now accurate on mounts and machine state, but the credential clause is absolute in the wrong direction — must-fix 4 here); suggestion 5 (softened correctly, then re-broken by the 5f inversion — must-fix 1 here).
+- **The fix pass's claim to have broken the recurrence pattern is half-true.** It did re-read neighbours and it did find three unflagged defects on its own, two of which were real (the duplicated containment clause in the mode-definition bullet; the plan's stale mechanism claim). But the third — overruling the review on 5f — inverted a fact, because the re-verification used the branch's stale copy of the file rather than `main`. The pattern narrowed (round 1: whole paragraphs false; round 2: half-paragraphs; round 3: single clauses) but did not close.
+
+### Convergence
+Another **full** multi-specialist round is not worth the operator's time on a prose diff — the four must-fixes each come with the replacement wording above and none is a design question. What is non-negotiable is the order: **merge `main` into the branch first**, because round 3 proved the branch's own copies are an unreliable verification baseline (they are what produced must-fix 1 and 2), then apply the fixes, then a **targeted** re-check limited to (a) every `file:line` citation re-resolved against the merged tree and (b) the two recurring paragraphs — container containment and in-process containment — read clause by clause with a source line recorded for each clause, not just the ones named here. That is the cheap path to convergence; a fourth full round is not.
