@@ -158,3 +158,15 @@ excludes fixing CI in affected project repos — keep that boundary.
 - [ ] Update AGENTS.md's "Merge verification (ADR-0018)" section to match whatever merge_pr.sh behavior lands.
 - [ ] Add a test or documented repro for the "no checks configured" stderr path (mock/stub gh pr checks) rather than relying on a live no-CI repo.
 - [ ] Note the stderr-string-match fragility (unversioned gh CLI message) in the implementation as a comment.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-08-24 14:03 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-610/plan.md` at `5f5efab`
+**Branch**: feature/issue-610 at `5f5efab`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
