@@ -220,6 +220,37 @@ grep -qE '^cd "\$ROOT_DIR" \|\|' "$MERGE_PR" \
     && ok "cd \$ROOT_DIR has an explicit failure branch" \
     || bad "cd \$ROOT_DIR is unguarded — set -e would abort bannerless with exit 1"
 
+# Same structural argument as the sync branch above, for the other two paths
+# AGENTS.md names as exit 3. Both survived mutation in the Round-4 review:
+# deleting their `exit` left the whole suite green, and the script then carried
+# on past a failed cleanup — or fell off the end returning 0 — after an
+# already-merged PR. Neither branch is reachable here (every test stops at a
+# pre-merge guard, by design), so they are asserted structurally.
+# `closer_re` matches the line that ends the enclosing block. It is a full
+# regex, not a token: the cd branch wraps its banner in an inner `{ ... } >&2`
+# group, so only the *unindented* `}` closes the branch itself.
+assert_exits_after() {
+    local label="$1" anchor="$2" closer_re="$3" line tail_after first
+    line=$(grep -n -- "$anchor" "$MERGE_PR" | head -1 | cut -d: -f1)
+    if [[ -z "$line" ]]; then
+        bad "could not locate '$anchor' — the structural check for $label has no anchor"
+        return
+    fi
+    tail_after=$(awk -v start="$line" 'NR>start' "$MERGE_PR")
+    first=$(grep -m1 -E "^[[:space:]]*exit([[:space:];]|\$)|$closer_re" <<<"$tail_after")
+    if [[ "$first" =~ exit[[:space:]]+\"?\$POST_MERGE_RC ]]; then
+        ok "$label exits \$POST_MERGE_RC before the branch closes"
+    else
+        bad "$label reaches '${first:-end of file}' before any exit — the failure would return 0 or be ignored"
+    fi
+}
+
+echo "Test: the cd-failure branch ends by exiting, not by falling through"
+assert_exits_after "cd-failure branch" "cannot cd to workspace root" "^\}"
+
+echo "Test: the worktree-removal-failure branch ends by exiting, not by falling through"
+assert_exits_after "worktree-removal-failure branch" "worktree removal failed" "^[[:space:]]*fi([[:space:];]|\$)"
+
 echo ""
 echo "========================================"
 echo "Passed: $PASS   Failed: $FAIL"
