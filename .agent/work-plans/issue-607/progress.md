@@ -502,17 +502,17 @@ Prose-only diff — no package tests apply. Worktree clean; nothing pushed.
 Specialists: static analysis (no linter profile for `.md`; no trailing whitespace or over-long added lines; worktree clean), governance, plan drift, Claude Adversarial x2 (Lens A + Lens B, fresh-context sub-agents). Copilot off (default). **Local Adversarial (5f) did not run, and could not have**: on current `main` it is opt-in via `--local` (#590) and was not passed — and the model is absent anyway, the Ollama server answers but `/api/tags` returns `{"models":[]}` and `ollama list` is empty, so `qwen3.5:35b` is not pulled on this host.
 
 ### Findings
-- [ ] (must-fix) The 5f default is inverted in both files, and the round-2 review it overruled was right: on current `main` `review-code/SKILL.md:45-47,104-106,152-158,750-752` make 5f **opt-in via `--local`, off by default** (#590, merged into `main` as `0d0aebf`), with `--no-local` a deprecated no-op. `430a18c` verified against the branch's stale copy of that file and shipped "on by default; `--no-local` opts out" into both. Cross-pass confirmed (Lens A + Lens B + lead). Fix: "specialist 5f (opt-in via `--local`) cannot run there at all — no host Ollama endpoint"; the `Agent`-tool reason already carries the exception — `.claude/skills/run-issue/SKILL.md:140-141`, `.agent/knowledge/skill_workflows.md:154-155`
-- [ ] (must-fix) Citations are verified against two different baselines and one ships wrong. `review-code/SKILL.md:333-335` resolves only in the branch's stale copy; on `main` those lines are the static-analysis linter table and the sequential-fallback sentence is at **343-346**. The `docker_run_agent.sh` citations are the mirror image — correct against `main`, ~160 lines off against the branch's own copy. Root cause: the branch does not contain `main` (`git merge-base --is-ancestor main HEAD` fails; `main` has moved through #590/#594/#602/#604 since the base), which is also what produced the finding above. Fix: merge `main` first (required before push regardless), then re-resolve every citation against the merged tree. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:139`
-- [ ] (must-fix) The in-process bullet whose job is to deflate residual containment re-inflates it: "`ask` rules and the `PreToolUse` hooks wired in `.claude/settings.json` still fire". That file defines **no** `ask` rules (they are in the untracked `.claude/settings.local.json`, as the very next bullet says) and exactly **one** `PreToolUse` hook — matcher `AskUserQuestion`, invoked `… || true`, warn-only by design (`AGENTS.md:585`: "never blocks") and unable to match an Edit/Bash/commit call at all. Cross-pass confirmed (Lens B + lead) — `.claude/skills/run-issue/SKILL.md:209-211`
-- [ ] (must-fix) "**no GitHub credentials enter**" is contradicted nine lines later by its own citation (`-e GH_TOKEN` forwarded at `docker_run_agent.sh:690`), by the container bullet at `:175-177`, and by the knowledge file's mirror, which correctly says *write* auth. Same absolute again at `:230-231` ("GitHub auth included … exactly the capability the sandbox withholds") and `skill_workflows.md:166-167` ("simply does not have host GitHub auth"). Fix: say **write** auth consistently in both files; and re-attribute the README claim, which leads with "container filesystem isolation as the security boundary" (`.devcontainer/agent/README.md:3`) — the framing this same paragraph refutes — not with the credential property. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:189-191,230-231`, `.agent/knowledge/skill_workflows.md:166-167`
-- [ ] (suggestion) "skips itself with a one-line notice … and **silently** dropping the cross-model pass" contradicts itself inside one sentence: `review-code/SKILL.md:797` and the report/progress templates (`:891,949,968-975,994`) all emit `Local Adversarial skipped: <reason>`. Drop "silently" — `.claude/skills/run-issue/SKILL.md:143-144`
-- [ ] (suggestion) "only when `--context-file` is passed, **i.e. only on the container path**" — the gloss is false: `--context-file` is orthogonal to `--mode` (`dispatch_subagent.sh:312-317`), and `CONTEXT_SECTION` is spliced into the handoff at `:461-463`, before the mode branch, so an in-process dispatch that passes it gets the fence too. The knowledge file's sibling sentence stops at "only on the `--context-file` path" and is correct; delete the gloss — `.claude/skills/run-issue/SKILL.md:167-168`
-- [ ] (suggestion) The fence-loss enumeration reads as exhaustive but names two phases; `plan-task/SKILL.md:36` and `review-plan/SKILL.md:112` both fetch `comments`, and post-PR `review-code/SKILL.md:256` fetches `comments,reviews`. Generalize the heading (the bullet's closing sentence already does) rather than listing phases — `.claude/skills/run-issue/SKILL.md:165-172`
-- [ ] (suggestion) "only `.agent/` is re-mounted `:ro`" omits that `.agent/scratchpad` is punched back read-write over it (`docker_run_agent.sh:515` on `main`) — `.claude/skills/run-issue/SKILL.md:196`
-- [ ] (suggestion) "no GitHub *write* auth **ever**" is stronger than the script: `docker_run_agent.sh:651-665` takes `AGENT_GH_TOKEN` as an explicit override ahead of the `gh-readonly-token` file and validates no scopes — read-only is a filename convention, not an enforced property. Drop "ever" — `.agent/knowledge/skill_workflows.md:170-172`
-- [ ] (suggestion) Off-by-one: the quoted handoff sentence begins at `dispatch_subagent.sh:468` ("…dispatched for **issue #$ISSUE**. Work only"); cite `:468-469` — `.claude/skills/run-issue/SKILL.md:221`
-- [ ] (suggestion) Two unchanged neighbours in the same file now disagree with the new text: `:48` still says "A container dispatch **has no GitHub read auth**" against the new `:175-177`; and `:344` cites `review-code/SKILL.md:864-866, 872` for the post-PR `## Local Review` heading, which lives at `:1029-1036` — `864-872` is the ship-verdict block this PR edits. Both cheap to close in the same pass — `.claude/skills/run-issue/SKILL.md:48,344`
+- [x] (must-fix) The 5f default is inverted in both files, and the round-2 review it overruled was right: on current `main` `review-code/SKILL.md:45-47,104-106,152-158,750-752` make 5f **opt-in via `--local`, off by default** (#590, merged into `main` as `0d0aebf`), with `--no-local` a deprecated no-op. `430a18c` verified against the branch's stale copy of that file and shipped "on by default; `--no-local` opts out" into both. Cross-pass confirmed (Lens A + Lens B + lead). Fix: "specialist 5f (opt-in via `--local`) cannot run there at all — no host Ollama endpoint"; the `Agent`-tool reason already carries the exception — `.claude/skills/run-issue/SKILL.md:140-141`, `.agent/knowledge/skill_workflows.md:154-155`
+- [x] (must-fix) Citations are verified against two different baselines and one ships wrong. `review-code/SKILL.md:333-335` resolves only in the branch's stale copy; on `main` those lines are the static-analysis linter table and the sequential-fallback sentence is at **343-346**. The `docker_run_agent.sh` citations are the mirror image — correct against `main`, ~160 lines off against the branch's own copy. Root cause: the branch does not contain `main` (`git merge-base --is-ancestor main HEAD` fails; `main` has moved through #590/#594/#602/#604 since the base), which is also what produced the finding above. Fix: merge `main` first (required before push regardless), then re-resolve every citation against the merged tree. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:139`
+- [x] (must-fix) The in-process bullet whose job is to deflate residual containment re-inflates it: "`ask` rules and the `PreToolUse` hooks wired in `.claude/settings.json` still fire". That file defines **no** `ask` rules (they are in the untracked `.claude/settings.local.json`, as the very next bullet says) and exactly **one** `PreToolUse` hook — matcher `AskUserQuestion`, invoked `… || true`, warn-only by design (`AGENTS.md:585`: "never blocks") and unable to match an Edit/Bash/commit call at all. Cross-pass confirmed (Lens B + lead) — `.claude/skills/run-issue/SKILL.md:209-211`
+- [x] (must-fix) "**no GitHub credentials enter**" is contradicted nine lines later by its own citation (`-e GH_TOKEN` forwarded at `docker_run_agent.sh:690`), by the container bullet at `:175-177`, and by the knowledge file's mirror, which correctly says *write* auth. Same absolute again at `:230-231` ("GitHub auth included … exactly the capability the sandbox withholds") and `skill_workflows.md:166-167` ("simply does not have host GitHub auth"). Fix: say **write** auth consistently in both files; and re-attribute the README claim, which leads with "container filesystem isolation as the security boundary" (`.devcontainer/agent/README.md:3`) — the framing this same paragraph refutes — not with the credential property. Cross-pass confirmed (Lens A + Lens B + lead) — `.claude/skills/run-issue/SKILL.md:189-191,230-231`, `.agent/knowledge/skill_workflows.md:166-167`
+- [x] (suggestion) "skips itself with a one-line notice … and **silently** dropping the cross-model pass" contradicts itself inside one sentence: `review-code/SKILL.md:797` and the report/progress templates (`:891,949,968-975,994`) all emit `Local Adversarial skipped: <reason>`. Drop "silently" — `.claude/skills/run-issue/SKILL.md:143-144`
+- [x] (suggestion) "only when `--context-file` is passed, **i.e. only on the container path**" — the gloss is false: `--context-file` is orthogonal to `--mode` (`dispatch_subagent.sh:312-317`), and `CONTEXT_SECTION` is spliced into the handoff at `:461-463`, before the mode branch, so an in-process dispatch that passes it gets the fence too. The knowledge file's sibling sentence stops at "only on the `--context-file` path" and is correct; delete the gloss — `.claude/skills/run-issue/SKILL.md:167-168`
+- [x] (suggestion) The fence-loss enumeration reads as exhaustive but names two phases; `plan-task/SKILL.md:36` and `review-plan/SKILL.md:112` both fetch `comments`, and post-PR `review-code/SKILL.md:256` fetches `comments,reviews`. Generalize the heading (the bullet's closing sentence already does) rather than listing phases — `.claude/skills/run-issue/SKILL.md:165-172`
+- [x] (suggestion) "only `.agent/` is re-mounted `:ro`" omits that `.agent/scratchpad` is punched back read-write over it (`docker_run_agent.sh:515` on `main`) — `.claude/skills/run-issue/SKILL.md:196`
+- [x] (suggestion) "no GitHub *write* auth **ever**" is stronger than the script: `docker_run_agent.sh:651-665` takes `AGENT_GH_TOKEN` as an explicit override ahead of the `gh-readonly-token` file and validates no scopes — read-only is a filename convention, not an enforced property. Drop "ever" — `.agent/knowledge/skill_workflows.md:170-172`
+- [x] (suggestion) Off-by-one: the quoted handoff sentence begins at `dispatch_subagent.sh:468` ("…dispatched for **issue #$ISSUE**. Work only"); cite `:468-469` — `.claude/skills/run-issue/SKILL.md:221`
+- [x] (suggestion) Two unchanged neighbours in the same file now disagree with the new text: `:48` still says "A container dispatch **has no GitHub read auth**" against the new `:175-177`; and `:344` cites `review-code/SKILL.md:864-866, 872` for the post-PR `## Local Review` heading, which lives at `:1029-1036` — `864-872` is the ship-verdict block this PR edits. Both cheap to close in the same pass — `.claude/skills/run-issue/SKILL.md:48,344`
 
 ### Verified, not flagged
 - **The auto-mode tell now works as specified, confirmed firsthand.** In this dispatched sub-agent the `While auto mode is active:` reminder was injected **once**, attached to the first tool result, and did not recur across ~25 subsequent tool calls — so "present anywhere in the whole context" is the check that works and the per-turn form would indeed have failed. I later read both files containing the sentinel verbatim and could still tell the injection from the quotations, so the second trap is stated correctly too. One nit only: the doc asserts it is a `system-reminder`; it arrived without a visible tag, so the tag is not itself verifiable from inside — the discriminator the doc already gives (injected session text, never file content you read) is the one that carries.
@@ -551,3 +551,112 @@ Specialists: static analysis (no linter profile for `.md`; no trailing whitespac
 
 ### Convergence
 Another **full** multi-specialist round is not worth the operator's time on a prose diff — the four must-fixes each come with the replacement wording above and none is a design question. What is non-negotiable is the order: **merge `main` into the branch first**, because round 3 proved the branch's own copies are an unreliable verification baseline (they are what produced must-fix 1 and 2), then apply the fixes, then a **targeted** re-check limited to (a) every `file:line` citation re-resolved against the merged tree and (b) the two recurring paragraphs — container containment and in-process containment — read clause by clause with a source line recorded for each clause, not just the ones named here. That is the cheap path to convergence; a fourth full round is not.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-24 11:35 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-607 at `70139c9`
+**Addressed**: `## Local Review (Pre-Push)` (2026-08-24 10:50 -04:00, branch at `b33e250`, Round 3 — 4 must-fix, 7 suggestions)
+**Commits**: 5b3c32e, 36371e6, 638301a, 42cde4f, 1465d59, 70139c9
+
+Round 3's precondition was met before any fix: `main` is merged into the branch
+(`0ba4957`, clean) and `git merge-base --is-ancestor main HEAD` now passes, so
+every claim and citation below was re-resolved against the **merged** tree, not
+against the branch's stale copies. No verification recorded in an earlier entry
+was reused.
+
+### Actions
+- [x] (must-fix) 5f is **opt-in via `--local`**, not on by default — corrected in both files; `--no-local` named as the deprecated no-op — `run-issue/SKILL.md:139-146`, `skill_workflows.md:154-158`
+- [x] (must-fix) Every citation re-resolved against the merged tree (audit table below); `review-code/SKILL.md:333-335` → `:343-346` — `run-issue/SKILL.md:139`
+- [x] (must-fix) The in-process permission bullet now deflates containment: `.claude/settings.json` has **no** `ask` rules and exactly **one** `PreToolUse` hook (matcher `AskUserQuestion`, `… || true`, warn-only), which cannot match an edit/commit/shell call — `run-issue/SKILL.md:219-227`
+- [x] (must-fix) "no GitHub credentials enter" → GitHub **write** auth, said consistently; the README claim re-attributed (it *leads* with filesystem isolation, and its own absolute is the one the paragraph narrows) — `run-issue/SKILL.md:197-202,212-217,246-248`, `skill_workflows.md:167-170`
+- [x] (suggestion) "silently dropping the cross-model pass" removed with the rewritten 5f clause (5f is off by default, so nothing is dropped) — `run-issue/SKILL.md:139-146`
+- [x] (suggestion) The "i.e. only on the container path" gloss deleted; `--context-file` is orthogonal to `--mode` and stated as such with sources — `run-issue/SKILL.md:165-179`
+- [x] (suggestion) The fence-loss bullet generalized from "`review-issue`'s job too" to *any phase that fetches third-party text itself*, naming `plan-task`/`review-plan`/post-PR `review-code` as further `comments` fetchers — `run-issue/SKILL.md:165-179`
+- [x] (suggestion) `.agent/scratchpad` punched back read-write over the `.agent:ro` overlay now stated, with both line cites — `run-issue/SKILL.md:207-208`
+- [x] (suggestion) "no GitHub *write* auth **ever**" → dropped "ever"; read-only-ness noted as a filename convention the script does not validate — `skill_workflows.md:171-175`
+- [x] (suggestion) Off-by-one closed: the handoff quote is `dispatch_subagent.sh:468-469` — `run-issue/SKILL.md:237`
+- [x] (suggestion) Both stale neighbours closed: `:48` no longer says "no GitHub read auth" flatly, and the post-PR heading cite is now `review-code/SKILL.md:1043-1051` — `run-issue/SKILL.md:48-49,344`
+
+### Targeted re-check (a): every `file:line` in the diff, re-resolved
+
+Each was read at the cited line in the merged tree; the "resolves to" column is
+what is actually there.
+
+| Citation | Resolves to | OK |
+|---|---|---|
+| `docker_run_agent.sh:509` | `MOUNT_ARGS+=(-v "$ROOT_DIR:$ROOT_DIR")` | yes |
+| `docker_run_agent.sh:512` | `.agent` re-mount with `:ro` | yes |
+| `docker_run_agent.sh:526` | `.agent/scratchpad` read-write mount (was `:515` pre-merge — #602 moved it) | yes, corrected |
+| `docker_run_agent.sh:546` / `:591` | anonymous `build`/`install`/`log` volume, main layers / worktree layers | yes, newly cited |
+| `docker_run_agent.sh:596-597` | both worktree trees mounted read-write | yes |
+| `docker_run_agent.sh:599-616` | §6 — `~/.claude.json`, `~/.claude/settings.json`, `~/.claude/.credentials.json` | yes |
+| `docker_run_agent.sh:651-665` | `AGENT_GH_TOKEN` override → `gh-readonly-token` file → `export GH_TOKEN`; no scope validation | yes |
+| `docker_run_agent.sh:688` / `:690` | `CLAUDE_CODE_OAUTH_TOKEN` / `AGENT_GH_TOKEN:+-e GH_TOKEN` | yes |
+| `dispatch_subagent.sh:312-317` | the "`--context-file` is ORTHOGONAL to the task source" comment | yes |
+| `dispatch_subagent.sh:461-463` / `:498` | `CONTEXT_SECTION` spliced into `HANDOFF` / `if [ "$MODE" = "in-process" ]` — splice precedes the branch | yes |
+| `dispatch_subagent.sh:468-469` | "You are a fresh-context sub-agent … Work only / within this issue's worktree…" | yes, corrected from `:469` |
+| `review-code/SKILL.md:343-346` | "use the `Agent` tool … otherwise evaluate / sequentially." | yes, corrected from `:333-335` |
+| `review-code/SKILL.md:256` | `gh pr view … ,comments,reviews,…` | yes |
+| `review-code/SKILL.md:1043-1051` | post-PR header prose + the `## Local Review` template heading | yes, corrected from `:864-866, 872` |
+| `plan-task/SKILL.md:36` | `gh issue view <N> --json …,comments,url` | yes |
+| `review-plan/SKILL.md:112` | `gh issue view "$ISSUE_NUM" … --json …,comments,url` | yes (both `review-plan` hunks in this PR start at `:368`, so `:112` is unshifted) |
+| `AGENTS.md:585` | `check_question_context.py` row — "Warn-only … never blocks a checkpoint" | yes |
+| `.devcontainer/agent/README.md:3-5` | "container filesystem isolation as the security boundary. No GitHub credentials enter the container…" | yes |
+
+### Targeted re-check (b): the two recurring paragraphs, clause by clause
+
+**Container containment** (`run-issue/SKILL.md:194-214`):
+
+| Clause | Source |
+|---|---|
+| separates the modes = GitHub write auth + machine state, not file access | `docker_run_agent.sh:509` (whole root rw) vs. `:690` (only optional read token) |
+| isolates OS/dependency state | container image; no host `/` mount — mount list is `:505-616` |
+| build artifacts are anonymous volumes | `:546`, `:591` |
+| withholds GitHub **write** auth → cannot push / open a PR | `:648-665` (only a nominally read-only token is ever exported); push runs on the host via the gateway, `:797` |
+| "not *all* GitHub credentials" | `:690` forwards `GH_TOKEN` when configured |
+| README states the absolute; leads with filesystem isolation | `.devcontainer/agent/README.md:3-5` |
+| workspace root bind-mounted rw at the same absolute path | `:509` |
+| both worktree trees mounted rw again | `:596-597` |
+| only `.agent/` re-mounted `:ro` | `:512` |
+| `.agent/scratchpad` punched back rw over it | `:526` |
+| host Claude credentials mounted | `:599-616` |
+| `CLAUDE_CODE_OAUTH_TOKEN` forwarded | `:688` |
+| optional read-only GitHub token forwarded as `-e GH_TOKEN` | `:690` |
+| read-only-ness is filename convention, unvalidated ⇒ "no write auth" is configuration, not enforcement | `:651-665` (`AGENT_GH_TOKEN` override accepted verbatim; no scope check) |
+| does not put host files out of reach | `:509`, `:596-597` |
+
+**In-process containment** (`run-issue/SKILL.md:216-248`):
+
+| Clause | Source |
+|---|---|
+| auto mode approves the routine calls | host session permission mode; `~/.claude/settings.json` has an `autoMode` key and **no** `permissions` key |
+| tracked baseline defines **no** `ask` rules | `.claude/settings.json` → `permissions` has only `allow` (31 entries) |
+| the machine's `ask` rules are untracked | `.claude/settings.local.json` → `permissions.ask` = `tmux send-keys`, `merge_pr.sh` (three path forms), `make merge-pr`, `gh pr merge` |
+| exactly **one** `PreToolUse` hook, matcher `AskUserQuestion`, `… \|\| true` | `.claude/settings.json` → `hooks.PreToolUse` (single entry) |
+| warn-only, "never blocks" | `AGENTS.md:585` |
+| cannot match an edit / commit / shell call | its matcher is `AskUserQuestion` — no Edit/Write/Bash matcher exists in the file |
+| allowlist carries no `deny`; `~/.claude/settings.json` neither | `.claude/settings.json` (`allow` only); user settings has no `permissions` key at all |
+| worktree scoping is handoff prose, unenforced | `dispatch_subagent.sh:468-469` |
+| `skill_workflows.md` says "no filesystem isolation" | `skill_workflows.md:103` |
+| the script header's "convention-only … ADR-0004/0005" is about the exit contract | `dispatch_subagent.sh:7-8` |
+| phase runs with the host's own GitHub **write** auth | host `gh` auth; the container's counterpart is `:648-665` |
+
+### Not re-opened (per operator instruction)
+- The `#606` citation (real PR, merged as `a00193c`) — left as-is.
+- The safety reasoning covering both dispatch paths — left as-is.
+- The `review-plan` self-review heuristic fix staying in this PR — left as-is.
+
+### Plan sync
+`plan.md` needed no edit: it carries no `file:line` citations and its
+Implementation Notes already describe the sandbox's contribution as "a clean
+machine plus the absence of GitHub write auth", which is what the corrected
+prose now says.
+
+### Local checks
+Pre-commit ran clean on all six commits (no `--no-verify`); no linter profile
+applies to `.md`. Tree clean; nothing pushed. Residual-claim sweep over both
+files finds no surviving "credentials enter", "on by default", "silently", or
+"no GitHub read auth" text.
