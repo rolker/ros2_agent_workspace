@@ -157,14 +157,28 @@ optional read-only token is configured (`docker_run_agent.sh` forwards it as
 `dispatch_subagent.sh --check` (#532) before relying on it.
 
 **What contains a dispatched agent — in either mode.** Neither mode puts a human
-behind each tool call, so be accurate about what does the containing. The two
-modes are not close, and the honest comparison does not favour in-process.
+behind each tool call, so be accurate about what does the containing — including
+where that narrows the container's story. The two modes differ, but on a
+narrower axis than "sandboxed vs. not": what actually separates them is GitHub
+write auth and machine state, not access to your files.
 
-In a **container**, the sandbox boundary is the *whole* of it, and it is real:
-a separate filesystem, isolated dependency state, no route to the host's caches,
-and — the property `.devcontainer/agent/README.md` leads with — **no host
-credentials inside**. A container run that goes wrong cannot push, cannot open a
-PR, and cannot reach anything the host is logged into.
+A **container** contains real things, but fewer than "sandbox" suggests, so name
+them precisely. It isolates the **OS and dependency state** and the **build
+artifacts** (each layer workspace's `build/`/`install`/`log` is an anonymous
+volume, not the host's). And — the property `.devcontainer/agent/README.md`
+leads with — **no GitHub credentials enter**: a container run that goes wrong
+cannot push and cannot open a PR.
+
+What it does **not** isolate is the workspace itself.
+`docker_run_agent.sh:509` bind-mounts the **entire workspace root read-write at
+the same absolute path**, and 596-597 mount both worktree trees read-write
+again; only `.agent/` is re-mounted `:ro`. Nor is it credential-free in general:
+§6 (599-616) mounts the host's `~/.claude/.credentials.json`, `~/.claude.json`
+and `~/.claude/settings.json`, the long-lived `CLAUDE_CODE_OAUTH_TOKEN` is
+forwarded at 688, and where the optional read-only GitHub token is configured it
+is forwarded at 690 as `-e GH_TOKEN`. So the honest summary is: a container
+gives the phase a **clean machine and no GitHub write auth** — it does not put
+the host's files out of its reach.
 
 **In-process, markedly less contains the phase**, and none of the mechanisms you
 might reach for actually hold:
