@@ -157,7 +157,16 @@ tri-state outcome instead of widening the boolean.
 | `.agent/scripts/lib/workspace.py` | Added during implementation — new shared `get_optional_layers()`, extracted so `sync_repos.py` and `validate_workspace.py` decide "this layer may be absent" from one parser (byte-compatible with `setup_layers.sh`'s `is_optional_layer()`) instead of two |
 | `.agent/scripts/validate_workspace.py` | Added during implementation — switched from its own optional-layer parsing to the shared helper; behaviour unchanged (a repo in an optional layer stays allowed-missing) |
 | `.agent/scripts/tests/test_workspace_lib.py` | Added during implementation — pins the shared parser's comment/blank handling, its missing-file `set()`, and its agreement with `setup_layers.sh` |
-| `AGENTS.md` | One-clause addition to the `sync_repos.py` script-table row noting exit-code semantics |
+| `AGENTS.md` | Exit-code semantics for the `sync_repos.py`, `pull_remote.py`, `push_remote.py` and `validate_workspace.py` script-table rows |
+| `.agent/scripts/pull_remote.py` | Scope widening — tri-state `is_dirty()` / `get_current_branch()`; `_check_pull_preconditions()` returns an (status, message) problem so an unreadable tree or git state is an `error` (exit 1), not a `skip`; the same carve-out in `_fetch_into_branch()` and in the `--json` arm |
+| `.agent/scripts/tests/test_pull_remote.py` | New — classification driven through `process_repo()`, the entry point `iter_repos` calls |
+| `.agent/scripts/validate_workspace.py` | Scope widening — three-state `ValidationResult` + `EXIT_CODES`; zero configured repos is `UNCONFIGURED` (exit 3), not a pass; `--fix` gated on drift and its re-validation result no longer discarded |
+| `.agent/scripts/tests/test_validate_workspace.py` | New — outcome classification and exit status, stubbed at the `get_overlay_repos` / `get_actual_repos` seams |
+| `.agent/scripts/dashboard.sh` | Consequence of the above — the validation check reads the exit code three ways instead of pass/fail |
+| `.agent/scripts/tests/test_dashboard_validate_status.sh` | New — runs the real `dashboard.sh` against a stub validate script for each exit code |
+| `.agent/scripts/lib/remote_utils.py` | Scope widening — `remote_probe()`/`RemoteState` tri-state (`remote_exists()` kept as the boolean wrapper for `add_remote.py`); `run_git()` catches `OSError` instead of letting it kill the run |
+| `.agent/scripts/push_remote.py` | Consequence — an unreadable repo is an `error`, not a "remote not found" skip |
+| `.agent/scripts/tests/test_remote_probe.py` | New — the shared probe, the `OSError` guard, and `push_remote.py`'s consumption of both |
 | `.agent/scripts/tests/test_net_retry.py` | Check for `sync_repo` return-value assertions that need updating for the enum change (no changes expected if it only checks `run_network_cmd`/`sync_gitbug` call routing, but verify) |
 
 ## Principles Self-Check
@@ -380,10 +389,11 @@ mechanical must-fixes, no reopened design question.
   missing-file paths, the latter checked against `setup_layers.sh`'s own
   `is_optional_layer()` rather than a restatement of it; this plan re-synced
   with the two files the work added.
-- **Deliberately not widened**: the same `success and bool(output)` false green
-  in `pull_remote.py:42` and the 0-repo all-clear in `validate_workspace.py` are
-  the same defect class at different entry points, tracked as a separate
-  follow-up rather than folded into a diff that has had three review rounds.
+- **Round 2 proposed not widening** — the same `success and bool(output)` false
+  green in `pull_remote.py:42` and the 0-repo all-clear in
+  `validate_workspace.py` were to be tracked as a separate follow-up rather
+  than folded into a diff that had had three review rounds. **The operator
+  overruled this**; see "Scope widened after Round 2" below.
 
 **Round 2 verification**: 106 pytest cases green across
 `.agent/scripts/tests/` (29 in `test_sync_repos.py`, 4 in the new
@@ -394,9 +404,72 @@ reverting the post-merge exit to 1, unguarding the `cd`, dropping the parser's
 `#`-strip or blank-skip, returning a non-empty set for a missing file, and
 deleting `locate_repo`'s explicit-path fallback.
 
+## Scope widened after Round 2 (operator decision)
+
+Round 2 ruled the sibling instances a follow-up issue. The operator overruled
+that on two workspace rules, and they land on this branch, in this PR, as one
+atomic commit per script:
+
+- AGENTS.md's **filing discipline** — "for consolidation/cleanup work, default
+  to bundling related changes into one PR (atomic commits inside) rather than
+  fanning out many small issues".
+- The **Quality Standard** — "when fixing a bug, fix it completely… never leave
+  a 'good enough' fix when the proper one is within reach". A defect class
+  found and left in place in a sibling script is exactly that.
+
+The scope is *this defect class*: a git command that failed being reported as a
+benign answer, so a run that did nothing still exits 0. Four sites, all of them
+verified against source, not inferred:
+
+1. **`pull_remote.py` `is_dirty()`** — `success and bool(output)`, so a failed
+   `git status` read as "clean". The most consequential of the set: `--pull`
+   *merges* on this answer.
+2. **`pull_remote.py` `get_current_branch()`** — `output if success and output
+   else None` collapsed a genuine detached HEAD with a failed git command. The
+   identical bug #609 split apart in `sync_repos.py`, split the same way here:
+   `""` is a benign skip, `None` is a repo we cannot read.
+3. **`validate_workspace.py`** — `not (missing or extra or mismatched)` is
+   vacuously true over an empty configuration, so a workspace with **zero**
+   repos configured printed `✅ Workspace validation PASSED!` and exited 0.
+4. **`lib/remote_utils.py` `remote_exists()` / `run_git()`** — found while
+   re-verifying the neighbouring claims in `process_repo()`, the function site 1
+   feeds. `remote_exists()` answered False when `git remote` itself failed, so
+   both `pull_remote.py` and `push_remote.py` reported "remote not found" and
+   skipped, green, a repo they had never read; and `run_git()` caught only
+   `CalledProcessError`, so an unusable repo directory raised `OSError`,
+   escaped, and killed the run with no summary. `remote_exists()` is kept as a
+   boolean wrapper for `add_remote.py`, where False is the correct answer.
+
+Three consequences the widened scope pulls in, each handled rather than noted:
+
+- **`dashboard.sh:166`** runs `validate_workspace.py` and branched on pass/fail,
+  so the new outcome would have printed "Workspace drift detected. Run: make
+  validate" — sending the operator back to the same empty answer. It now reads
+  the exit code three ways. (No CI workflow invokes the script — verified
+  against `.github/workflows/`; `make validate` is the documented local gate.)
+- **Exit-code numbering.** `validate_workspace.py`'s new UNCONFIGURED outcome is
+  **3**, not 2: argparse already owns 2, the same collision Round 2 caught in
+  `merge_pr.sh`. And as with `make sync`, GNU make flattens any non-zero recipe
+  status to its own 2, so both AGENTS.md rows and the module docstrings say to
+  branch on these codes only when calling the scripts directly.
+- **A neighbouring bug in `validate_workspace.py`'s `main()`**: a successful
+  `--fix` re-validated the workspace and then discarded the answer, exiting 1 on
+  the stale result — a workspace `--fix` had just repaired still read red.
+
+**Deliberately not touched** (each verified correct as written):
+`lib/remote_utils.py:119`/`:124`, whose fallback chains are by design — each
+probe falls through to the next and finally to `"main"`; `pull_remote.py`'s
+`_compare_branches()` log listing, where a failure only omits detail from a
+message; and `pull_remote.py`'s existing exit-code handling, which was already
+correct. `add_remote.py` keeps `remote_exists()`.
+
 ## Estimated Scope
 
-Single PR. Two files change behavior (`sync_repos.py`, `merge_pr.sh`), a third
-(`validate_workspace.py`) moves to a shared helper in `lib/workspace.py`, two
-new test modules are added, and `AGENTS.md` plus the two hook docs get doc
-updates.
+Single PR. After the Round-2 scope widening, six files change behavior
+(`sync_repos.py`, `merge_pr.sh`, `pull_remote.py`, `validate_workspace.py`,
+`lib/remote_utils.py`, `push_remote.py`), one consumer follows
+(`dashboard.sh`), `validate_workspace.py` also moves to the shared
+`lib/workspace.py` helper, six test modules are added, and `AGENTS.md`, the
+`Makefile` help text and the two hook docs get doc updates. One atomic commit
+per script, so any single widening commit can be dropped without unpicking the
+rest.
