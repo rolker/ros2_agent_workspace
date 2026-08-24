@@ -180,7 +180,7 @@ tri-state outcome instead of widening the boolean.
 |---|---|---|
 | `sync_repo()`'s return type (bool → enum) | Every call site (`main()`, both `sync_gitbug()` gates) | Yes — step 2 |
 | `sync_repos.py` exit code semantics | `AGENTS.md` script-table row | Yes — step 7 |
-| `merge_pr.sh`'s handling of `make sync`'s exit code | `merge_pr.sh`'s existing `test_merge_pr.sh` test file — check whether it stubs `make sync` and needs a case for the new failure-banner path | Yes — step 5 implementation; test coverage for `merge_pr.sh` itself is an open question (see below) rather than committed scope, since the existing `test_merge_pr.sh` conventions need to be read first |
+| `merge_pr.sh`'s handling of `make sync`'s exit code | `merge_pr.sh`'s existing `test_merge_pr.sh` test file | Yes — step 5 implementation. **Row closed**: `test_merge_pr.sh` exercises only pre-merge guards (arg handling, worktree resolution, field mode) and by design never reaches the sync tail, so no end-to-end case is feasible. It instead locks the piece that *is* a contract — the reserved exit code 3, distinct from the usage-error 2 — alongside `bash -n`/shellcheck |
 | Test suite composition | `run_script_tests.sh` picks up `test_*.py` in `tests/` automatically (already confirmed — no runner change needed) | N/A, no action needed |
 
 ## Documentation & Instruction Impact
@@ -243,9 +243,64 @@ Both resolved; recorded here rather than deleted so the decision trail survives.
   Both call sites now route through one `record()` helper that compares against
   members explicitly, and a test asserts all members are truthy so the trap
   stays documented.
+- **`preflight_repo()` extracted from `sync_repo()`.** The tri-state outcome
+  turned `sync_repo()` into a function with more early returns than pylint's
+  `too-many-return-statements` limit allows. The pre-sync guards (path, working
+  tree, branch) moved into their own function rather than suppressing the check
+  — the same call the tests make with a probe table instead of one flag per
+  probe. No lint rule is disabled anywhere in this change.
 - **Unresolvable paths report their own reason** (`path not resolved`) rather
   than a generic failure, so a host with an un-imported layer can tell that
   case apart from a network failure.
+
+## Review-driven corrections (Local Review pre-push, `576a3ff`)
+
+Round 1 of `review-code` found two independently-reproduced false-signal
+defects sitting on either side of the very signal this PR exists to make
+trustworthy, plus three more must-fixes and nine suggestions.
+
+- **False green: `is_dirty()` treated an unreadable working tree as clean.**
+  `success and bool(output)` collapsed "no changes" and "could not look",
+  so a repo with a corrupt index *and* real uncommitted changes classified
+  SYNCED — the exact class of false green #609 removes, and a contradiction of
+  `SyncOutcome.FAILED`'s own "a state we cannot even read". Now True/False/None,
+  with None → FAILED. `run_git_cmd()` also caught only `CalledProcessError`, so
+  an unreadable repo directory raised `OSError` and killed the run with no
+  summary; it is now a per-repo failure.
+- **False red: an optional layer that was never imported failed the run.**
+  `configs/manifest/optional_layers.txt` lists `site`, and `setup_layers.sh`
+  deliberately removes an optional layer whose private repos it cannot import
+  and exits 0 — so "path not resolved → FAILED" made `make sync` permanently
+  red on a supported host. Three cases are now distinguished: optional layer
+  absent → SKIPPED; required layer absent → FAILED, naming `setup_layers.sh`;
+  repo missing inside an imported layer → FAILED, "path not resolved". A
+  *required* repo that cannot be located still fails, as designed.
+- **The root workspace repo's outcome was untested.** No `main()` test keyed an
+  outcome on `ros2_agent_workspace`, so reverting its call site to the
+  truthiness trap left all 14 tests green — on the repo `merge_pr.sh` merges
+  into. Its failure and skip paths are now pinned, and the
+  language-invariant `test_outcomes_are_all_truthy` (which passed under that
+  same mutation) is gone.
+- **`merge_pr.sh` propagated make's exit code 2** — already its own usage-error
+  code, asserted as such by `test_merge_pr.sh`. rc=2 read as "invoked wrong"
+  invites retrying a merge that is already done and irreversible. A reserved
+  code 3 now means "merged and cleaned up, sync failed"; all four exit codes are
+  documented in the script header and in `AGENTS.md`'s row, which previously
+  never mentioned the script can exit non-zero with the merge complete.
+- **An empty repo list claimed a quantified all-clear.** Where `configs/manifest`
+  is missing (un-bootstrapped clone, or a workspace worktree) the summary read
+  `✅ Sync complete — 1 synced, 0 skipped, 0 failures` while all 35 configured
+  repos went unenumerated — a stronger false claim than the bare success line
+  this issue replaced. It is now a named failure.
+- **Suggestions actioned**: per-cause failure reasons (plan step 4's
+  "reuse what's already captured" — the summary had recorded the literal
+  "sync failed" for everything); an off-network host reported as "remote
+  unreachable" rather than 35 identical pull failures; `git status -sb` failing
+  no longer prints a bare `✅ Fetched.` (Plan Review finding 8, settled by
+  fixing rather than deferring); exact summary counts asserted; the
+  ADR-0010 rationale for git-bug failures not failing the run written down;
+  the `AGENTS.md` row extended to every FAILED/SKIPPED cause; the failure banner
+  moved to stderr; this plan re-synced.
 
 ## Verification performed
 
@@ -258,6 +313,22 @@ Both resolved; recorded here rather than deleted so the decision trail survives.
 - `bash -n` clean on `merge_pr.sh`; `sync_repos.py --dry-run` exits 0 on a clean
   run. Note a *workspace worktree* has an empty `layers/`, so a dry run there
   only walks the root repo — the loop is exercised by the tests, not by that.
+
+After the Local Review round:
+
+- 25 tests in `test_sync_repos.py` (from 14), full `run_script_tests.sh` green
+  (21 shell, 98 pytest).
+- **The three mutations that previously survived now fail**: the root call site
+  reverted to `if sync_repo(...)`, a root FAILED demoted to SKIPPED, and the
+  synced/skipped counts dropped from the success summary. Re-checked in both
+  directions for each new behaviour as well — reverting `is_dirty()` to
+  `success and bool(output)`, and both an over- and under-permissive
+  optional-layer rule, each break a named test.
+- **Live, not inferred**: a dry run against this host's real 35 repos through a
+  mirrored root reports `35 synced`; removing `site_ws` from that mirror turns
+  it into `34 synced, 1 skipped` with `optional layer 'site' is not set up`,
+  and no failure — confirming the false red is gone on the exact configuration
+  that produced it.
 
 ## Estimated Scope
 
