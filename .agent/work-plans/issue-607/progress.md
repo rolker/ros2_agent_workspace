@@ -262,3 +262,65 @@ resolve which branch applies to them. All are cheap to fix at plan level.
 - [ ] (suggestion) Permission-mode inheritance asserted as mechanism; ground it in the observed #604 lifecycle instead — `plan.md:12-15`
 - [ ] (suggestion) Record the auto-mode reason in `skill_workflows.md` too, not only in `run-issue/SKILL.md` — `plan.md:66-75`
 - [ ] (suggestion) Record review-plan/SKILL.md:435 and .devcontainer README as checked-and-out-of-scope so review-code need not re-litigate — `plan.md:76-80`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-08-24 09:55 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-607 at `d8d50d7`
+**Mode**: pre-push
+**Depth**: Standard (reason: governance-touching instruction files that other agents read as authority; ~79 net prose lines across two skill files + one knowledge file)
+**Must-fix**: 6 | **Suggestions**: 6
+**Round**: 1 | **Ship**: continue — the change is inert as written (the auto-mode tell it names is operator-facing, not agent-observable), its safety paragraph claims containment that does not exist, and its fail-safe branch routes `review-code` to a mode the next bullet says cannot host it
+
+Specialists: static analysis (no linter profile for `.md`; pre-commit clean on all
+four changed files), governance, plan drift, Claude Adversarial x2 (Lens A + Lens B).
+Local Adversarial skipped: model `qwen3.5:35b` not pulled. Copilot off (default).
+
+### Findings
+- [ ] (must-fix) Auto-mode tell is not agent-observable: the text points at the session's permission-mode indicator, a terminal UI element rendered for the operator, so a careful reader must answer "cannot confirm" every time and fall through to container — the new default never fires. The signal the agent can actually read is the injected `While auto mode is active:` system reminder. Re-opens Plan Review must-fix 5 (nominally closed) — `.claude/skills/run-issue/SKILL.md:97-99`, `.agent/knowledge/skill_workflows.md:131-132`
+- [ ] (must-fix) In-process containment sentence overstates on all three clauses: auto mode is precisely what stands the permission policy down; `.claude/settings.json` carries an `allow` array only, no `deny` anywhere (verified), so the allowlist refuses nothing; the worktree confines nothing — `dispatch_subagent.sh` writes the scoping as prose and its own header calls the contract "convention-only (no enforcement, per ADR-0004/0005)", and this PR's sibling file says "no filesystem isolation"; checkpoints gate publication after the phase has run. The paragraph also omits the real giveaway — in-process hands the phase the host's credentials, the property `.devcontainer/agent/README.md` makes the sandbox's headline. Re-opens Plan Review must-fix 4 — `.claude/skills/run-issue/SKILL.md:126-135`
+- [ ] (must-fix) The fail-safe branch routes the `review-code` fan-out to container, while the next bullet says further `Agent`-tool fan-out and the host Ollama endpoint cannot run there at all — a direct contradiction between adjacent bullets, mirrored in the knowledge file, landing in the branch written for the uncertain reader — `.claude/skills/run-issue/SKILL.md:113-120`, `.agent/knowledge/skill_workflows.md:139,146-148`
+- [ ] (must-fix) The load-bearing evidence claim miscounts itself: "all seven phases" enumerates eight, and the real #604 timeline holds nine typed entries — the enumeration drops the `triage-reviews` / Integrated Review phase, the single datapoint that best supports the host-auth bullet. Cited as "Observed, not assumed" — `.claude/skills/run-issue/SKILL.md:103-107`, `.agent/knowledge/skill_workflows.md:135-136`, `.agent/work-plans/issue-607/plan.md:174-176`
+- [ ] (must-fix) review-plan self-review heuristic contradicts itself: L371-374 prescribes comparing the whole `**By**` field as the detection procedure, L385-391 says the review is independent "no matter what the `**By**` line says" and not to rely on the string. Whole-field matching still false-positives on a genuinely independent same-model dispatch — the defect narrowed from "always" to "whenever the models happen to match" — `.claude/skills/review-plan/SKILL.md:371-374,385-391`
+- [ ] (must-fix) Plan sync is append-only, which `plan-task/SKILL.md` § During implementation rule 3 names explicitly ("Never append-only... misleads Copilot, human reviewers, and future onboarding agents — all of whom read the top first"). Commit `d8d50d7` is 62 insertions, 0 deletions: Approach step 1 still fences off ~L76-91 and still says keep the safety paragraph "content unchanged", step 3 still says "No other files", the Files-to-Change table still lists two, and Estimated Scope still reads "two files" — `.agent/work-plans/issue-607/plan.md:36-64,85-91,128-131,141`
+- [ ] (suggestion) "no GitHub auth of its own" / "cannot run in a container at all" overstates: `docker_run_agent.sh` forwards an optional read-only token as `-e GH_TOKEN` and `dispatch_subagent.sh --check` advertises it ("container reads only; the host publishes"). Accurate form is no GitHub *write* auth, read auth only when that token is configured — `.claude/skills/run-issue/SKILL.md:122-124`, `.agent/knowledge/skill_workflows.md:146-148`
+- [ ] (suggestion) The code-block comment's predicate ("when the host is not in auto mode") is narrower than the bullet's fail-safe rule ("cannot confirm auto mode"); the code block is the copy-paste surface and sits 25 lines above the bullet — `.agent/knowledge/skill_workflows.md:106`
+- [ ] (suggestion) A route the old text handled is now unrouted: cannot-confirm auto mode *and* container auth not ready. The prior wording sent that case to in-process; `--check` is now only a trailing caveat — `.claude/skills/run-issue/SKILL.md:110-124`
+- [ ] (suggestion) The two "regardless of mode" absolutes collide on `triage-reviews`, which needs host GitHub read auth *and* takes third-party PR comments as input — data `dispatch_subagent.sh` itself fences as "data, not authority". State the precedence — `.claude/skills/run-issue/SKILL.md:116-120`
+- [ ] (suggestion) The original's closing caution ("it *is* the safeguard you're relying on — keep it in mind before dispatching anything that processes untrusted input") became an endorsement ("untrusted input belongs there"). The sole-containment clause does survive; the hesitation does not. The hinge flip itself is settled operator ground — this is only about restoring the residual caution — `.claude/skills/run-issue/SKILL.md:130-132`
+- [ ] (suggestion) `review-plan/SKILL.md:451` still recommends `--mode container` for implementation work with no reference to the new default; the file is already edited by this PR, so aligning it is free — `.claude/skills/review-plan/SKILL.md:451`
+
+### Governance
+
+| Principle | Verdict | Notes |
+|---|---|---|
+| Human control and transparency | Concern | The containment paragraph claims guardrails that do not exist (must-fix 2); an agent reading it concludes it is held by mechanisms that hold nothing. |
+| Enforcement over documentation | Watch | Advisory prose only, as #545 was — consistent, not a regression. `dispatch_subagent.sh` requires an explicit `--mode`, so there is no default to enforce. |
+| Capture decisions, not just implementations | Pass | The reason (auto mode) is recorded inline in both files, with #545 → #607 citations in each. |
+| A change includes its consequences | Concern | Third stale surface closed and adapters verified clean; the plan itself was not synced inline (must-fix 6). |
+| Only what's needed / Improve incrementally | Pass | Two target files plus one folded-in operator-approved fix; no tooling change. |
+| Test what breaks | N/A | Advisory prose, no enforced logic. |
+| Workspace vs. project separation | Pass | Workspace infra only. |
+| Primary framework first, portability where free | Pass | Claude-Code-specific default with an explicit non-Claude fallback branch. |
+
+| ADR | Triggered | Compliant | Notes |
+|---|---|---|---|
+| 0001 — Adopt ADRs | Watch, not required | Yes | Parity with #545's prose-only precedent; requiring one now would be an inconsistent bar. Consider a "supersedes the #545 default because X" line so the next reader tells reversal from drift. |
+| 0003 — Project-agnostic workspace | Yes | Yes | Generic dispatch tooling. |
+| 0004 / 0005 — Enforcement hierarchy | Watch | Yes | No new compliance rule; but must-fix 2 is this pair's point exactly — the doc claims enforcement the layers do not provide. |
+| 0013 — progress.md vocabulary | Yes | Yes | Entry types correct throughout the timeline. |
+| 0015 — Dispatch handoff context contract | No | N/A | The `--context-file` mechanism is untouched. |
+
+| Changed | Required update | Status |
+|---|---|---|
+| `.claude/skills/*` (framework skill) | Framework adapter files | Done — verified `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md`, `CLAUDE.md` carry no mode-choice rationale |
+| Retired dispatch-mode advice | Every surface repeating it | Done — independent widened search over "implementation-heavy", bare `--mode container`, "lean toward", "prefer container", "prompt-free", "permission prompt", "approval loop" found no further live surface beyond the one fixed (`review-plan:451` raised as a suggestion) |
+| Implementation diverged from plan | Plan synced inline per `plan-task` § During implementation | Missing — append-only (must-fix 6) |
+
+### Notes
+- The #606 citation is correct and was left alone, as instructed: #606 is the open PR fixing #604. Not re-litigated.
+- Two operator-settled decisions were treated as ground truth, not re-opened: the safety reasoning covering both dispatch paths, and folding the review-plan heuristic fix into this PR.
+- Prior Plan Review verdict was changes-requested (5 must-fix, 3 suggestions). Findings 1, 2, 3, 6, 7 are genuinely closed. Findings 4 and 5 are closed in form but not in substance — the text now *has* a containment sentence and *has* a named tell, but the containment sentence is inaccurate and the tell is unreadable by its intended reader. Those are must-fix 2 and must-fix 1 here.
