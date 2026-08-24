@@ -198,10 +198,16 @@ might reach for actually hold:
 - The **allowlist** refuses nothing. `.claude/settings.json` carries a
   `permissions.allow` array and there is no `deny` list anywhere in this
   workspace's settings. An allowlist pre-approves; it does not deny.
-- The **worktree does not confine anything.** The scoping is prose in the
-  handoff, not a boundary — `dispatch_subagent.sh` says so in its own header
-  ("convention-only (no enforcement, per ADR-0004/0005)"), and the in-process
-  mode line in `skill_workflows.md` reads "no filesystem isolation".
+- The **worktree does not confine anything.** The scoping is prose *addressed to
+  the sub-agent*, not a boundary: `dispatch_subagent.sh:469` writes "Work only
+  within this issue's worktree; do not touch other issues" into the handoff
+  text, and nothing enforces it. The in-process mode line in
+  `skill_workflows.md` says the same from the other side — "no filesystem
+  isolation". (Do not cite the script's header here: its "convention-only (no
+  enforcement, per ADR-0004/0005)" is about the sub-agent's *`progress.md` exit
+  contract*, a different subject. ADR-0004/0005's enforcement hierarchy is
+  still the right lens — documentation is its weakest layer, and this scoping
+  is documentation.)
 - The phase runs with **the host's own credentials** — GitHub auth included.
   That is exactly the capability the sandbox withholds, and it is the real
   difference between the modes.
