@@ -375,6 +375,15 @@ dispatched sub-agent and read the plan cold, do not — you are
 independent, and that is a fact about how you were invoked, which only
 you can report.
 
+**One mechanical marker does exist, and it settles the common case.**
+`dispatch_subagent.sh` writes a handoff header into every dispatch —
+"You are a fresh-context sub-agent dispatched for **issue #N**"
+(`dispatch_subagent.sh:468`). Present in your context ⇒ you were dispatched
+⇒ you are independent ⇒ no annotation. Its **absence** proves nothing (a
+dispatch by other means carries no header), so it is a positive test only —
+but it shrinks "genuinely unsure" to near-zero for the lifecycle path this
+skill actually runs on.
+
 **No comparison of the `**By**` line can decide this** (#607). Every
 dispatched agent in this workspace shares one `$AGENT_NAME` (set once
 per session by `set_git_identity_env.sh`), so a name-only match fires on
@@ -391,7 +400,10 @@ the model, so this needs no extra slot in the entry. **Matching** strings
 are evidence of nothing. If a `## Plan Authored` entry exists and you are
 genuinely unsure how you were invoked, **apply the
 `(in-context — author self-review)` annotation** and state in one line
-what left you unsure. Applying it is the conservative default: at worst it understates
+what left you unsure. That line goes in the entry body, as the first line
+under the `**Plan**:`/`**PR**:` block of the `## Plan Review` entry below —
+e.g. "Independence uncertain: no dispatch header in context and the
+`**By**` model string matches the plan author's". Applying it is the conservative default: at worst it understates
 an independence you had, where omitting it claims one you could not
 establish.
 
