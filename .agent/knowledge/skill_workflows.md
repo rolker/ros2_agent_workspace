@@ -161,8 +161,9 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   being no host Ollama endpoint — losing the fresh-context independence that is
   the point. So run it in-process wherever an `Agent` tool exists, in every
   permission mode, and pay the prompts; on a runtime that has none, the degraded
-  container run is the fallback, not a preference. If
-  container auth is not ready either (`dispatch_subagent.sh --check`), run
+  container run is the fallback, not a preference. **Back on the
+  cannot-confirm branch as a whole** — not just for `review-code` — if container
+  auth is not ready either (`dispatch_subagent.sh --check`), run any phase
   in-process and accept the prompts rather than not running at all. The fallback
   direction is deliberate: an uncertain reader must not land on the
   prompt-flooding branch
@@ -183,8 +184,8 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   the build artifacts, and (by configuration) GitHub write auth — **not** the
   host workspace tree. See `run-issue/SKILL.md` § How phases are dispatched,
   *What contains a dispatched agent*.
-  - Conversely, a container is *configured* without host GitHub **write** auth,
-    and has read auth only when the optional read-only token is configured
+  - On the credential side in more detail: a container is *configured* without
+    host GitHub **write** auth, and has read auth only when the optional read-only token is configured
     (`docker_run_agent.sh` forwards it as `-e GH_TOKEN`; its read-only-ness is a
     convention of that token's filename, not a scope the script validates —
     `docker_run_agent.sh:651-665`). It also has no host Ollama endpoint and no
@@ -201,6 +202,10 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
     have had to in a container anyway. **That duty is `review-issue`'s too
     now:** the script emits the fence only on the `--context-file` path, so an
     in-process `review-issue` that fetches the body itself with `gh` gets none.
+    The fence is written into the phases themselves — `review-issue/SKILL.md`
+    step 1, `plan-task/SKILL.md` step 1 and `triage-reviews/SKILL.md` step 5 —
+    because a dispatched sub-agent loads its own SKILL.md, not the
+    orchestrator's.
 - **Run container dispatches in the background** so the host session stays
   responsive to the operator; check results on completion.
 - **Never give a sub-agent filesystem-wide search scope** — scope prompts to
