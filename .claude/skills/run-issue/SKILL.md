@@ -152,7 +152,9 @@ you cannot see it, so it is not the check.
   - **Container auth not ready either?** If `dispatch_subagent.sh --check`
     (#532) reports missing tokens and you cannot confirm auto mode, run
     in-process anyway. An approval-heavy phase is worse than a quiet one; it is
-    not worse than a phase that cannot start.
+    not worse than a phase that cannot start. On a runtime with no `Agent`
+    tool that fallback does not exist either — there, drive the phase manually,
+    as the bullet above says.
 - **Choose `container` regardless of mode when a phase needs a clean
   OS/dependency environment** — that is the isolation a container actually
   supplies. It is **not** sufficient containment for untrusted input on its own:
