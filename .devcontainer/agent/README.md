@@ -207,11 +207,22 @@ boundary the container enforces.
 Nor is the container credential-free in general. It inherits the host's Claude
 Code authentication: `~/.claude/.credentials.json`, `~/.claude.json` and
 `~/.claude/settings.json` are mounted (`docker_run_agent.sh:599-616`), and the
-long-lived `CLAUDE_CODE_OAUTH_TOKEN` is forwarded at `:688`. What does *not*
-enter is GitHub **write** credentials.
+long-lived `CLAUDE_CODE_OAUTH_TOKEN` is forwarded at `:688`.
 
-All pushes and PR creation happen on the host via the push gateway, where the user
-has full visibility and control.
+What is genuinely withheld is narrower than "GitHub write credentials", and it
+holds only for the read-only configuration above. `git push` fails
+unconditionally: no SSH keys, no `~/.config/gh`, no credential helper and no
+`gh auth setup-git` anywhere in the launcher or the entrypoint (verified), so
+there is no transport for git to authenticate over. `gh` is a separate matter —
+it authenticates from `GH_TOKEN` alone, so a write-capable PAT left in
+`AGENT_GH_TOKEN` makes `gh pr create` and `gh api -X POST` succeed from inside
+the container. Mint that token read-only and the whole boundary holds; the
+launcher will not check it for you.
+
+Pushes and PR creation are therefore meant to happen on the host via the push
+gateway, where the user has full visibility and control — `git push` cannot
+happen anywhere else, and `gh` publication stays on the host as long as the
+forwarded token is read-only.
 
 The `.agent/` directory is mounted read-only to prevent the agent from modifying
 workspace infrastructure scripts. The exception is `.agent/scratchpad/`, which is

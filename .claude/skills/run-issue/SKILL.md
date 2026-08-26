@@ -204,10 +204,12 @@ them precisely. It isolates the **OS and dependency state** and the **build
 artifacts** (each layer workspace's `build`/`install`/`log` is an anonymous
 volume, not the host's — `docker_run_agent.sh:546`, and `:591` for the
 worktrees' copies). And it is *configured* without GitHub **write** auth — no
-SSH keys and no `~/.config/gh` are mounted — so a container run that goes wrong
-cannot push and cannot open a PR. Read "configured" literally: that is what the
-launcher forwards, not something the container enforces, and it is narrower than
-"no GitHub credentials" (next paragraph).
+SSH keys, no `~/.config/gh`, no credential helper and no `gh auth setup-git` —
+so a container run that goes wrong cannot `git push` at all, and cannot open a
+PR either unless the optional `GH_TOKEN` was minted with write scopes. Read
+"configured" literally: that is what the launcher forwards, not something the
+container enforces, and it is narrower than "no GitHub credentials" (next
+paragraph).
 `.devcontainer/agent/README.md`'s opening and § Security Model state the same
 boundary in the same terms, corrected to match in this PR — before it, that
 README led with "container filesystem isolation as the security boundary" and
