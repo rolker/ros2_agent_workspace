@@ -190,9 +190,11 @@ you cannot see it, so it is not the check.
     instructions.
 
 Container isn't free: it pays a launch cost, it cannot see host-built layer
-installs, and it has **no GitHub *write* auth** — reads work only when the
-optional read-only token is configured (`docker_run_agent.sh` forwards it as
-`-e GH_TOKEN`), otherwise pass the body in with `--context-file` (#552). Check
+installs, and it is *configured* **without GitHub *write* auth** — it cannot
+`git push` at all, and cannot open a PR either unless the optional `GH_TOKEN`
+was minted with write scopes rather than read-only. Reads work only when that
+token is configured (`docker_run_agent.sh` forwards it as `-e GH_TOKEN`),
+otherwise pass the body in with `--context-file` (#552). Check
 `dispatch_subagent.sh --check` (#532) before relying on it.
 
 **What contains a dispatched agent — in either mode.** Neither mode puts a human
@@ -272,8 +274,12 @@ They are host-enforced and mode-independent, but they gate *publication after
 the phase has already run* — they catch a bad result, not a bad act.
 
 So keep the sandbox in mind as what it is: **not a wall around untrusted input,
-but the one arrangement in which a phase that goes wrong reaches neither GitHub
-write auth nor the host's machine state.** Auto mode retired the *prompt cost*
+but the one arrangement in which a phase that goes wrong leaves the host's OS,
+dependency and build state untouched and — as the launcher configures the
+tokens — carries no GitHub write auth.** Both halves are bounded, and the
+bounds are the ones stated above: it still reaches the host's files through the
+bind-mounted workspace, and the write-auth half holds unless the optional
+`GH_TOKEN` was minted with write scopes. Auto mode retired the *prompt cost*
 of in-process dispatch, not that difference — so think before running a phase
 in-process on input you have reason to distrust. But stated plainly the
 difference is about credentials and machine state, not containment: against
