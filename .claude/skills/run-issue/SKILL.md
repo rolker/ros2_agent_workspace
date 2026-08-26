@@ -216,8 +216,10 @@ token is configured (`docker_run_agent.sh` forwards it as `-e GH_TOKEN`),
 otherwise pass the body in with `--context-file` (#552). Check
 `dispatch_subagent.sh --check` (#532) before relying on it.
 
-**What contains a dispatched agent — in either mode.** Neither mode puts a human
-behind each tool call, so be accurate about what does the containing — including
+**What contains a dispatched agent — in either mode.**
+([ADR-0019](../../../docs/decisions/0019-what-contains-a-dispatched-agent.md)
+records this model as a decision; this section is its operational statement.)
+Neither mode puts a human behind each tool call, so be accurate about what does the containing — including
 where that narrows the container's story. The two modes differ, but on a
 narrower axis than "sandboxed vs. not": what actually separates them is GitHub
 write auth and machine state, not access to your files.

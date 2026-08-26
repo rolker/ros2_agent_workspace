@@ -183,7 +183,9 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   the rest of the boundary too: the sandbox holds back the OS/dependency state,
   the build artifacts, and (by configuration) GitHub write auth — **not** the
   host workspace tree. See `run-issue/SKILL.md` § How phases are dispatched,
-  *What contains a dispatched agent*.
+  *What contains a dispatched agent*, and
+  [ADR-0019](../../docs/decisions/0019-what-contains-a-dispatched-agent.md),
+  which records the model as a decision.
   - On the credential side in more detail: a container is *configured* without
     host GitHub **write** auth, and has read auth only when the optional read-only token is configured
     (`docker_run_agent.sh` forwards it as `-e GH_TOKEN`; its read-only-ness is a
