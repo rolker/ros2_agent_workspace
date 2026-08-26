@@ -269,9 +269,18 @@ reach for one at a time — each does less than its name suggests:
   included. That is exactly the capability the sandbox is configured to
   withhold, and it is the real difference between the modes.
 
-What genuinely survives is `run-issue`'s **checkpoints** (publish, PR, merge).
-They are host-enforced and mode-independent, but they gate *publication after
-the phase has already run* — they catch a bad result, not a bad act.
+What survives in both modes is `run-issue`'s **checkpoints** (publish, PR,
+merge) — but be precise about what backs them, because that too differs by mode.
+They are the orchestrator's own `AskUserQuestion` calls (§ Checkpoints, below),
+and the only `PreToolUse` hook on `AskUserQuestion` is warn-only (`… || true`,
+`AGENTS.md:585`). In **container** mode the push/PR gate is backed materially:
+there is no push transport at all, so the checkpoint cannot be walked past. In
+**in-process** mode the only thing between a phase and `git push` /
+`gh pr create` is the handoff prose telling it not to
+(`dispatch_subagent.sh:475-477`, "Do **not** `git push` — the host performs
+pushes with its own credentials") — the same documentation layer this section
+just demoted for worktree scoping. And in either mode they gate *publication
+after the phase has already run* — they catch a bad result, not a bad act.
 
 So keep the sandbox in mind as what it is: **not a wall around untrusted input,
 but the one arrangement in which a phase that goes wrong leaves the host's OS,
