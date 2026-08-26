@@ -777,3 +777,35 @@ Pre-commit ran clean on every commit (no `--no-verify`, no rule suppressed).
 Changes are Markdown only — no build or package test applies. New README anchor
 links (`#mount-strategy`, `#security-model`, `#read-only-github-access`) resolve
 to existing headings.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-08-25 22:17 -04:00
+**By**: Claude Code Agent (Claude Opus 5 (1M context))
+
+**PR**: #608 at `b6e94f3`
+**Sources**: 3 (Copilot R2 @ `b6e94f3`, prior `## Integrated Review` R4 @ `517faa9` + its `## Implementation` @ `3544e84`, CI rollup)
+**Cross-source confirmations**: 0 same-SHA; **2 cross-round recurrences** (a round-4 finding fixed at the cited site and re-stated at an uncited one in the same pass)
+**CI**: failures-noted — 9 checks at this head; the `pull_request` run is fully green, the `push` run's `Lint (pre-commit)` failed in bootstrap with "Failed to determine ROS apt source version from GitHub API" (infra/rate-limit, not this diff). `main` carries no branch protection, so nothing is blocking; AGENTS.md § Merging still says don't merge the workspace repo on a red check — re-run that job.
+
+Copilot's earlier review (11 comments @ `517faa9`) is fully triaged and closed by
+the round-4 entry and its fix pass; it is stale and not re-litigated here. This
+round covers the 4 live comments at `b6e94f3`. **No false positives** — each was
+checked against the local file at the cited line and holds.
+
+### Findings
+- [ ] (must-fix, Copilot; recurrence of R4 finding 3) `review-plan`'s Next-step block still offers `--mode container` "when the work is isolation-worthy (untrusted input, ...)" — the exact claim this PR removed from `run-issue/SKILL.md:160` and `skill_workflows.md` in the same pass. A plan reviewer following this line is routed into the mode the PR now documents as *not* sufficient containment (workspace and both worktrees bind-mounted rw; `CLAUDE_CODE_OAUTH_TOKEN` forwarded). Restrict the container reason to the clean OS/dependency environment and point untrusted input at the data fence — `.claude/skills/review-plan/SKILL.md:463`
+- [ ] (must-fix, Copilot; recurrence of R4 cross-confirmed finding 1) § Security Model closes with the flat "What does *not* enter is GitHub **write** credentials" — three lines after the same section states that a write-capable PAT in `AGENT_GH_TOKEN` is forwarded as `GH_TOKEN` unvalidated and *does* give the container write auth. Verified: no `gh auth setup-git`, no credential helper, no SSH keys, so `git push` does fail as the bullet says — but `gh pr create` / `gh api -X POST` would not. Qualify the sentence to the genuinely read-only configuration — `.devcontainer/agent/README.md:212`
+- [ ] (valid, Copilot) The troubleshooting check prints the first 10 characters of `CLAUDE_CODE_OAUTH_TOKEN` — a long-lived credential this PR's own prerequisites newly recommend — into terminal scrollback and screenshots, for no diagnostic gain over a presence test. It also does not cover the `~/.claude/.credentials.json` fallback it names in the same line. Replace with a non-printing presence check across all three sources — `.devcontainer/agent/README.md:416`
+- [ ] (valid, Copilot) The "Container auth not ready either?" fallback says "run in-process anyway", 6 lines after the bullet establishing that a non-Claude runtime has no in-process option at all (`the Agent tool *is* in-process dispatch`). For that reader the stated fallback is unexecutable; the real one is the manual drive named in the preceding bullet. Add the clause — `.claude/skills/run-issue/SKILL.md:155`
+
+### False positives
+- None. All 4 comments were verified against the local file at the cited line; each describes a real defect at the current head, and all 4 sit on lines this PR added or changed.
+
+### Note for the next fix pass
+Both must-fix findings are the *same failure mode* the round-4 `## Implementation`
+entry named in its own closing note — "fixed the named clause, left the adjacent
+one". Round 4 corrected the untrusted-input claim in two files and the
+credential absolute in three, each time at the site Copilot cited. The two sites
+above were the uncited mirrors. Sweep for both claims repo-wide, not at the cited
+lines only.
