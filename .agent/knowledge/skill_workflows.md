@@ -148,7 +148,11 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   **If you cannot confirm auto mode is active** — the reminder is absent from
   your whole context; that sentinel is the whole test, since the operator's
   permission mode is not observable to you — the older rule stands and the many-tool-call phases (**implement**,
-  **address-findings**) go to **containers**, which run prompt-free. On a
+  **address-findings**) go to **containers**, which run prompt-free. The quick,
+  cheap phases (**review-issue**, **plan-task**, **review-plan**) stay
+  in-process even on this branch — few tool calls, so few prompts to save, and
+  a containerized `review-issue` additionally needs a host-side
+  `--context-file` fetch. On a
   **non-Claude host runtime** there is no in-process option to weigh at all —
   the `Agent` tool *is* in-process dispatch — so drive the phases manually or
   containerize them. **`review-code` is excluded**: it *runs* in a container but

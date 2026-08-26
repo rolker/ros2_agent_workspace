@@ -134,6 +134,13 @@ you cannot see it, so it is not the check.
   **`container`** for the phases that do many tool calls —
   **implement** and **address-findings**. That is the case #545 was written for,
   and it has not gone away.
+  - **The quick, cheap phases stay `in-process` on this branch too** —
+    `review-issue`, `plan-task` and `review-plan`. The container lean here is
+    about tool-call volume, and these three make few calls, so there are few
+    prompts to save; containerizing them buys a launch cost and, for
+    `review-issue`, a host-side `--context-file` fetch that in-process does not
+    need. Read the branch as "containerize the many-tool-call phases", not
+    "containerize everything".
   - **`review-code` is the exception, not a member of that list.** Its
     specialist fan-out wants the `Agent` tool for fresh-context independence,
     and the sandbox has neither that nor the host Ollama endpoint. It still
