@@ -168,9 +168,11 @@ Field-earned rules for sub-agent dispatch (`dispatch_subagent.sh`,
   prompt-flooding branch
   ([#545](https://github.com/rolker/ros2_agent_workspace/issues/545) →
   [#607](https://github.com/rolker/ros2_agent_workspace/issues/607)).
-- **Choose containers for a clean dependency environment, not for prompt volume
-  and not as containment.** Work needing a fresh OS/dependency set belongs in
-  the sandbox whatever the host's permission mode — that is the isolation a
+- **Choose containers for a clean dependency environment, and never as
+  containment.** Prompt volume is a reason only on the branch above — where auto
+  mode is *unconfirmed*; under auto mode the prompts a container used to save
+  are not there to pay, so it is not a reason at all. Work needing a fresh
+  OS/dependency set belongs in the sandbox whatever the host's permission mode — that is the isolation a
   container really supplies. Untrusted input is *not* on that list: the launcher
   bind-mounts the workspace and both worktree trees read-write and forwards
   `CLAUDE_CODE_OAUTH_TOKEN`, so a prompt-injected phase in a container can still
