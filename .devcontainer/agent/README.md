@@ -148,7 +148,9 @@ make agent-run ISSUE=42
   `~/.config/ros2-agent/claude-oauth-token`), `ANTHROPIC_API_KEY` (API billing),
   or a host `~/.claude/.credentials.json` from `/login`. With none of the three
   the launcher exits with an error before starting the container
-  (`docker_run_agent.sh:317-328`). For **headless dispatch** use the long-lived
+  (`docker_run_agent.sh:317-328`) — except under `--shell`, which the same guard
+  exempts (`[ "$SHELL_MODE" = false ]`), so an interactive shell launches
+  uncredentialed and Claude Code cannot authenticate inside it. For **headless dispatch** use the long-lived
   token: mounted `.credentials.json` OAuth tokens cannot refresh in the sandbox
   (`:333-339`).
 - Worktree created on host before launch
@@ -424,7 +426,8 @@ Check that:
 1. Docker is running: `docker info`
 2. Image exists: `docker images | grep ros2-agent`
 3. Authentication is available — the launcher accepts any one of three sources
-   and errors out with none (`docker_run_agent.sh:317-328`). Test for
+   and errors out with none — unless `--shell` was passed, which that guard
+   exempts (`docker_run_agent.sh:317-328`). Test for
    *presence*; never echo the value, not even a prefix — these are long-lived
    credentials and terminal scrollback and screenshots outlive the check:
 
