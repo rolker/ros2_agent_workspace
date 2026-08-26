@@ -95,8 +95,8 @@ as-is in both target files" described an edit that had no subject.)*
    mode cannot be confirmed and prompt volume would otherwise be a problem.
    *(Corrected during implementation, as in step 1: "OS-level isolation
    (untrusted input)" was dropped — a container is not containment for
-   untrusted input, and the landed text names the data fence instead.)* Keep the three neighbouring
-   bullets (background dispatch, no filesystem-wide search scope, the
+   untrusted input, and the landed text names the data fence instead.)*
+   Keep the three neighbouring bullets (background dispatch, no filesystem-wide search scope, the
    exit-137 free-RAM gate) unchanged — orthogonal per the issue's scope.
    *(Two additions beyond the named bullet, both landed: the `# Container (…)`
    code-block comment ~25 lines above it — the same retired advice in
@@ -229,8 +229,8 @@ as-is in both target files" described an edit that had no subject.)*
 - None. The one substantive gap flagged by the Issue Review (conditioning
   the new default on auto mode) is addressed in Approach step 1; the
   citation-update gap is addressed in Approach step 1's last bullet; the
-  #606 citation is confirmed correct and left untouched per explicit
-  instruction.
+  #606 citation concerns the issue text only — neither target file contains it
+  — so nothing was edited there.
 
 ## Estimated Scope
 
@@ -257,8 +257,11 @@ this section carries only the *why*).
   change falsifies — the "for quick / cheap phases" scoping label, the
   unconditional prompt-flood caveat, and the "for isolation *and* prompt-free
   dispatch" bullet heading. A fence that preserves false text is not a scope
-  boundary worth keeping. The genuinely orthogonal `--context-file` and
-  background/freshness paragraphs were left alone.
+  boundary worth keeping. The background/freshness paragraphs were genuinely
+  orthogonal and were left alone. The `--context-file` paragraphs were not: the
+  fence came down there too (rounds 3 and 6), for the same reason — they stated
+  a container-auth absolute and left `--context-file`'s orthogonality to
+  `--mode` unsaid.
 
 - **The new default names an observable tell** even though the plan said "no new
   detection mechanism", because the reader who applies the condition *is* the
@@ -279,9 +282,11 @@ this section carries only the *why*).
   worktree scoping is handoff prose with nothing enforcing it — and on the
   container side, `docker_run_agent.sh` bind-mounts the whole workspace root
   read-write and forwards the host's Claude credentials, so the sandbox's real
-  contribution is a clean machine plus the absence of GitHub write auth. Stated
-  that plainly, the case for containers on untrusted input rests on where it
-  actually holds.
+  contribution is a clean machine plus the absence of GitHub write auth *as
+  configured*. Stated that plainly, the case for containers on untrusted input
+  does not hold at all — which is why the landed text points at the data fence
+  instead, and why round 6 records the model as **ADR-0019** with ADR-0012
+  addendums on ADR-0004 and ADR-0015.
 
 - **`review-plan/SKILL.md` was folded in** (operator decision) rather than split
   out: its self-review heuristic compared `$AGENT_NAME` against the plan author,
