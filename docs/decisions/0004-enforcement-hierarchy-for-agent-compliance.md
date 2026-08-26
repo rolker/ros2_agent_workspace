@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. The **Container isolation** row is qualified by
+[ADR-0019](0019-what-contains-a-dispatched-agent.md): a container isolates OS
+and dependency state and build artifacts, not agent behaviour — read that ADR
+before citing container isolation as the enforcement of a rule.
 
 ## Context
 
@@ -57,3 +60,10 @@ workflow. That decision will be informed by real usage.
 - Adding new enforcement requires changes at multiple layers
 - Container isolation adds infrastructure complexity and its role in the workflow is
   still being determined
+
+## References
+
+- [ADR-0019](0019-what-contains-a-dispatched-agent.md) — what a dispatched
+  agent's container actually contains; qualifies this ADR's container-isolation
+  row (cross-reference addendum per
+  [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md)).
