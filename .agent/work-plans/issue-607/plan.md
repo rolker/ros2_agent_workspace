@@ -115,7 +115,9 @@ merged as `a00193c`. Leave that citation as-is in both target files — do not
 |------|--------|
 | `.claude/skills/run-issue/SKILL.md` | Rewrite "Choosing a mode": in-process default conditioned on auto mode (tell = the injected `While auto mode is active:` system reminder, which the agent can actually read); container reframed to isolation/dependency-environment; the in-process/container bullet definitions above it re-conditioned; the containment paragraph rewritten to cover both dispatch paths accurately; citation `(#545)` → `(#607)`. |
 | `.agent/knowledge/skill_workflows.md` | Rewrite the "Fan-out goes to containers" bullet in § Dispatch Practices with the same auto-mode-conditioned isolation framing, plus the `# Container (…)` code-block comment ~25 lines above it; carries its own `#545` → `#607` citation. |
-| `.claude/skills/review-plan/SKILL.md` | Added during implementation (operator-approved): align the `--mode container` recommendation for implementation work with the new default, and fix the self-review-detection heuristic to key on invocation rather than the shared `**By**` identity string. |
+| `.claude/skills/review-plan/SKILL.md` | Added during implementation (operator-approved): align the `--mode container` recommendation for implementation work with the new default, and fix the self-review-detection heuristic to key on invocation rather than the shared `**By**` identity string. Extended in the round-5 fix pass: the Next-step block's container reason is now the clean OS/dependency environment, with untrusted input pointed at the data fence. |
+| `.devcontainer/agent/README.md` | Added during the round-4 fix pass: this PR's containment paragraph cites the README as the source of the "no GitHub credentials enter the container" framing, so the README had to stop asserting it. Opening and § Security Model now state the real boundary (forwarded host Claude credentials, unvalidated `GH_TOKEN` scopes, workspace bind-mounted rw); Prerequisites and the "Container won't start" checklist corrected to the three auth sources the launcher actually accepts, and (round 5) the auth check made a non-printing presence test. |
+| `.claude/skills/review-code/SKILL.md` | Added during the round-2 fix pass: the convergence guidance costed each review round as "a container cycle", an assumption this issue retires. One-line correction. |
 
 ## Principles Self-Check
 
@@ -167,9 +169,12 @@ merged as `a00193c`. Leave that citation as-is in both target files — do not
 
 ## Estimated Scope
 
-Single PR, three files, prose-only edits (the third,
-`.claude/skills/review-plan/SKILL.md`, was added during implementation by
-operator decision — see Approach step 3 and the Implementation Notes).
+Single PR, five files, prose-only edits. Two were planned;
+`.claude/skills/review-plan/SKILL.md` was added during implementation by
+operator decision (see Approach step 3 and the Implementation Notes), and
+`.devcontainer/agent/README.md` and `.claude/skills/review-code/SKILL.md`
+were added by review rounds as consequences of the claims this PR corrects
+(see Files to Change).
 
 
 ## Implementation Notes
