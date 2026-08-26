@@ -170,7 +170,7 @@ you cannot see it, so it is not the check.
     as the bullet above says.
 - **Choose `container` regardless of mode when a phase needs a clean
   OS/dependency environment** — that is the isolation a container actually
-  supplies. It is **not** sufficient containment for untrusted input on its own:
+  supplies. It is **not** containment for untrusted input at all:
   the launcher bind-mounts the workspace and both worktree trees read-write and
   forwards `CLAUDE_CODE_OAUTH_TOKEN`, so a prompt-injected phase inside a
   container can still rewrite host-visible files and spend the host credential
