@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted.
+Accepted. Its credential absolutes ("no GitHub write auth", "zero GitHub auth
+inside the sandbox", "the container touches neither") are read as statements
+about the launcher's **token configuration**, not properties the container
+enforces — see [ADR-0019](0019-what-contains-a-dispatched-agent.md).
 
 ## Context
 
@@ -130,3 +133,7 @@ direction.
 - Issue [#490](https://github.com/rolker/ros2_agent_workspace/issues/490) /
   [#481](https://github.com/rolker/ros2_agent_workspace/issues/481) — the
   dispatch plumbing + `run-issue` orchestrator this contract governs.
+- [ADR-0019](0019-what-contains-a-dispatched-agent.md) — what a dispatched
+  agent's container actually contains; qualifies this ADR's credential
+  absolutes (cross-reference addendum per
+  [ADR-0012](0012-permit-cross-reference-addendums-in-adrs.md)).

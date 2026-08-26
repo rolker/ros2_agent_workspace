@@ -1,8 +1,15 @@
 # Sandboxed Agent DevContainer
 
-Run Claude Code in YOLO mode inside a Docker container, using container filesystem
-isolation as the security boundary. No GitHub credentials enter the container — commits
-happen inside, pushes and PR creation happen from the host via the push gateway.
+Run Claude Code in YOLO mode inside a Docker container. Be precise about what
+that contains: the container isolates the **OS/dependency state** and the
+**build artifacts**, and it is configured without GitHub **write** auth — so
+commits happen inside, and pushes and PR creation happen from the host via the
+push gateway. It does **not** isolate the workspace files, which are
+bind-mounted read-write at the same absolute path (see
+[Mount Strategy](#mount-strategy)), and it is not credential-free: it inherits
+the host's Claude Code authentication, and may carry an optional GitHub token
+whose read-only-ness is a convention, not a checked scope (see
+[Security Model](#security-model)).
 
 ## Quick Start
 
@@ -136,7 +143,16 @@ make agent-run ISSUE=42
 ### Prerequisites
 
 - Docker installed and running
-- `ANTHROPIC_API_KEY` environment variable set
+- Claude Code authentication reachable by the launcher — any one of
+  `CLAUDE_CODE_OAUTH_TOKEN` (recommended: `claude setup-token`, saved to
+  `~/.config/ros2-agent/claude-oauth-token`), `ANTHROPIC_API_KEY` (API billing),
+  or a host `~/.claude/.credentials.json` from `/login`. With none of the three
+  the launcher exits with an error before starting the container
+  (`docker_run_agent.sh:317-328`) — except under `--shell`, which the same guard
+  exempts (`[ "$SHELL_MODE" = false ]`), so an interactive shell launches
+  uncredentialed and Claude Code cannot authenticate inside it. For **headless dispatch** use the long-lived
+  token: mounted `.credentials.json` OAuth tokens cannot refresh in the sandbox
+  (`:333-339`).
 - Worktree created on host before launch
 
 ## Mount Strategy
@@ -174,7 +190,7 @@ earlier ones at the same path. So `.agent/` (ro) overlays the base (rw), and
 
 ## Security Model
 
-The container has **no write-level network authentication**:
+The container is **configured** without write-level network authentication:
 
 - No SSH keys (`~/.ssh/` not mounted)
 - No GitHub CLI write auth (`~/.config/gh/` not mounted)
@@ -182,8 +198,33 @@ The container has **no write-level network authentication**:
 - `git commit` works (local operation)
 - `git push` fails (no credentials) — by design
 
-All pushes and PR creation happen on the host via the push gateway, where the user
-has full visibility and control.
+"Configured" is the operative word: the launcher forwards `AGENT_GH_TOKEN` (or
+the `~/.config/ros2-agent/gh-readonly-token` file) into the container as
+`GH_TOKEN` (`docker_run_agent.sh:651-665`, `:690`) **without validating its
+scopes** — the read-only-ness comes from the filename and from how you minted
+the PAT, not from anything the launcher checks. Put a write-capable PAT there
+and the container has write auth. This is a configuration to hold to, not a
+boundary the container enforces.
+
+Nor is the container credential-free in general. It inherits the host's Claude
+Code authentication: `~/.claude/.credentials.json`, `~/.claude.json` and
+`~/.claude/settings.json` are mounted (`docker_run_agent.sh:599-616`), and the
+long-lived `CLAUDE_CODE_OAUTH_TOKEN` is forwarded at `:688`.
+
+What is genuinely withheld is narrower than "GitHub write credentials", and it
+holds only for the read-only configuration above. `git push` fails
+unconditionally: no SSH keys, no `~/.config/gh`, no credential helper and no
+`gh auth setup-git` anywhere in the launcher or the entrypoint (verified), so
+there is no transport for git to authenticate over. `gh` is a separate matter —
+it authenticates from `GH_TOKEN` alone, so a write-capable PAT left in
+`AGENT_GH_TOKEN` makes `gh pr create` and `gh api -X POST` succeed from inside
+the container. Mint that token read-only and the whole boundary holds; the
+launcher will not check it for you.
+
+Pushes and PR creation are therefore meant to happen on the host via the push
+gateway, where the user has full visibility and control — `git push` cannot
+happen anywhere else, and `gh` publication stays on the host as long as the
+forwarded token is read-only.
 
 The `.agent/` directory is mounted read-only to prevent the agent from modifying
 workspace infrastructure scripts. The exception is `.agent/scratchpad/`, which is
@@ -275,8 +316,10 @@ make agent-run ISSUE=42
 - `gh api` — read-only API calls
 - `gh search` — search code, issues, PRs
 
-Agents still **cannot** push, create PRs, or create issues from inside the container.
-Those actions go through the push gateway on the host.
+With a genuinely read-only PAT, agents **cannot** push, create PRs, or create
+issues from inside the container; those actions go through the push gateway on
+the host. That holds because of how you minted the token — the launcher does not
+verify it (see [Security Model](#security-model)) — so mint it read-only.
 
 ## Troubleshooting
 
@@ -382,5 +425,16 @@ available).
 Check that:
 1. Docker is running: `docker info`
 2. Image exists: `docker images | grep ros2-agent`
-3. API key is set: `echo $ANTHROPIC_API_KEY | head -c 10`
+3. Authentication is available — the launcher accepts any one of three sources
+   and errors out with none — unless `--shell` was passed, which that guard
+   exempts (`docker_run_agent.sh:317-328`). Test for
+   *presence*; never echo the value, not even a prefix — these are long-lived
+   credentials and terminal scrollback and screenshots outlive the check:
+
+   ```bash
+   [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN: set"
+   [ -n "$ANTHROPIC_API_KEY" ]       && echo "ANTHROPIC_API_KEY: set"
+   [ -f ~/.claude/.credentials.json ] && echo "~/.claude/.credentials.json: present"
+   ```
+
 4. Worktree exists: `.agent/scripts/worktree_list.sh`
