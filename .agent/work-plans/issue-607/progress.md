@@ -809,3 +809,84 @@ one". Round 4 corrected the untrusted-input claim in two files and the
 credential absolute in three, each time at the site Copilot cited. The two sites
 above were the uncited mirrors. Sweep for both claims repo-wide, not at the cited
 lines only.
+
+## Implementation
+**Status**: complete
+**When**: 2026-08-25 22:23 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #608 at `264f4d1`
+**Addressed**: `## Integrated Review` (2026-08-25 22:17 -04:00, PR #608 @ `b6e94f3`) — 4 open findings, 0 false positives
+**Commits**: `4b7bb8d`, `d47ad83`, `113551b`, `fc742c8`, `73962bd`, `264f4d1`
+
+All four actioned; none deferred. Per the review entry's "Note for the next fix
+pass", both claims were swept repo-wide before fixing rather than at the cited
+lines only — the sweep is recorded below, and it turned up one further mirror of
+the credential absolute (in `run-issue/SKILL.md` itself), corrected in the same
+commit.
+
+### Actions
+- [x] (must-fix, Copilot; R4 finding 3 recurrence) `review-plan`'s Next-step
+  block no longer offers `--mode container` for "isolation-worthy (untrusted
+  input …)" work. The container reason is now the clean OS/dependency
+  environment; the bind-mount + forwarded-`CLAUDE_CODE_OAUTH_TOKEN` gap is
+  stated, and untrusted input is pointed at the **data fence**, held by the
+  phase in either mode, cross-referenced to `run-issue/SKILL.md`
+  § How phases are dispatched, *What contains a dispatched agent* —
+  `.claude/skills/review-plan/SKILL.md:462-471` (`4b7bb8d`)
+- [x] (must-fix, Copilot; R4 cross-confirmed finding 1 recurrence) § Security
+  Model's flat "What does *not* enter is GitHub **write** credentials" replaced
+  with the boundary as it actually holds: `git push` fails unconditionally
+  (verified — no SSH keys, no `~/.config/gh`, and no credential helper or
+  `gh auth setup-git` anywhere in the launcher or entrypoint), while `gh`
+  authenticates from `GH_TOKEN` alone, so a write-capable PAT in
+  `AGENT_GH_TOKEN` makes `gh pr create` / `gh api -X POST` succeed. The
+  following paragraph's "All pushes and PR creation happen on the host" was
+  re-scoped to match — `.devcontainer/agent/README.md:212-220` (`d47ad83`)
+- [x] (valid, Copilot) The "Container won't start" auth check no longer prints
+  the first 10 characters of `CLAUDE_CODE_OAUTH_TOKEN`. It is now a
+  non-printing presence test across all three sources the launcher accepts —
+  env token, `ANTHROPIC_API_KEY`, and `~/.claude/.credentials.json` — using
+  the launcher's own `-n`/`-f` predicates, with the reason for not echoing
+  stated inline — `.devcontainer/agent/README.md:426-437` (`113551b`,
+  `264f4d1`)
+- [x] (valid, Copilot) The "Container auth not ready either?" fallback now names
+  the executable route for a runtime with no `Agent` tool: "there, drive the
+  phase manually, as the bullet above says" — `.claude/skills/run-issue/SKILL.md:152-157`
+  (`fc742c8`)
+
+### Repo-wide sweep (per the review's note)
+- **Container-as-containment-for-untrusted-input**: `grep` over `.md`/`.sh`
+  for `isolation-worthy`, `untrusted`, and `--mode container` across the
+  worktree. The only live surface was `review-plan/SKILL.md:463` (finding 1).
+  `run-issue/SKILL.md` and `skill_workflows.md` already carry the corrected
+  form; remaining hits are `review-code`'s unrelated
+  `--allow-untrusted-copilot` gate, `dispatch_subagent.sh`'s data fence, and
+  historical work-plan text.
+- **The GitHub-write absolute**: `grep` for `write credential`,
+  `GitHub credential`, `no credentials`, `credential-free`, `write auth`,
+  `write-level`. Two live sites: `README.md:212` (finding 2) and one *mirror
+  not separately flagged* — `run-issue/SKILL.md:207` still concluded "cannot
+  push and cannot open a PR" as an absolute. Corrected in `d47ad83` to "cannot
+  `git push` at all, and cannot open a PR either unless the optional
+  `GH_TOKEN` was minted with write scopes". `docs/decisions/0015`'s "no
+  GitHub write auth" was left alone deliberately: an accepted ADR is a
+  historical record of the decision, not live guidance.
+
+### Plan sync
+The Files-to-Change table listed three files while the branch touches five —
+`.devcontainer/agent/README.md` (added by the round-4 fix pass) and
+`.claude/skills/review-code/SKILL.md` (round 2) were never recorded. Both rows
+added inline with why they entered scope, and Estimated Scope updated from
+"three files" to five (`73962bd`). Not a listed finding; it is the same
+plan-drift class rounds 3-4 flagged and a direct consequence of this pass
+editing the README again.
+
+### Checks
+Pre-commit ran clean on all six commits (no `--no-verify`, no rule suppressed).
+Markdown only — no build or package test applies. Verified: the three README
+anchors cited by other files (`#mount-strategy`, `#security-model`,
+`#read-only-github-access`) still resolve to existing headings; the new
+`review-plan` cross-reference resolves to the real `## How phases are
+dispatched` heading (`run-issue/SKILL.md:38`); `docker_run_agent.sh:317-328`
+re-read to confirm the three-source auth check and its error path.
