@@ -177,8 +177,12 @@ built layer workspace, which a clone is not:
 
 ```bash
 # layer mode only; in clone mode report "SKIPPED (no layer checkout)"
-# Addressed through $ROOT for the same reason step 1 is: in a layer worktree
-# neither .agent/scripts/ nor layers/ sits beside you.
+# Addressed through $ROOT for the same reason step 1 is: a relative
+# .agent/scripts/ or layers/ does not exist beside you in a layer worktree.
+# $ROOT alone does not rescue that case — step 1's caveat applies here too:
+# in a LAYER worktree $ROOT resolves to the project repo's own root, where
+# these paths are exactly as absent, so pass the workspace root explicitly
+# (or run the audit from the workspace) before this command means anything.
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source "$ROOT/.agent/scripts/setup.bash" && cd "$ROOT/layers/main/<layer>_ws" \
     && colcon test --packages-select <package> && colcon test-result --verbose

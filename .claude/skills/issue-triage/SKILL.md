@@ -38,15 +38,19 @@ checks), so this is the normal case, not an edge one.
 ```bash
 ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
     && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
-python3 "$ROOT/.agent/scripts/list_overlay_repos.py"
 ```
 
 (In a *layer* worktree that resolves to the project repo's own root, so pass
 the workspace root explicitly or run from the workspace itself.)
 
-If `$ROOT/configs/manifest` is absent — a fresh clone or a container, where
-`layers/` does not exist and `configs/manifest` is a symlink into it — add the
-cloned manifest before concluding the list is empty:
+Enumerate through the fallback, **never** with a bare
+`list_overlay_repos.py "$ROOT/..."` call of its own. Where `$ROOT/configs/manifest`
+is absent — a fresh clone or a container, where `layers/` does not exist and
+`configs/manifest` is a symlink into it — the manifests have to be cloned
+first, and an enumeration that runs before that prints `[]` at **exit 0**,
+which the empty-list guard below then maps to the one remedy this skill's own
+rules forbid. So there is exactly one enumeration site, and it is on the
+fallback's success path:
 
 ```bash
 source "$ROOT/.agent/scripts/manifest_fallback.sh"

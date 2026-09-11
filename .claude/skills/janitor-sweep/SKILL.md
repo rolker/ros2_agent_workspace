@@ -163,6 +163,17 @@ report-only skill that will run repeatedly:
   re-creates what it needs. Say so in the report footer so an operator short of
   disk knows what is safe to delete (this host has hit 100% before).
 
+  **These, not the reports, are what fills a disk.** The reports are a few KB
+  each and capped at 20; the caches are one shallow working tree per repo the
+  sweep has *ever* resolved — including repos since dropped from the manifest,
+  which no later run will ever touch again. They are deliberately left
+  uncapped: pruning by age would delete a clone a concurrent audit is reading,
+  and the cheap, safe reclaim is the whole-directory `rm -rf` above. So the
+  footer names the two directories **with their current sizes**
+  (`du -sh "$ROOT/.agent/scratchpad/janitor-repos" "$ROOT/.agent/scratchpad/manifest-repo"`),
+  rather than leaving the operator to discover the number when the disk is
+  already full.
+
 ### 2. Build the repo rotation
 
 The rotation is built from the manifest **urls**, before anything is cloned —
@@ -438,8 +449,10 @@ Report format:
 
 ---
 Reports here are kept for the last 20 runs. The shallow clones under
-`.agent/scratchpad/janitor-repos/` and `.agent/scratchpad/manifest-repo/` are
-caches — deleting them is always safe.
+`.agent/scratchpad/janitor-repos/` (<size>) and
+`.agent/scratchpad/manifest-repo/` (<size>) are caches, never pruned by this
+skill and the only output here that grows without bound — deleting either
+directory is always safe.
 ```
 
 Fill the **Checks** line from the status table, not from impression. If any
