@@ -19,7 +19,7 @@ issue: 569
 - [ ] Settle in plan-task: the durable-output design. The three existing periodic skills it chains (`audit-workspace`, `audit-project`, `issue-triage`) report to the conversation only — fine for manual trigger, since a human reads the same session. The janitor is explicitly meant to run unattended, so "one rolling GitHub issue, updated in place" needs to be the actual persisted record, not just a conversational summary that then gets posted; confirm the plan's write step treats the GitHub issue update as the durable output (mirroring `review-issue`'s canonical-local-write-then-best-effort-post pattern) rather than assuming GitHub is always reachable — the plan should say explicitly what happens when the API call to update the issue fails, per the false-green lesson from #609 the issue itself already cites for skipped/failed checks.
 - [ ] Forward-looking, non-blocking: this slice explicitly defers the trigger mechanism, but note for that follow-up that updating the rolling issue is itself a GitHub *write*. If the eventual trigger is a container dispatch, ADR-0015/ADR-0019 already establish the pattern to reuse (host publishes; container produces + best-effort posts) — worth citing when that decision is made rather than re-deriving it.
 
-## Notes (not blocking, recorded for the record)
+### Notes (not blocking, recorded for the record)
 
 **Scope / right repo**: Yes to both. The proposed skill (chain existing detectors, write one rolling report, no PRs opened) is workspace-generic tooling consistent with ADR-0003 and fits the existing `.claude/skills/{audit-workspace,audit-project,issue-triage,research}` pattern of "Utility/periodic, not tied to the per-issue lifecycle." The 2026-09-11 scope comment's split (sweep now, trigger later) is a good incremental slice — it removes the prior #564 sequencing dependency (correctly noted as lifted: the sweep now *produces* #564's enforcement inventory rather than depending on it) and keeps this PR reviewable on its own.
 
@@ -255,33 +255,101 @@ past the round-1 list — chiefly the three environments the sweep claims to run
 one input the resolver still does not validate.
 
 ### Findings
-- [ ] (must-fix) A manifest `version:` reaches `git fetch --depth 1 origin "$REPO_VERSION"` unvalidated and with no `--`, so `--upload-pack=<script>` executes arbitrary code — and the run still exits 0 reporting mode `clone` with the pin silently unhonoured (reproduced end-to-end); `REPO_URL` is validated for exactly this, `version:` is not — `.agent/scripts/resolve_repo_checkout.sh:283,308`
-- [ ] (must-fix) Step 2 rule 2 names `field_mode.sh` the authoritative allowlist, but `is_field_mode` needs a checkout on disk and the rotation is built from manifest urls before anything is resolved; with no checkout it returns 1 = "dev mode", so every gitcloud repo is silently *included* — the false green the rule exists to prevent — `.claude/skills/janitor-sweep/SKILL.md:107-112`
-- [ ] (must-fix) `issue-triage` step 1 still enumerates with a worktree-relative `list_overlay_repos.py` (0 repos from a worktree vs 35 from the main root, reproduced), so the guard this PR adds fires on every sweep run from a worktree — the sweep's stated primary environment — as `FAILED: no repo manifest configured — run 'make setup-all'`, a false FAILED with wrong remediation — `.claude/skills/issue-triage/SKILL.md:32`
-- [ ] (must-fix) If `gh` is unauthenticated or rate-limited every candidate lands in rule 3's FAILED bucket, the chunk is empty, and check 2's rollup defines FAILED only for "failed to resolve / failed to audit" — so the report can read `Project governance | OK | 0 repos audited` — `.claude/skills/janitor-sweep/SKILL.md:127-139,168-171`
-- [ ] (must-fix) Step 1's environment table claims a no-`layers/` host still enumerates repos, but `configs/manifest` is a symlink *into* `layers/main/core_ws/src/unh_marine_autonomy/config` here, so the stated verification can never pass and the sweep is FAILED there — contradicting the resolver header and the AGENTS.md row, which both say a container hits exit 3 — `.claude/skills/janitor-sweep/SKILL.md:87,39`, `.claude/skills/audit-project/SKILL.md:18,67`
-- [ ] (must-fix) The consequences-map clause this PR adds requires a durable-output skill to "name the state in which that write failed"; `janitor-sweep` is the only skill it applies to and step 4 names none — it asserts the write always succeeds, and the four-state contract has no row for a read-only or full filesystem — `.agent/knowledge/principles_review_guide.md:49` vs `.claude/skills/janitor-sweep/SKILL.md:201-202`
-- [ ] (must-fix) Principles Self-Check still lists "exactly one rolling issue" as a delivered property — the one place in the plan that still promises the publish step this slice removed — `.agent/work-plans/issue-569/plan.md:267`
-- [ ] (must-fix) "(operator decision, 2026-09-11 on issue #569)" is not true of the issue: #569's only scope comment still promises "writing one rolling report". Post the later decision as a comment or cite the timeline instead — `.claude/skills/janitor-sweep/SKILL.md:287-288`
-- [ ] (must-fix) `GIT_TERMINAL_PROMPT=0` + `GIT_ASKPASS=/bin/true` do not cover ssh, which reads host-key and passphrase prompts from `/dev/tty`; the manifests carry a `git@github.com:` url, so the header's "never prompt / meant to run unattended" guarantee is false there, and unbounded on a host without `timeout` — `.agent/scripts/resolve_repo_checkout.sh:92-97`
-- [ ] (suggestion) `flock 9` has no `-w` timeout, so one stuck run blocks every concurrent run on that repo indefinitely — `.agent/scripts/resolve_repo_checkout.sh:258`
-- [ ] (suggestion) The lock is released when the resolver exits, so the caller audits `$TARGET` unlocked and a concurrent `clone_fresh`'s `rm -rf` can still delete a tree being read; the header overstates what the lock buys — `.agent/scripts/resolve_repo_checkout.sh:49-51,273`
-- [ ] (suggestion) No retention policy for either output: `janitor-repos/` accumulates a shallow clone per audited repo and `janitor/` a report per run, both gitignored so nothing will flag the growth — `.claude/skills/janitor-sweep/SKILL.md:193,243`
-- [ ] (suggestion) The rotation ignores `configs/manifest/optional_layers.txt`, so a repo from an optional layer produces `FAILED(repo probe)` on every sweep forever — a permanent false red — `.claude/skills/janitor-sweep/SKILL.md:122-131`
-- [ ] (suggestion) The script header's exit-5 vocabulary ("clone or refresh failed") is narrower than the code, which also returns 5 for `mktemp`, cache `mkdir`, `flock` and an unreadable layer checkout; the AGENTS.md row is more complete than the script's own header — `.agent/scripts/resolve_repo_checkout.sh:39`
-- [ ] (suggestion) Test gaps on the most intricate branches: the SHA-pin fallback, the `FETCH_REF=HEAD` refresh, and the `flock` path are unexercised, and the worktree case covers only the layer branch, not the clone branch — `.agent/scripts/tests/test_resolve_repo_checkout.sh`
-- [ ] (suggestion) Failure messages interpolate `$REPO_URL` verbatim into stderr, which the caller funnels into the report step 4 says must stay scrubbed — latent credential leak if a manifest ever carries userinfo — `.agent/scripts/resolve_repo_checkout.sh:287,294,306`
-- [ ] (suggestion) `underlay.repos` is excluded from the search, but exit 4 says "not listed in any of the N configured repos" — name the exclusion so the operator does not hunt a manifest bug — `.agent/scripts/resolve_repo_checkout.sh:209`
-- [ ] (suggestion) `ISO-week mod chunk-count` is left to be re-derived while every other computation is given as a snippet; `date +%V` is zero-padded, so `$(( 08 % n ))` is an invalid-octal error — give the `10#` form — `.claude/skills/janitor-sweep/SKILL.md:140-141`
-- [ ] (suggestion) The no-repo-name branch asserts `REPO_MODE=layer` without observing it (so step 7's "correct layer" can report Yes where it could not run), step 5's snippet is still fully relative against the main-root rule added above it, and the "has at least one `package.xml`" verification has no check — `.claude/skills/audit-project/SKILL.md:57-61,166`
-- [ ] (suggestion) Step 1's `ROOT=` snippet is byte-identical to `audit-project`'s but omits its layer-worktree caveat — `.claude/skills/janitor-sweep/SKILL.md:70-71`
-- [ ] (suggestion) Step 2's example runs `list_overlay_repos.py` with no `--format` while the table uses `names` and the resolver uses `json` — say which "the list" is — `.claude/skills/janitor-sweep/SKILL.md:95`
-- [ ] (suggestion) Nothing tracks the deferred publishing-and-trigger decision: the skill, the plan and `skill_workflows.md` all cross-reference it with no issue number — file it at PR time
-- [ ] (suggestion) "The resolver is tested, including three distinct failure paths" is stale — exits 2 through 7 are each tested across 18 cases — `.agent/work-plans/issue-569/plan.md:270`
-- [ ] (suggestion) "six resolver defects" reads as a complete enumeration of the merit-fixed round-1 findings but omits 7, 10 and 14 (and five, not six, were against the resolver) — `.agent/work-plans/issue-569/plan.md:59`
-- [ ] (suggestion) [R9] still describes the landed clause as "persists its record to its own rolling report" — stale wording, and contradicted by the Files-to-Change row 47 lines later — `.agent/work-plans/issue-569/plan.md:203`
-- [ ] (suggestion) `## Notes (not blocking, recorded for the record)` is a non-canonical H2 among ADR-0013 entry types, so `progress_read.py` cannot see its content — demote to H3 — `.agent/work-plans/issue-569/progress.md:22`
-- [ ] (suggestion) The AGENTS.md row says "a per-repo `flock` serialises concurrent runs" without the script's own documented degradation: absent `flock`, it warns and proceeds unlocked — `AGENTS.md:571`
-- [ ] (suggestion) Run from a worktree the script is the worktree's copy but executes the MAIN branch's `list_overlay_repos.py`; deliberate, but a worktree that changes both tests only half its change — say so in the header — `.agent/scripts/resolve_repo_checkout.sh:139-151`
-- [ ] (suggestion) The Ask-First re-confirmation the plan itself defers to PR time is still owed, and the `principles_review_guide` clause landed as a four-sentence paragraph rather than the "one-line clause" the approval was framed around — `.agent/work-plans/issue-569/plan.md:305-309`
-- [ ] (suggestion) The issue title is "scheduled ... sweep" and the trigger is deferred, so the PR body should say "Part of #569" and leave it open rather than closing it
+- [x] (must-fix) A manifest `version:` reaches `git fetch --depth 1 origin "$REPO_VERSION"` unvalidated and with no `--`, so `--upload-pack=<script>` executes arbitrary code — and the run still exits 0 reporting mode `clone` with the pin silently unhonoured (reproduced end-to-end); `REPO_URL` is validated for exactly this, `version:` is not — `.agent/scripts/resolve_repo_checkout.sh:283,308`
+- [x] (must-fix) Step 2 rule 2 names `field_mode.sh` the authoritative allowlist, but `is_field_mode` needs a checkout on disk and the rotation is built from manifest urls before anything is resolved; with no checkout it returns 1 = "dev mode", so every gitcloud repo is silently *included* — the false green the rule exists to prevent — `.claude/skills/janitor-sweep/SKILL.md:107-112`
+- [x] (must-fix) `issue-triage` step 1 still enumerates with a worktree-relative `list_overlay_repos.py` (0 repos from a worktree vs 35 from the main root, reproduced), so the guard this PR adds fires on every sweep run from a worktree — the sweep's stated primary environment — as `FAILED: no repo manifest configured — run 'make setup-all'`, a false FAILED with wrong remediation — `.claude/skills/issue-triage/SKILL.md:32`
+- [x] (must-fix) If `gh` is unauthenticated or rate-limited every candidate lands in rule 3's FAILED bucket, the chunk is empty, and check 2's rollup defines FAILED only for "failed to resolve / failed to audit" — so the report can read `Project governance | OK | 0 repos audited` — `.claude/skills/janitor-sweep/SKILL.md:127-139,168-171`
+- [x] (must-fix) Step 1's environment table claims a no-`layers/` host still enumerates repos, but `configs/manifest` is a symlink *into* `layers/main/core_ws/src/unh_marine_autonomy/config` here, so the stated verification can never pass and the sweep is FAILED there — contradicting the resolver header and the AGENTS.md row, which both say a container hits exit 3 — `.claude/skills/janitor-sweep/SKILL.md:87,39`, `.claude/skills/audit-project/SKILL.md:18,67`
+- [x] (must-fix) The consequences-map clause this PR adds requires a durable-output skill to "name the state in which that write failed"; `janitor-sweep` is the only skill it applies to and step 4 names none — it asserts the write always succeeds, and the four-state contract has no row for a read-only or full filesystem — `.agent/knowledge/principles_review_guide.md:49` vs `.claude/skills/janitor-sweep/SKILL.md:201-202`
+- [x] (must-fix) Principles Self-Check still lists "exactly one rolling issue" as a delivered property — the one place in the plan that still promises the publish step this slice removed — `.agent/work-plans/issue-569/plan.md:267`
+- [x] (must-fix) "(operator decision, 2026-09-11 on issue #569)" is not true of the issue: #569's only scope comment still promises "writing one rolling report". Post the later decision as a comment or cite the timeline instead — `.claude/skills/janitor-sweep/SKILL.md:287-288`
+- [x] (must-fix) `GIT_TERMINAL_PROMPT=0` + `GIT_ASKPASS=/bin/true` do not cover ssh, which reads host-key and passphrase prompts from `/dev/tty`; the manifests carry a `git@github.com:` url, so the header's "never prompt / meant to run unattended" guarantee is false there, and unbounded on a host without `timeout` — `.agent/scripts/resolve_repo_checkout.sh:92-97`
+- [x] (suggestion) `flock 9` has no `-w` timeout, so one stuck run blocks every concurrent run on that repo indefinitely — `.agent/scripts/resolve_repo_checkout.sh:258`
+- [x] (suggestion) The lock is released when the resolver exits, so the caller audits `$TARGET` unlocked and a concurrent `clone_fresh`'s `rm -rf` can still delete a tree being read; the header overstates what the lock buys — `.agent/scripts/resolve_repo_checkout.sh:49-51,273`
+- [x] (suggestion) No retention policy for either output: `janitor-repos/` accumulates a shallow clone per audited repo and `janitor/` a report per run, both gitignored so nothing will flag the growth — `.claude/skills/janitor-sweep/SKILL.md:193,243`
+- [x] (suggestion) The rotation ignores `configs/manifest/optional_layers.txt`, so a repo from an optional layer produces `FAILED(repo probe)` on every sweep forever — a permanent false red — `.claude/skills/janitor-sweep/SKILL.md:122-131`
+- [x] (suggestion) The script header's exit-5 vocabulary ("clone or refresh failed") is narrower than the code, which also returns 5 for `mktemp`, cache `mkdir`, `flock` and an unreadable layer checkout; the AGENTS.md row is more complete than the script's own header — `.agent/scripts/resolve_repo_checkout.sh:39`
+- [x] (suggestion) Test gaps on the most intricate branches: the SHA-pin fallback, the `FETCH_REF=HEAD` refresh, and the `flock` path are unexercised, and the worktree case covers only the layer branch, not the clone branch — `.agent/scripts/tests/test_resolve_repo_checkout.sh`
+- [x] (suggestion) Failure messages interpolate `$REPO_URL` verbatim into stderr, which the caller funnels into the report step 4 says must stay scrubbed — latent credential leak if a manifest ever carries userinfo — `.agent/scripts/resolve_repo_checkout.sh:287,294,306`
+- [x] (suggestion) `underlay.repos` is excluded from the search, but exit 4 says "not listed in any of the N configured repos" — name the exclusion so the operator does not hunt a manifest bug — `.agent/scripts/resolve_repo_checkout.sh:209`
+- [x] (suggestion) `ISO-week mod chunk-count` is left to be re-derived while every other computation is given as a snippet; `date +%V` is zero-padded, so `$(( 08 % n ))` is an invalid-octal error — give the `10#` form — `.claude/skills/janitor-sweep/SKILL.md:140-141`
+- [x] (suggestion) The no-repo-name branch asserts `REPO_MODE=layer` without observing it (so step 7's "correct layer" can report Yes where it could not run), step 5's snippet is still fully relative against the main-root rule added above it, and the "has at least one `package.xml`" verification has no check — `.claude/skills/audit-project/SKILL.md:57-61,166`
+- [x] (suggestion) Step 1's `ROOT=` snippet is byte-identical to `audit-project`'s but omits its layer-worktree caveat — `.claude/skills/janitor-sweep/SKILL.md:70-71`
+- [x] (suggestion) Step 2's example runs `list_overlay_repos.py` with no `--format` while the table uses `names` and the resolver uses `json` — say which "the list" is — `.claude/skills/janitor-sweep/SKILL.md:95`
+- [x] (suggestion) Nothing tracks the deferred publishing-and-trigger decision: the skill, the plan and `skill_workflows.md` all cross-reference it with no issue number — file it at PR time (recorded as an open item in `plan.md` § Open items for PR time — the operator files the issue, not the agent)
+- [x] (suggestion) "The resolver is tested, including three distinct failure paths" is stale — exits 2 through 7 are each tested across 18 cases — `.agent/work-plans/issue-569/plan.md:270`
+- [x] (suggestion) "six resolver defects" reads as a complete enumeration of the merit-fixed round-1 findings but omits 7, 10 and 14 (and five, not six, were against the resolver) — `.agent/work-plans/issue-569/plan.md:59`
+- [x] (suggestion) [R9] still describes the landed clause as "persists its record to its own rolling report" — stale wording, and contradicted by the Files-to-Change row 47 lines later — `.agent/work-plans/issue-569/plan.md:203`
+- [x] (suggestion) `## Notes (not blocking, recorded for the record)` is a non-canonical H2 among ADR-0013 entry types, so `progress_read.py` cannot see its content — demote to H3 — `.agent/work-plans/issue-569/progress.md:22`
+- [x] (suggestion) The AGENTS.md row says "a per-repo `flock` serialises concurrent runs" without the script's own documented degradation: absent `flock`, it warns and proceeds unlocked — `AGENTS.md:571`
+- [x] (suggestion) Run from a worktree the script is the worktree's copy but executes the MAIN branch's `list_overlay_repos.py`; deliberate, but a worktree that changes both tests only half its change — say so in the header — `.agent/scripts/resolve_repo_checkout.sh:139-151`
+- [x] (suggestion) The Ask-First re-confirmation the plan itself defers to PR time is still owed, and the `principles_review_guide` clause landed as a four-sentence paragraph rather than the "one-line clause" the approval was framed around — `.agent/work-plans/issue-569/plan.md:305-309` (recorded as an open item in `plan.md`; the clause's growth past "one line" is named there for the re-confirmation)
+- [x] (suggestion) The issue title is "scheduled ... sweep" and the trigger is deferred, so the PR body should say "Part of #569" and leave it open rather than closing it (recorded as an open item in `plan.md` § Open items for PR time — the PR body is written at push time)
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-11 14:08 -04:00
+**By**: Claude Opus (Claude Opus 5, 1M context)
+
+**Branch**: feature/issue-569 at `0074164`
+**Addressed**: the `## Local Review (Pre-Push)` of 2026-09-11 13:52 -04:00 (round 2, branch at `c974e26`) — 9 must-fix, 20 suggestions
+**Commits**: 04f07c3, ebd81bc, 57d9538, d882440, 6076662, 60fa85e, ee37859, f00af9a, 8bd3786, 0074164
+
+Three of the nine were design-level and changed what the slice contains, so
+they are recorded here rather than only in the boxes:
+
+- **The manifest is the first thing "it clones what it needs" must cover.**
+  `configs/manifest` is a symlink *into* `layers/`, so the no-`layers/`
+  environment had no manifests at all and the skill's claim about it could not
+  be true. Rather than soften the claim, it is made true: the tracked
+  `configs/project_bootstrap.url` names the manifest repo and branch, so
+  `manifest_fallback.sh` derives, shallow-clones and hands back a config dir,
+  and `list_overlay_repos.py --config-dir` **adds** it to the search path.
+  Resolver exit 3 now means "no manifest AND no bootstrap pointer"; a manifest
+  clone that failed is exit 5 — `make setup-all` cannot fix an unreachable
+  remote, so it must not be the advice. Hermetic throughout: the derived clone
+  host is overridable (`WORKSPACE_MANIFEST_GIT_BASE`), and the tests point it at
+  a local `file://` fixture.
+- **One allowlist, reachable without a checkout.** `is_field_url` is factored
+  out of `is_field_mode` in `field_mode.sh` — the same file, so ADR-0011 keeps
+  one authority — and the sweep classifies manifest urls with it.
+- **`issue-triage` anchors its enumeration at `$ROOT`**, so the empty-list guard
+  this PR added fires only when nothing is genuinely configured (0 repos from a
+  worktree vs 35 from the main root, re-measured on this host).
+
+Verification: `make lint` — all 18 pre-commit hooks Passed;
+`.agent/scripts/tests/run_script_tests.sh` — 26 shell test files ✅, 217 pytest
+cases passed, `✅ All script tests passed.` The resolver's own suite is 29
+hermetic cases (was 18).
+
+### Actions
+
+Must-fix:
+- [x] 1 — `version:` validated as a full SHA or a ref-safe name before git sees it, `--` on every user-derived refspec, SHA pins verified against HEAD after the detach, url userinfo redacted in stderr — `.agent/scripts/resolve_repo_checkout.sh` (ebd81bc). Negative tests include a real `--upload-pack=` helper asserting it was never executed.
+- [x] 2 — `is_field_url` in `.agent/scripts/field_mode.sh`; the sweep's step 2 rule 2 calls it and says why `is_field_mode` is wrong there (04f07c3, ee37859).
+- [x] 3 — `issue-triage` step 1 enumerates through `$ROOT`, with the manifest fallback before the empty-list guard — `.claude/skills/issue-triage/SKILL.md` (60fa85e).
+- [x] 4 — check 2's rollup now covers the rotation: any failed candidate probe is FAILED, an empty chunk is never OK, its three causes are distinguished, and `gh auth status` is probed once so a shared cause is named once (f00af9a).
+- [x] 5 — the environment table's third row states what the code now does (manifest clone → enumerate → mode `clone`), and the verification named is one that passes; the resolver header and the `AGENTS.md` row say the same (d882440, f00af9a).
+- [x] 6 — `FAILED(report write: <reason>)` added as the fifth state in the status contract and named in step 4 and step 5, with the findings printed inline so a run is not lost with its file (f00af9a).
+- [x] 7 — the Principles Self-Check line no longer promises a rolling issue (0074164).
+- [x] 8 — cited to the issue comment that actually records the decision (issue #569 comment 5637608783's successor, the 2026-09-11 "Scope update"), which the host posted; nothing re-posted from here (f00af9a).
+- [x] 9 — `GIT_SSH_COMMAND` with `BatchMode=yes` / `StrictHostKeyChecking=accept-new` / `ConnectTimeout`, `timeout` where available and a loud note where not; the header states precisely what each piece buys (57d9538).
+
+Suggestions — all taken except three that belong to PR time:
+- [x] `flock -w` (300s, `RESOLVE_LOCK_TIMEOUT`), and an honest account of what the lock does not buy: it is released at exit, so the caller reads the tree unlocked (6076662).
+- [x] Retention policy documented for both scratchpad outputs — keep the last 20 reports; the clone caches are disposable (f00af9a).
+- [x] `optional_layers.txt` honoured: an inaccessible optional-layer repo is an exclusion, not a permanent false red (ee37859).
+- [x] `date +%V` given as `10#$WEEK`, with the chunk arithmetic as a snippet (ee37859).
+- [x] Exit-vocabulary consistency (header ⇄ `AGENTS.md`), the `underlay.repos` exclusion named in exit 4, the worktree/MAIN-script split recorded (6076662).
+- [x] Test gaps closed: SHA pin honoured and SHA pin absent, `FETCH_REF=HEAD` refresh, both `flock` branches, and the worktree case's **clone** branch (ebd81bc, 6076662).
+- [x] `audit-project`: the mode is observed rather than asserted, the `package.xml` verification has a check, step 5's snippet is `$ROOT`-addressed (8bd3786).
+- [x] Sweep step 1 carries `audit-project`'s layer-worktree caveat; step 2 says `--format json` and why (ee37859, f00af9a).
+- [x] Plan staleness: "three distinct failure paths", "six resolver defects", [R9]'s rolling-report wording (0074164).
+- [x] `## Notes` demoted to `### Notes` so `progress_read.py` can see its content.
+- [x] `AGENTS.md` row records the `flock` degradation (proceeds unlocked, and says so) (6076662).
+- [x] The deferred publishing-and-trigger decision has no tracking issue — recorded as an open item in `plan.md` § Open items for PR time. **Not filed from here**: the operator files it (deferred by instruction).
+- [x] The Ask-First re-confirmation, and the clause that landed as a paragraph rather than one line — recorded in `plan.md`'s Open Questions with what grew, for the re-confirmation at PR time (deferred: it is the operator's confirmation to give).
+- [x] PR body must say "Part of #569" — recorded as an open item in `plan.md`; the body is written at push time (deferred: nothing is pushed from here).
+
+### Not done
+- Nothing is pushed; no PR is opened or updated from this pass.
