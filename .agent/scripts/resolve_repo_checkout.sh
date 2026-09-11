@@ -104,11 +104,30 @@ redact_url() {
     fi
 }
 
-# Network git operations get a wall-clock bound and never prompt: this script
-# is meant to run unattended, where a credential prompt would hang forever.
-GIT_NET=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true)
+# Unattended network git, precisely:
+#   - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/true stop git's own username and
+#     password prompts. They do NOT cover ssh, which reads its host-key and
+#     key-passphrase prompts straight from /dev/tty — and the workspace
+#     manifests carry `git@github.com:` urls, so ssh is a live path here.
+#   - GIT_SSH_COMMAND adds ssh's own equivalents: BatchMode=yes refuses every
+#     interactive prompt (passphrase, password, keyboard-interactive) instead
+#     of asking, and StrictHostKeyChecking=accept-new accepts a first-seen host
+#     key without asking while still REFUSING a changed one. ConnectTimeout
+#     bounds the TCP handshake.
+#   - `timeout` bounds the whole operation in wall-clock time, which is the
+#     only thing that covers a server that accepts the connection and then
+#     stalls. Set GIT_SSH_COMMAND in the environment to override the ssh
+#     options (the value below is a default, not a policy).
+# Together these mean a network operation FAILS rather than hanging. Where
+# `timeout` is missing the run is still non-interactive, but only git's and
+# ssh's own timeouts bound it — so the script says so rather than implying a
+# guarantee it cannot make.
+GIT_NET=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true
+         "GIT_SSH_COMMAND=${GIT_SSH_COMMAND:-ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15}")
 if command -v timeout >/dev/null 2>&1; then
     GIT_NET=(timeout 300 "${GIT_NET[@]}")
+else
+    echo "resolve_repo_checkout.sh: timeout(1) not available — network git operations are non-interactive but not wall-clock bounded" >&2
 fi
 
 # Main workspace root: from a worktree, the common git dir points at the main
