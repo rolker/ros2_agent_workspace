@@ -106,6 +106,45 @@ the last 20 reports; the clone caches are disposable — this host has hit 100% 
 the `audit-project` mode/`package.xml`/`$ROOT` fixes, and the plan/progress staleness
 lines this section is part of.
 
+### Plan revision 2026-09-11 (post-`## Local Review (Pre-Push)`, round 4 — after publishing)
+
+Round 4 graded the branch **ship: recommended** with three must-fix, and the
+operator approved publishing with those three fixed on the PR afterwards
+(PR #625, already open). They are three separate false-green paths, all in the
+same funnel:
+
+- **All four checks must grade the same tree.** Check 1 delegates to
+  `/audit-workspace`, which addresses every input by bare relative path and so
+  audits the *current directory* — while checks 2-4 are anchored at `$ROOT`. A
+  sweep run from a worktree (this skill's stated normal case) graded that
+  branch's governance docs for check 1 and the main root for the rest, and
+  reported the mixture as one workspace state. `audit-workspace` takes no root
+  argument, so the step now says to `cd "$ROOT"` for that check.
+- **A manifest on disk is never bypassed for a clone.** `manifest_fallback.sh`'s
+  early return recognised only `configs/manifest/repos`, while
+  `get_overlay_repos` also reads `configs/*.repos` — so on that supported layout
+  the helper attempted a network clone whose failure the resolver turned into
+  exit 5 before the manifest right there was ever opened. A false RED over a
+  working state; the early return now covers both layouts (`underlay.repos`
+  excluded, since that search ignores it).
+- **A refresh that failed is its own outcome.** A cached manifest clone that
+  could not be refreshed returned 0 with a stderr warning; both callers capture
+  stdout only, so a sweep could report `4 of 4 completed` over a repo list it
+  could not verify. It is now rc **6**, mapped to
+  `FAILED(manifest refresh: <reason>)` by `janitor-sweep` and `issue-triage`,
+  and to exit 5 by the resolver. `AGENTS.md`'s exit-5 row described behaviour
+  the code did not have; it now says what the code does.
+
+Adjacent suggestions taken in the same pass: `audit-project`'s second `$ROOT`
+site (its rationale contradicted step 1's own caveat — fix every site),
+`issue-triage`'s bare enumeration ahead of the fallback snippet (one
+enumeration site, on the success path, as `janitor-sweep` already had), the
+`AGENTS.md` exit-row wording above, and a retention note naming the clone
+caches as the output that actually fills a disk. Round 3's changes remain
+recorded as "Round 3 —" clauses in the Files-to-Change rows below; the
+remaining round-4 suggestions (trust model, lock scope, and the rest) are
+recorded in `progress.md` for the re-review.
+
 ## Approach
 
 1. **[D1] Fix the repo-location gap at its source, not in the janitor.** `audit-project`
@@ -292,7 +331,7 @@ lines this section is part of.
 
 | File | Change |
 |------|--------|
-| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract (including named FAILED evidence for each of the four checks), report format, timestamped local report write, known limitations, deferred publishing-and-trigger note |
+| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract (including named FAILED evidence for each of the four checks), report format, timestamped local report write, known limitations, deferred publishing-and-trigger note. Round 4 — check 1 runs from `$ROOT` so all four checks grade the same tree; rc 6 from the manifest fallback is `FAILED(manifest refresh: ...)`; the retention note names the clone caches as the unbounded output |
 | `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; clones the manifest's pinned version, verifies a cached clone's origin, validates the `version:` pin before it reaches git and verifies a SHA pin after the fact (round 2), serialises the shared cache with a **bounded** `flock` wait (round 2), sources `manifest_fallback.sh` so a host with no `layers/` still has manifests (round 2), validates the repo name before it reaches a path handed to `rm -rf`; prints `path\tmode` and nothing at all on a failure path; fails loud with the distinct exit codes in [R1] |
 | `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — the hermetic cases in [R5] |
 | `.claude/skills/audit-project/SKILL.md` | All five `layers/main/...` sites: step 1 uses the resolver; the AGENTS.md currency check and the report `**Location**` header accept a clone path; the optional `colcon test` and step 7's "correct layer" report SKIPPED in `clone` mode |
@@ -300,8 +339,8 @@ lines this section is part of.
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `janitor-sweep` to the skill enumeration (instruction files — **operator-approved**) |
 | `.agent/knowledge/skill_workflows.md` | Add `janitor-sweep` to the Utility-skills table |
 | `.agent/knowledge/principles_review_guide.md` | [R9] clarifying clause on the durable-findings consequences-map row — stating only what is true: three of the four periodic skills persist nothing at all |
-| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run |
-| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep. Round 3 — re-clone a cached manifest whose `origin` no longer matches the url the current pointer derives, validate `WORKSPACE_MANIFEST_GIT_BASE` before it reaches `git clone`, and refuse to be executed rather than exiting 0 having done nothing |
+| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run. Round 4 — one enumeration site, on the fallback's success path (the bare call ahead of it printed `[]` at exit 0 on a no-`layers/` host), plus the rc 6 arm |
+| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep. Round 3 — re-clone a cached manifest whose `origin` no longer matches the url the current pointer derives, validate `WORKSPACE_MANIFEST_GIT_BASE` before it reaches `git clone`, and refuse to be executed rather than exiting 0 having done nothing. Round 4 — the early return recognises every layout `get_overlay_repos` reads (`configs/manifest/repos` **and** `configs/*.repos`), and a cached clone that could not be refreshed is its own exit **6** rather than rc 0 with a stale-cache warning |
 | `.agent/scripts/field_mode.sh` | Round 2 — factor the URL classification into `is_field_url`; `is_field_mode` calls it. One allowlist for both a checkout and a bare manifest url |
 | `.agent/scripts/list_overlay_repos.py`, `.agent/scripts/lib/workspace.py` | Round 2 — `--config-dir` / `extra_config_dirs`, **additive** to the normal search path, for reading a cloned manifest's `.repos` files. Round 3 — `get_optional_layers(..., extra_config_dirs=)` reads `optional_layers.txt` from the same effective config dir, so the optional-layer exclusion is not silently empty on a host with no `layers/` |
 | `.agent/scripts/tests/test_field_mode.sh`, `.agent/scripts/tests/test_workspace_lib.py` | Round 2 — `is_field_url` over the same URL table as `is_field_mode`; `extra_config_dirs` additive and tolerant of a stale path |
