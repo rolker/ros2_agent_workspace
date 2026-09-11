@@ -113,6 +113,7 @@ else
     case $? in
         3) echo "FAILED(no repo manifest configured — run 'make setup-all')" ;;
         5) echo "FAILED(manifest repo unreachable — the reason is on stderr)" ;;
+        6) echo "FAILED(manifest refresh — the reason is on stderr)" ;;
         *) echo "FAILED(manifest fallback: unexpected exit)" ;;
     esac
 fi
@@ -128,6 +129,15 @@ A manifest clone that was **attempted and failed** is
 `FAILED(manifest repo unreachable: <reason>)` — never rule 1's "no repo
 manifest configured — run `make setup-all`", which would send the operator to a
 command that cannot fix an unreachable remote.
+
+A **cached** manifest clone that could not be refreshed (rc 6) is
+`FAILED(manifest refresh: <reason>)`, and it is terminal in the same way. The
+cached copy is still on disk and still readable, which is exactly why it needs
+its own state: enumerating from it would produce a full four-check run over a
+repo list — which repos exist, at which versions — that this host could not
+verify, and the report would then say `4 of 4 completed`. An unverifiable
+result is not an empty one and not a clean one; per the status contract it is
+`FAILED`, with the reason named.
 
 The three environments this must work in, and how each is verified before a
 change to this step ships:

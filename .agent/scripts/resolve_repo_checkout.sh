@@ -221,8 +221,12 @@ if [[ -f "$SCRIPT_DIR/manifest_fallback.sh" ]]; then
         fallback_rc=$?
         # A manifest clone that FAILED is not "no manifest configured": the
         # pointer named one and we could not get it. That is exit 5, with the
-        # helper's reason already on stderr.
-        [[ "$fallback_rc" -eq 5 ]] && exit 5
+        # helper's reason already on stderr. rc 6 — a cached manifest clone
+        # that could not be REFRESHED — is the same answer here: this script's
+        # exit 5 already covers "a clone or refresh failed", and resolving a
+        # repo out of a manifest we could not verify is the false green the
+        # exit vocabulary exists to prevent.
+        [[ "$fallback_rc" -eq 5 || "$fallback_rc" -eq 6 ]] && exit 5
         # rc 3 — no manifest and no usable pointer. Fall through: if nothing is
         # enumerable after that, the EMPTY verdict below reports exit 3.
     fi

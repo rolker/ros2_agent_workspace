@@ -450,6 +450,35 @@ else
     fail "source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h4b. a cached manifest that cannot be REFRESHED is a failure ----------
+# The cached clone is still readable, which is exactly why a refresh failure
+# needs its own answer: returning 0 with a stderr warning let the caller
+# enumerate from a manifest of unknown age and still report a completed run —
+# the report-level false green. rc 6 out of the helper, exit 5 out of the
+# resolver ("a clone or refresh failed"), with the reason on stderr.
+root=$(make_root manifest_refresh_fails)
+origin=$(make_origin manifest_refresh_fails)
+make_manifest_origin refreshowner testmanifest "file://$origin"
+echo "https://raw.githubusercontent.com/refreshowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -ne 0 ]; then
+    fail "manifest refresh setup: first resolve should succeed, rc=$rc ($(stderr_text))"
+else
+    # The manifest clone is now cached. Take its origin away: the next run must
+    # refuse the cached copy rather than quietly enumerate from it.
+    rm -rf "$TMPDIR_ROOT/manifest_origins/refreshowner/testmanifest.git"
+    out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+          "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+    if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+       && stderr_text | grep -q "could not refresh the cached manifest repo"; then
+        pass "a cached manifest that could not be refreshed → failure, never a silent stale read"
+    else
+        fail "manifest refresh failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+    fi
+fi
+
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
 # The early return has to recognise EVERY layout get_overlay_repos reads
 # (configs/manifest/repos AND configs/*.repos). Recognising only the first made

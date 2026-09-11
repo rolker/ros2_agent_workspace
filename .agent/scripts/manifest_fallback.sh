@@ -27,6 +27,12 @@
 #       5) ;;  # the manifest repo could not be USED (reason on stderr): the
 #              # clone or the cache/lock failed, the derived git base was
 #              # refused, or the pointer and the manifest repo disagree
+#       6) ;;  # a CACHED manifest clone could not be refreshed (reason on
+#              # stderr). Its own outcome, not a warning on top of rc 0: the
+#              # cached copy may be arbitrarily stale, and a caller that
+#              # enumerated from it while reporting success would be claiming
+#              # a state it could not verify. Callers report it as
+#              # FAILED(manifest refresh: <reason>)
 #   esac
 #
 # Environment:
@@ -156,6 +162,11 @@ manifest_config_dir() {
         # exit 0, and the whole rotation would enumerate from a manifest this
         # workspace no longer points at. `resolve_repo_checkout.sh` performs
         # exactly this guard one level down.
+        #
+        # The url is the only key needed: the refresh below fetches and hard
+        # resets to the CURRENT pointer's `$branch` on every run, so a cached
+        # clone made at a different branch of the same repo is corrected
+        # rather than reused as-is.
         cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
         if [[ "$cached_url" != "$git_url" ]]; then
             echo "manifest_fallback: cached manifest clone at $clone_dir points at '${cached_url:-<none>}', the bootstrap pointer derives '$git_url' — re-cloning" >&2
@@ -164,12 +175,19 @@ manifest_config_dir() {
     fi
 
     if [[ -d "$clone_dir/.git" ]]; then
-        # A refresh failure leaves a usable (if possibly stale) manifest. Say
-        # so and carry on — reporting "no manifest configured" over a manifest
-        # that is right there would be the worse answer.
+        # A refresh that failed is its OWN outcome, not a warning printed over
+        # a success. The cached copy may be arbitrarily stale — the manifest
+        # that decides which repos exist, at which versions — and every caller
+        # captures stdout only, so returning 0 here handed back a config dir
+        # with nothing in the return value to distinguish it from a refreshed
+        # one. A sweep would then report "4 of 4 completed" over a repo list it
+        # could not verify: exactly the report-level false green the callers'
+        # status contract exists to prevent. Callers map 6 to
+        # FAILED(manifest refresh: <reason>).
         if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1) \
            || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1); then
-            echo "manifest_fallback: could not refresh the cached manifest repo at $clone_dir ($out) — using the cached copy, which may be stale" >&2
+            echo "manifest_fallback: could not refresh the cached manifest repo at $clone_dir ($out) — the cached copy may be stale, so this is a failure, not a fallback" >&2
+            return 6
         fi
     else
         rm -rf "$clone_dir"

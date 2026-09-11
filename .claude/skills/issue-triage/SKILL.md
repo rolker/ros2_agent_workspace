@@ -56,13 +56,17 @@ else
     case $? in
         3) echo "FAILED: no repo manifest configured — run 'make setup-all'" ;;
         5) echo "FAILED: manifest repo unreachable — the reason is on stderr" ;;
+        6) echo "FAILED: manifest refresh — the reason is on stderr" ;;
         *) echo "FAILED: manifest fallback exited unexpectedly" ;;
     esac
 fi
 ```
 
-Both failure arms are terminal — neither falls through to an enumeration,
-which would report zero repos as a clean triage.
+Every failure arm is terminal — none falls through to an enumeration, which
+would report zero repos as a clean triage. rc 6 (a cached manifest clone that
+could not be refreshed) is terminal too, and for the opposite reason: the
+cached manifest is readable, so the triage would run to completion over a repo
+list this host could not verify and report it as a finished scan.
 
 This outputs a JSON list of `{name, url, version, source_file}` for all overlay repos.
 Parse the `owner/repo` from each URL.
