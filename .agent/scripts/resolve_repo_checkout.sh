@@ -32,7 +32,9 @@
 #      segment)
 #   3  no repo manifest configured at all (configs/manifest absent or holding
 #      no .repos) — list_overlay_repos.py prints an empty list at exit 0 in
-#      this state, which would otherwise read as "repo not found"
+#      this state, which would otherwise read as "repo not found". Note this
+#      is an un-bootstrapped clone or a container, NOT a worktree: the script
+#      resolves against the main root, where configs/manifest does live.
 #   4  repo not listed in any manifest that WAS read
 #   5  clone or refresh failed
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
