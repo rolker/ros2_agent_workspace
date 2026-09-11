@@ -12,7 +12,10 @@ description: Check a project repo against workspace and project-level convention
 ```
 
 If no repo name is given, audit the project repo in the current directory
-(when working in a layer worktree).
+(when working in a layer worktree). If one is given, the repo is located with
+`.agent/scripts/resolve_repo_checkout.sh` — a layer checkout when one exists,
+otherwise a shallow clone — so the audit also runs from a worktree, a fresh
+clone, or a container, none of which have `layers/`.
 
 ## Overview
 
@@ -31,14 +34,36 @@ This checks a single project repo.
 
 ### 1. Identify the repo
 
-If a repo name is given, find it under `layers/main/*/src/<repo-name>`.
-If not, use the current directory. Verify it's a valid project repo
-(has at least one `package.xml`).
+If no repo name is given, use the current directory (a layer worktree) and
+treat the mode as `layer`. Verify it's a valid project repo (has at least one
+`package.xml`).
+
+If a repo name is given, resolve it with `resolve_repo_checkout.sh`, which
+**does not assume `layers/` exists** — it prefers an existing layer checkout
+and otherwise shallow-clones the URL the workspace manifests declare. `layers/`
+is gitignored and absent in every worktree, fresh clone and container, so
+audits run from those places would otherwise find nothing.
 
 ```bash
-# Find repo location
-find layers/main/*/src/<repo-name> -maxdepth 0 -type d 2>/dev/null
+# Prints "<path><TAB><layer|clone>"; every failure exits non-zero with a reason
+if ! resolved=$(.agent/scripts/resolve_repo_checkout.sh <repo-name>); then
+    # exit 3 = no repo manifest configured at all (run `make setup-all`)
+    # exit 4 = repo not listed in any manifest that was read
+    # exit 5 = clone/refresh failed    exit 6 = manifest unreadable
+    echo "FAILED: could not resolve <repo-name> (see stderr)"
+    exit 1
+fi
+REPO_PATH=${resolved%%$'\t'*}
+REPO_MODE=${resolved##*$'\t'}
 ```
+
+Record `REPO_MODE` — the audit's report header names it, and in `clone` mode
+the two genuinely layer-dependent checks (the optional `colcon test` run in
+step 5, and step 7's "correct layer") must report **SKIPPED (no layer
+checkout)**, never OK. A check that could not run is never rendered as a pass.
+Everything else — governance coverage, the agent guide, package metadata,
+test-file existence, documentation — reads the working tree and is unaffected
+by the mode.
 
 ### 2. Check governance coverage
 
@@ -59,8 +84,8 @@ contain the template's stable `## Quality Standard` heading (the marker
 `.agent/templates/project_agents_md.md` instructs repos to keep verbatim):
 
 ```bash
-AGENTS_FILE=$(ls layers/main/*/src/<repo-name>/AGENTS.md 2>/dev/null | head -1)
-if [ -z "$AGENTS_FILE" ]; then
+AGENTS_FILE="$REPO_PATH/AGENTS.md"
+if [ ! -f "$AGENTS_FILE" ]; then
     echo "MISSING: no root AGENTS.md"
 elif ! grep -q '^## Quality Standard' "$AGENTS_FILE"; then
     echo "STALE: Quality Standard section missing"
@@ -99,9 +124,16 @@ For each `package.xml` in the repo:
 For each package:
 
 - Do test files exist? (`test/`, `tests/`, `*_test.py`, `*_test.cpp`)
-- If available, run or report last known test results:
+
+Test-file existence is the default check and works in either mode — it reads
+the working tree. Per the Guidelines below, tests are **not** run unless the
+user asks.
+
+Only when the user asks, and only in `layer` mode, run them — `colcon` needs a
+built layer workspace, which a clone is not:
 
 ```bash
+# layer mode only; in clone mode report "SKIPPED (no layer checkout)"
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
 ```
@@ -118,7 +150,9 @@ Report test existence and pass/fail, not test quality.
 ### 7. Cross-reference with workspace
 
 - Is this repo listed in a `.repos` config file?
-- Is it in the expected layer?
+- Is it in the expected layer? (`layer` mode only — in `clone` mode there is no
+  layer checkout to compare against, so report **SKIPPED (no layer
+  checkout)**.)
 - Does the workspace's `.agent/project_knowledge/` symlink (pointing to
   `.agents/workspace-context/`) include content from this repo?
 
@@ -127,7 +161,9 @@ Report test existence and pass/fail, not test quality.
 ```markdown
 ## Project Audit: <repo-name>
 
-**Location**: `layers/main/<layer>_ws/src/<repo-name>`
+**Location**: `<resolved path>` (`layer` — `layers/main/<layer>_ws/src/<repo-name>`,
+or `clone` — `.agent/scratchpad/janitor-repos/<repo-name>`)
+**Checkout mode**: layer / clone
 **Packages**: N packages (list)
 
 ### Governance Coverage
@@ -162,7 +198,7 @@ creating one with the project_agents_guide.md template">
 | Check | Status |
 |---|---|
 | Listed in .repos | Yes / No |
-| Correct layer | Yes / No |
+| Correct layer | Yes / No / SKIPPED (no layer checkout) |
 | ... | ... |
 
 ### Recommended Actions
