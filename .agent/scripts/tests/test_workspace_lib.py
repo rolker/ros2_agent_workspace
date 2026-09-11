@@ -63,6 +63,47 @@ def test_an_empty_file_declares_no_optional_layers(tmp_path):
     assert get_optional_layers(tmp_path) == set()
 
 
+def test_a_cloned_manifest_supplies_the_optional_layers(tmp_path):
+    """No `layers/` means no `configs/manifest` (it is a symlink into the layer
+    tree), so the only copy of optional_layers.txt is the one inside the
+    manifest clone manifest_fallback.sh makes. Reading only the workspace path
+    there returns an empty set, and every repo from an inaccessible optional
+    layer goes red on every sweep — the permanent false failure the exclusion
+    exists to prevent (#569)."""
+    clone_config = tmp_path / "clone" / "config"
+    (clone_config / "repos").mkdir(parents=True)
+    (clone_config / "optional_layers.txt").write_text("# private\nsite\n")
+
+    assert get_optional_layers(tmp_path) == set()
+    assert get_optional_layers(tmp_path, extra_config_dirs=[str(clone_config / "repos")]) == {
+        "site"
+    }
+
+
+def test_the_optional_layers_file_is_also_found_in_the_config_dir_itself(tmp_path):
+    """The `--config-dir` value is where the `.repos` files are; a manifest that
+    keeps optional_layers.txt beside them rather than one level up is read the
+    same way, so the caller never has to know the manifest's layout."""
+    config_dir = tmp_path / "clone" / "repos"
+    config_dir.mkdir(parents=True)
+    (config_dir / "optional_layers.txt").write_text("site\n")
+
+    assert get_optional_layers(tmp_path, extra_config_dirs=[str(config_dir)]) == {"site"}
+
+
+def test_the_workspaces_own_optional_layers_file_wins(tmp_path):
+    """A cloned manifest is a fallback for a host that has none, never an
+    override of the one this workspace actually uses."""
+    write_optional(tmp_path, "site\n")
+    clone_config = tmp_path / "clone" / "config"
+    (clone_config / "repos").mkdir(parents=True)
+    (clone_config / "optional_layers.txt").write_text("something_else\n")
+
+    assert get_optional_layers(tmp_path, extra_config_dirs=[str(clone_config / "repos")]) == {
+        "site"
+    }
+
+
 def test_matches_setup_layers_sh_on_the_same_file(tmp_path):
     """The compatibility claim, checked against the shell implementation itself
     rather than against a restatement of it."""

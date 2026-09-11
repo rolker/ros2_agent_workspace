@@ -213,9 +213,19 @@ Then, in order:
    from this host** — not `FAILED`. Without this the same repo goes red on
    every sweep, forever, for a condition nobody intends to fix:
 
+   Pass step 1's `$EXTRA_CONFIG` as well: `optional_layers.txt` lives at
+   `configs/manifest/optional_layers.txt`, behind the same symlink as the
+   `.repos` files, so on a host with no `layers/` the only copy is the one
+   inside the cloned manifest. Without it this returns an **empty set** there
+   and every inaccessible optional-layer repo is `FAILED` on every sweep —
+   exactly what this rule exists to prevent.
+
    ```bash
    python3 -c 'import sys; sys.path.insert(0, sys.argv[1] + "/.agent/scripts/lib"); \
-       from workspace import get_optional_layers; print(" ".join(sorted(get_optional_layers(sys.argv[1]))))' "$ROOT"
+       from workspace import get_optional_layers; \
+       extra = [d for d in sys.argv[2:] if d]; \
+       print(" ".join(sorted(get_optional_layers(sys.argv[1], extra_config_dirs=extra))))' \
+       "$ROOT" "${EXTRA_CONFIG:-}"
    # a repo from site.repos is in layer "site"
    ```
 
