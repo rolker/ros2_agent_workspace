@@ -57,3 +57,29 @@ issue: 569
 
 - Reuse `review-issue`'s two-step output pattern (canonical local artifact first, best-effort GitHub post second) for the rolling-issue update, so a GitHub outage degrades to "report written, not yet posted" rather than silently reporting nothing.
 - When the trigger-mechanism follow-up issue is filed, point it at ADR-0015/ADR-0019 up front rather than re-deriving the container-vs-write-auth reasoning from scratch.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-11 12:46 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-569/plan.md` at `8afd8b5`
+**Branch**: feature/issue-569 at `8afd8b5`
+**Phases**: single
+
+Four items the `## Issue Review` entry left for this phase are decided in the plan
+as **[D1]**–**[D4]**: (D1) the layer-checkout assumption is fixed at its source — a new
+`.agent/scripts/resolve_repo_checkout.sh` (layer checkout, else shallow clone into
+`.agent/scratchpad/`) that `audit-project` step 1 calls, with layer-dependent checks
+reporting SKIPPED in clone mode, rather than a janitor-local workaround; (D2) the four
+skill-list sites land in the same PR; (D3) durable output is a local canonical write
+first, then the rolling issue (body updated in place + sweep posted as a comment), with
+a named POST FAILED path and a next-run backlog post so an unattended failed publish
+cannot vanish, plus a per-check OK/FINDINGS/SKIPPED/FAILED contract so a report can only
+read clean when all four checks completed; (D4) the deferred trigger decision is pointed
+at ADR-0015/ADR-0019 in the skill's deferred-trigger section.
+
+### Open questions
+- [ ] The PR edits four instruction files (`AGENTS.md` + three adapters) — Ask First; confirm blanket approval or review at PR time.
+- [ ] Should the consequences-map row on durable-findings skills gain a clause for non-issue-scoped skills? Out of this PR unless wanted.
+- [ ] May the sweep create the rolling issue on first run (title `Janitor sweep report (rolling)`, no label), or will the operator open it by hand?
