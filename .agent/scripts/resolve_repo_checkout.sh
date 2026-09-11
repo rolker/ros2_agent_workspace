@@ -10,7 +10,10 @@
 # container, so those callers silently had nothing to audit. This script gives
 # them one resolution rule: use the layer checkout when there is one, otherwise
 # shallow-clone the URL the workspace manifests already declare, at the version
-# those manifests pin.
+# those manifests pin. Where the manifests themselves are missing — they live
+# behind the same `configs/manifest` -> `layers/...` symlink — the manifest
+# repo is cloned first, from the tracked `configs/project_bootstrap.url`
+# pointer (see manifest_fallback.sh).
 #
 # Usage:
 #   .agent/scripts/resolve_repo_checkout.sh <repo-name>
@@ -30,11 +33,17 @@
 #   0  resolved
 #   2  usage error (no argument, or a repo name that is not a single path
 #      segment)
-#   3  no repo manifest configured at all (configs/manifest absent or holding
-#      no .repos) — list_overlay_repos.py prints an empty list at exit 0 in
+#   3  no repo manifest configured AND none derivable from the tracked
+#      `configs/project_bootstrap.url` pointer — so zero repos are
+#      enumerable. list_overlay_repos.py prints an empty list at exit 0 in
 #      this state, which would otherwise read as "repo not found". Note this
-#      is an un-bootstrapped clone or a container, NOT a worktree: the script
-#      resolves against the main root, where configs/manifest does live.
+#      is NOT a worktree: the script resolves against the main root, where
+#      configs/manifest does live. A host with neither (a container, a fresh
+#      clone) reaches this only when the bootstrap pointer is missing or in a
+#      form the fallback cannot derive a git url from — when it IS derivable,
+#      the manifest repo is shallow-cloned into the scratch cache and the
+#      repos enumerate from there (see manifest_fallback.sh). A manifest
+#      clone that was attempted and FAILED is exit 5, never exit 3.
 #   4  repo not listed in any manifest that WAS read
 #   5  clone or refresh failed
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
@@ -176,10 +185,36 @@ if [[ ! -f "$LIST_SCRIPT" ]]; then
     exit 6
 fi
 
+# `configs/manifest` is a symlink INTO the layer tree, so a host with no
+# `layers/` has no manifests at all — the manifest is the first thing a
+# resolver that "clones what it needs" has to be able to clone. The shared
+# helper derives the manifest repo from the tracked
+# `configs/project_bootstrap.url` pointer, clones it into the scratch cache,
+# and hands back a directory to read `.repos` from; it prints nothing (rc 0)
+# when the workspace has its own manifest, which is the normal case.
+EXTRA_CONFIG=()
+if [[ -f "$SCRIPT_DIR/manifest_fallback.sh" ]]; then
+    # shellcheck source=manifest_fallback.sh
+    source "$SCRIPT_DIR/manifest_fallback.sh"
+    if fallback_dir=$(manifest_config_dir "$MAIN_ROOT"); then
+        [[ -n "$fallback_dir" ]] && EXTRA_CONFIG=(--config-dir "$fallback_dir")
+    else
+        fallback_rc=$?
+        # A manifest clone that FAILED is not "no manifest configured": the
+        # pointer named one and we could not get it. That is exit 5, with the
+        # helper's reason already on stderr.
+        [[ "$fallback_rc" -eq 5 ]] && exit 5
+        # rc 3 — no manifest and no usable pointer. Fall through: if nothing is
+        # enumerable after that, the EMPTY verdict below reports exit 3.
+    fi
+else
+    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/manifest_fallback.sh — no manifest fallback for a host without layers/" >&2
+fi
+
 # stdout and stderr are kept apart: folding them together turns any benign
 # stderr noise on a *successful* run into unparseable JSON, i.e. a readable
 # manifest reported as exit 6.
-if ! repos_json=$(python3 "$LIST_SCRIPT" --format json 2>"$TMP_DIR/list.err"); then
+if ! repos_json=$(python3 "$LIST_SCRIPT" --format json "${EXTRA_CONFIG[@]}" 2>"$TMP_DIR/list.err"); then
     echo "resolve_repo_checkout.sh: could not read the repo manifests: $(tr '\n' ' ' < "$TMP_DIR/list.err")" >&2
     exit 6
 fi
@@ -236,7 +271,7 @@ case "$verdict" in
         exit 6
         ;;
     EMPTY)
-        echo "resolve_repo_checkout.sh: no repo manifest configured under $MAIN_ROOT/configs — run 'make setup-all'" >&2
+        echo "resolve_repo_checkout.sh: no repo manifest configured under $MAIN_ROOT/configs, and none could be derived from configs/project_bootstrap.url — run 'make setup-all'" >&2
         exit 3
         ;;
     NOTFOUND)

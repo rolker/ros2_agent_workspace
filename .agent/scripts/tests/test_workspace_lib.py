@@ -267,7 +267,7 @@ def test_list_overlay_repos_cli_exits_non_zero_on_an_unparseable_manifest(monkey
     it could not parse hands them an empty array indistinguishable from "no
     repos are configured" (#609)."""
 
-    def boom(include_underlay=False):
+    def boom(include_underlay=False, extra_config_dirs=None):
         raise WorkspaceConfigError("cannot parse core.repos: mapping values not allowed")
 
     monkeypatch.setattr(list_overlay_repos, "get_overlay_repos", boom)
@@ -283,8 +283,41 @@ def test_list_overlay_repos_cli_exits_non_zero_on_an_unparseable_manifest(monkey
 def test_list_overlay_repos_cli_still_prints_a_healthy_manifest(monkeypatch, capsys):
     """False-RED guard for the arm above."""
     monkeypatch.setattr(
-        list_overlay_repos, "get_overlay_repos", lambda include_underlay=False: [{"name": "alpha"}]
+        list_overlay_repos,
+        "get_overlay_repos",
+        lambda include_underlay=False, extra_config_dirs=None: [{"name": "alpha"}],
     )
     monkeypatch.setattr(sys, "argv", ["list_overlay_repos.py", "--format", "names"])
     list_overlay_repos.main()
     assert capsys.readouterr().out.strip() == "alpha"
+
+
+def test_extra_config_dirs_are_additive_not_a_replacement(tmp_path, monkeypatch):
+    """`configs/manifest` is a symlink into the gitignored layer tree, so a
+    host with no `layers/` has no manifests at all and a caller hands us a
+    cloned manifest's config dir instead (manifest_fallback.sh). That dir must
+    ADD to the workspace's own search path: replacing it would hide manifests
+    a partially set-up workspace does have, which is the same "reported over
+    repos nothing enumerated" failure from the other side."""
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    extra = tmp_path / "cloned_manifest" / "repos"
+    extra.mkdir(parents=True)
+    (extra / "site.repos").write_text(
+        "repositories:\n  beta:\n    type: git\n    url: git@example:beta.git\n"
+        "    version: main\n"
+    )
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+
+    assert [r["name"] for r in workspace.get_overlay_repos()] == ["alpha"]
+    both = workspace.get_overlay_repos(extra_config_dirs=[str(extra)])
+    assert sorted(r["name"] for r in both) == ["alpha", "beta"]
+
+
+def test_an_extra_config_dir_that_does_not_exist_is_ignored(tmp_path, monkeypatch):
+    """False-RED guard: the fallback prints nothing when the workspace has its
+    own manifest, and a stale path must not turn a healthy enumeration into an
+    error."""
+    write_manifest(tmp_path, "core.repos", GOOD_MANIFEST)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda: str(tmp_path))
+    repos = workspace.get_overlay_repos(extra_config_dirs=[str(tmp_path / "nope")])
+    assert [r["name"] for r in repos] == ["alpha"]

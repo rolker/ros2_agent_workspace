@@ -58,12 +58,18 @@ def get_workspace_root():
     return str(workspace_root)
 
 
-def get_overlay_repos(include_underlay=False):
+def get_overlay_repos(include_underlay=False, extra_config_dirs=None):
     """
     Get a list of all repositories defined in workspace .repos files.
 
     Args:
         include_underlay (bool): If True, include repositories from underlay.repos
+        extra_config_dirs (list): Additional directories to search for `.repos`
+            files, searched AFTER the workspace's own. Additive on purpose:
+            `configs/manifest` is a symlink into the layer tree, so a host with
+            no `layers/` has no manifests at all, and a caller can hand us a
+            cloned manifest's config dir (see manifest_fallback.sh) without
+            hiding any manifest the workspace does have.
 
     Returns:
         list: List of dictionaries containing repository information:
@@ -85,6 +91,7 @@ def get_overlay_repos(include_underlay=False):
         os.path.join(workspace_root, "configs", "manifest", "repos"),
         os.path.join(workspace_root, "configs"),
     ]
+    config_dirs.extend(extra_config_dirs or [])
 
     # Sorted: glob order is filesystem order, which decided *which* manifest
     # error a caller saw first, and whether a lookup reached a valid manifest

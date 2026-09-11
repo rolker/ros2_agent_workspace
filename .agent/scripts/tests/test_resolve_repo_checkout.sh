@@ -12,6 +12,10 @@
 # tree so the cases cannot see each other's clones or touch the real
 # workspace. The clone cases point the manifest at a bare git repo created in
 # the same temp tree and served over `file://` — no remote is ever contacted.
+# The manifest-fallback cases do the same one level up: the tracked bootstrap
+# pointer is a plain string, and `WORKSPACE_MANIFEST_GIT_BASE` points the
+# derived clone url at a local fixture, so cloning the MANIFEST repo is
+# exercised without the network either.
 #
 # Every failure case also asserts that **stdout is empty**: the whole point of
 # the script's exit-code vocabulary is that a caller never receives an empty
@@ -350,6 +354,80 @@ if [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] && [ -f "$path/SECOND" ]; then
     pass "a manifest with no version: clones, then refreshes against the remote's HEAD"
 else
     fail "no version: rc=$rc rc2=$rc2 advanced=$([ -f "$path/SECOND" ] && echo yes || echo no) ($(stderr_text))"
+fi
+
+# --- 6h. no configs/manifest at all: clone the MANIFEST repo, then the repo ---
+# `configs/manifest` is a symlink into the layer tree, so a host without
+# `layers/` has no manifests either — "it clones what it needs" has to cover
+# the manifest first. The bootstrap pointer is a tracked file, and
+# WORKSPACE_MANIFEST_GIT_BASE points the derived clone url at a local fixture,
+# so this stays hermetic: no network, ever.
+make_manifest_origin() {
+    # $1 = owner, $2 = repo, $3 = demo repo url to declare
+    local owner="$1" name="$2" demo_url="$3"
+    local work="$TMPDIR_ROOT/manifest_work/$name"
+    local bare="$TMPDIR_ROOT/manifest_origins/$owner/$name.git"
+    mkdir -p "$work/config/repos" "$(dirname "$bare")"
+    cat > "$work/config/repos/core.repos" <<EOF
+repositories:
+  demo_repo:
+    type: git
+    url: $demo_url
+    version: main
+EOF
+    git -C "$work" init -q -b main
+    git -C "$work" add -A
+    git -C "$work" "${GIT_ID[@]}" commit -qm "manifest"
+    git clone -q --bare "$work" "$bare"
+}
+
+root=$(make_root manifest_fallback)
+origin=$(make_origin manifest_fallback)
+make_manifest_origin testowner testmanifest "file://$origin"
+echo "https://raw.githubusercontent.com/testowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+path=${out%%$'\t'*}
+mode=${out##*$'\t'}
+if [ "$rc" -eq 0 ] && [ "$mode" = "clone" ] && [ -f "$path/README.md" ]; then
+    pass "no configs/manifest: the manifest repo is cloned from the bootstrap pointer, then the repo"
+else
+    fail "manifest fallback: rc=$rc out='$out' ($(stderr_text))"
+fi
+
+# A second run reuses the cached manifest clone rather than failing on it.
+out2=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+       "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 0 ] && [ "$out2" = "$out" ]; then
+    pass "a cached manifest clone is refreshed and reused on the next run"
+else
+    fail "manifest fallback (cached): rc=$rc out='$out2' ($(stderr_text))"
+fi
+
+# --- 6i. a manifest clone that FAILED is exit 5, never "no manifest" (3) -----
+# The pointer named a manifest repo and we could not get it. Reporting that as
+# "no repo manifest configured — run make setup-all" would send the operator
+# to a command that cannot fix a broken remote.
+root=$(make_root manifest_fallback_fails)
+echo "https://raw.githubusercontent.com/testowner/absentmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] && stderr_text | grep -q "could not clone the manifest repo"; then
+    pass "an unreachable manifest repo → exit 5, distinct from 'no manifest configured'"
+else
+    fail "manifest fallback failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
+# --- 6j. a bootstrap pointer in an underivable form is exit 3, and says so ---
+root=$(make_root manifest_fallback_unsupported)
+echo "https://example.internal/some/other/place/bootstrap.yaml" > "$root/configs/project_bootstrap.url"
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ] && stderr_text | grep -q "cannot derive a git url"; then
+    pass "a bootstrap pointer this fallback cannot derive a git url from → exit 3, with the reason"
+else
+    fail "unsupported pointer: rc=$rc out='$out' (expected 3 / empty), stderr='$(stderr_text)'"
 fi
 
 # --- 7. the same name in two manifests with different urls is ambiguous -----
