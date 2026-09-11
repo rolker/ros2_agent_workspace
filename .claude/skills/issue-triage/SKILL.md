@@ -50,9 +50,19 @@ cloned manifest before concluding the list is empty:
 
 ```bash
 source "$ROOT/.agent/scripts/manifest_fallback.sh"
-extra=$(manifest_config_dir "$ROOT") \
-    && python3 "$ROOT/.agent/scripts/list_overlay_repos.py" ${extra:+--config-dir "$extra"}
+if extra=$(manifest_config_dir "$ROOT"); then
+    python3 "$ROOT/.agent/scripts/list_overlay_repos.py" ${extra:+--config-dir "$extra"}
+else
+    case $? in
+        3) echo "FAILED: no repo manifest configured — run 'make setup-all'" ;;
+        5) echo "FAILED: manifest repo unreachable — the reason is on stderr" ;;
+        *) echo "FAILED: manifest fallback exited unexpectedly" ;;
+    esac
+fi
 ```
+
+Both failure arms are terminal — neither falls through to an enumeration,
+which would report zero repos as a clean triage.
 
 This outputs a JSON list of `{name, url, version, source_file}` for all overlay repos.
 Parse the `owner/repo` from each URL.
@@ -70,6 +80,13 @@ to "there are none" (#609). So:
   produce a triage report.
 - Non-zero exit from the script → **`FAILED: manifest unreadable`** with its
   stderr. Also not an empty list.
+- `manifest_config_dir` exit **5** — the bootstrap pointer names a manifest
+  repo this host could not clone (unreachable remote, no credentials, a
+  pointer and a manifest that disagree) → **`FAILED: manifest repo
+  unreachable`** with its stderr reason. Never `make setup-all`: that
+  command's own first step is this same clone, so it cannot fix it. Exit
+  **3** — no `configs/manifest` *and* no usable bootstrap pointer — is the
+  one state whose remedy really is `make setup-all`.
 - `--repo <name>` that matches nothing in a manifest that *was* read → report
   that the repo is not listed, rather than triaging an empty set.
 
