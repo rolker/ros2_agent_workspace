@@ -56,11 +56,55 @@ hostname and absolute local paths** so the deferred publish decision inherits a
 format that needs no scrubbing.
 
 The remaining must-fix findings are fixed on their merits in this round —
-the `$ROOT` anchoring of every path the sweep touches, six resolver defects,
-FAILED criteria for the two sub-skill checks (with the empty-list guard added
-to `issue-triage` itself rather than to the janitor's wrapper), and the
-consequences-map clause, which claimed a durable output for three skills that
-have none.
+the `$ROOT` anchoring of every path the sweep touches, five defects in the
+resolver (its empty-success paths, the unvalidated repo name, the version pin,
+the cached-clone origin check and the shared-cache race) plus the two skill-side
+ones the review raised alongside them, FAILED criteria for the two sub-skill
+checks (with the empty-list guard added to `issue-triage` itself rather than to
+the janitor's wrapper), and the consequences-map clause, which claimed a durable
+output for three skills that have none.
+
+### Plan revision 2026-09-11 (post-`## Local Review (Pre-Push)`, round 2)
+
+The second pre-push review returned **changes-requested** with 9 must-fix
+findings and 20 suggestions, all new ground rather than re-opened round-1
+items. Three were design-level and changed what this slice contains:
+
+- **The manifest is the first thing "it clones what it needs" must cover.**
+  `configs/manifest` is a *symlink into* `layers/main/core_ws/src/<manifest
+  repo>/config`, so the claim that a no-`layers/` host still enumerates repos
+  could not be true — the manifests live behind the very thing that is missing.
+  New `.agent/scripts/manifest_fallback.sh` derives the manifest repo and branch
+  from the **tracked** `configs/project_bootstrap.url` pointer, shallow-clones it
+  into `.agent/scratchpad/manifest-repo/`, and hands back a config directory;
+  `list_overlay_repos.py --config-dir` (new, repeatable) **adds** it to the search
+  path rather than replacing it. Resolver exit 3 now means "no manifest **and** no
+  bootstrap pointer"; a manifest clone that was attempted and failed is exit 5.
+- **One allowlist, reachable without a checkout.** The rotation classified
+  origins with `is_field_mode`, which needs a checkout on disk — with none it
+  returns "dev mode", silently *including* every gitcloud repo. The URL
+  classification is factored out as `is_field_url` in the same file
+  (`field_mode.sh`), so `is_field_mode` calls it and the sweep uses it directly:
+  one authority (ADR-0011), no second copy of the host list.
+- **`issue-triage` enumerates against `$ROOT`**, like the resolver and the sweep.
+  It was worktree-relative, which enumerates 0 repos where the main root
+  enumerates 35 — so the empty-list guard this PR adds fired as a false FAILED on
+  the sweep's primary environment.
+
+The other six must-fix are the `version:` validation (an unvalidated pin reached
+`git fetch` as an *option*, executing `--upload-pack=` and still exiting 0 with the
+pin unhonoured), check 2's rollup over an empty chunk, the report-write failure
+state, the ssh/unattended guarantee, the plan's last rolling-issue line, and the
+publish-decision citation — now the issue comment that records it.
+
+Suggestions taken in the same round: bounded `flock` wait plus an honest account
+of what the lock does not buy, `optional_layers.txt` honoured in the rotation, the
+`10#` form for `date +%V`, url redaction in resolver stderr, the underlay exclusion
+named in exit 4, exit-vocabulary consistency between the script header and
+`AGENTS.md`, a documented **retention policy** for both scratchpad outputs (keep
+the last 20 reports; the clone caches are disposable — this host has hit 100% disk),
+the `audit-project` mode/`package.xml`/`$ROOT` fixes, and the plan/progress staleness
+lines this section is part of.
 
 ## Approach
 
@@ -200,8 +244,9 @@ have none.
    row for the new script. **[R9]** Also land the one-line clarifying clause on the
    consequences-map row "Add a workflow skill that produces durable findings" in
    `.agent/knowledge/principles_review_guide.md`: a periodic, non-issue-scoped skill (the
-   janitor, and its three siblings) persists its record to its own rolling report instead
-   of a `progress.md` entry, which is keyed by issue. Without the clause the row reads
+   janitor) persists its record to its own local report file instead of a
+   `progress.md` entry, which is keyed by issue — while its three siblings persist
+   nothing at all, which the clause says rather than implying a pattern. Without the clause the row reads
    unconditionally and every future `audit-workspace` / `review-code` pass re-flags this
    skill. All of these edits are **operator-approved** (Open Question 1, closed).
 8. **[D4] Forward-looking note, non-blocking.** In the skill's
@@ -255,7 +300,11 @@ have none.
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `janitor-sweep` to the skill enumeration (instruction files — **operator-approved**) |
 | `.agent/knowledge/skill_workflows.md` | Add `janitor-sweep` to the Utility-skills table |
 | `.agent/knowledge/principles_review_guide.md` | [R9] clarifying clause on the durable-findings consequences-map row — stating only what is true: three of the four periodic skills persist nothing at all |
-| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares |
+| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run |
+| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep |
+| `.agent/scripts/field_mode.sh` | Round 2 — factor the URL classification into `is_field_url`; `is_field_mode` calls it. One allowlist for both a checkout and a bare manifest url |
+| `.agent/scripts/list_overlay_repos.py`, `.agent/scripts/lib/workspace.py` | Round 2 — `--config-dir` / `extra_config_dirs`, **additive** to the normal search path, for reading a cloned manifest's `.repos` files |
+| `.agent/scripts/tests/test_field_mode.sh`, `.agent/scripts/tests/test_workspace_lib.py` | Round 2 — `is_field_url` over the same URL table as `is_field_mode`; `extra_config_dirs` additive and tolerant of a stale path |
 
 `.gitignore` already ignores `.agent/scratchpad/*`, which covers both the report directory
 and the clone cache — verified, no change.
@@ -264,10 +313,10 @@ and the clone cache — verified, no change.
 
 | Principle | Consideration |
 |---|---|
-| Human control and transparency | Report-only. No PRs, no per-finding issues, exactly one rolling issue; the operator decides what becomes work. |
+| Human control and transparency | Report-only, and in this slice publish-nothing: no PRs, no per-finding issues, no GitHub write at all — one local report file per run, which the operator triages into work. |
 | Enforcement over documentation | The sweep is still hand-run this slice — a recorded sequencing choice, not a gap. The one mechanically enforceable piece (repo resolution, including its false-green paths) gets a script and a test. |
 | A change includes its consequences | Step 7 lands all four skill-list sites, the script table, and the consequences-map clause in this PR. |
-| Test what breaks | The resolver is tested, including three distinct failure paths. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
+| Test what breaks | The resolver is tested across every exit it can return (2 through 7) and both resolution modes, including the manifest fallback, the `version:` validation, the SHA-pin path and the clone-cache lock — 29 hermetic cases. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
 | Only what's needed | Chains existing detectors; adds one small script. No scheduler, no rotation state, no new infra. |
 | Workspace vs. project separation | Rotation is derived from `.repos` manifests and a remote AGENTS.md probe — no repo names hardcoded (ADR-0003). |
 | Improve incrementally | Sweep now, trigger later, as the operator scoped it; the two deferred limitations ([R4], [R8]) are named where the trigger decision will meet them. |
@@ -308,7 +357,13 @@ All three are closed by the 2026-09-11 operator decisions:
   `principles_review_guide.md`) — **approved** for this PR. The approval was given
   verbally at the 2026-09-11 plan checkpoint and is recorded only in this plan and in
   the `## Plan Authored` / `## Local Review (Pre-Push)` timeline; the review flagged
-  that as a thin trace, so **re-confirm it at PR time** before merge.
+  that as a thin trace, so **re-confirm it at PR time** before merge. Two details to
+  re-confirm with it, both flagged by the round-2 review: the
+  `principles_review_guide.md` clause landed as a **four-sentence paragraph**, not the
+  "one-line clause" the approval was framed around (it grew to say what is true of all
+  four periodic skills, and now also carries the failed-write requirement); and the
+  round-2 fixes added `AGENTS.md` script rows for `manifest_fallback.sh` and a rewritten
+  row for `resolve_repo_checkout.sh`.
 - [x] Consequences-map clause for non-issue-scoped durable-findings skills — **land it**
   ([R9]).
 - [x] ~~May the sweep create the rolling issue on first run~~ — **moot for this slice**:
@@ -317,6 +372,22 @@ All three are closed by the 2026-09-11 operator decisions:
   with the AI signature, two or more is FAILED) carries forward to the deferred
   publishing-and-trigger decision, which must also settle the create-path race the review
   found.
+
+## Open items for PR time
+
+- [ ] **File the follow-up issue for the deferred publishing-and-trigger
+  decision.** The skill, this plan and `skill_workflows.md` all cross-reference
+  it with no issue number, so nothing tracks it once this PR merges. It needs
+  the two known limitations ([R4], [R8]) and the settled-but-unshipped rolling
+  issue design (including the create-path race) carried into its body. Left for
+  the operator to file — the agent does not open it.
+- [ ] **The PR body says "Part of #569", not "Closes #569".** The issue title is
+  "*Scheduled* janitor…" and the trigger is explicitly deferred, so this slice
+  does not close it (AGENTS.md § Issue-closing keywords — the keyword auto-closes
+  even in a negated or sibling mention, so scrub it from any plan text pasted
+  into the body, including this line's neighbours).
+- [ ] **Re-confirm the instruction-file edits** — see Open Questions above for
+  what grew beyond the original framing.
 
 ## Estimated Scope
 
