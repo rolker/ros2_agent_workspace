@@ -103,7 +103,7 @@ Available workflow skills: `run-issue`, `review-issue`, `plan-task`, `review-pla
 `review-code`, `brainstorm`, `research`, `audit-workspace`, `audit-project`,
 `gather-project-knowledge`, `onboard-project`, `brand-guidelines`,
 `triage-reviews`, `address-findings`, `skill-importer`, `document-package`, `issue-triage`,
-`test-engineering`, `inspiration-tracker`, `import-field-changes`,
+`test-engineering`, `inspiration-tracker`, `import-field-changes`, `janitor-sweep`,
 `start-deployment`, `wrap-up-deployment`.
 
 ## References

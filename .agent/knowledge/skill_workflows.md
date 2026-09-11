@@ -72,6 +72,7 @@ accepts a PR number / URL for post-PR review of someone else's work.
 | `inspiration-tracker` | Periodically | Track external projects for portable enhancements and interesting patterns |
 | `document-package` | After audit-project flags doc gaps | Generate or update ROS 2 package README and API docs from source |
 | `issue-triage` | Periodically | Cross-repo issue scanning, categorization, and stale issue detection |
+| `janitor-sweep` | Periodically | Chain the four staleness detectors into one rolling GitHub report issue; report-only |
 | `test-engineering` | After audit-project flags test gaps | Test scaffolding, debugging, and coverage analysis for ROS 2 packages |
 
 ### Makefile skills
