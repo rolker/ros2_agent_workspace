@@ -231,3 +231,57 @@ merits — called out individually below so they are not read as fixed.
   green — 17 shell suites including `test_resolve_repo_checkout.sh` at 18/18,
   plus 215 pytest cases.
 - Not pushed, per the dispatch contract.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-11 13:52 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-569 at `c974e26`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1653 lines / 13 files, instruction-file + new-script + skill triggers)
+**Must-fix**: 9 | **Suggestions**: 20
+**Round**: 2 | **Ship**: continue — must-fix is down from 14 but not low, and three are genuine correctness concerns rather than mechanical edits: a reproduced command-execution-plus-false-green path through the manifest `version:`, a sweep rule that cites a script it cannot call and whose failure mode silently *includes* the repos it exists to exclude, and a chained skill that reports FAILED on every worktree run
+
+Specialists: Static Analysis (shellcheck clean at `--severity=warning`; pre-commit 18 hooks all-pass on the changed files; `test_resolve_repo_checkout.sh` 18/18), Governance, Plan Drift, Claude Adversarial Lens A + Lens B. Copilot and local model not run (not opted in).
+
+All 27 round-1 findings independently verified closed in the code — 24 fixed on their
+merits, 3 genuinely and completely removed with the publish step (no residue in the skill;
+the design is carried forward in `plan.md` as `[DEFERRED-PUB]`). The design continues to
+hold up: the resolver is the right shape, the tests are hermetic and non-vacuous, and the
+SKIPPED/FAILED vocabulary is real. This round's findings are new ground reached by looking
+past the round-1 list — chiefly the three environments the sweep claims to run in, and the
+one input the resolver still does not validate.
+
+### Findings
+- [ ] (must-fix) A manifest `version:` reaches `git fetch --depth 1 origin "$REPO_VERSION"` unvalidated and with no `--`, so `--upload-pack=<script>` executes arbitrary code — and the run still exits 0 reporting mode `clone` with the pin silently unhonoured (reproduced end-to-end); `REPO_URL` is validated for exactly this, `version:` is not — `.agent/scripts/resolve_repo_checkout.sh:283,308`
+- [ ] (must-fix) Step 2 rule 2 names `field_mode.sh` the authoritative allowlist, but `is_field_mode` needs a checkout on disk and the rotation is built from manifest urls before anything is resolved; with no checkout it returns 1 = "dev mode", so every gitcloud repo is silently *included* — the false green the rule exists to prevent — `.claude/skills/janitor-sweep/SKILL.md:107-112`
+- [ ] (must-fix) `issue-triage` step 1 still enumerates with a worktree-relative `list_overlay_repos.py` (0 repos from a worktree vs 35 from the main root, reproduced), so the guard this PR adds fires on every sweep run from a worktree — the sweep's stated primary environment — as `FAILED: no repo manifest configured — run 'make setup-all'`, a false FAILED with wrong remediation — `.claude/skills/issue-triage/SKILL.md:32`
+- [ ] (must-fix) If `gh` is unauthenticated or rate-limited every candidate lands in rule 3's FAILED bucket, the chunk is empty, and check 2's rollup defines FAILED only for "failed to resolve / failed to audit" — so the report can read `Project governance | OK | 0 repos audited` — `.claude/skills/janitor-sweep/SKILL.md:127-139,168-171`
+- [ ] (must-fix) Step 1's environment table claims a no-`layers/` host still enumerates repos, but `configs/manifest` is a symlink *into* `layers/main/core_ws/src/unh_marine_autonomy/config` here, so the stated verification can never pass and the sweep is FAILED there — contradicting the resolver header and the AGENTS.md row, which both say a container hits exit 3 — `.claude/skills/janitor-sweep/SKILL.md:87,39`, `.claude/skills/audit-project/SKILL.md:18,67`
+- [ ] (must-fix) The consequences-map clause this PR adds requires a durable-output skill to "name the state in which that write failed"; `janitor-sweep` is the only skill it applies to and step 4 names none — it asserts the write always succeeds, and the four-state contract has no row for a read-only or full filesystem — `.agent/knowledge/principles_review_guide.md:49` vs `.claude/skills/janitor-sweep/SKILL.md:201-202`
+- [ ] (must-fix) Principles Self-Check still lists "exactly one rolling issue" as a delivered property — the one place in the plan that still promises the publish step this slice removed — `.agent/work-plans/issue-569/plan.md:267`
+- [ ] (must-fix) "(operator decision, 2026-09-11 on issue #569)" is not true of the issue: #569's only scope comment still promises "writing one rolling report". Post the later decision as a comment or cite the timeline instead — `.claude/skills/janitor-sweep/SKILL.md:287-288`
+- [ ] (must-fix) `GIT_TERMINAL_PROMPT=0` + `GIT_ASKPASS=/bin/true` do not cover ssh, which reads host-key and passphrase prompts from `/dev/tty`; the manifests carry a `git@github.com:` url, so the header's "never prompt / meant to run unattended" guarantee is false there, and unbounded on a host without `timeout` — `.agent/scripts/resolve_repo_checkout.sh:92-97`
+- [ ] (suggestion) `flock 9` has no `-w` timeout, so one stuck run blocks every concurrent run on that repo indefinitely — `.agent/scripts/resolve_repo_checkout.sh:258`
+- [ ] (suggestion) The lock is released when the resolver exits, so the caller audits `$TARGET` unlocked and a concurrent `clone_fresh`'s `rm -rf` can still delete a tree being read; the header overstates what the lock buys — `.agent/scripts/resolve_repo_checkout.sh:49-51,273`
+- [ ] (suggestion) No retention policy for either output: `janitor-repos/` accumulates a shallow clone per audited repo and `janitor/` a report per run, both gitignored so nothing will flag the growth — `.claude/skills/janitor-sweep/SKILL.md:193,243`
+- [ ] (suggestion) The rotation ignores `configs/manifest/optional_layers.txt`, so a repo from an optional layer produces `FAILED(repo probe)` on every sweep forever — a permanent false red — `.claude/skills/janitor-sweep/SKILL.md:122-131`
+- [ ] (suggestion) The script header's exit-5 vocabulary ("clone or refresh failed") is narrower than the code, which also returns 5 for `mktemp`, cache `mkdir`, `flock` and an unreadable layer checkout; the AGENTS.md row is more complete than the script's own header — `.agent/scripts/resolve_repo_checkout.sh:39`
+- [ ] (suggestion) Test gaps on the most intricate branches: the SHA-pin fallback, the `FETCH_REF=HEAD` refresh, and the `flock` path are unexercised, and the worktree case covers only the layer branch, not the clone branch — `.agent/scripts/tests/test_resolve_repo_checkout.sh`
+- [ ] (suggestion) Failure messages interpolate `$REPO_URL` verbatim into stderr, which the caller funnels into the report step 4 says must stay scrubbed — latent credential leak if a manifest ever carries userinfo — `.agent/scripts/resolve_repo_checkout.sh:287,294,306`
+- [ ] (suggestion) `underlay.repos` is excluded from the search, but exit 4 says "not listed in any of the N configured repos" — name the exclusion so the operator does not hunt a manifest bug — `.agent/scripts/resolve_repo_checkout.sh:209`
+- [ ] (suggestion) `ISO-week mod chunk-count` is left to be re-derived while every other computation is given as a snippet; `date +%V` is zero-padded, so `$(( 08 % n ))` is an invalid-octal error — give the `10#` form — `.claude/skills/janitor-sweep/SKILL.md:140-141`
+- [ ] (suggestion) The no-repo-name branch asserts `REPO_MODE=layer` without observing it (so step 7's "correct layer" can report Yes where it could not run), step 5's snippet is still fully relative against the main-root rule added above it, and the "has at least one `package.xml`" verification has no check — `.claude/skills/audit-project/SKILL.md:57-61,166`
+- [ ] (suggestion) Step 1's `ROOT=` snippet is byte-identical to `audit-project`'s but omits its layer-worktree caveat — `.claude/skills/janitor-sweep/SKILL.md:70-71`
+- [ ] (suggestion) Step 2's example runs `list_overlay_repos.py` with no `--format` while the table uses `names` and the resolver uses `json` — say which "the list" is — `.claude/skills/janitor-sweep/SKILL.md:95`
+- [ ] (suggestion) Nothing tracks the deferred publishing-and-trigger decision: the skill, the plan and `skill_workflows.md` all cross-reference it with no issue number — file it at PR time
+- [ ] (suggestion) "The resolver is tested, including three distinct failure paths" is stale — exits 2 through 7 are each tested across 18 cases — `.agent/work-plans/issue-569/plan.md:270`
+- [ ] (suggestion) "six resolver defects" reads as a complete enumeration of the merit-fixed round-1 findings but omits 7, 10 and 14 (and five, not six, were against the resolver) — `.agent/work-plans/issue-569/plan.md:59`
+- [ ] (suggestion) [R9] still describes the landed clause as "persists its record to its own rolling report" — stale wording, and contradicted by the Files-to-Change row 47 lines later — `.agent/work-plans/issue-569/plan.md:203`
+- [ ] (suggestion) `## Notes (not blocking, recorded for the record)` is a non-canonical H2 among ADR-0013 entry types, so `progress_read.py` cannot see its content — demote to H3 — `.agent/work-plans/issue-569/progress.md:22`
+- [ ] (suggestion) The AGENTS.md row says "a per-repo `flock` serialises concurrent runs" without the script's own documented degradation: absent `flock`, it warns and proceeds unlocked — `AGENTS.md:571`
+- [ ] (suggestion) Run from a worktree the script is the worktree's copy but executes the MAIN branch's `list_overlay_repos.py`; deliberate, but a worktree that changes both tests only half its change — say so in the header — `.agent/scripts/resolve_repo_checkout.sh:139-151`
+- [ ] (suggestion) The Ask-First re-confirmation the plan itself defers to PR time is still owed, and the `principles_review_guide` clause landed as a four-sentence paragraph rather than the "one-line clause" the approval was framed around — `.agent/work-plans/issue-569/plan.md:305-309`
+- [ ] (suggestion) The issue title is "scheduled ... sweep" and the trigger is deferred, so the PR body should say "Part of #569" and leave it open rather than closing it
