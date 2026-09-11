@@ -271,6 +271,87 @@ else
     fail "bad url: rc=$rc out='$out' (expected 6 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6e. a version: in no ref-safe form is a malformed entry -----------------
+# `version:` reaches `git clone --branch` and `git fetch <refspec>`. A value
+# starting with `-` is read as an OPTION — `--upload-pack=<script>` executes
+# it — and because a fetch that consumed its argument as a flag still
+# succeeds, the run used to exit 0 reporting mode `clone` with the pin
+# silently unhonoured. Every one of these must be refused before git sees it.
+sentinel="$TMPDIR_ROOT/upload_pack_ran"
+rm -f "$sentinel"
+cat > "$TMPDIR_ROOT/evil.sh" <<EOF
+#!/bin/bash
+touch "$sentinel"
+exit 1
+EOF
+chmod +x "$TMPDIR_ROOT/evil.sh"
+bad_version_ok=1
+bad_version_n=0
+for badver in "--upload-pack=$TMPDIR_ROOT/evil.sh" "-x" "foo..bar" "has space" "main;rm -rf /" 'v$(touch /tmp/nope)' "refs/heads/@{-1}"; do
+    bad_version_n=$((bad_version_n + 1))
+    root=$(make_root "bad_version_$bad_version_n")
+    origin=$(make_origin "bad_version_$bad_version_n")
+    write_manifest "$root" "demo_repo" "file://$origin" "$badver"
+    out=$(run_resolver "$root" demo_repo); rc=$?
+    if [ "$rc" -ne 6 ] || [ -n "$out" ]; then
+        fail "version '$badver' should be a malformed entry: rc=$rc out='$out' stderr='$(stderr_text)'"
+        bad_version_ok=0
+    fi
+done
+if [ -e "$sentinel" ]; then
+    fail "version '--upload-pack=...' reached git: the helper script was EXECUTED"
+    bad_version_ok=0
+fi
+if [ "$bad_version_ok" -eq 1 ]; then
+    pass "a version: that is not a SHA or a ref-safe name → exit 6, never handed to git"
+fi
+
+# --- 6f. a full-SHA pin is honoured, and a SHA that is not there fails loud --
+# The SHA path is the one `clone --branch` cannot serve, so it goes through
+# clone + fetch + detach — the path where an unhonoured pin used to exit 0.
+root=$(make_root sha_pin)
+origin=$(make_origin sha_pin)
+sha=$(git -C "$TMPDIR_ROOT/origins/sha_pin.work" rev-parse HEAD)
+write_manifest "$root" "demo_repo" "file://$origin" "$sha"
+out=$(run_resolver "$root" demo_repo); rc=$?
+path=${out%%$'\t'*}
+if [ "$rc" -eq 0 ] && [ "$(git -C "$path" rev-parse HEAD 2>/dev/null)" = "$sha" ]; then
+    pass "a full-SHA version: pin is fetched and checked out at that commit"
+else
+    fail "sha pin: rc=$rc out='$out' head='$(git -C "$path" rev-parse HEAD 2>/dev/null)' expected '$sha' ($(stderr_text))"
+fi
+
+root=$(make_root sha_pin_absent)
+origin=$(make_origin sha_pin_absent)
+write_manifest "$root" "demo_repo" "file://$origin" "0123456789abcdef0123456789abcdef01234567"
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] && stderr_text | grep -q "failed"; then
+    pass "a SHA pin the remote does not have → exit 5, never rc 0 with the pin unhonoured"
+else
+    fail "absent sha pin: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
+# --- 6g. no version: at all refreshes against the remote's HEAD --------------
+# FETCH_REF falls back to HEAD when the manifest pins nothing; that branch is
+# only reached on the second (refresh) run.
+root=$(make_root no_version)
+origin=$(make_origin no_version)
+cat > "$root/configs/test.repos" <<EOF
+repositories:
+  demo_repo:
+    type: git
+    url: file://$origin
+EOF
+out=$(run_resolver "$root" demo_repo); rc=$?
+path=${out%%$'\t'*}
+advance_origin no_version
+out2=$(run_resolver "$root" demo_repo); rc2=$?
+if [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] && [ -f "$path/SECOND" ]; then
+    pass "a manifest with no version: clones, then refreshes against the remote's HEAD"
+else
+    fail "no version: rc=$rc rc2=$rc2 advanced=$([ -f "$path/SECOND" ] && echo yes || echo no) ($(stderr_text))"
+fi
+
 # --- 7. the same name in two manifests with different urls is ambiguous -----
 root=$(make_root ambiguous)
 origin=$(make_origin ambiguous)

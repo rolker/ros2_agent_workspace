@@ -38,8 +38,10 @@
 #   4  repo not listed in any manifest that WAS read
 #   5  clone or refresh failed
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
-#      `url:` key, or a URL in no recognised form) — distinct from 4, which
-#      means the manifests were fine and simply do not name this repo
+#      `url:` key, a URL in no recognised form, or a `version:` that is
+#      neither a full commit SHA nor a ref-safe branch/tag name) — distinct
+#      from 4, which means the manifests were fine and simply do not name
+#      this repo
 #   7  the repo is declared in more than one manifest with DIFFERENT urls —
 #      ambiguous, so which one to audit is the operator's call, not a silent
 #      first-match
@@ -88,6 +90,19 @@ TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/resolve_repo_checkout.XXXXXX") || {
 }
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
+
+# Failure messages name the url so the operator can see which remote failed,
+# and the caller funnels this stderr into a report that must stay free of
+# credentials. A manifest url is not supposed to carry userinfo, but "supposed
+# to" is not a guarantee — strip any `user[:password]@` before printing.
+redact_url() {
+    local url="$1"
+    if [[ "$url" =~ ^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@(.*)$ ]]; then
+        printf '%s<redacted>@%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    else
+        printf '%s' "$url"
+    fi
+}
 
 # Network git operations get a wall-clock bound and never prompt: this script
 # is meant to run unattended, where a credential prompt would hang forever.
@@ -233,8 +248,35 @@ REPO_VERSION=${detail#*$'\t'}
 if [[ ! "$REPO_URL" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] \
    && [[ ! "$REPO_URL" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^[:space:]]+$ ]] \
    && [[ ! "$REPO_URL" =~ ^/[^[:space:]]*$ ]]; then
-    echo "resolve_repo_checkout.sh: '$REPO_NAME' has an unrecognised url '$REPO_URL' — the manifest entry is malformed" >&2
+    echo "resolve_repo_checkout.sh: '$REPO_NAME' has an unrecognised url '$(redact_url "$REPO_URL")' — the manifest entry is malformed" >&2
     exit 6
+fi
+
+# `version:` reaches `git clone --branch` and `git fetch <refspec>` and is just
+# as much manifest input as the url — an unvalidated one starting with `-` is
+# read as an OPTION (`--upload-pack=<script>` executes it), and because a fetch
+# that consumed its argument as a flag still succeeds, the run would exit 0
+# reporting mode `clone` with the pin silently unhonoured. Require a value that
+# is either a full commit SHA or a ref-safe branch/tag name.
+if [[ -n "$REPO_VERSION" ]]; then
+    version_ok=0
+    if [[ "$REPO_VERSION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        version_ok=1
+    elif [[ "$REPO_VERSION" != -* ]] \
+         && [[ "$REPO_VERSION" != *..* ]] \
+         && [[ "$REPO_VERSION" =~ ^[A-Za-z0-9._/+-]+$ ]] \
+         && git check-ref-format --branch "$REPO_VERSION" >/dev/null 2>&1; then
+        # The character-class test is deliberately narrower than
+        # check-ref-format: it also excludes whitespace, control characters and
+        # the revision-expression punctuation (`{}`, `~`, `^`, `@`) that
+        # check-ref-format's --branch form would resolve against the *current*
+        # repo rather than treat as a literal name.
+        version_ok=1
+    fi
+    if [[ "$version_ok" -ne 1 ]]; then
+        echo "resolve_repo_checkout.sh: '$REPO_NAME' pins version '$REPO_VERSION', which is neither a full commit SHA nor a ref-safe branch/tag name — the manifest entry is malformed" >&2
+        exit 6
+    fi
 fi
 
 # --- (c) shallow clone / refresh ---------------------------------------------
@@ -278,22 +320,40 @@ clone_fresh() {
             return 0
         fi
         # A `version:` may also be a commit SHA, which --branch cannot take.
+        # `--` before the refspec keeps a ref from being read as an option, and
+        # the SHA is re-checked against HEAD afterwards: a pin that did not
+        # take must never reach the caller as a successful resolve.
         rm -rf "$TARGET"
         if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1) \
-           && out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin "$REPO_VERSION" 2>&1) \
-           && out=$(git -C "$TARGET" checkout --detach FETCH_HEAD 2>&1); then
+           && out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$REPO_VERSION" 2>&1) \
+           && out=$(git -C "$TARGET" checkout --detach FETCH_HEAD 2>&1) \
+           && out=$(verify_pin); then
             return 0
         fi
-        echo "resolve_repo_checkout.sh: clone of $REPO_URL at version '$REPO_VERSION' failed: $out" >&2
+        echo "resolve_repo_checkout.sh: clone of $(redact_url "$REPO_URL") at version '$REPO_VERSION' failed: $out" >&2
         rm -rf "$TARGET"
         return 1
     fi
     if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1); then
         return 0
     fi
-    echo "resolve_repo_checkout.sh: clone of $REPO_URL failed: $out" >&2
+    echo "resolve_repo_checkout.sh: clone of $(redact_url "$REPO_URL") failed: $out" >&2
     rm -rf "$TARGET"
     return 1
+}
+
+# A full-SHA pin is verifiable after the fact, and verifying it is what closes
+# the gap between "the fetch command returned 0" and "the tree is at the pinned
+# commit". A branch/tag pin is honoured by `clone --branch` itself.
+verify_pin() {
+    [[ "$REPO_VERSION" =~ ^[0-9a-fA-F]{40}$ ]] || return 0
+    local head
+    head=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null)
+    if [[ "${head,,}" != "${REPO_VERSION,,}" ]]; then
+        echo "checked out '${head:-<none>}', not the pinned '$REPO_VERSION'"
+        return 1
+    fi
+    return 0
 }
 
 if [[ -d "$TARGET/.git" ]]; then
@@ -303,10 +363,11 @@ if [[ -d "$TARGET/.git" ]]; then
     # remote's code under the new remote's name.
     cached_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
     if [[ "$cached_url" != "$REPO_URL" ]]; then
-        echo "resolve_repo_checkout.sh: cached clone of $REPO_NAME points at '${cached_url:-<none>}', manifest says '$REPO_URL' — re-cloning" >&2
+        echo "resolve_repo_checkout.sh: cached clone of $REPO_NAME points at '$(redact_url "${cached_url:-<none>}")', manifest says '$(redact_url "$REPO_URL")' — re-cloning" >&2
         clone_fresh || exit 5
-    elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin "$FETCH_REF" 2>&1) \
-         || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1); then
+    elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$FETCH_REF" 2>&1) \
+         || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1) \
+         || ! refresh_out=$(verify_pin); then
         # A shallow fetch of a pinned SHA is not served by every host; a
         # re-clone is the honest recovery, and only its failure is exit 5.
         echo "resolve_repo_checkout.sh: could not refresh the existing clone at $TARGET ($refresh_out) — re-cloning" >&2
