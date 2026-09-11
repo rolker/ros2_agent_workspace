@@ -126,10 +126,10 @@ lines this section is part of.
    |---|---|
    | 0 | Resolved — `path<TAB>layer` or `path<TAB>clone` on stdout |
    | 2 | Usage error |
-   | 3 | **No repo manifest configured** — `configs/manifest` absent or holding no `.repos`, so *zero* repos are enumerable. `list_overlay_repos.py` prints an empty list at exit 0 in this state (verified in this worktree, where `configs/` holds only `project_bootstrap.url`), which is exactly the #609 false-green the issue forbids. It is a loud FAILED here, never "repo not found". |
+   | 3 | **No repo manifest configured AND none derivable** — no `configs/manifest`, *and* no bootstrap pointer a manifest clone can be derived from, so *zero* repos are enumerable. `list_overlay_repos.py` prints an empty list at exit 0 in this state, which is exactly the #609 false-green the issue forbids; it is a loud FAILED here, never "repo not found". Round 2 narrowed this: the resolver resolves against the **main** root (so a worktree on a set-up host never reaches it), and where a pointer *is* derivable — as it is in this checkout — the manifest repo is cloned instead (`manifest_fallback.sh`). A manifest clone that was attempted and failed is 5, never 3. |
    | 4 | Repo not listed in any manifest (manifests *were* read) |
-   | 5 | Clone/refresh failed, or a layer checkout exists but cannot be read |
-   | 6 | Manifest unreadable, or the repo's entry is malformed (no `url:`, or a url in no recognised form) |
+   | 5 | No checkout could be produced: a clone or refresh failed (including the manifest repo's own clone, and a `WORKSPACE_MANIFEST_GIT_BASE` refused before it reaches git), a layer checkout exists but cannot be read, or the local scaffolding could not be set up (temp dir, cache directory, or the per-repo lock — including its bounded wait timing out) |
+   | 6 | Manifest unreadable, or the repo's entry is malformed: no `url:`, a url in no recognised form, or (round 2) a `version:` that is neither a full commit SHA nor a ref-safe branch/tag name — an unvalidated one reaches `git clone --branch` as an **option** |
    | 7 | The repo is declared in two manifests with **conflicting urls** — ambiguous, never a silent first-match |
 
    **[R3]** Rewrite `audit-project` step 1 to call the resolver. In `clone` mode the only
@@ -272,7 +272,7 @@ lines this section is part of.
    the whole `.agent/`: the resolver's clone cache is `<root>/.agent/scratchpad/`, which
    must stay inside the temp tree, or the cases see each other's clones and write into the
    real workspace (caught while writing the test — linking all of `.agent/` made the
-   clone-failure case pass a stale cached clone instead). Eighteen cases, one per resolution
+   clone-failure case pass a stale cached clone instead). Thirty-two cases, one per resolution
    rule and one per named failure: prefers a **non-empty** layer checkout; an *empty*
    `src/<repo>` (what a partial `vcs import` leaves) falls through to a clone rather than
    resolving as mode `layer`; an *unreadable* one is exit 5, not a silent fallback; clones
@@ -293,7 +293,7 @@ lines this section is part of.
 | File | Change |
 |------|--------|
 | `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract (including named FAILED evidence for each of the four checks), report format, timestamped local report write, known limitations, deferred publishing-and-trigger note |
-| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; clones the manifest's pinned version, verifies a cached clone's origin, serialises the shared cache with `flock`, validates the repo name before it reaches a path handed to `rm -rf`; prints `path\tmode` and nothing at all on a failure path; fails loud with the distinct exit codes in [R1] |
+| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; clones the manifest's pinned version, verifies a cached clone's origin, validates the `version:` pin before it reaches git and verifies a SHA pin after the fact (round 2), serialises the shared cache with a **bounded** `flock` wait (round 2), sources `manifest_fallback.sh` so a host with no `layers/` still has manifests (round 2), validates the repo name before it reaches a path handed to `rm -rf`; prints `path\tmode` and nothing at all on a failure path; fails loud with the distinct exit codes in [R1] |
 | `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — the hermetic cases in [R5] |
 | `.claude/skills/audit-project/SKILL.md` | All five `layers/main/...` sites: step 1 uses the resolver; the AGENTS.md currency check and the report `**Location**` header accept a clone path; the optional `colcon test` and step 7's "correct layer" report SKIPPED in `clone` mode |
 | `AGENTS.md` | Script-reference row for `resolve_repo_checkout.sh` (instruction file — **operator-approved**) |
@@ -301,9 +301,9 @@ lines this section is part of.
 | `.agent/knowledge/skill_workflows.md` | Add `janitor-sweep` to the Utility-skills table |
 | `.agent/knowledge/principles_review_guide.md` | [R9] clarifying clause on the durable-findings consequences-map row — stating only what is true: three of the four periodic skills persist nothing at all |
 | `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run |
-| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep |
+| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep. Round 3 — re-clone a cached manifest whose `origin` no longer matches the url the current pointer derives, validate `WORKSPACE_MANIFEST_GIT_BASE` before it reaches `git clone`, and refuse to be executed rather than exiting 0 having done nothing |
 | `.agent/scripts/field_mode.sh` | Round 2 — factor the URL classification into `is_field_url`; `is_field_mode` calls it. One allowlist for both a checkout and a bare manifest url |
-| `.agent/scripts/list_overlay_repos.py`, `.agent/scripts/lib/workspace.py` | Round 2 — `--config-dir` / `extra_config_dirs`, **additive** to the normal search path, for reading a cloned manifest's `.repos` files |
+| `.agent/scripts/list_overlay_repos.py`, `.agent/scripts/lib/workspace.py` | Round 2 — `--config-dir` / `extra_config_dirs`, **additive** to the normal search path, for reading a cloned manifest's `.repos` files. Round 3 — `get_optional_layers(..., extra_config_dirs=)` reads `optional_layers.txt` from the same effective config dir, so the optional-layer exclusion is not silently empty on a host with no `layers/` |
 | `.agent/scripts/tests/test_field_mode.sh`, `.agent/scripts/tests/test_workspace_lib.py` | Round 2 — `is_field_url` over the same URL table as `is_field_mode`; `extra_config_dirs` additive and tolerant of a stale path |
 
 `.gitignore` already ignores `.agent/scratchpad/*`, which covers both the report directory
@@ -316,7 +316,7 @@ and the clone cache — verified, no change.
 | Human control and transparency | Report-only, and in this slice publish-nothing: no PRs, no per-finding issues, no GitHub write at all — one local report file per run, which the operator triages into work. |
 | Enforcement over documentation | The sweep is still hand-run this slice — a recorded sequencing choice, not a gap. The one mechanically enforceable piece (repo resolution, including its false-green paths) gets a script and a test. |
 | A change includes its consequences | Step 7 lands all four skill-list sites, the script table, and the consequences-map clause in this PR. |
-| Test what breaks | The resolver is tested across every exit it can return (2 through 7) and both resolution modes, including the manifest fallback, the `version:` validation, the SHA-pin path and the clone-cache lock — 29 hermetic cases. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
+| Test what breaks | The resolver is tested across every exit it can return (2 through 7) and both resolution modes, including the manifest fallback (its origin check, its refused git base, and its sourced-only guard), the `version:` validation, the SHA-pin path and the clone-cache lock — 32 hermetic cases. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
 | Only what's needed | Chains existing detectors; adds one small script. No scheduler, no rotation state, no new infra. |
 | Workspace vs. project separation | Rotation is derived from `.repos` manifests and a remote AGENTS.md probe — no repo names hardcoded (ADR-0003). |
 | Improve incrementally | Sweep now, trigger later, as the operator scoped it; the two deferred limitations ([R4], [R8]) are named where the trigger decision will meet them. |
