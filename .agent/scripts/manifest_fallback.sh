@@ -61,9 +61,25 @@ manifest_config_dir() {
     local bootstrap_url owner repo branch config_path git_url cache clone_dir
 
     # The normal case: the workspace has its manifest on disk. Print nothing.
+    #
+    # This test must recognise EVERY layout `get_overlay_repos` reads, or a
+    # workable on-disk manifest is bypassed for a network clone whose failure
+    # then hard-fails the caller (resolve_repo_checkout.sh turns rc 5 into
+    # exit 5) before the manifest right there is ever opened — a false RED over
+    # a working state. `lib/workspace.py` searches BOTH `configs/manifest/repos`
+    # (the symlink into the layer tree) and `configs/` itself, so both count.
+    # `underlay.repos` does not: it is on that search's ignore list, so a
+    # workspace holding only that one still enumerates zero overlay repos and
+    # does need the fallback.
     if [[ -d "$root/configs/manifest/repos" ]]; then
         return 0
     fi
+    local repos_file
+    for repos_file in "$root"/configs/*.repos; do
+        [[ -e "$repos_file" ]] || continue
+        [[ "$(basename "$repos_file")" == "underlay.repos" ]] && continue
+        return 0
+    done
 
     bootstrap_url="${BOOTSTRAP_URL:-}"
     if [[ -z "$bootstrap_url" && -f "$pointer_file" ]]; then

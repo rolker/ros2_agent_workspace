@@ -450,6 +450,27 @@ else
     fail "source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
+# The early return has to recognise EVERY layout get_overlay_repos reads
+# (configs/manifest/repos AND configs/*.repos). Recognising only the first made
+# the helper attempt a network clone on a workspace whose manifest was right
+# there, and the resolver turned that clone's failure into exit 5 before the
+# on-disk manifest was ever opened — a false RED over a workable state. The
+# pointer here derives an absent manifest repo on purpose: if the early return
+# regresses, the clone fails and this case goes to 5.
+root=$(make_root manifest_on_disk_wins)
+origin=$(make_origin manifest_on_disk_wins)
+write_manifest "$root" "demo_repo" "file://$origin"
+echo "https://raw.githubusercontent.com/testowner/absentmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 0 ] && [ -n "$out" ] && ! stderr_text | grep -q "manifest_fallback"; then
+    pass "a configs/*.repos manifest on disk short-circuits the fallback, never a clone"
+else
+    fail "on-disk configs/*.repos: rc=$rc out='$out' ($(stderr_text))"
+fi
+
 # --- 6i. a manifest clone that FAILED is exit 5, never "no manifest" (3) -----
 # The pointer named a manifest repo and we could not get it. Reporting that as
 # "no repo manifest configured — run make setup-all" would send the operator
