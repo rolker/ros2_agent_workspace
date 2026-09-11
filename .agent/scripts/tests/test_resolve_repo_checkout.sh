@@ -365,7 +365,7 @@ fi
 make_manifest_origin() {
     # $1 = owner, $2 = repo, $3 = demo repo url to declare
     local owner="$1" name="$2" demo_url="$3"
-    local work="$TMPDIR_ROOT/manifest_work/$name"
+    local work="$TMPDIR_ROOT/manifest_work/$owner/$name"
     local bare="$TMPDIR_ROOT/manifest_origins/$owner/$name.git"
     mkdir -p "$work/config/repos" "$(dirname "$bare")"
     cat > "$work/config/repos/core.repos" <<EOF
@@ -403,6 +403,29 @@ if [ "$rc" -eq 0 ] && [ "$out2" = "$out" ]; then
     pass "a cached manifest clone is refreshed and reused on the next run"
 else
     fail "manifest fallback (cached): rc=$rc out='$out2' ($(stderr_text))"
+fi
+
+# --- 6h2. repointing the bootstrap pointer wins over the cached manifest -----
+# The manifest cache is keyed on the repo NAME, so a pointer moved to a
+# different owner's manifest of the same name lands on the existing clone.
+# Reusing it would enumerate the whole rotation from a manifest the workspace
+# no longer points at, at exit 0 — the resolver already refuses the same thing
+# one level down for project repos.
+origin2=$(make_origin manifest_fallback_repointed)
+make_manifest_origin otherowner testmanifest "file://$origin2"
+echo "https://raw.githubusercontent.com/otherowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out3=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+       "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+path3=${out3%%$'\t'*}
+cached_manifest_url=$(git -C "$root/.agent/scratchpad/manifest-repo/testmanifest" \
+                      remote get-url origin 2>/dev/null)
+if [ "$rc" -eq 0 ] \
+   && [ "$cached_manifest_url" = "file://$TMPDIR_ROOT/manifest_origins/otherowner/testmanifest.git" ] \
+   && grep -q "manifest_fallback_repointed" "$path3/README.md"; then
+    pass "a cached manifest clone whose origin no longer matches the bootstrap pointer is re-cloned"
+else
+    fail "manifest repoint: rc=$rc out='$out3' origin='$cached_manifest_url' ($(stderr_text))"
 fi
 
 # --- 6i. a manifest clone that FAILED is exit 5, never "no manifest" (3) -----

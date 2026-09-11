@@ -106,7 +106,22 @@ manifest_config_dir() {
         echo "manifest_fallback: flock not available — the manifest cache is unlocked for this run" >&2
     fi
 
-    local out
+    local out cached_url
+    if [[ -d "$clone_dir/.git" ]]; then
+        # The cache is keyed on the repo NAME alone, so a cached clone is only
+        # reusable once its origin is confirmed to be the url the CURRENT
+        # bootstrap pointer derives — repoint the pointer at a different
+        # owner's manifest and the old clone would otherwise be returned at
+        # exit 0, and the whole rotation would enumerate from a manifest this
+        # workspace no longer points at. `resolve_repo_checkout.sh` performs
+        # exactly this guard one level down.
+        cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
+        if [[ "$cached_url" != "$git_url" ]]; then
+            echo "manifest_fallback: cached manifest clone at $clone_dir points at '${cached_url:-<none>}', the bootstrap pointer derives '$git_url' — re-cloning" >&2
+            rm -rf "$clone_dir"
+        fi
+    fi
+
     if [[ -d "$clone_dir/.git" ]]; then
         # A refresh failure leaves a usable (if possibly stale) manifest. Say
         # so and carry on — reporting "no manifest configured" over a manifest
