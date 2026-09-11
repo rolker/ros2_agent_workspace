@@ -52,12 +52,24 @@ In a *layer* worktree that resolves to the project repo's own root, so pass the
 workspace root explicitly (or run the audit from the workspace) when auditing
 a named repo from inside one.
 
-**No repo name given** — audit the current directory, mode `layer`. Verify it's
-a valid project repo (has at least one `package.xml`):
+**No repo name given** — audit the current directory. Verify it is a project
+repo (at least one `package.xml`) before auditing it, and **observe** the mode
+rather than asserting it: the current directory is only a `layer` checkout if
+it actually sits under a layer tree. A project repo cloned somewhere else — or
+this skill re-entered on a resolver clone — is mode `clone`, and step 7's
+"correct layer" check must report SKIPPED there rather than answering from an
+assumption it never tested.
 
 ```bash
 REPO_PATH=$(pwd)
-REPO_MODE=layer
+if ! find "$REPO_PATH" -maxdepth 2 -name package.xml -print -quit | grep -q .; then
+    echo "FAILED: $REPO_PATH has no package.xml — not a project repo"
+    exit 1
+fi
+case "$REPO_PATH" in
+    "$ROOT"/layers/*/src/*) REPO_MODE=layer ;;
+    *)                      REPO_MODE=clone ;;
+esac
 ```
 
 **A repo name given** — resolve it with `resolve_repo_checkout.sh`, which
@@ -162,8 +174,11 @@ built layer workspace, which a clone is not:
 
 ```bash
 # layer mode only; in clone mode report "SKIPPED (no layer checkout)"
+# Addressed through $ROOT for the same reason step 1 is: in a layer worktree
+# neither .agent/scripts/ nor layers/ sits beside you.
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
-source .agent/scripts/setup.bash && cd layers/main/<layer>_ws && colcon test --packages-select <package> && colcon test-result --verbose
+source "$ROOT/.agent/scripts/setup.bash" && cd "$ROOT/layers/main/<layer>_ws" \
+    && colcon test --packages-select <package> && colcon test-result --verbose
 ```
 
 Report test existence and pass/fail, not test quality.
