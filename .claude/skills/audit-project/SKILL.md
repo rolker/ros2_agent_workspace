@@ -34,28 +34,56 @@ This checks a single project repo.
 
 ### 1. Identify the repo
 
-If no repo name is given, use the current directory (a layer worktree) and
-treat the mode as `layer`. Verify it's a valid project repo (has at least one
-`package.xml`).
+Both branches below must leave `REPO_PATH` and `REPO_MODE` set — every later
+step reads them, and an unset `REPO_PATH` turns step 2's currency check into a
+read of `/AGENTS.md`.
 
-If a repo name is given, resolve it with `resolve_repo_checkout.sh`, which
-**does not assume `layers/` exists** — it prefers an existing layer checkout
-and otherwise shallow-clones the URL the workspace manifests declare. `layers/`
-is gitignored and absent in every worktree, fresh clone and container, so
-audits run from those places would otherwise find nothing.
+The scripts are addressed through the **main workspace root**, not a relative
+path: `.agent/scripts/` does not exist beside you in a layer worktree (you are
+inside the project repo there), and `configs/manifest` exists only in the main
+checkout.
+
+```bash
+ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
+```
+
+In a *layer* worktree that resolves to the project repo's own root, so pass the
+workspace root explicitly (or run the audit from the workspace) when auditing
+a named repo from inside one.
+
+**No repo name given** — audit the current directory, mode `layer`. Verify it's
+a valid project repo (has at least one `package.xml`):
+
+```bash
+REPO_PATH=$(pwd)
+REPO_MODE=layer
+```
+
+**A repo name given** — resolve it with `resolve_repo_checkout.sh`, which
+**does not assume `layers/` exists**: it prefers an existing layer checkout and
+otherwise shallow-clones the URL the workspace manifests declare, at the
+version they pin. `layers/` is gitignored and absent in every worktree, fresh
+clone and container, so audits run from those places would otherwise find
+nothing.
 
 ```bash
 # Prints "<path><TAB><layer|clone>"; every failure exits non-zero with a reason
-if ! resolved=$(.agent/scripts/resolve_repo_checkout.sh <repo-name>); then
+if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" <repo-name>); then
+    # exit 2 = usage (including a repo name that is not a single path segment)
     # exit 3 = no repo manifest configured at all (run `make setup-all`)
     # exit 4 = repo not listed in any manifest that was read
-    # exit 5 = clone/refresh failed    exit 6 = manifest unreadable
+    # exit 5 = clone/refresh failed    exit 6 = manifest unreadable or malformed
+    # exit 7 = declared in two manifests with conflicting urls — do not guess
     echo "FAILED: could not resolve <repo-name> (see stderr)"
     exit 1
 fi
 REPO_PATH=${resolved%%$'\t'*}
 REPO_MODE=${resolved##*$'\t'}
 ```
+
+Each of those exits is a distinct FAILED reason to report — none of them is
+"repo not found", and none is a reason to continue with an unset `REPO_PATH`.
 
 Record `REPO_MODE` — the audit's report header names it, and in `clone` mode
 the two genuinely layer-dependent checks (the optional `colcon test` run in
