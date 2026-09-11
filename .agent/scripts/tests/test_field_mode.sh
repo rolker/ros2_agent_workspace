@@ -1,11 +1,16 @@
 #!/bin/bash
 # .agent/scripts/tests/test_field_mode.sh
-# Tests for is_field_mode() and describe_mode() in field_mode.sh
+# Tests for is_field_url(), is_field_mode() and describe_mode() in field_mode.sh
 #
 # Stubs `git remote get-url origin` by initializing throwaway repos with
 # specific origin URLs. Covers GitHub SSH/HTTPS variants, several
 # non-GitHub origins, and substring traps (mygithub.com etc.) that the
 # bare `*github.com*` pattern would mishandle.
+#
+# `is_field_url` is exercised over the SAME URL table as `is_field_mode`,
+# because the two must never disagree: `is_field_mode` is implemented on top
+# of it, and `janitor-sweep` classifies manifest URLs — for which no checkout
+# exists — through `is_field_url` alone.
 
 set -e
 
@@ -122,6 +127,56 @@ else
     echo "✅ PASS: nonexistent path → return 1"
     TEST_PASS=$((TEST_PASS + 1))
 fi
+echo ""
+
+echo "=== is_field_url: the same verdicts, with no checkout on disk ==="
+# Every URL the table above classifies through a checkout must classify
+# identically from the bare URL — that is the whole point of the extraction.
+for u in "git@github.com:rolker/ros2_agent_workspace.git" \
+         "https://github.com/rolker/ros2_agent_workspace.git" \
+         "ssh://git@github.com/rolker/ros2_agent_workspace.git" \
+         "git@GITHUB.COM:rolker/repo.git" \
+         "git@ssh.github.com:rolker/repo.git" \
+         "ssh://git@ssh.github.com:443/rolker/repo.git"; do
+    if is_field_url "$u"; then
+        echo "❌ FAIL: is_field_url '$u' → expected dev mode"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    else
+        echo "✅ PASS: is_field_url '$u' → dev mode"
+        TEST_PASS=$((TEST_PASS + 1))
+    fi
+done
+
+for u in "git@gitcloud:field/test-repo.git" \
+         "https://gitlab.com/foo/bar.git" \
+         "git@mygithub.com:user/repo.git" \
+         "https://notgithub.com/foo/bar.git" \
+         "git@github.company.internal:org/repo.git" \
+         "https://example.com/github.com/foo.git" \
+         "git@gitcloud:team/github.com-mirror.git" \
+         "not-a-url"; do
+    if is_field_url "$u"; then
+        echo "✅ PASS: is_field_url '$u' → field mode"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: is_field_url '$u' → expected field mode"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+done
+
+# A bare word with no scheme, user or path separator IS a host to git (the
+# `not-a-url` case above) — so it is field mode, the restrictive answer.
+# An empty or purely-local URL yields no host at all; that returns dev mode,
+# the same safer default is_field_mode uses for a repo with no origin.
+for u in "" "/local/path/repo.git"; do
+    if is_field_url "$u"; then
+        echo "❌ FAIL: is_field_url '$u' → expected dev mode (unclassifiable)"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    else
+        echo "✅ PASS: is_field_url '$u' → dev mode (unclassifiable)"
+        TEST_PASS=$((TEST_PASS + 1))
+    fi
+done
 echo ""
 
 echo "=== describe_mode output sanity ==="
