@@ -56,6 +56,18 @@ reported:
 completed (`OK` or `FINDINGS`). This is the #609 false-green rule applied to a
 report: an empty result and an unobtainable result are different answers.
 
+**The report write is itself a state, and it is the fifth one.** The four
+states above grade the four *checks*; the sweep's durable output is the report
+file, and that write can fail — a read-only or full filesystem, a
+`$REPORT_DIR` that cannot be created, a scratchpad on a container volume that
+is not mounted. A sweep whose report did not land is
+`FAILED(report write: <reason>)`, announced in the conversation as the
+headline, with the findings printed inline so the run is not lost with the
+file. The consequences map requires a durable-output skill to name the state
+in which that write failed
+([`principles_review_guide.md`](../../../.agent/knowledge/principles_review_guide.md)),
+and this is that state. It is never "the sweep ran clean".
+
 ## Steps
 
 ### 1. Resolve the workspace root and the report directory
@@ -70,12 +82,42 @@ worktree-relative path would enumerate zero repos on a host that has 35.
 ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
     && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
 REPORT_DIR="$ROOT/.agent/scratchpad/janitor"
-mkdir -p "$REPORT_DIR"
+mkdir -p "$REPORT_DIR" || echo "FAILED(report directory: cannot create $REPORT_DIR)"
 ```
+
+In a *layer* worktree that resolves to the **project repo's** own root, not the
+workspace — pass the workspace root explicitly (or run the sweep from the
+workspace) if you ever invoke it from inside one. This is the same snippet
+`audit-project` step 1 uses, and the same caveat applies to both.
 
 `.gitignore` already covers `.agent/scratchpad/*`, so nothing here is ever
 committed. Use `"$ROOT/..."` for **every** script and file the sweep touches —
 `list_overlay_repos.py`, `research_digest.md`, `docs/`, the report directory.
+
+**Where there is no `configs/manifest`** — a fresh clone or a container, where
+`layers/` does not exist and `configs/manifest` is a symlink *into* it — the
+manifests have to be cloned before any repo can be enumerated. That is
+`manifest_fallback.sh`'s job, and it is the first thing "the sweep clones what
+it needs" covers:
+
+```bash
+source "$ROOT/.agent/scripts/manifest_fallback.sh"
+if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
+    # empty when the workspace has its own manifest (the normal case)
+    LIST_ARGS=(${EXTRA_CONFIG:+--config-dir "$EXTRA_CONFIG"})
+else
+    case $? in
+        3) : ;;  # no manifest and no bootstrap pointer — step 2 rule 1 FAILED
+        5) : ;;  # the manifest repo could not be cloned — FAILED, with its reason
+    esac
+fi
+python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
+```
+
+A manifest clone that was **attempted and failed** is
+`FAILED(manifest repo unreachable: <reason>)` — never rule 1's "no repo
+manifest configured — run `make setup-all`", which would send the operator to a
+command that cannot fix an unreachable remote.
 
 The three environments this must work in, and how each is verified before a
 change to this step ships:
@@ -84,10 +126,22 @@ change to this step ships:
 |---|---|---|
 | Fully set-up host, run from the main checkout | `$ROOT` is the main root; repos enumerate | `python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format names \| wc -l` is non-zero |
 | Fully set-up host, run from a worktree | `$ROOT` is still the **main** root | the same command, run from the worktree, returns the same count — covered mechanically for the resolver by `test_resolve_repo_checkout.sh`'s worktree case |
-| No `layers/` at all (fresh clone, container) | repos still enumerate from `configs/manifest`; `audit-project` clones what it needs | `ls "$ROOT/layers"` is absent while the count above is non-zero; `resolve_repo_checkout.sh <repo>` prints mode `clone` |
+| No `layers/` at all (fresh clone, container) | **no manifest is on disk** (`configs/manifest` is a symlink into `layers/`), so the manifest repo is shallow-cloned from the tracked `configs/project_bootstrap.url` pointer and the repos enumerate from that clone; `audit-project` then clones each repo it audits | `ls "$ROOT/layers"` is absent; `manifest_config_dir "$ROOT"` prints a path under `.agent/scratchpad/manifest-repo/`, and `list_overlay_repos.py --config-dir "$(manifest_config_dir "$ROOT")" --format names \| wc -l` is non-zero; `resolve_repo_checkout.sh <repo>` prints mode `clone` — covered mechanically by `test_resolve_repo_checkout.sh`'s manifest-fallback cases |
 
-If `configs/manifest` is itself absent — an un-bootstrapped clone — step 2's
-first rule fires and the sweep is `FAILED`, not empty.
+If there is neither a `configs/manifest` nor a usable bootstrap pointer — an
+un-bootstrapped clone with nothing to derive from — step 2's first rule fires
+and the sweep is `FAILED`, not empty.
+
+**Retention.** Both outputs are caches with no automatic cleanup, and this is a
+report-only skill that will run repeatedly:
+
+- `$REPORT_DIR` — keep the **last 20** reports; delete older ones at the end of
+  a run (`ls -1t "$REPORT_DIR"/*-sweep.md | tail -n +21 | xargs -r rm -f`). The
+  reports are small, but nothing else will ever prune them.
+- `.agent/scratchpad/janitor-repos/` and `.agent/scratchpad/manifest-repo/` —
+  disposable shallow clones, safe to `rm -rf` at any time; the next run
+  re-creates what it needs. Say so in the report footer so an operator short of
+  disk knows what is safe to delete (this host has hit 100% before).
 
 ### 2. Build the repo rotation
 
@@ -173,8 +227,16 @@ Then, in order:
    step 2 checks once the repo is in the rotation. A present-but-stale
    `AGENTS.md` is a finding for the audit to make, not a reason to skip the
    repo.
-4. If repos were enumerated but every one was excluded, that is
-   `SKIPPED(no eligible repos: <reasons>)` — distinct from rule 1's FAILED.
+4. An empty survivor set has **two different causes, and they are not the same
+   status**. If repos were enumerated and every one was *excluded* (a named,
+   expected reason — non-GitHub origin, no root `AGENTS.md`, inaccessible
+   optional layer), that is `SKIPPED(no eligible repos: <reasons>)`. If any
+   candidate FAILED its probe, the rotation is **not** trustworthy and the
+   project-governance check is `FAILED` — see check 2 below. In particular, an
+   unauthenticated or rate-limited `gh` fails *every* probe, which would
+   otherwise leave an empty chunk that reads as "0 repos audited, OK". Probe
+   `gh auth status` once, before the per-repo probes, so the report can name
+   the one cause instead of repeating it per repo.
 5. Sort the survivors by name, chunk by 3, and select chunk
    `ISO-week mod chunk-count`. `date +%V` is **zero-padded**, and bash reads a
    leading zero as octal — `$(( 08 % 3 ))` is an error, twice a year — so force
@@ -211,10 +273,20 @@ run" is not a status.
   inside the audit and makes the check `FINDINGS` at worst, never `OK`. Probe
   the inputs before reporting the check's status; do not infer it from the
   narrative.
-- **Check 2 — `audit-project`** rolls up its per-repo runs: `FAILED` if any
-  repo failed to resolve (any non-zero exit from `resolve_repo_checkout.sh`) or
-  failed to audit, otherwise `FINDINGS` if any repo produced findings,
-  otherwise `OK`. Per-repo statuses are listed individually regardless.
+- **Check 2 — `audit-project`** rolls up its per-repo runs, and the rollup
+  covers the rotation as well as the audits: `FAILED` if **any candidate failed
+  its rule-3 probe**, if any repo in the chunk failed to resolve (any non-zero
+  exit from `resolve_repo_checkout.sh`), or if any repo failed to audit;
+  otherwise `FINDINGS` if any repo produced findings; otherwise `OK`.
+  Per-repo statuses are listed individually regardless.
+
+  **An empty chunk is never `OK`.** Audit-count zero has three causes and the
+  check must say which: every candidate *excluded* → `SKIPPED(no eligible
+  repos: <reasons>)`; any candidate *failed* → `FAILED(repo probe: <reason>)`,
+  naming the shared cause once where there is one (`gh` unauthenticated,
+  rate-limited, offline); a chunk that legitimately holds repos which all
+  audited clean → `OK`, with a non-zero count. `Project governance | OK | 0
+  repos audited` is a report this skill must never produce.
 - **Check 3 — `issue-triage`** is `FAILED` when it scanned no repos (its step 1
   now carries the same empty-manifest guard as rule 1 above — a scan of zero
   repos reports no stale issues, which is not the same as there being none),
@@ -244,8 +316,23 @@ Generate the timestamp with `date`; never hand-type one (AGENTS.md
 overwrite the first run's report — the runs are the record, so they must
 accumulate.
 
-This write depends on neither network nor auth, so the sweep always produces
-its record. It is the sweep's durable output.
+This write depends on neither network nor auth, so a sweep that reached step 4
+produces its record wherever the filesystem is writable. It is the sweep's
+durable output — and, being the durable output, the one place the sweep must
+not assume success:
+
+```bash
+if ! printf '%s' "$REPORT_BODY" > "$REPORT"; then
+    echo "FAILED(report write: could not write $REPORT)"
+fi
+```
+
+A failed write (read-only filesystem, no space, an unwritable or absent
+`$REPORT_DIR`, a container whose scratchpad volume is not mounted) is
+`FAILED(report write: <reason>)` per the status contract: **say it in the
+conversation, print the findings inline so the run is not lost with the file,
+and never describe the sweep as clean**. Checks that completed are still
+reported with their own statuses — the failure is the record, not the checks.
 
 **Keep the report free of host identity and absolute local paths.** Name files
 relative to the workspace root (`.agent/knowledge/research_digest.md`, not
@@ -292,7 +379,14 @@ Report format:
 |---|---|
 | <repo> | excluded: non-GitHub origin |
 | <repo> | excluded: no root AGENTS.md |
+| <repo> | excluded: optional layer `site`, not accessible from this host |
+| <repo> | FAILED(repo probe: gh unauthenticated) |
 | <repo> | not in this week's chunk |
+
+---
+Reports here are kept for the last 20 runs. The shallow clones under
+`.agent/scratchpad/janitor-repos/` and `.agent/scratchpad/manifest-repo/` are
+caches — deleting them is always safe.
 ```
 
 Fill the **Checks** line from the status table, not from impression. If any
@@ -304,7 +398,8 @@ clean.
 Summarise in the conversation and name the report file by its path **relative
 to the workspace root** (`.agent/scratchpad/janitor/<file>`). Lead with the
 coverage line — `X of 4 completed` — so a partial sweep cannot read as a clean
-one. Nothing is published; say so plainly rather than leaving it ambiguous.
+one. If the report write failed, lead with that instead and print the findings
+inline. Nothing is published; say so plainly rather than leaving it ambiguous.
 
 ## Known limitations
 
@@ -330,8 +425,10 @@ them.
 ## Deferred: publishing and the trigger
 
 This slice writes a local report and nothing else. **Publishing and the trigger
-are one decision, deferred together** (operator decision, 2026-09-11 on issue
-#569): where a sweep's findings live durably depends on what runs the sweep,
+are one decision, deferred together** (operator decision at the round-1
+code-review checkpoint, recorded on issue #569 as the
+["Scope update (2026-09-11)" comment](https://github.com/rolker/ros2_agent_workspace/issues/569#issuecomment-5638517972),
+which supersedes the earlier scope-decision comment's "one rolling report"): where a sweep's findings live durably depends on what runs the sweep,
 and deciding either half alone would fix the other by accident.
 
 Whatever is chosen, a future GitHub publish step is a GitHub **write**, which
