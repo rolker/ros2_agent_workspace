@@ -430,6 +430,47 @@ else
     fail "unsupported pointer: rc=$rc out='$out' (expected 3 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6k. the per-repo lock actually serialises, and its wait is bounded ------
+# The cache is shared by every worktree on a host, and the refresh path runs
+# `rm -rf` over it. An untimed wait would let one wedged run block the host
+# forever with nothing said; a run that ignored the lock would race.
+if command -v flock >/dev/null 2>&1; then
+    root=$(make_root flock_waits)
+    origin=$(make_origin flock_waits)
+    write_manifest "$root" "demo_repo" "file://$origin"
+    lockfile="$root/.agent/scratchpad/janitor-repos/.demo_repo.lock"
+    mkdir -p "$(dirname "$lockfile")"
+
+    # Hold the lock briefly, then release: the resolver must WAIT, not fail.
+    ( flock 9; sleep 2 ) 9>"$lockfile" &
+    holder=$!
+    sleep 0.3
+    out=$(run_resolver "$root" demo_repo); rc=$?
+    wait "$holder" 2>/dev/null
+    if [ "$rc" -eq 0 ] && [ "${out##*$'\t'}" = "clone" ]; then
+        pass "a held clone-cache lock is waited for, not raced past"
+    else
+        fail "flock wait: rc=$rc out='$out' ($(stderr_text))"
+    fi
+
+    # Hold it past the (overridden) wait: a named failure with empty stdout,
+    # never an indefinite hang and never a resolve over a racing tree.
+    ( flock 9; sleep 5 ) 9>"$lockfile" &
+    holder=$!
+    sleep 0.3
+    out=$(RESOLVE_LOCK_TIMEOUT=1 "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo \
+          2>"$TMPDIR_ROOT/stderr"); rc=$?
+    kill "$holder" 2>/dev/null
+    wait "$holder" 2>/dev/null
+    if [ "$rc" -eq 5 ] && [ -z "$out" ] && stderr_text | grep -q "could not lock the clone cache"; then
+        pass "a lock held past the wait → exit 5 with a reason, never an indefinite hang"
+    else
+        fail "flock timeout: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+    fi
+else
+    echo "⏭️  SKIP: flock cases (flock not available on this host)"
+fi
+
 # --- 7. the same name in two manifests with different urls is ambiguous -----
 root=$(make_root ambiguous)
 origin=$(make_origin ambiguous)
@@ -499,6 +540,22 @@ if git -C "$root" "${GIT_ID[@]}" worktree add -q -b wt "$wt" >/dev/null 2>&1; th
         pass "run from a worktree, resolves against the MAIN workspace root"
     else
         fail "worktree: rc=$rc out='$out' (expected 0 / '$expected'), stderr='$(stderr_text)'"
+    fi
+
+    # ...and the clone branch from the same worktree: with no layer checkout,
+    # the clone must still land in the MAIN root's cache, not the worktree's.
+    # A worktree has no `layers/` of its own, so this is the arrangement every
+    # real sweep run hits.
+    rm -rf "$root/layers"
+    out=$("$wt/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+    path=${out%%$'\t'*}
+    mode=${out##*$'\t'}
+    if [ "$rc" -eq 0 ] && [ "$mode" = "clone" ] \
+       && [ "$path" = "$root/.agent/scratchpad/janitor-repos/demo_repo" ] \
+       && [ -f "$path/README.md" ]; then
+        pass "run from a worktree with no layer checkout, clones into the MAIN root's cache"
+    else
+        fail "worktree clone: rc=$rc out='$out' (expected mode clone under $root), stderr='$(stderr_text)'"
     fi
 else
     fail "worktree: could not create the test worktree"

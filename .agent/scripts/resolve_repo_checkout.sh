@@ -45,7 +45,10 @@
 #      repos enumerate from there (see manifest_fallback.sh). A manifest
 #      clone that was attempted and FAILED is exit 5, never exit 3.
 #   4  repo not listed in any manifest that WAS read
-#   5  clone or refresh failed
+#   5  could not produce a checkout: a clone or refresh failed (including the
+#      manifest repo's own clone), a layer checkout exists but cannot be read,
+#      or the local scaffolding the clone needs could not be set up (temp dir,
+#      cache directory, or the per-repo lock)
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
 #      `url:` key, a URL in no recognised form, or a `version:` that is
 #      neither a full commit SHA nor a ref-safe branch/tag name) — distinct
@@ -60,6 +63,22 @@
 # current worktree, so every worktree on a host shares one cache — and is
 # therefore guarded by a per-repo `flock` so two concurrent runs cannot race
 # on the same tree (see "Concurrency" below).
+#
+# What the lock does and does not buy: it serialises the CLONE/REFRESH of one
+# repo, which is where `rm -rf` + `clone` + `reset --hard` run. It is released
+# when this script exits, so the caller reads $TARGET UNLOCKED — a concurrent
+# run that re-clones the same repo can still delete a tree an audit is reading.
+# Closing that would take a per-run directory (or a lock the caller holds for
+# the audit's duration), which is a change to the caller's contract, not to
+# this script; until then, concurrent audits of the SAME repo on one host are
+# not safe, and different repos are.
+#
+# Run from a worktree, this is the worktree's copy of the script and it sources
+# the worktree's copy of `manifest_fallback.sh` — but it executes the MAIN
+# checkout's `list_overlay_repos.py`, because that is where `configs/` lives.
+# Deliberate, and worth knowing when testing a change: a worktree that edits
+# both this script and `list_overlay_repos.py` only exercises the first half
+# until the branch is merged.
 
 set -uo pipefail
 
@@ -275,7 +294,7 @@ case "$verdict" in
         exit 3
         ;;
     NOTFOUND)
-        echo "resolve_repo_checkout.sh: '$REPO_NAME' is not listed in any of the $detail configured repos" >&2
+        echo "resolve_repo_checkout.sh: '$REPO_NAME' is not listed in any of the $detail configured repos (underlay.repos is excluded from this search by list_overlay_repos.py — a repo declared only there is expected to land here)" >&2
         exit 4
         ;;
     AMBIGUOUS)
@@ -347,14 +366,23 @@ fi
 # Concurrency: the cache is shared by every worktree on the host, and the
 # refresh path runs `rm -rf` + `clone` + `reset --hard` over it. Two runs
 # racing there can delete a tree the other is reading. A per-repo advisory
-# lock, held for the whole clone/refresh, serialises them. `flock` is
+# lock with a bounded wait, held for the whole clone/refresh, serialises them.
+# `flock` is
 # util-linux and present on every host this workspace targets; where it is
 # absent the script proceeds unlocked rather than failing, and says so.
 if command -v flock >/dev/null 2>&1; then
-    if exec 9>"$CACHE_DIR/.$REPO_NAME.lock" && flock 9; then
+    # Bounded wait: an untimed `flock` lets one wedged run (a stalled clone, a
+    # process stopped under a debugger) block every other run on the host
+    # forever, with no output to say why. 300s is longer than the network
+    # timeout above, so a healthy holder always finishes first; past that the
+    # honest answer is a named failure, not an indefinite hang.
+    # RESOLVE_LOCK_TIMEOUT overrides the wait, in seconds — the tests use it to
+    # exercise the timeout path without waiting five minutes for it.
+    lock_wait="${RESOLVE_LOCK_TIMEOUT:-300}"
+    if exec 9>"$CACHE_DIR/.$REPO_NAME.lock" && flock -w "$lock_wait" 9; then
         :
     else
-        echo "resolve_repo_checkout.sh: could not lock the clone cache for $REPO_NAME" >&2
+        echo "resolve_repo_checkout.sh: could not lock the clone cache for $REPO_NAME within ${lock_wait}s — another run may be wedged on $CACHE_DIR/.$REPO_NAME.lock" >&2
         exit 5
     fi
 else
