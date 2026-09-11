@@ -131,30 +131,103 @@ SKIPPED/FAILED vocabulary, local-write-then-publish, real hermetic tests. All ni
 plan-review findings verified resolved; all consequence sites landed, none missed.
 
 ### Findings
-- [ ] (must-fix) Step 3 builds the rotation with a worktree-relative `list_overlay_repos.py` while step 1 and the resolver anchor at the main root; returns `[]` at exit 0 in a worktree, so the sweep aborts FAILED on a fully set-up host — unrunnable in its primary environment (4-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:88`
-- [ ] (must-fix) `printf "$(cd "$candidate" && pwd)"` discards the subshell status: an unreadable layer dir prints an empty path at rc 0 — an empty success, the class the header claims closed (reproduced) — `.agent/scripts/resolve_repo_checkout.sh:78`
-- [ ] (must-fix) Layer probe is `[[ -d ]]` only, so a partially-imported empty `src/<repo>` resolves as mode `layer` at rc 0 and nothing downstream validates it (reproduced) — `.agent/scripts/resolve_repo_checkout.sh:76-81`
-- [ ] (must-fix) Manifest `version:` is parsed then discarded; the clone takes the remote default branch. Measured: 9 of 45 repos differ from the pinned `jazzy`, four of them `noetic` — clone mode would grade a different branch than layer mode (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:108-115,141`
-- [ ] (must-fix) Cache keyed on repo name only; refresh never verifies the cached clone's `origin` still matches the manifest URL, and a name present in two of the three manifests silently takes the first (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:126,133-138`
-- [ ] (must-fix) `REPO_NAME` validated only for non-empty / no leading `-`, then interpolated into `TARGET` and fed to `rm -rf`; vcstool keys are paths and `--repos` is operator input — constrain to one path segment — `.agent/scripts/resolve_repo_checkout.sh:60-64,126,140`
-- [ ] (must-fix) The onboarding probe's 404 means both "no AGENTS.md" and "repo not visible to this token"; the guidance publishes the latter as the factual exclusion "not onboarded" — a not-run check rendered as a finding — `.claude/skills/janitor-sweep/SKILL.md:103-107`
-- [ ] (must-fix) Only checks 2 and 4 have FAILED criteria; checks 1 and 3 are sub-skills with no defined failure evidence, and `issue-triage` has no empty-list guard of its own, so it reports OK over zero repos scanned (2-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:118-126`
-- [ ] (must-fix) `rolker/ros2_agent_workspace` verified PUBLIC, yet the report publishes `**Host**: <hostname>`, the names of excluded field/gitcloud repos, and an absolute local path on POST FAILED — scrub them or require a private rolling issue (operator decision) — `.claude/skills/janitor-sweep/SKILL.md:153,178-185,247`
-- [ ] (must-fix) Report filename is date-only, so a second run the same day overwrites an earlier *unpublished* report — defeating the step-2 backlog that exists so a failed post cannot vanish — `.claude/skills/janitor-sweep/SKILL.md:141`
-- [ ] (must-fix) The rolling issue is found via the lagging `gh issue list --search` index; two close runs can both create one, wedging every later run at FAILED(ambiguous) and contradicting the skill's own "never a second" invariant (2-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:197-208`
-- [ ] (must-fix) Internal contradiction: Usage says `--dry-run` publishes nothing, but step 2 publishes the backlog unconditionally before step 5, where `--dry-run` stops — `.claude/skills/janitor-sweep/SKILL.md:16` vs `:75-81,254`
-- [ ] (must-fix) The added Exception claims all four named periodic skills persist to "its own durable output"; false for three of them, which have no durable output at all — a future audit will flag them against a rule this PR just wrote — `.agent/knowledge/principles_review_guide.md:49`
-- [ ] (must-fix) Hardcodes `rolker/ros2_agent_workspace` in four executed `gh` commands, failing ADR-0003's fork-reusability test; sibling skills parameterise it — `.claude/skills/janitor-sweep/SKILL.md:193,198,220,230-231`
-- [ ] (suggestion) Shared clone cache has no lock; concurrent runs race on `rm -rf`/`clone`/`reset --hard` and the failure path can delete a concurrent run's fresh tree — close before any trigger lands (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:125-146`
-- [ ] (suggestion) `git clone "$repo_url"` has no `--` separator or scheme check, and no `GIT_TERMINAL_PROMPT=0`/timeout for unattended use — `.agent/scripts/resolve_repo_checkout.sh:134,141`
-- [ ] (suggestion) A listed repo with no `url:` key misreports as exit 4 "not listed"; the `repo_url` substitution's status is unchecked — `.agent/scripts/resolve_repo_checkout.sh:108-120`
-- [ ] (suggestion) `2>&1` folds stderr into the JSON payload, so benign stderr noise on a successful run turns a readable manifest into exit 6 — `.agent/scripts/resolve_repo_checkout.sh:90`
-- [ ] (suggestion) Test gaps: exit 6 untested; the refresh case cannot distinguish refresh from re-clone or a stale tree; no failure case asserts stdout is empty; usage covers only the missing-argument arm — `.agent/scripts/tests/test_resolve_repo_checkout.sh:68-142`
-- [ ] (suggestion) The no-repo-name branch never sets `$REPO_PATH`, so line 87 reads `/AGENTS.md`; and the resolver is called by a relative path that does not exist in a layer worktree — `.claude/skills/audit-project/SKILL.md:37-39,49,87`
-- [ ] (suggestion) `--repos` is item 5 of an ordered list, leaving it ambiguous whether the no-manifest FAILED guard and the exclusion filters still apply on a hand-run — `.claude/skills/janitor-sweep/SKILL.md:111`
-- [ ] (suggestion) The AI signature is mandated on the created issue and every comment, but the `--body-file` written is the unsigned canonical report — say where the signature is appended — `.claude/skills/janitor-sweep/SKILL.md:219-241`
-- [ ] (suggestion) The non-GitHub exclusion hand-rolls the host allowlist; AGENTS.md names `field_mode.sh` authoritative, and it admits `ssh.github.com` — `.claude/skills/janitor-sweep/SKILL.md:99`
-- [ ] (suggestion) The onboarding probe tests AGENTS.md *presence* while ADR-0017's currency signal is the `## Quality Standard` marker; say presence, not currency, is the rotation gate — `.claude/skills/janitor-sweep/SKILL.md:103`
-- [ ] (suggestion) Both describe exit 3 as "the state of every worktree and fresh clone", but the script anchors at the main root so a worktree on a set-up host never hits it — `AGENTS.md:571`, `.agent/scripts/resolve_repo_checkout.sh:28-30`
-- [ ] (suggestion) Plan Files-to-Change still says "six hermetic cases"; `[R5]` and the test say seven — residual plan drift — `.agent/work-plans/issue-569/plan.md:192`
-- [ ] (suggestion) The Ask-First approval for the instruction-file edits exists only as agent-authored plan prose with no durable trace; finding 13 also landed more than the "one-line clause" described — re-confirm at PR time — `.agent/work-plans/issue-569/plan.md:26-33,238-247`
+- [x] (must-fix) Step 3 builds the rotation with a worktree-relative `list_overlay_repos.py` while step 1 and the resolver anchor at the main root; returns `[]` at exit 0 in a worktree, so the sweep aborts FAILED on a fully set-up host — unrunnable in its primary environment (4-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:88`
+- [x] (must-fix) `printf "$(cd "$candidate" && pwd)"` discards the subshell status: an unreadable layer dir prints an empty path at rc 0 — an empty success, the class the header claims closed (reproduced) — `.agent/scripts/resolve_repo_checkout.sh:78`
+- [x] (must-fix) Layer probe is `[[ -d ]]` only, so a partially-imported empty `src/<repo>` resolves as mode `layer` at rc 0 and nothing downstream validates it (reproduced) — `.agent/scripts/resolve_repo_checkout.sh:76-81`
+- [x] (must-fix) Manifest `version:` is parsed then discarded; the clone takes the remote default branch. Measured: 9 of 45 repos differ from the pinned `jazzy`, four of them `noetic` — clone mode would grade a different branch than layer mode (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:108-115,141`
+- [x] (must-fix) Cache keyed on repo name only; refresh never verifies the cached clone's `origin` still matches the manifest URL, and a name present in two of the three manifests silently takes the first (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:126,133-138`
+- [x] (must-fix) `REPO_NAME` validated only for non-empty / no leading `-`, then interpolated into `TARGET` and fed to `rm -rf`; vcstool keys are paths and `--repos` is operator input — constrain to one path segment — `.agent/scripts/resolve_repo_checkout.sh:60-64,126,140`
+- [x] (must-fix) The onboarding probe's 404 means both "no AGENTS.md" and "repo not visible to this token"; the guidance publishes the latter as the factual exclusion "not onboarded" — a not-run check rendered as a finding — `.claude/skills/janitor-sweep/SKILL.md:103-107`
+- [x] (must-fix) Only checks 2 and 4 have FAILED criteria; checks 1 and 3 are sub-skills with no defined failure evidence, and `issue-triage` has no empty-list guard of its own, so it reports OK over zero repos scanned (2-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:118-126`
+- [x] (must-fix) `rolker/ros2_agent_workspace` verified PUBLIC, yet the report publishes `**Host**: <hostname>`, the names of excluded field/gitcloud repos, and an absolute local path on POST FAILED — scrub them or require a private rolling issue (operator decision) — `.claude/skills/janitor-sweep/SKILL.md:153,178-185,247`
+- [x] (must-fix) Report filename is date-only, so a second run the same day overwrites an earlier *unpublished* report — defeating the step-2 backlog that exists so a failed post cannot vanish — `.claude/skills/janitor-sweep/SKILL.md:141`
+- [x] (must-fix) The rolling issue is found via the lagging `gh issue list --search` index; two close runs can both create one, wedging every later run at FAILED(ambiguous) and contradicting the skill's own "never a second" invariant (2-way cross-confirmed) — `.claude/skills/janitor-sweep/SKILL.md:197-208`
+- [x] (must-fix) Internal contradiction: Usage says `--dry-run` publishes nothing, but step 2 publishes the backlog unconditionally before step 5, where `--dry-run` stops — `.claude/skills/janitor-sweep/SKILL.md:16` vs `:75-81,254`
+- [x] (must-fix) The added Exception claims all four named periodic skills persist to "its own durable output"; false for three of them, which have no durable output at all — a future audit will flag them against a rule this PR just wrote — `.agent/knowledge/principles_review_guide.md:49`
+- [x] (must-fix) Hardcodes `rolker/ros2_agent_workspace` in four executed `gh` commands, failing ADR-0003's fork-reusability test; sibling skills parameterise it — `.claude/skills/janitor-sweep/SKILL.md:193,198,220,230-231`
+- [x] (suggestion) Shared clone cache has no lock; concurrent runs race on `rm -rf`/`clone`/`reset --hard` and the failure path can delete a concurrent run's fresh tree — close before any trigger lands (2-way cross-confirmed) — `.agent/scripts/resolve_repo_checkout.sh:125-146`
+- [x] (suggestion) `git clone "$repo_url"` has no `--` separator or scheme check, and no `GIT_TERMINAL_PROMPT=0`/timeout for unattended use — `.agent/scripts/resolve_repo_checkout.sh:134,141`
+- [x] (suggestion) A listed repo with no `url:` key misreports as exit 4 "not listed"; the `repo_url` substitution's status is unchecked — `.agent/scripts/resolve_repo_checkout.sh:108-120`
+- [x] (suggestion) `2>&1` folds stderr into the JSON payload, so benign stderr noise on a successful run turns a readable manifest into exit 6 — `.agent/scripts/resolve_repo_checkout.sh:90`
+- [x] (suggestion) Test gaps: exit 6 untested; the refresh case cannot distinguish refresh from re-clone or a stale tree; no failure case asserts stdout is empty; usage covers only the missing-argument arm — `.agent/scripts/tests/test_resolve_repo_checkout.sh:68-142`
+- [x] (suggestion) The no-repo-name branch never sets `$REPO_PATH`, so line 87 reads `/AGENTS.md`; and the resolver is called by a relative path that does not exist in a layer worktree — `.claude/skills/audit-project/SKILL.md:37-39,49,87`
+- [x] (suggestion) `--repos` is item 5 of an ordered list, leaving it ambiguous whether the no-manifest FAILED guard and the exclusion filters still apply on a hand-run — `.claude/skills/janitor-sweep/SKILL.md:111`
+- [x] (suggestion) The AI signature is mandated on the created issue and every comment, but the `--body-file` written is the unsigned canonical report — say where the signature is appended — `.claude/skills/janitor-sweep/SKILL.md:219-241`
+- [x] (suggestion) The non-GitHub exclusion hand-rolls the host allowlist; AGENTS.md names `field_mode.sh` authoritative, and it admits `ssh.github.com` — `.claude/skills/janitor-sweep/SKILL.md:99`
+- [x] (suggestion) The onboarding probe tests AGENTS.md *presence* while ADR-0017's currency signal is the `## Quality Standard` marker; say presence, not currency, is the rotation gate — `.claude/skills/janitor-sweep/SKILL.md:103`
+- [x] (suggestion) Both describe exit 3 as "the state of every worktree and fresh clone", but the script anchors at the main root so a worktree on a set-up host never hits it — `AGENTS.md:571`, `.agent/scripts/resolve_repo_checkout.sh:28-30`
+- [x] (suggestion) Plan Files-to-Change still says "six hermetic cases"; `[R5]` and the test say seven — residual plan drift — `.agent/work-plans/issue-569/plan.md:192`
+- [x] (suggestion) The Ask-First approval for the instruction-file edits exists only as agent-authored plan prose with no durable trace; finding 13 also landed more than the "one-line clause" described — re-confirm at PR time — `.agent/work-plans/issue-569/plan.md:26-33,238-247`
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-11 13:35 -04:00
+**By**: Claude Opus
+
+**Branch**: feature/issue-569 at `c0ff8fc`
+**Addressed**: `## Local Review (Pre-Push)` (2026-09-11 13:09 -04:00, branch at `602f3dc`), verdict changes-requested, round 1
+**Commits**: `c24fc16`, `0de04d8`, `af824dd`, `ff0d236`, `c6ab389`, `3f889c3`, `c179c2e`, `07dbf3d`, `c0ff8fc`
+
+### Scope change made at this checkpoint
+
+The operator chose **local report only for now**: the sweep writes its local
+report file and nothing else. The rolling GitHub issue, the exact-title lookup,
+the create-once path, the `POST FAILED` headline, the `.unpublished` backlog
+and `--dry-run` are removed from this slice. Publishing is deferred **together
+with** the trigger, since where a sweep's findings live durably depends on what
+runs the sweep; any future GitHub publish must cite ADR-0015/ADR-0019
+(container produces, host publishes). `plan.md` marks those deliverables
+`[DEFERRED-PUB]` rather than deleting their design.
+
+Three must-fix findings are therefore **resolved by removal**, not on their
+merits — called out individually below so they are not read as fixed.
+
+### Actions — must-fix
+
+- [x] 1. Step 3 built the rotation with a worktree-relative `list_overlay_repos.py` — **fixed**. Every path the sweep touches is addressed through `$ROOT` (the main workspace root), and step 1 now carries the three environments this must work in with how each is verified: set-up host from the main checkout, set-up host from a worktree, and no `layers/` at all. The worktree half is covered mechanically by the resolver's new worktree test case — `.claude/skills/janitor-sweep/SKILL.md` steps 1-2, `.agent/scripts/tests/test_resolve_repo_checkout.sh` case 9
+- [x] 2. `printf "$(cd ...)"` discarded the subshell status — **fixed**. The `cd` status reaches the exit code; an unreadable candidate is exit 5 with a reason, and nothing is written to stdout on any failure path — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 3. Layer probe was `[[ -d ]]` only — **fixed**. An empty `src/<repo>` (partial `vcs import`) falls through to the clone path with a note. Unreadable is tested *before* empty, since `ls -A` cannot tell them apart and a permissions fault must not be downgraded to a silent fallback — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 4. Manifest `version:` parsed then discarded — **fixed**. The clone takes the pin (branch, tag, or a SHA via a ref fetch) and refreshes against that same ref. Re-measured on this host's manifest rather than quoting the review's number: 35 overlay repos, of which `rqt_marine_radar` pins `jazzy` while the remote still defaults to `noetic` — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 5. Cache never verified against the manifest URL, and a duplicated name took the first — **fixed**. A cached clone whose `origin` differs from the manifest url is re-cloned; one name with conflicting urls across manifests is the new exit 7, never a silent first-match — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 6. `REPO_NAME` unvalidated before `rm -rf` — **fixed**. It must now be a single path segment; `../..`, `foo/bar`, `-rf`, `.`, `..`, empty and embedded-space names are all exit 2, asserted in the test — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 7. The onboarding probe published "not visible to this token" as "not onboarded" — **fixed**. The repo's visibility is probed first; only a *visible* repo's missing `AGENTS.md` is an exclusion, and any other probe failure is FAILED for that repo. The step also states it gates on presence, not currency — `.claude/skills/janitor-sweep/SKILL.md` step 2
+- [x] 8. Checks 1 and 3 had no FAILED criteria, and `issue-triage` had no empty-list guard — **fixed in both places**. The janitor names each check's failure evidence; the empty-manifest / unreadable-manifest / failed-per-repo-list guards landed in `issue-triage`'s own step 1, not the janitor's wrapper, because every other caller shares the hole — `.claude/skills/janitor-sweep/SKILL.md` step 3, `.claude/skills/issue-triage/SKILL.md` step 1
+- [x] 9. The report published the hostname, excluded field-repo names and an absolute path to a public repo — **resolved by removal** (nothing is published). The concern still shaped the local format: it names files relative to the workspace root and records no hostname, so the deferred publish decision inherits a format needing no scrubbing. Excluded repo names stay — they are already in the tracked manifests
+- [x] 10. Date-only report filename overwrote an earlier report — **fixed**, and it still applies with publishing gone. The name is timestamped, generated with `date` and never hand-typed, so successive runs accumulate — `.claude/skills/janitor-sweep/SKILL.md` step 4
+- [x] 11. Two close runs could each create a rolling issue through the lagging search index — **resolved by removal**. The settled design is carried forward in `plan.md` as `[DEFERRED-PUB]`, with the race recorded as something the deferred decision must solve before a create path ships
+- [x] 12. `--dry-run` published the backlog before the step where it stopped — **resolved by removal**. `--dry-run` is gone with the publish step it existed to suppress; an opt-out publish path is still a publish path to review
+- [x] 13. The consequences-map clause claimed durable output for all four periodic skills — **fixed**. It now says only what is true: the row does not apply to a non-issue-scoped skill; three of the four persist nothing at all (a gap, not a pattern to copy); only `janitor-sweep` has a durable output, and after the scope change that is a local file — `.agent/knowledge/principles_review_guide.md:49`
+- [x] 14. Hardcoded `rolker/ros2_agent_workspace` in four `gh` commands — **fixed by removal plus re-check**. All four were in the publish step. Re-grepped after the removal: no repo slug remains anywhere in the skill, and the only `gh` calls left derive `<owner>/<repo>` from the manifest url (ADR-0003's fork test). The deferred publish design records `gh repo view --json nameWithOwner` as the derivation to use
+
+### Actions — suggestions
+
+- [x] 15. Unlocked shared clone cache — **fixed** (taken because the cache was being reworked anyway). A per-repo `flock`, held across the whole clone/refresh, serialises runs; where `flock` is absent the script proceeds and says so — `.agent/scripts/resolve_repo_checkout.sh`
+- [x] 16. `git clone` without `--`, scheme check, `GIT_TERMINAL_PROMPT=0` or timeout — **fixed**. All four, plus `GIT_ASKPASS`; an unrecognised url is exit 6 and never reaches git
+- [x] 17. A listed repo with no `url:` misreported as exit 4 — **fixed**: it is exit 6, a malformed entry, and the lookup's status is checked
+- [x] 18. `2>&1` folded stderr into the JSON payload — **fixed**: stdout and stderr are kept apart, so benign noise on a successful run no longer reads as an unreadable manifest
+- [x] 19. Test gaps — **fixed**: the suite went from 7 cases to 18, adding exit 6 (three arms), a refresh distinguishable from a re-clone via an untracked sentinel plus a real upstream advance, an empty-stdout assertion on every failure case, and all three usage arms
+- [x] 20. `audit-project`'s unset `REPO_PATH` and relative resolver path — **fixed**: both branches set `REPO_PATH`/`REPO_MODE`, and scripts are addressed through the main root with the layer-worktree caveat stated — `.claude/skills/audit-project/SKILL.md` step 1
+- [x] 21. `--repos` ambiguity as item 5 of an ordered list — **fixed**: Usage says it replaces the chunk selection only, every other guard still applies, and names the direct `/audit-project <repo>` route for auditing an excluded repo deliberately
+- [x] 22. The AI signature was mandated but the `--body-file` written was unsigned — **resolved by removal** (no issue or comment is created)
+- [x] 23. Hand-rolled GitHub host allowlist — **fixed**: defers to `field_mode.sh`, which AGENTS.md names authoritative and which admits `ssh.github.com`
+- [x] 24. Probe tested presence while ADR-0017's signal is the `## Quality Standard` marker — **fixed**: the rotation gate says presence, and the marker stays `audit-project`'s check
+- [x] 25. "the state of every worktree and fresh clone" described exit 3 wrongly — **fixed in both places**: the script header and the `AGENTS.md` row now say an un-bootstrapped clone or a container, since the script resolves against the main root
+- [x] 26. Plan said "six hermetic cases" while `[R5]` said seven — **fixed**: both now describe the eighteen actually written
+- [x] 27. The Ask-First approval had only agent-authored plan prose as its trace — **recorded, and flagged for re-confirmation**. The plan now says where the approval was given and that it must be re-confirmed at PR time before merge; a durable trace is the operator's to leave
+
+### Notes
+
+- The review entry's header says **18 suggestions**, but only **13** suggestion
+  checkboxes are present in its Findings list. All 13 are actioned above; the
+  five-item gap is in the source entry's count, not an unactioned backlog.
+- Two commits are coarser than one-finding-per-commit: the `janitor-sweep`
+  rewrite (`af824dd`) and the resolver rewrite (`c24fc16`). Both files were
+  rewritten wholesale — the janitor because the scope change rewrote the steps
+  the other findings live in — so the commit messages enumerate each finding
+  instead.
+- Verification: `pre-commit run --all-files` all-pass (18 hooks; run via the
+  workspace venv, since `make lint` is broken on this machine by an unrelated
+  `core.hooksPath` setting), and `.agent/scripts/tests/run_script_tests.sh`
+  green — 17 shell suites including `test_resolve_repo_checkout.sh` at 18/18,
+  plus 215 pytest cases.
+- Not pushed, per the dispatch contract.
