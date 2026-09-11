@@ -402,3 +402,48 @@ two or more independent passes.
 - [x] (suggestion) `audit-project`'s mode observation compares `$REPO_PATH` against `"$ROOT"/layers/*/src/*`, but when cwd IS a layer checkout `$ROOT` is the project repo's own root, so a genuine layer checkout is observed as mode `clone`; conservative, but wrong, and the caveat text names only layer worktrees — `.claude/skills/audit-project/SKILL.md:56-73` (deferred: recorded — audit-project's mode observation is outside the no-layers/ seam this pass targets)
 - [x] (suggestion) Plan staleness: the exit-3 row and its "verified in this worktree" parenthetical are now wrong about shipped behaviour (this worktree's pointer IS derivable, and the resolver resolves against the MAIN root) and contradict the plan's own round-2 section; "Eighteen cases" contradicts the verified 29 stated 44 lines later; exits 5/6 and the resolver's Files-to-Change row omit the round-2 additions — `.agent/work-plans/issue-569/plan.md:129,131-132,275,296`
 - [x] (suggestion) Unstated trust model: the sweep now clones remote repos into the workspace and an agent with full host tool access reads their `AGENTS.md`, docs and configs as audit input; neither skill nor script says cloned content is untrusted data, never instructions. Also `.agent/scratchpad/README.md`'s cleanup advice (`find … -mtime +1 -delete`) would gut the janitor clone caches and contradicts the keep-last-20 retention — `.claude/skills/janitor-sweep/SKILL.md` step 3, `.agent/scratchpad/README.md` (deferred: recorded — the trust-model statement and the scratchpad README retention conflict are their own change)
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-11 14:33 -04:00
+**By**: Claude Opus (Claude Code Agent)
+
+**Branch**: feature/issue-569 at `96485fe`
+**Addressed**: `## Local Review (Pre-Push)` (round 3, 2026-09-11 14:20 -04:00, branch at `9880b8e`) — 4 must-fix, 18 suggestions
+**Commits**: `2624717`, `9e7e93a`, `aaa371c`, `7653e7a`, `da8c528`, `69b155e`, `9a40d91`, `07103bd`, `390d08a`, `e7ff6bb`
+
+Scope per the operator: one short fix pass — the four must-fix (all in the
+no-`layers/` path) plus the suggestions adjacent to them. The remaining ten
+suggestions are checked-and-deferred with a reason on each, and stay on the
+record for the next round.
+
+**Verification**: `make lint` — all 18 hooks Passed. `.agent/scripts/tests/run_script_tests.sh` — "✅ All script tests passed" (26 shell test files, `test_resolve_repo_checkout.sh` now 32/32; 220 pytest cases, `test_workspace_lib.py` 23).
+
+### Actions
+- [x] (must-fix) Cached manifest clone reused without an origin check — `.agent/scripts/manifest_fallback.sh:109-123` now reads `git remote get-url origin` and re-clones on any mismatch with the url the current bootstrap pointer derives, mirroring `resolve_repo_checkout.sh:446`. Hermetic test 6h2 repoints the pointer at a second local manifest fixture and asserts both the cached clone's new origin and that the repo resolved is the one the NEW manifest declares.
+- [x] (must-fix) Step 2's rotation command dropped `--config-dir` — `.claude/skills/janitor-sweep/SKILL.md` step 2 now passes `"${LIST_ARGS[@]}"`, with a comment naming the consequence of dropping it; step 1 sets `EXTRA_CONFIG`/`LIST_ARGS` before the `if`, enumerates only on the success path, and names the FAILED status in each failure arm.
+- [x] (must-fix) Optional-layer exclusion read the path behind the missing symlink — `get_optional_layers()` takes `extra_config_dirs` and searches each dir and its parent (the file sits beside `repos/` in the manifest repo); the workspace's own file still wins. Three tests in `test_workspace_lib.py`. The skill passes step 1's `$EXTRA_CONFIG`.
+- [x] (must-fix) `issue-triage` had no rc-5 arm — `.claude/skills/issue-triage/SKILL.md:40-90` snippet branches rc 3 / rc 5 / unexpected, both arms terminal, and the guard list carries the rc-5 case with an accurate remedy (`make setup-all`'s own first step is the clone that just failed); rc 3 keeps `make setup-all`.
+- [x] (suggestion) `is_field_url` undocumented — `AGENTS.md` § Field Mode gains a sourced example and the empty-url note; the `field_mode.sh` script row names both entry points and why a url caller must not use `is_field_mode`.
+- [x] (suggestion) Exit-vocabulary drift — `AGENTS.md`'s resolver row (exit 5 scaffolding causes, exit 6 `version:`), its `manifest_fallback` row (exit 2/3/5, origin re-clone), and `audit-project`'s caller snippet now match the script headers, which are the vocabulary of record.
+- [x] (suggestion) `WORKSPACE_MANIFEST_GIT_BASE` unvalidated — required to be `<scheme>://<host>/<path>` before it reaches `git clone`, refused at exit 5; test 6h3 proves `--upload-pack=evil` never reaches git.
+- [x] (suggestion) No sourced-vs-executed guard — `manifest_fallback.sh` exits 2 with a reason when executed, the mirror of the resolver's guard; test 6h4.
+- [x] (suggestion) `LIST_ARGS` unbound under `set -u` / rc-5 enumerating anyway — fixed with the step-1 restructure above.
+- [x] (suggestion) `CHUNK_COUNT` zero ⇒ division by zero — guarded beside the base-10 fix, pointing at rule 4.
+- [x] (suggestion) Second `gh api` probe lacked `>/dev/null`; rule 2 did not cover an empty `url:` — both fixed in step 2/3.
+- [x] (suggestion) Plan staleness — `plan.md` exit-3/5/6 rows, "Eighteen cases" → 32 (matching the count stated later, also corrected), and the Files-to-Change rows for the resolver, `manifest_fallback.sh` and `workspace.py` now describe what shipped.
+
+### Deferred (checked — consciously handled, not changed)
+- [x] (suggestion) Manifest url/branch derived from the raw path rather than `bootstrap.yaml`'s `git_url:`/`branch:` (deferred: reading the YAML authoritatively is a design change; the derived values were verified to match on this host)
+- [x] (suggestion) `manifest_config_dir` succeeds on a config dir holding no `.repos` (deferred: a wording/behaviour change to the EMPTY vocabulary, beyond this pass)
+- [x] (suggestion) The fd-8 manifest lock drops at the command substitution (deferred: at the operator's direction — widening the lock's scope changes the caller's contract)
+- [x] (suggestion) `timeout(1)` absent silently drops the wall-clock bound (deferred: parity note with the resolver, cosmetic next to this round's false-green fixes)
+- [x] (suggestion) `exec 9>` failure reported as a lock timeout (deferred: resolver message change, outside the no-`layers/` seam this pass targets)
+- [x] (suggestion) Layer-checkout glob first-match / `AMBIGUOUS` keyed only on url (deferred: resolver design question, not a short fix)
+- [x] (suggestion) Resolver stderr embeds absolute paths that reach the report (deferred: touches the report's host-identity contract; next round)
+- [x] (suggestion) Onboarding probe reads the default branch, not the pinned `version:` (deferred: at the operator's direction — `?ref=` changes what the gate reads)
+- [x] (suggestion) `audit-project`'s mode observation misreads a layer checkout as `clone` (deferred: outside the no-`layers/` seam this pass targets)
+- [x] (suggestion) Unstated trust model for cloned content; `.agent/scratchpad/README.md` cleanup advice would gut the caches (deferred: its own change — a trust-model statement plus a retention correction)
+
+### Next
+`review-code` (re-review) on the fixes. Not pushed — the host performs pushes.
