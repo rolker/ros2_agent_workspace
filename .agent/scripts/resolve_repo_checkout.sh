@@ -9,13 +9,17 @@
 # tree. `layers/` is gitignored and absent in every worktree, fresh clone and
 # container, so those callers silently had nothing to audit. This script gives
 # them one resolution rule: use the layer checkout when there is one, otherwise
-# shallow-clone the URL the workspace manifests already declare.
+# shallow-clone the URL the workspace manifests already declare, at the version
+# those manifests pin.
 #
 # Usage:
 #   .agent/scripts/resolve_repo_checkout.sh <repo-name>
 #
 # Output (stdout, on success only):
 #   <absolute-path><TAB><layer|clone>
+#
+# Nothing is ever printed to stdout on a failure path — a caller that reads
+# stdout gets a path or nothing at all, never an empty string at exit 0.
 #
 # The mode field matters to callers: `clone` means there is no layer checkout,
 # so layer-dependent checks (a `colcon test` run, "is it in the expected
@@ -24,17 +28,25 @@
 # Exit codes — every failure is named, and none of them is an empty success
 # (#609's false-green lesson):
 #   0  resolved
-#   2  usage error
+#   2  usage error (no argument, or a repo name that is not a single path
+#      segment)
 #   3  no repo manifest configured at all (configs/manifest absent or holding
 #      no .repos) — list_overlay_repos.py prints an empty list at exit 0 in
 #      this state, which would otherwise read as "repo not found"
 #   4  repo not listed in any manifest that WAS read
 #   5  clone or refresh failed
-#   6  manifest unreadable — list_overlay_repos.py itself failed
+#   6  manifest unreadable, or the repo's manifest entry is malformed (no
+#      `url:` key, or a URL in no recognised form) — distinct from 4, which
+#      means the manifests were fine and simply do not name this repo
+#   7  the repo is declared in more than one manifest with DIFFERENT urls —
+#      ambiguous, so which one to audit is the operator's call, not a silent
+#      first-match
 #
 # Clones land in <main-workspace-root>/.agent/scratchpad/janitor-repos/<repo>
 # (gitignored). The cache is anchored at the MAIN workspace root, not the
-# current worktree, so every worktree on a host shares one cache.
+# current worktree, so every worktree on a host shares one cache — and is
+# therefore guarded by a per-repo `flock` so two concurrent runs cannot race
+# on the same tree (see "Concurrency" below).
 
 set -uo pipefail
 
@@ -50,6 +62,7 @@ TREE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 usage() {
     echo "usage: resolve_repo_checkout.sh <repo-name>" >&2
+    echo "  <repo-name> is a single path segment, as it appears in a .repos manifest" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -57,10 +70,28 @@ if [[ $# -ne 1 ]]; then
     exit 2
 fi
 
+# The name is interpolated into a cache path that is handed to `rm -rf`, and
+# vcstool manifest keys are *paths* while `--repos` is operator input. Constrain
+# it to one path segment before it can mean anything else.
 REPO_NAME="$1"
-if [[ -z "${REPO_NAME//[[:space:]]/}" || "$REPO_NAME" == -* ]]; then
+if [[ ! "$REPO_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9._+-]*$ ]] || [[ "$REPO_NAME" == "." || "$REPO_NAME" == ".." ]]; then
+    echo "resolve_repo_checkout.sh: '$REPO_NAME' is not a valid repo name (one path segment: letters, digits, . _ + -, not starting with '.' or '-')" >&2
     usage
     exit 2
+fi
+
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/resolve_repo_checkout.XXXXXX") || {
+    echo "resolve_repo_checkout.sh: could not create a temp dir" >&2
+    exit 5
+}
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+# Network git operations get a wall-clock bound and never prompt: this script
+# is meant to run unattended, where a credential prompt would hang forever.
+GIT_NET=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true)
+if command -v timeout >/dev/null 2>&1; then
+    GIT_NET=(timeout 300 "${GIT_NET[@]}")
 fi
 
 # Main workspace root: from a worktree, the common git dir points at the main
@@ -73,11 +104,33 @@ if common_dir=$(git -C "$TREE_ROOT" rev-parse --path-format=absolute --git-commo
 fi
 
 # --- (a) an existing layer checkout wins -------------------------------------
+# A bare `-d` test is not enough: `vcs import` leaves an empty `src/<repo>`
+# directory behind when it fails partway, and resolving that as mode `layer`
+# hands the caller a directory with nothing in it to audit — an empty success
+# wearing a valid path. An empty candidate falls through to the clone path
+# instead, with a note, so the caller still gets a real checkout.
 for candidate in "$MAIN_ROOT"/layers/main/*/src/"$REPO_NAME"; do
-    if [[ -d "$candidate" ]]; then
-        printf '%s\t%s\n' "$(cd "$candidate" && pwd)" "layer"
-        exit 0
+    [[ -d "$candidate" ]] || continue
+    # Unreadable is not empty. `ls -A` returns nothing for both, so testing
+    # emptiness first would quietly downgrade a permissions fault to "fall back
+    # to a clone" and audit a different tree than the operator has on disk.
+    if [[ ! -r "$candidate" || ! -x "$candidate" ]]; then
+        echo "resolve_repo_checkout.sh: the layer checkout at $candidate is not readable (permissions?)" >&2
+        exit 5
     fi
+    if [[ -z "$(ls -A "$candidate" 2>/dev/null)" ]]; then
+        echo "resolve_repo_checkout.sh: $candidate exists but is empty (partial 'vcs import'?) — falling back to a clone" >&2
+        continue
+    fi
+    # `cd` can still fail on an unreadable directory; its status must reach the
+    # exit code rather than being swallowed by a command substitution inside
+    # printf's format argument.
+    if ! abs_path=$(cd "$candidate" && pwd); then
+        echo "resolve_repo_checkout.sh: cannot enter the layer checkout at $candidate (permissions?)" >&2
+        exit 5
+    fi
+    printf '%s\t%s\n' "$abs_path" "layer"
+    exit 0
 done
 
 # --- (b) otherwise resolve the URL from the workspace manifests ---------------
@@ -87,36 +140,99 @@ if [[ ! -f "$LIST_SCRIPT" ]]; then
     exit 6
 fi
 
-if ! repos_json=$(python3 "$LIST_SCRIPT" --format json 2>&1); then
-    echo "resolve_repo_checkout.sh: could not read the repo manifests: $repos_json" >&2
+# stdout and stderr are kept apart: folding them together turns any benign
+# stderr noise on a *successful* run into unparseable JSON, i.e. a readable
+# manifest reported as exit 6.
+if ! repos_json=$(python3 "$LIST_SCRIPT" --format json 2>"$TMP_DIR/list.err"); then
+    echo "resolve_repo_checkout.sh: could not read the repo manifests: $(tr '\n' ' ' < "$TMP_DIR/list.err")" >&2
     exit 6
 fi
 
-# Zero repos enumerated is NOT "repo not found" — it means nothing is
-# configured to look through. Reported as its own failure so a caller cannot
-# render it as "nothing to audit".
-repo_count=$(printf '%s' "$repos_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null)
-if [[ -z "$repo_count" ]]; then
-    echo "resolve_repo_checkout.sh: manifest listing was not valid JSON" >&2
-    exit 6
-fi
-if [[ "$repo_count" -eq 0 ]]; then
-    echo "resolve_repo_checkout.sh: no repo manifest configured under $MAIN_ROOT/configs — run 'make setup-all'" >&2
-    exit 3
-fi
-
-repo_url=$(printf '%s' "$repos_json" | python3 -c '
+# One lookup, one verdict. Zero repos enumerated is NOT "repo not found" — it
+# means nothing is configured to look through; a repo declared twice with two
+# different URLs is not a first-match; and an entry with no `url:` is a broken
+# manifest, not an absent repo.
+lookup=$(printf '%s' "$repos_json" | python3 -c '
 import json, sys
-name = sys.argv[1]
-for repo in json.load(sys.stdin):
-    if repo.get("name") == name:
-        print(repo.get("url", ""))
-        break
-' "$REPO_NAME")
 
-if [[ -z "$repo_url" ]]; then
-    echo "resolve_repo_checkout.sh: '$REPO_NAME' is not listed in any of the $repo_count configured repos" >&2
-    exit 4
+name = sys.argv[1]
+try:
+    repos = json.load(sys.stdin)
+except (ValueError, TypeError) as exc:
+    print("BADJSON\t%s" % exc)
+    raise SystemExit(0)
+if not isinstance(repos, list):
+    print("BADJSON\tmanifest listing is not a list")
+    raise SystemExit(0)
+if not repos:
+    print("EMPTY\t0")
+    raise SystemExit(0)
+
+matches = [r for r in repos if r.get("name") == name]
+if not matches:
+    print("NOTFOUND\t%d" % len(repos))
+    raise SystemExit(0)
+
+urls = {(r.get("url") or "") for r in matches}
+if len(urls) > 1:
+    print("AMBIGUOUS\t%s" % " | ".join(
+        "%s (%s)" % (r.get("url") or "<no url>", r.get("source_file") or "?") for r in matches))
+    raise SystemExit(0)
+
+url = matches[0].get("url") or ""
+if not url:
+    print("NOURL\t%s" % (matches[0].get("source_file") or "?"))
+    raise SystemExit(0)
+print("OK\t%s\t%s" % (url, matches[0].get("version") or ""))
+' "$REPO_NAME" 2>"$TMP_DIR/lookup.err")
+
+if [[ -z "$lookup" ]]; then
+    echo "resolve_repo_checkout.sh: could not interpret the manifest listing: $(tr '\n' ' ' < "$TMP_DIR/lookup.err")" >&2
+    exit 6
+fi
+
+verdict=${lookup%%$'\t'*}
+detail=${lookup#*$'\t'}
+
+case "$verdict" in
+    BADJSON)
+        echo "resolve_repo_checkout.sh: manifest listing was not valid JSON: $detail" >&2
+        exit 6
+        ;;
+    EMPTY)
+        echo "resolve_repo_checkout.sh: no repo manifest configured under $MAIN_ROOT/configs — run 'make setup-all'" >&2
+        exit 3
+        ;;
+    NOTFOUND)
+        echo "resolve_repo_checkout.sh: '$REPO_NAME' is not listed in any of the $detail configured repos" >&2
+        exit 4
+        ;;
+    AMBIGUOUS)
+        echo "resolve_repo_checkout.sh: '$REPO_NAME' is declared with conflicting urls: $detail — resolve the manifests, do not guess" >&2
+        exit 7
+        ;;
+    NOURL)
+        echo "resolve_repo_checkout.sh: '$REPO_NAME' is listed in $detail with no 'url:' key — the manifest entry is malformed" >&2
+        exit 6
+        ;;
+    OK) ;;
+    *)
+        echo "resolve_repo_checkout.sh: unexpected manifest lookup result '$verdict'" >&2
+        exit 6
+        ;;
+esac
+
+REPO_URL=${detail%%$'\t'*}
+REPO_VERSION=${detail#*$'\t'}
+[[ "$REPO_VERSION" == "$detail" ]] && REPO_VERSION=""
+
+# The URL reaches `git clone`; require a recognised form so it can never be
+# read as an option or a stray local path.
+if [[ ! "$REPO_URL" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] \
+   && [[ ! "$REPO_URL" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^[:space:]]+$ ]] \
+   && [[ ! "$REPO_URL" =~ ^/[^[:space:]]*$ ]]; then
+    echo "resolve_repo_checkout.sh: '$REPO_NAME' has an unrecognised url '$REPO_URL' — the manifest entry is malformed" >&2
+    exit 6
 fi
 
 # --- (c) shallow clone / refresh ---------------------------------------------
@@ -130,19 +246,72 @@ if ! mkdir -p "$CACHE_DIR" 2>/dev/null; then
     exit 5
 fi
 
-if [[ -d "$TARGET/.git" ]]; then
-    if ! refresh_out=$(git -C "$TARGET" fetch --depth 1 origin 2>&1) \
-       || ! reset_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1); then
-        echo "resolve_repo_checkout.sh: could not refresh the existing clone at $TARGET: ${reset_out:-$refresh_out}" >&2
+# Concurrency: the cache is shared by every worktree on the host, and the
+# refresh path runs `rm -rf` + `clone` + `reset --hard` over it. Two runs
+# racing there can delete a tree the other is reading. A per-repo advisory
+# lock, held for the whole clone/refresh, serialises them. `flock` is
+# util-linux and present on every host this workspace targets; where it is
+# absent the script proceeds unlocked rather than failing, and says so.
+if command -v flock >/dev/null 2>&1; then
+    if exec 9>"$CACHE_DIR/.$REPO_NAME.lock" && flock 9; then
+        :
+    else
+        echo "resolve_repo_checkout.sh: could not lock the clone cache for $REPO_NAME" >&2
         exit 5
     fi
 else
+    echo "resolve_repo_checkout.sh: flock not available — the clone cache is unlocked for this run" >&2
+fi
+
+# The pinned ref, as a fetch refspec. Empty `version:` means "whatever the
+# remote's HEAD is", which `HEAD` expresses exactly.
+FETCH_REF="${REPO_VERSION:-HEAD}"
+
+clone_fresh() {
     rm -rf "$TARGET"
-    if ! clone_out=$(git clone --depth 1 "$repo_url" "$TARGET" 2>&1); then
-        echo "resolve_repo_checkout.sh: clone of $repo_url failed: $clone_out" >&2
+    local out
+    if [[ -n "$REPO_VERSION" ]]; then
+        # Branch or tag: one shot.
+        if out=$("${GIT_NET[@]}" git clone --depth 1 --branch "$REPO_VERSION" -- "$REPO_URL" "$TARGET" 2>&1); then
+            return 0
+        fi
+        # A `version:` may also be a commit SHA, which --branch cannot take.
         rm -rf "$TARGET"
-        exit 5
+        if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1) \
+           && out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin "$REPO_VERSION" 2>&1) \
+           && out=$(git -C "$TARGET" checkout --detach FETCH_HEAD 2>&1); then
+            return 0
+        fi
+        echo "resolve_repo_checkout.sh: clone of $REPO_URL at version '$REPO_VERSION' failed: $out" >&2
+        rm -rf "$TARGET"
+        return 1
     fi
+    if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1); then
+        return 0
+    fi
+    echo "resolve_repo_checkout.sh: clone of $REPO_URL failed: $out" >&2
+    rm -rf "$TARGET"
+    return 1
+}
+
+if [[ -d "$TARGET/.git" ]]; then
+    # The cache is keyed on repo name alone, so a cached tree is only reusable
+    # once its origin is confirmed to be the URL this manifest declares —
+    # otherwise a renamed or re-homed repo would be audited from the old
+    # remote's code under the new remote's name.
+    cached_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
+    if [[ "$cached_url" != "$REPO_URL" ]]; then
+        echo "resolve_repo_checkout.sh: cached clone of $REPO_NAME points at '${cached_url:-<none>}', manifest says '$REPO_URL' — re-cloning" >&2
+        clone_fresh || exit 5
+    elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin "$FETCH_REF" 2>&1) \
+         || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1); then
+        # A shallow fetch of a pinned SHA is not served by every host; a
+        # re-clone is the honest recovery, and only its failure is exit 5.
+        echo "resolve_repo_checkout.sh: could not refresh the existing clone at $TARGET ($refresh_out) — re-cloning" >&2
+        clone_fresh || exit 5
+    fi
+else
+    clone_fresh || exit 5
 fi
 
 printf '%s\t%s\n' "$TARGET" "clone"
