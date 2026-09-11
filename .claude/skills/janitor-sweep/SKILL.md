@@ -185,8 +185,14 @@ Then, in order:
 
    ```bash
    source "$ROOT/.agent/scripts/field_mode.sh"
+   [ -n "$REPO_URL" ] || { echo "FAILED(manifest entry has no url)"; continue; }
    is_field_url "$REPO_URL" && echo "excluded: non-GitHub origin"
    ```
+
+   Check the url is **non-empty** first: `is_field_url` classifies an empty or
+   host-less url as dev mode by design (`field_mode.sh`'s header assigns that
+   check to the caller), so an entry with no `url:` would otherwise be swept
+   into the rotation and fail later, unexplained.
 
    Do not hand-roll the host list: `field_mode.sh` is the authoritative source
    (AGENTS.md § Field Mode, ADR-0011) and admits `ssh.github.com` — the
@@ -203,9 +209,13 @@ Then, in order:
    repos (ADR-0003).
 
    ```bash
-   gh api "repos/$SLUG" >/dev/null            # 1. is the repo visible at all?
-   gh api "repos/$SLUG/contents/AGENTS.md"    # 2. only then, is it onboarded?
+   gh api "repos/$SLUG" >/dev/null                       # 1. visible at all?
+   gh api "repos/$SLUG/contents/AGENTS.md" >/dev/null    # 2. then: onboarded?
    ```
+
+   Both are probes, not reads — only their exit status is used, so both send
+   their output to `/dev/null` (the second otherwise dumps base64 file JSON
+   into the transcript on every onboarded repo).
 
    Both probes are needed, because a 404 on the second one alone means two
    different things — "this repo has no root `AGENTS.md`" and "this token
@@ -269,6 +279,7 @@ Then, in order:
    ```bash
    WEEK=$(date +%V)                      # e.g. "08"
    CHUNK_COUNT=$(( (N + 2) / 3 ))        # N = surviving candidates
+   [ "$CHUNK_COUNT" -gt 0 ] || { echo "SKIPPED/FAILED per rule 4"; return; }
    CHUNK_INDEX=$(( 10#$WEEK % CHUNK_COUNT ))
    ```
 
