@@ -91,23 +91,42 @@ first rule fires and the sweep is `FAILED`, not empty.
 
 ### 2. Build the repo rotation
 
+The rotation is built from the manifest **urls**, before anything is cloned —
+so every rule below has to be answerable from a url plus a `gh` probe.
+
 ```bash
-python3 "$ROOT/.agent/scripts/list_overlay_repos.py"
+# --format json: the rotation needs each repo's url (for the origin check and
+# the slug) and its source_file, not just the name.
+python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json
 ```
 
 Then, in order:
 
 1. **If the list is empty, stop and report
    `FAILED(no repo manifest configured — run 'make setup-all')`.** This is a
-   deliberate, named failure. `configs/manifest` is gitignored and absent in
-   every fresh clone, and `list_overlay_repos.py` prints an empty list at
-   **exit 0** in that state — rendering it as "no repos to audit" is exactly
-   the false green this contract forbids. A non-zero exit from that script is
-   `FAILED(manifest unreadable: <stderr>)` — also not an empty list.
-2. Exclude repos whose origin is not on the GitHub allowlist. Do not hand-roll
-   the host list: `.agent/scripts/field_mode.sh` is the authoritative source
-   (AGENTS.md § Field Mode) and admits `ssh.github.com` — the SSH-over-443
-   fallback — alongside `github.com`. A gitcloud/Forgejo origin is listed as
+   deliberate, named failure. `configs/manifest` is a symlink into the
+   gitignored layer tree and absent in every fresh clone, and
+   `list_overlay_repos.py` prints an empty list at **exit 0** in that state —
+   rendering it as "no repos to audit" is exactly the false green this contract
+   forbids. A non-zero exit from that script is
+   `FAILED(manifest unreadable: <stderr>)` — also not an empty list. Where
+   there is no `configs/manifest`, step 1's fallback has already added the
+   cloned manifest's config dir, so an empty list here means nothing is
+   configured at all.
+2. Exclude repos whose origin is not on the GitHub allowlist, by URL:
+
+   ```bash
+   source "$ROOT/.agent/scripts/field_mode.sh"
+   is_field_url "$REPO_URL" && echo "excluded: non-GitHub origin"
+   ```
+
+   Do not hand-roll the host list: `field_mode.sh` is the authoritative source
+   (AGENTS.md § Field Mode, ADR-0011) and admits `ssh.github.com` — the
+   SSH-over-443 fallback — alongside `github.com`. Use `is_field_url`, **not**
+   `is_field_mode`: the latter reads a *checkout's* origin, and at this point
+   in the sweep nothing is checked out — with no checkout it returns 1 ("dev
+   mode"), which would silently *include* every gitcloud repo, the exact false
+   green this rule exists to prevent. A gitcloud/Forgejo origin is listed as
    **excluded: non-GitHub origin, not reachable from a generic runner** —
    never silently dropped.
 3. Probe the survivors for onboarding. The slug comes from the manifest URL
@@ -125,10 +144,29 @@ Then, in order:
    cannot see this repo" — and publishing the second as the first states a
    check that never ran as a finding about the repo. So:
    - repo probe fails (404, auth, rate limit, network) → `FAILED(repo probe:
-     <reason>)` for that repo. Not an exclusion.
+     <reason>)` for that repo. Not an exclusion — **except** for a repo from an
+     **optional layer**, below.
    - repo visible, `AGENTS.md` 404 → **excluded: no root `AGENTS.md`**.
    - `AGENTS.md` probe fails for any other reason → `FAILED(onboarding probe:
      <reason>)`.
+
+   **Optional layers are a supported host configuration, not a failure.**
+   `configs/manifest/optional_layers.txt` lists layers a host is allowed not to
+   have — typically private repos this host cannot see (`site` here).
+   `setup_layers.sh` exits 0 without them and `validate_workspace.py` allows
+   the same, so a repo-probe 404/auth failure for a repo whose `source_file` is
+   that layer's `.repos` is **excluded: optional layer `<name>`, not accessible
+   from this host** — not `FAILED`. Without this the same repo goes red on
+   every sweep, forever, for a condition nobody intends to fix:
+
+   ```bash
+   python3 -c 'import sys; sys.path.insert(0, sys.argv[1] + "/.agent/scripts/lib"); \
+       from workspace import get_optional_layers; print(" ".join(sorted(get_optional_layers(sys.argv[1]))))' "$ROOT"
+   # a repo from site.repos is in layer "site"
+   ```
+
+   A repo from an optional layer whose probes **succeed** stays in the rotation
+   — the exclusion covers the inaccessible case only.
 
    What this gates on is **presence**, not currency: ADR-0017's currency signal
    is the `## Quality Standard` marker *inside* the file, which `audit-project`
@@ -138,7 +176,15 @@ Then, in order:
 4. If repos were enumerated but every one was excluded, that is
    `SKIPPED(no eligible repos: <reasons>)` — distinct from rule 1's FAILED.
 5. Sort the survivors by name, chunk by 3, and select chunk
-   `ISO-week mod chunk-count`.
+   `ISO-week mod chunk-count`. `date +%V` is **zero-padded**, and bash reads a
+   leading zero as octal — `$(( 08 % 3 ))` is an error, twice a year — so force
+   base 10:
+
+   ```bash
+   WEEK=$(date +%V)                      # e.g. "08"
+   CHUNK_COUNT=$(( (N + 2) / 3 ))        # N = surviving candidates
+   CHUNK_INDEX=$(( 10#$WEEK % CHUNK_COUNT ))
+   ```
 
 The report always lists the **full** candidate set with each repo's in/out
 status and reason, plus the chunk index and the ISO week used.
