@@ -193,7 +193,20 @@ fi
 if is_field_mode "/path/to/repo"; then  # check a specific repo
     # ...
 fi
+
+# is_field_url classifies a URL with no checkout behind it — the form to use
+# when reading repo urls out of a manifest (nothing is cloned yet). Note
+# is_field_mode with no checkout returns 1 ("dev mode"), so using it there
+# would silently admit every field-origin repo.
+if is_field_url "git@gitcloud:field/some_repo.git"; then
+    # ...
+fi
 ```
+
+An **empty** url is not field mode: `is_field_url` returns 1 (dev mode) for
+an empty or host-less url, matching `is_field_mode`'s "no origin → the safer
+default". A caller that must tell "not a field origin" from "could not
+classify this at all" checks the url is non-empty itself.
 
 **Reconciliation**: field commits come back to GitHub via the
 `/import-field-changes` skill on a connected dev machine. Use that skill
@@ -553,7 +566,7 @@ include a guard that prints an error if accidentally sourced.
 | `.agent/scripts/worktree_enter.sh` | Enter worktree (must be sourced) **(source)** |
 | `.agent/scripts/worktree_remove.sh` | Remove worktree |
 | `.agent/scripts/worktree_list.sh` | List active worktrees |
-| `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)** |
+| `.agent/scripts/field_mode.sh` | Detect field mode (non-GitHub origin) vs. dev mode **(source or exec)**. Two sourced entry points: `is_field_mode [repo_dir]` classifies a *checkout* by its `origin`, and `is_field_url <url>` classifies a **url** with no checkout behind it — what a caller reading repo urls out of a manifest needs, since `is_field_mode` with nothing checked out returns 1 ("dev mode") and would admit every field-origin repo (used by `janitor-sweep`'s rotation). Both treat an empty/host-less input as dev mode |
 | `.agent/scripts/dlog.sh` | Prompt-free, `date`-stamped deployment log appender (`dlog.sh <logfile> <message>`); allowlist once for prompt-free + accurate live-ops logging (#515/#516) |
 | `.agent/scripts/progress_append.sh` | Prompt-free progress.md entry appender + scoped committer (`progress_append.sh [-C <dir>] <N> [--title <t>] < entry.md`); validates the ADR-0013 `## <Entry Type>` heading, creates frontmatter, commits only that file under the agent identity (fails loud if unset); allowlisted in tracked `.claude/settings.json` — the shared baseline; per-machine `.claude/settings.local.json` still layers on top (#594) |
 | `.agent/scripts/agent start-task <N>` | High-level wrapper: create + enter worktree |
