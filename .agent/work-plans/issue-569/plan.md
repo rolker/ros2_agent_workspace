@@ -40,8 +40,10 @@ instruction-file edits** this PR needs, closing Open Question 1. Each resolution
    prints `<path>\t<layer|clone>` on stdout and exits non-zero with a reason on stderr
    when it cannot produce a checkout. Resolution order: (a) an existing
    `layers/main/*/src/<repo>` checkout; (b) otherwise a shallow clone (`--depth 1`) of the
-   URL from `list_overlay_repos.py` into `<workspace-root>/.agent/scratchpad/janitor-repos/<repo>`
-   (gitignored), refreshed in place if already present.
+   URL from `list_overlay_repos.py` into `<main-workspace-root>/.agent/scratchpad/janitor-repos/<repo>`
+   (gitignored), refreshed in place if already present. `--depth 1` only — a
+   `--filter=blob:none` clone that still checks out a working tree refetches every blob
+   immediately, so the filter would buy nothing here.
 
    **[R1] Distinct, named failure statuses — no empty success.** The script's exit codes
    separate the cases the `## Plan Review` found collapsed:
@@ -118,8 +120,8 @@ instruction-file edits** this PR needs, closing Open Question 1. Each resolution
    the current snapshot and post the sweep as a *comment*, so "updated in place" and an
    audit trail both hold. (d) If (b) or (c) fails, the run's headline is
    `POST FAILED — report written to <path>, not published`, the local file is left in
-   place, and **the next run posts any unpublished report it finds in that directory before
-   its own**.
+   place beside an `.unpublished` marker, and **the next run on this host posts any marked
+   report it finds in that directory before its own**.
 
    **[R4] The backlog is host-local, and the skill says so.** The `## Plan Review` is right
    that `.agent/scratchpad/` is gitignored and, in a worktree, per-worktree. Two changes:
@@ -166,15 +168,20 @@ instruction-file edits** this PR needs, closing Open Question 1. Each resolution
    so a correctly named file is picked up automatically.
 
    **[R5] Hermetic, per that suite's contract** ("temp sandboxes, stubbed `gh`, no
-   network"). Each case builds a throwaway workspace root — a temp dir with a symlink to
-   the real `.agent/` (so the script's own root resolution lands on the fake root, since
-   Python's `abspath` and the script's `dirname` walk do not resolve symlinks) plus a
-   `configs/*.repos` manifest — and the clone case points that manifest at a **local
-   `file://` bare origin created in the same temp tree**. No remote is ever contacted.
-   Cases: prefers an existing layer checkout; clones when `layers/` is absent; refreshes an
-   existing clone; **exit 5 with a reason when the clone fails**; exit 4 when the repo is
-   absent from a manifest that *was* read; and **exit 3 when no manifest is configured at
-   all** — the false-green path [R1] names.
+   network"). Each case builds a throwaway workspace root — a temp dir holding
+   **`.agent/scripts` as a symlink** to the real one (so the script's own root resolution
+   and `list_overlay_repos.py`'s land on the fake root, since bash's `cd` is logical and
+   Python's `abspath` does not resolve symlinks) plus a `configs/*.repos` manifest — and
+   the clone cases point that manifest at a **local `file://` bare origin created in the
+   same temp tree**. No remote is ever contacted. *Only* `.agent/scripts` is linked, never
+   the whole `.agent/`: the resolver's clone cache is `<root>/.agent/scratchpad/`, which
+   must stay inside the temp tree, or the cases see each other's clones and write into the
+   real workspace (caught while writing the test — linking all of `.agent/` made the
+   clone-failure case pass a stale cached clone instead). Seven cases: prefers an existing
+   layer checkout; clones when `layers/` is absent; refreshes an existing clone; **exit 5
+   with a reason when the clone fails**; exit 4 when the repo is absent from a manifest
+   that *was* read; **exit 3 when no manifest is configured at all** — the false-green path
+   [R1] names; and exit 2 on a missing argument.
 
 ## Files to Change
 
