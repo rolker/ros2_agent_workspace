@@ -102,17 +102,27 @@ it needs" covers:
 
 ```bash
 source "$ROOT/.agent/scripts/manifest_fallback.sh"
+EXTRA_CONFIG=""
+LIST_ARGS=()
 if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
     # empty when the workspace has its own manifest (the normal case)
     LIST_ARGS=(${EXTRA_CONFIG:+--config-dir "$EXTRA_CONFIG"})
+    python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 else
+    # Both arms are terminal: the sweep is FAILED and nothing is enumerated.
     case $? in
-        3) : ;;  # no manifest and no bootstrap pointer — step 2 rule 1 FAILED
-        5) : ;;  # the manifest repo could not be cloned — FAILED, with its reason
+        3) echo "FAILED(no repo manifest configured — run 'make setup-all')" ;;
+        5) echo "FAILED(manifest repo unreachable — the reason is on stderr)" ;;
+        *) echo "FAILED(manifest fallback: unexpected exit)" ;;
     esac
 fi
-python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 ```
+
+`$EXTRA_CONFIG` and `$LIST_ARGS` are what the rest of the sweep enumerates
+with — **every** later `list_overlay_repos.py` call passes `"${LIST_ARGS[@]}"`,
+and the optional-layer lookup in step 2 passes `$EXTRA_CONFIG`. Both are set
+(empty) before the `if`, so neither is unbound under `set -u`, and neither
+failure arm falls through to an enumeration.
 
 A manifest clone that was **attempted and failed** is
 `FAILED(manifest repo unreachable: <reason>)` — never rule 1's "no repo
@@ -151,7 +161,11 @@ so every rule below has to be answerable from a url plus a `gh` probe.
 ```bash
 # --format json: the rotation needs each repo's url (for the origin check and
 # the slug) and its source_file, not just the name.
-python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json
+# "${LIST_ARGS[@]}" is step 1's — empty on a host with its own configs/manifest,
+# and `--config-dir <cloned manifest>` where there is none. Dropping it here
+# enumerates ZERO repos on a no-`layers/` host, and rule 1 below then fires the
+# one remedy lines above forbid.
+python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 ```
 
 Then, in order:
