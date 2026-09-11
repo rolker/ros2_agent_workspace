@@ -20,21 +20,59 @@ rolling report issue**. It must not assume `layers/` exists.
 Four items were left for this plan by the `## Issue Review` entry; each is decided below
 and marked **[D1]**–**[D4]**.
 
+### Plan revision 2026-09-11 (post-`## Plan Review`)
+
+The `## Plan Review` entry returned **changes-requested** with two must-fix and three
+should-fix findings, plus four suggestions. At the plan checkpoint the operator directed:
+fix **all five** must-fix/should-fix findings in the plan before implementing; drop the
+`run_script_tests.sh` registration row (suggestion 6); create the rolling issue with plain
+`gh issue create` (suggestion 7); record the rotation's lack of a coverage guarantee as a
+known limitation rather than building state for it (suggestion 8); and land the
+consequences-map clarifying clause (suggestion 9). The operator also **approved the
+instruction-file edits** this PR needs, closing Open Question 1. Each resolution is marked
+**[R1]**–**[R9]** below.
+
 ## Approach
 
 1. **[D1] Fix the repo-location gap at its source, not in the janitor.** `audit-project`
    step 1 resolves a repo with `find layers/main/*/src/<repo>` — a hard dependency on a
    local layer checkout. Add `.agent/scripts/resolve_repo_checkout.sh <repo-name>`, which
-   prints `<path>\t<layer|clone>` and exits non-zero with a reason on stderr when it
-   cannot produce a checkout. Resolution order: (a) an existing
-   `layers/main/*/src/<repo>` checkout; (b) otherwise a shallow clone
-   (`--depth 1 --filter=blob:none`) of the URL from `list_overlay_repos.py` into
-   `.agent/scratchpad/janitor-repos/<repo>` (gitignored), refreshed if already present.
-   Rewrite `audit-project` step 1 to call it and to state that in `clone` mode the
-   layer-dependent checks (step 5 `colcon test`, step 7 "correct layer") report
-   **SKIPPED (no layer checkout)**, never OK. Rationale: the janitor is not the only
+   prints `<path>\t<layer|clone>` on stdout and exits non-zero with a reason on stderr
+   when it cannot produce a checkout. Resolution order: (a) an existing
+   `layers/main/*/src/<repo>` checkout; (b) otherwise a shallow clone (`--depth 1`) of the
+   URL from `list_overlay_repos.py` into `<workspace-root>/.agent/scratchpad/janitor-repos/<repo>`
+   (gitignored), refreshed in place if already present.
+
+   **[R1] Distinct, named failure statuses — no empty success.** The script's exit codes
+   separate the cases the `## Plan Review` found collapsed:
+
+   | Exit | Meaning |
+   |---|---|
+   | 0 | Resolved — `path<TAB>layer` or `path<TAB>clone` on stdout |
+   | 2 | Usage error |
+   | 3 | **No repo manifest configured** — `configs/manifest` absent or holding no `.repos`, so *zero* repos are enumerable. `list_overlay_repos.py` prints an empty list at exit 0 in this state (verified in this worktree, where `configs/` holds only `project_bootstrap.url`), which is exactly the #609 false-green the issue forbids. It is a loud FAILED here, never "repo not found". |
+   | 4 | Repo not listed in any manifest (manifests *were* read) |
+   | 5 | Clone/refresh failed |
+   | 6 | Manifest unreadable — `list_overlay_repos.py` itself failed |
+
+   **[R3]** Rewrite `audit-project` step 1 to call the resolver. In `clone` mode the only
+   genuinely layer-dependent items report **SKIPPED (no layer checkout)**, never OK: the
+   *optional* `colcon test` invocation inside step 5, and step 7's "correct layer" check.
+   Step 5 as a whole is **not** layer-dependent — `audit-project`'s own Guidelines say
+   "Don't run tests by default", so its default behaviour is a test-file-existence check
+   that works fine against a clone, and marking the whole step SKIPPED would under-report
+   a check that did run.
+
+   Rationale for fixing it here rather than in the janitor: the janitor is not the only
    caller that will run outside a full layer tree, and a janitor-local workaround would
    leave the defect in place for every other caller.
+
+   **[R2] All five hardcoded `layers/main/...` sites in `audit-project` change**, not
+   just step 1 (SKILL.md lines 34, 40, 62, 106, 130). Line 62's root-`AGENTS.md` currency
+   check is precisely what the janitor's onboarding signal reads, and line 130's
+   `**Location**` report header must be able to say a clone path. The two remaining
+   layer-only sites (line 106's `colcon test`, line 130's layer field) stay layer-shaped
+   but are explicitly labelled as such.
 2. **Write the janitor skill** at `.claude/skills/janitor-sweep/SKILL.md` (Utility/periodic,
    matching its three siblings). Usage: `/janitor-sweep [--repos <a,b,c>] [--dry-run]`.
    Per-check contract: every check ends as **OK / FINDINGS / SKIPPED(reason) /
@@ -44,27 +82,60 @@ and marked **[D1]**–**[D4]**.
    (gitcloud) is listed as **excluded: not reachable from a generic runner**, not silently
    dropped — and (ii) repos onboarded far enough to audit, probed remotely with
    `gh api repos/<owner>/<repo>/contents/AGENTS.md`. Sort the survivors by name, chunk by
-   3, and pick chunk `ISO-week mod chunk-count`. Deterministic, needs no persisted cursor,
-   and cycles all repos in `ceil(N/3)` weeks. `--repos` overrides for a hand-run. The
-   report always lists the full candidate set with each repo's in/out status and reason.
+   3, and pick chunk `ISO-week mod chunk-count`. Deterministic, needs no persisted cursor.
+   `--repos` overrides for a hand-run. The report always lists the full candidate set with
+   each repo's in/out status and reason.
+
+   **[R1]** An **empty candidate set is never "no repos to audit"**. Zero repos enumerated
+   at all (resolver exit 3 / the same empty-manifest state) is
+   `FAILED(no repo manifest — run make setup-all)`. Repos enumerated but all filtered out
+   is `SKIPPED(no eligible repos: <reasons>)`, with the full exclusion list. The two are
+   reported distinctly.
+
+   **[R8]** The rotation carries **no coverage guarantee while the trigger is deferred**:
+   the ISO-week modulus cycles all repos in `ceil(N/3)` weeks *only under a real weekly
+   trigger*. Repeated hand-runs inside one week re-audit the same chunk, and a week with
+   no run is never made up. This is recorded as a known limitation in the skill, to be
+   revisited with the trigger decision — no cursor state is built for it now. The report
+   names the **chunk index and ISO week** it used, so a reader can see which slice was
+   covered and which were not.
 4. **Chain the four checks**: `audit-workspace` (full), `audit-project` on the rotation
    chunk, `issue-triage --stale-days 90`, and a digest-freshness check that reads the
    `<!-- Last updated: YYYY-MM-DD -->` header of `.agent/knowledge/research_digest.md`
-   against the 30/90-day thresholds the file itself declares.
+   against the 30/90-day thresholds the file itself declares on the next line, plus each
+   entry's `**Updated**:` stamp for the 90-day per-entry threshold.
 5. **[D3] Durable output: local canonical write, then the rolling issue, with an explicit
    failure path.** Mirror `review-issue`'s pattern. (a) Always write the full report to
-   `.agent/scratchpad/janitor/<YYYY-MM-DD>-sweep.md` first — this write does not depend on
-   network or auth. (b) Locate the rolling issue by **exact** title
+   `<workspace-root>/.agent/scratchpad/janitor/<YYYY-MM-DD>-sweep.md` first — this write
+   depends on neither network nor auth. (b) Locate the rolling issue by **exact** title
    `Janitor sweep report (rolling)` on `rolker/ros2_agent_workspace`
    (`gh issue list --state open --search '... in:title'`, exact-match filtered in `jq`);
-   zero matches → create it once; **two or more matches → FAILED(ambiguous rolling issue),
-   never guess**. (c) Update the issue *body* to the current snapshot and post the sweep as
-   a *comment*, so "updated in place" and an audit trail both hold. (d) If (b) or (c)
-   fails, the run's headline is `POST FAILED — report written to <path>, not published`,
-   the local file is left in place, and **the next run detects any unpublished report in
-   that directory and posts it before its own** — an unattended failed post must not
-   vanish just because no human read the session. No findings are ever converted into
-   individual issues; the operator triages from the report.
+   **zero matches → create it once** — operator-approved, with plain `gh issue create`
+   **[R7]** (not `gh_create_issue.sh`, which auto-injects `Part of #<WORKTREE_ISSUE>` at
+   gh_create_issue.sh:82-95 and would permanently mis-parent the rolling issue to whatever
+   issue the operator happened to be on) and the AGENTS.md AI signature; **two or more
+   matches → FAILED(ambiguous rolling issue), never guess**. (c) Update the issue *body* to
+   the current snapshot and post the sweep as a *comment*, so "updated in place" and an
+   audit trail both hold. (d) If (b) or (c) fails, the run's headline is
+   `POST FAILED — report written to <path>, not published`, the local file is left in
+   place, and **the next run posts any unpublished report it finds in that directory before
+   its own**.
+
+   **[R4] The backlog is host-local, and the skill says so.** The `## Plan Review` is right
+   that `.agent/scratchpad/` is gitignored and, in a worktree, per-worktree. Two changes:
+   the path is anchored at the **main workspace root**, not the worktree
+   (`dirname $(git rev-parse --git-common-dir)`, falling back to the script-derived root
+   when that is unavailable), so every worktree on a host shares one backlog directory; and
+   the residual limitation — a sweep run on a *different host*, or in an ephemeral
+   container, cannot see another host's unpublished report — is stated as a **known
+   limitation** in the skill rather than papered over. Its mitigation is that an
+   unpublished run is loud in its own right (the `POST FAILED` headline names the absolute
+   path and the host), and the eventual trigger must carry its own failure signal; a
+   single-fixed-host trigger makes the backlog sufficient, an ephemeral one does not. This
+   is listed with the deferred-trigger note so the two are decided together.
+
+   No findings are ever converted into individual issues; the operator triages from the
+   report.
 6. **Report shape.** The report leads with a coverage header — `Checks: X of 4 completed,
    Y skipped, Z failed` — followed by the per-check status table, then findings grouped by
    check, then `Repos not audited this run (reason)`. The words "clean" / "no findings"
@@ -75,54 +146,72 @@ and marked **[D1]**–**[D4]**.
    `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` (all
    three carry the same `Available workflow skills:` enumeration), plus the Utility-skills
    table in `.agent/knowledge/skill_workflows.md`, plus the `AGENTS.md` script-reference
-   row for the new script.
+   row for the new script. **[R9]** Also land the one-line clarifying clause on the
+   consequences-map row "Add a workflow skill that produces durable findings" in
+   `.agent/knowledge/principles_review_guide.md`: a periodic, non-issue-scoped skill (the
+   janitor, and its three siblings) persists its record to its own rolling report instead
+   of a `progress.md` entry, which is keyed by issue. Without the clause the row reads
+   unconditionally and every future `audit-workspace` / `review-code` pass re-flags this
+   skill. All of these edits are **operator-approved** (Open Question 1, closed).
 8. **[D4] Forward-looking note, non-blocking.** In the skill's "Deferred: trigger" section,
    record that updating the rolling issue is a GitHub **write**, so whichever trigger is
    chosen must satisfy [ADR-0015](../../../docs/decisions/0015-dispatch-handoff-context-contract.md)
    (container produces, host publishes — a dispatched container has no GitHub write auth)
    and [ADR-0019](../../../docs/decisions/0019-what-contains-a-dispatched-agent.md)
    (what containment does and does not buy). The later decision cites these rather than
-   re-deriving them. No ADR is written in this slice — no lasting architecture decision is
-   made here.
-9. **Test** `resolve_repo_checkout.sh` in `.agent/scripts/tests/test_resolve_repo_checkout.sh`
-   (registered in `run_script_tests.sh`): prefers an existing layer checkout; clones when
-   `layers/` is absent; **exits non-zero with a reason when the clone fails** (the
-   false-green path); rejects a repo absent from every manifest.
+   re-deriving them, and also inherits the two limitations recorded in [R4] and [R8]. No
+   ADR is written in this slice — no lasting architecture decision is made here.
+9. **Test** `resolve_repo_checkout.sh` in `.agent/scripts/tests/test_resolve_repo_checkout.sh`.
+   **[R6]** No edit to `run_script_tests.sh` is needed — it globs `"$TESTS_DIR"/test_*.sh`,
+   so a correctly named file is picked up automatically.
+
+   **[R5] Hermetic, per that suite's contract** ("temp sandboxes, stubbed `gh`, no
+   network"). Each case builds a throwaway workspace root — a temp dir with a symlink to
+   the real `.agent/` (so the script's own root resolution lands on the fake root, since
+   Python's `abspath` and the script's `dirname` walk do not resolve symlinks) plus a
+   `configs/*.repos` manifest — and the clone case points that manifest at a **local
+   `file://` bare origin created in the same temp tree**. No remote is ever contacted.
+   Cases: prefers an existing layer checkout; clones when `layers/` is absent; refreshes an
+   existing clone; **exit 5 with a reason when the clone fails**; exit 4 when the repo is
+   absent from a manifest that *was* read; and **exit 3 when no manifest is configured at
+   all** — the false-green path [R1] names.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract, report format, rolling-issue write path, deferred-trigger note |
-| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; prints `path\tmode`; fails loud |
-| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — four cases above |
-| `.agent/scripts/tests/run_script_tests.sh` | Register the new test |
-| `.claude/skills/audit-project/SKILL.md` | Step 1 uses the resolver; steps 5 and 7 report SKIPPED in `clone` mode |
-| `AGENTS.md` | Script-reference row for `resolve_repo_checkout.sh` (**instruction file — Ask First**) |
-| `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `janitor-sweep` to the skill enumeration (**instruction files — Ask First**) |
+| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract, report format, rolling-issue write path, known limitations, deferred-trigger note |
+| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; prints `path\tmode`; fails loud with the distinct exit codes in [R1] |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — the six hermetic cases above |
+| `.claude/skills/audit-project/SKILL.md` | All five `layers/main/...` sites: step 1 uses the resolver; the AGENTS.md currency check and the report `**Location**` header accept a clone path; the optional `colcon test` and step 7's "correct layer" report SKIPPED in `clone` mode |
+| `AGENTS.md` | Script-reference row for `resolve_repo_checkout.sh` (instruction file — **operator-approved**) |
+| `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `janitor-sweep` to the skill enumeration (instruction files — **operator-approved**) |
 | `.agent/knowledge/skill_workflows.md` | Add `janitor-sweep` to the Utility-skills table |
-| `.gitignore` | Ignore `.agent/scratchpad/` already covers the report + clone cache — verify, no change expected |
+| `.agent/knowledge/principles_review_guide.md` | [R9] clarifying clause on the durable-findings consequences-map row |
+
+`.gitignore` already ignores `.agent/scratchpad/*`, which covers both the report directory
+and the clone cache — verified, no change.
 
 ## Principles Self-Check
 
 | Principle | Consideration |
 |---|---|
 | Human control and transparency | Report-only. No PRs, no per-finding issues, exactly one rolling issue; the operator decides what becomes work. |
-| Enforcement over documentation | The sweep is still hand-run this slice — a recorded sequencing choice, not a gap. The one mechanically enforceable piece (repo resolution) gets a script and a test. |
-| A change includes its consequences | Step 7 lands all four skill-list sites plus the script table in this PR. |
-| Test what breaks | The resolver is tested, including its failure path. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
-| Only what's needed | Chains existing detectors; adds one 40-line script. No scheduler, no new infra. |
+| Enforcement over documentation | The sweep is still hand-run this slice — a recorded sequencing choice, not a gap. The one mechanically enforceable piece (repo resolution, including its false-green paths) gets a script and a test. |
+| A change includes its consequences | Step 7 lands all four skill-list sites, the script table, and the consequences-map clause in this PR. |
+| Test what breaks | The resolver is tested, including three distinct failure paths. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
+| Only what's needed | Chains existing detectors; adds one small script. No scheduler, no rotation state, no new infra. |
 | Workspace vs. project separation | Rotation is derived from `.repos` manifests and a remote AGENTS.md probe — no repo names hardcoded (ADR-0003). |
-| Improve incrementally | Sweep now, trigger later, as the operator scoped it. |
+| Improve incrementally | Sweep now, trigger later, as the operator scoped it; the two deferred limitations ([R4], [R8]) are named where the trigger decision will meet them. |
 
 ## ADR Compliance
 
 | ADR | Triggered | How addressed |
 |---|---|---|
 | ADR-0003 (project-agnostic workspace) | Yes | Rotation and checks are data-driven; nothing project-specific is baked into the skill. |
-| ADR-0013 (progress.md vocabulary) | Considered, not triggered | `progress.md` is per-issue-keyed; the janitor is not issue-scoped. Its durable record is the rolling issue, consistent with its three periodic siblings, none of which write `progress.md`. Stated explicitly in the skill so a failed post is distinguishable from "nothing to report". |
+| ADR-0013 (progress.md vocabulary) | Considered, not triggered | `progress.md` is per-issue-keyed; the janitor is not issue-scoped. Its durable record is the rolling issue, consistent with its three periodic siblings, none of which write `progress.md`. Stated explicitly in the skill so a failed post is distinguishable from "nothing to report", and now stated in the consequences map itself ([R9]) so the reading is not re-litigated at every audit. |
 | ADR-0015 / ADR-0019 (dispatch handoff / containment) | Not this slice | Cited as the forward pointer for the deferred trigger decision (step 8). |
-| ADR-0017 (AGENTS.md in project repos) | Indirectly | The remote AGENTS.md probe reuses ADR-0017's marker as the onboarding signal; `audit-project`'s currency check is unchanged. |
+| ADR-0017 (AGENTS.md in project repos) | Indirectly | The remote AGENTS.md probe reuses ADR-0017's marker as the onboarding signal; `audit-project`'s currency check is unchanged in substance, only in how it locates the file. |
 
 ## Consequences
 
@@ -131,30 +220,28 @@ and marked **[D1]**–**[D4]**.
 | Workflow skill list (add a skill) | Three adapter files + `skill_workflows.md` | Yes — step 7 |
 | A script in `.agent/scripts/` | `AGENTS.md` script table | Yes — step 7 |
 | A framework skill | That framework's adapter file | Yes — step 7 |
-| Add a skill producing durable findings | Consequences-map row says "persist a typed `progress.md` entry" | No — argued inapplicable (ADR table above); the map row arguably wants a clarifying clause for non-issue-scoped skills. Open Question 2. |
+| Add a skill producing durable findings | Consequences-map row says "persist a typed `progress.md` entry" | Yes — [R9] lands the clarifying clause for non-issue-scoped periodic skills |
 
 ## Documentation & Instruction Impact
 
-- **Stale docs** (must land in this PR): `.claude/skills/audit-project/SKILL.md` (step 1
-  becomes inaccurate the moment the resolver lands); `AGENTS.md` script table;
-  `.agent/knowledge/skill_workflows.md`; the three framework adapter skill lists.
-- **Agent-instruction candidates** (proposals only): a one-line clarification to the
-  `.agent/knowledge/principles_review_guide.md` consequences-map row about durable-findings
-  skills that are not issue-scoped (Open Question 2). Not applied in this PR.
+- **Stale docs** (land in this PR): `.claude/skills/audit-project/SKILL.md` (step 1 becomes
+  inaccurate the moment the resolver lands); `AGENTS.md` script table;
+  `.agent/knowledge/skill_workflows.md`; the three framework adapter skill lists;
+  `.agent/knowledge/principles_review_guide.md` ([R9]).
+- All instruction-file edits above are **operator-approved** for this PR (2026-09-11),
+  satisfying AGENTS.md § Boundaries "Ask First".
 
 ## Open Questions
 
-- [ ] This PR edits four instruction files (`AGENTS.md` and the three adapters), which is
-  **Ask First** under AGENTS.md § Boundaries. The edits are additive list/table rows required
-  by the Consequences Map — confirm that blanket approval covers them, or review them
-  individually at PR time.
-- [ ] Should the consequences-map row on durable-findings skills gain a clause for
-  non-issue-scoped skills, or is the existing reading (siblings don't write `progress.md`)
-  sufficient? Deliberately out of this PR unless the operator wants it in.
-- [ ] The rolling issue does not exist yet. Confirm the sweep may create it on first run
-  (title `Janitor sweep report (rolling)`, no label — none of the existing labels fit and
-  `gh_create_issue.sh` validates against `.agent/github_metadata.json`), or whether the
-  operator prefers to open it by hand first.
+All three are closed by the 2026-09-11 operator decisions:
+
+- [x] Instruction-file edits (`AGENTS.md`, three adapters, plus
+  `principles_review_guide.md`) — **approved** for this PR.
+- [x] Consequences-map clause for non-issue-scoped durable-findings skills — **land it**
+  ([R9]).
+- [x] May the sweep create the rolling issue on first run — **yes**, exactly once, on zero
+  exact-title matches, via plain `gh issue create` with the AI signature ([R7]). Two or
+  more matches is FAILED.
 
 ## Estimated Scope
 
