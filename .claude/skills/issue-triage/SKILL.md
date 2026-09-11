@@ -37,6 +37,25 @@ Parse the `owner/repo` from each URL.
 
 If `--repo` was specified, filter to just that repository.
 
+**An empty list is a failure, not an empty answer.** `configs/manifest` is
+gitignored and absent in a fresh clone, an un-bootstrapped checkout, and a
+container — and `list_overlay_repos.py` prints `[]` at **exit 0** in that
+state. A triage that scanned zero repos reports no stale issues, which reads
+identically to "there are none" (#609). So:
+
+- Empty list → stop and report
+  **`FAILED: no repo manifest configured — run 'make setup-all'`**. Do not
+  produce a triage report.
+- Non-zero exit from the script → **`FAILED: manifest unreadable`** with its
+  stderr. Also not an empty list.
+- `--repo <name>` that matches nothing in a manifest that *was* read → report
+  that the repo is not listed, rather than triaging an empty set.
+
+Every report this skill produces states how many repos were scanned, so a
+partial scan is never indistinguishable from a clean one. A repo whose
+`gh issue list` errors (auth, rate limit, network) is named and makes the run
+**FAILED** — never an all-clear over the repos that happened to answer.
+
 ### 2. Fetch open issues per repo
 
 For each repository:
