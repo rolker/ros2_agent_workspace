@@ -28,8 +28,30 @@ workspace-level tracking.
 
 ### 1. Enumerate repositories
 
+Enumerate against the **main workspace root**, never the current directory:
+`configs/` lives only in the main checkout, so a worktree-relative run
+enumerates **zero** repos on a host that has dozens — and would then trip the
+empty-list guard below as a false FAILED with the wrong remedy. This skill is
+routinely run from a worktree (directly, and as one of `janitor-sweep`'s four
+checks), so this is the normal case, not an edge one.
+
 ```bash
-python3 .agent/scripts/list_overlay_repos.py
+ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
+python3 "$ROOT/.agent/scripts/list_overlay_repos.py"
+```
+
+(In a *layer* worktree that resolves to the project repo's own root, so pass
+the workspace root explicitly or run from the workspace itself.)
+
+If `$ROOT/configs/manifest` is absent — a fresh clone or a container, where
+`layers/` does not exist and `configs/manifest` is a symlink into it — add the
+cloned manifest before concluding the list is empty:
+
+```bash
+source "$ROOT/.agent/scripts/manifest_fallback.sh"
+extra=$(manifest_config_dir "$ROOT") \
+    && python3 "$ROOT/.agent/scripts/list_overlay_repos.py" ${extra:+--config-dir "$extra"}
 ```
 
 This outputs a JSON list of `{name, url, version, source_file}` for all overlay repos.
@@ -37,11 +59,11 @@ Parse the `owner/repo` from each URL.
 
 If `--repo` was specified, filter to just that repository.
 
-**An empty list is a failure, not an empty answer.** `configs/manifest` is
-gitignored and absent in a fresh clone, an un-bootstrapped checkout, and a
-container — and `list_overlay_repos.py` prints `[]` at **exit 0** in that
-state. A triage that scanned zero repos reports no stale issues, which reads
-identically to "there are none" (#609). So:
+**An empty list is a failure, not an empty answer.** With the root anchored and
+the manifest fallback attempted, an empty list means nothing is configured at
+all — and `list_overlay_repos.py` prints `[]` at **exit 0** in that state. A
+triage that scanned zero repos reports no stale issues, which reads identically
+to "there are none" (#609). So:
 
 - Empty list → stop and report
   **`FAILED: no repo manifest configured — run 'make setup-all'`**. Do not
