@@ -302,7 +302,7 @@ Run each in turn and record its status per the contract above.
 
 | # | Check | How | Layer-dependent? |
 |---|---|---|---|
-| 1 | Workspace governance | `/audit-workspace`, full | No |
+| 1 | Workspace governance | `cd "$ROOT"` first, then `/audit-workspace`, full | No |
 | 2 | Project governance | `/audit-project <repo>` for each repo in the rotation chunk | No — `audit-project` resolves a clone when there is no layer checkout, and reports its two layer-dependent items as SKIPPED |
 | 3 | Issue staleness | `/issue-triage --stale-days 90` | No |
 | 4 | Research-digest freshness | Below | No |
@@ -311,7 +311,15 @@ Each check's FAILED evidence is named, because two of these are sub-skills that
 report into the conversation rather than returning an exit code — "it seemed to
 run" is not a status.
 
-- **Check 1 — `audit-workspace`** is `FAILED` when an input it needs cannot be
+- **Check 1 — `audit-workspace`** is the one check that does not take a root:
+  it addresses every input by bare relative path and so audits **the current
+  directory**. `cd "$ROOT"` before invoking it, and stay there for its run.
+  Without that, a sweep launched from a worktree — the skill's own normal case
+  — grades that branch's governance docs for check 1 and the main root for
+  checks 2-4, then reports the mixture as one workspace state. All four checks
+  must grade the same tree, and `$ROOT` is that tree.
+
+  It is `FAILED` when an input it needs cannot be
   read (`$ROOT/docs/PRINCIPLES.md`, `$ROOT/docs/decisions/`, `$ROOT/AGENTS.md`,
   `$ROOT/.agent/templates/`), or when its run ends without producing all seven
   checklist sections. A section it could not complete is `SKIPPED(<reason>)`
