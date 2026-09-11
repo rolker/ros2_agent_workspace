@@ -428,6 +428,18 @@ else
     fail "manifest repoint: rc=$rc out='$out3' origin='$cached_manifest_url' ($(stderr_text))"
 fi
 
+# --- 6h3. a WORKSPACE_MANIFEST_GIT_BASE in no url form is refused ------------
+# The base is the root of the trust chain and comes from the environment; an
+# unvalidated one starting with `-` is read by git as an OPTION.
+out=$(WORKSPACE_MANIFEST_GIT_BASE="--upload-pack=evil" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "WORKSPACE_MANIFEST_GIT_BASE"; then
+    pass "a WORKSPACE_MANIFEST_GIT_BASE in no recognised url form is refused, never handed to git"
+else
+    fail "git base validation: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
 # --- 6i. a manifest clone that FAILED is exit 5, never "no manifest" (3) -----
 # The pointer named a manifest repo and we could not get it. Reporting that as
 # "no repo manifest configured — run make setup-all" would send the operator

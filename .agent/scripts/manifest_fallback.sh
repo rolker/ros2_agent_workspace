@@ -24,16 +24,22 @@
 #       0) ;;  # usable: EMPTY string means "the workspace's own manifest is
 #              # present, no override needed"; non-empty is a --config-dir value
 #       3) ;;  # no manifest AND no usable bootstrap pointer — nothing to read
-#       5) ;;  # the manifest repo could not be cloned (reason on stderr)
+#       5) ;;  # the manifest repo could not be USED (reason on stderr): the
+#              # clone or the cache/lock failed, the derived git base was
+#              # refused, or the pointer and the manifest repo disagree
 #   esac
 #
 # Environment:
 #   BOOTSTRAP_URL                  overrides the pointer file (same precedence
 #                                  as setup_layers.sh, where it is source 1)
 #   WORKSPACE_MANIFEST_GIT_BASE    base for the derived clone url; defaults to
-#                                  https://github.com. Exists so the hermetic
-#                                  tests can point at a local `file://` fixture
-#                                  — no test ever reaches the network.
+#                                  https://github.com. Must be a
+#                                  `<scheme>://<host>/<path>` url (http(s), ssh,
+#                                  git, file) — anything else is refused at
+#                                  exit 5 rather than handed to `git clone`.
+#                                  Exists so the hermetic tests can point at a
+#                                  local `file://` fixture — no test ever
+#                                  reaches the network.
 #
 # The clone is a cache, not state: `rm -rf .agent/scratchpad/manifest-repo` at
 # any time and the next run re-creates it.
@@ -85,7 +91,17 @@ manifest_config_dir() {
         return 3
     fi
 
-    git_url="${WORKSPACE_MANIFEST_GIT_BASE:-https://github.com}/$owner/$repo.git"
+    # The base reaches `git clone`, and it is the root of the whole trust chain
+    # (manifest repo -> the repo list -> every repo the sweep clones). It comes
+    # from the ambient environment, so require a recognised url form — the same
+    # shape resolve_repo_checkout.sh requires of a manifest url — so it can
+    # never be read as a git OPTION or as a stray local path.
+    local git_base="${WORKSPACE_MANIFEST_GIT_BASE:-https://github.com}"
+    if [[ ! "$git_base" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] || [[ "$git_base" == *..* ]]; then
+        echo "manifest_fallback: WORKSPACE_MANIFEST_GIT_BASE '$git_base' is not a <scheme>://<host>/<path> url — refusing to hand it to git clone" >&2
+        return 5
+    fi
+    git_url="${git_base%/}/$owner/$repo.git"
     cache="$root/.agent/scratchpad/manifest-repo"
     clone_dir="$cache/$repo"
 
