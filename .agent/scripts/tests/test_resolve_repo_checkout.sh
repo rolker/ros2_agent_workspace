@@ -440,6 +440,16 @@ else
     fail "git base validation: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h4. manifest_fallback.sh refuses to be EXECUTED ------------------------
+# Executed, it would define its functions and exit 0 having done nothing — a
+# silent success from the one script whose job is to refuse those.
+out=$(bash "$REAL_SCRIPTS_DIR/manifest_fallback.sh" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 2 ] && [ -z "$out" ] && stderr_text | grep -q "must be sourced"; then
+    pass "manifest_fallback.sh executed → exit 2 with a reason, never a silent 0"
+else
+    fail "source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(stderr_text)'"
+fi
+
 # --- 6i. a manifest clone that FAILED is exit 5, never "no manifest" (3) -----
 # The pointer named a manifest repo and we could not get it. Reporting that as
 # "no repo manifest configured — run make setup-all" would send the operator

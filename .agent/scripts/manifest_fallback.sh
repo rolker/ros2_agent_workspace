@@ -44,6 +44,15 @@
 # The clone is a cache, not state: `rm -rf .agent/scratchpad/manifest-repo` at
 # any time and the next run re-creates it.
 
+# Sourced, not executed — the mirror image of resolve_repo_checkout.sh's guard.
+# Run directly, this file would define two functions and exit 0 having done
+# nothing at all: a silent success, from a script whose whole job is to refuse
+# to report success it did not earn.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "manifest_fallback.sh must be sourced, not executed: source ${BASH_SOURCE[0]} && manifest_config_dir <workspace-root>" >&2
+    exit 2
+fi
+
 # manifest_config_dir <workspace_root>
 # See the exit-code table above.
 manifest_config_dir() {
