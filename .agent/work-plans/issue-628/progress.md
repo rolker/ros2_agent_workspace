@@ -92,3 +92,38 @@ comparison and defers to plan review. But the comparison as written tilts
 against the Claude Code Routine on a ground that is solvable (finding 2b) and
 understates the Actions option's cost and credential surface (2a, 2c). The
 trigger question should not be put to the operator until that table is corrected.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-14 14:15 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-628 at `368c56f`
+**Addressed**: `## Plan Review` (2026-09-14 13:56 -04:00, plan at `864294d`, verdict changes-requested)
+**Commits**: 3c2c78a (plan revision), 368c56f (finding checkboxes)
+
+Plan-revision pass — the findings were against `.agent/work-plans/issue-628/plan.md`,
+not against code. No source file changed. Every factual claim added was verified
+against the tree or `gh` (both project repos are `git@github.com:rolker/…`;
+`unh_marine_autonomy` has no `docs/roadmap.md`; the BizzyBoat roadmap is 703 lines
+with no parent line; #626's open items include the host-path/credential-to-stderr
+class; `check_pr_authors.py` inspects each commit's primary author, not the PR
+opener; `GITHUB_TOKEN` is scoped to the repo running the workflow; ADR-0012 permits
+Status-line + References addendums; `CLAUDE.md:23-34` carries its own References list).
+
+### Actions
+- [x] (must-fix) Project-repo deliverables restored as sub-issues (5) and (6), filed in `rolker/unh_marine_autonomy` and `rolker/unh_echoboats_project11` and linked from #628; step 8 files them cross-repo, step 9 states #628 does not close until they exist — `plan.md` Sub-issue sequence table, steps 8-9
+- [x] (must-fix) Trigger comparison rewritten as a fair decision input: commit-identity and credential-surface columns added, all three rows scored on the same basis, a "what is *not* a discriminator" paragraph separating the PR-author question from commit identity, and the three real discriminators named. Still not pre-decided — `plan.md` Trigger comparison
+- [x] (must-fix) #626 redaction gate stated as an ADR-0020 Consequence, with the specific open sites named; (3)/(4) must not ship the publish path before it closes — `plan.md` Approach step 1
+- [x] (must-fix) `CLAUDE.md` References added to Files to Change, to the Ask-First approval scope (step 7), to the Consequences row and to Documentation & Instruction Impact — `plan.md` step 7, Files to Change, Consequences row 3
+- [x] (must-fix) ADR-0012 addendum on ADR-0015 decided here, not conditionally: new Approach step 2 quotes the addendum text (unattended trigger = a third actor with no host session), ADR Compliance row rewritten, ADR-0015 added to Files to Change — `plan.md` Approach step 2, ADR Compliance
+- [x] (suggestion) ADR-0004 / ADR-0005 row added to the ADR Compliance table, naming the deferral and its closers ((2) and (4)) — `plan.md` ADR Compliance
+- [x] (suggestion) Roadmap first cut bounded at 150 lines, against the measured 703-line BizzyBoat roadmap — `plan.md` Approach step 4
+- [x] (suggestion) #249's remaining items checked before the closing keyword: four body properties plus three items from its operator comment, each dispositioned in step 9; two carried forward explicitly, with a drop-to-`Part of` fallback in Open Questions — `plan.md` step 9, Open Questions
+- [x] (suggestion) Forcing function addressed by wording: the loop is declared ahead of its trigger, the pending state is written into the roadmap itself and linked to (4), and why declaring it early is deliberate — `plan.md` Approach step 4
+- [x] (suggestion) Splitting ADR-0020 in two — recorded as a named option in Approach step 1 with the seam identified (deferred: operator declined the split 2026-09-14; note it, do not do it)
+- [x] (suggestion) Whether the discovery declaration needs a new per-repo file — (deferred: not in the operator's approved scope for this pass; the go-ahead enumerated the other three suggestions and gave this one no disposition. **Open for the operator at the next plan review** — the change would be one clause in Approach step 1 making the ADR state the principle without mandating a separate file)
+
+### Notes
+- Nothing pushed, per the sub-agent handoff contract.
+- Next: `review-plan` re-review of the revised plan, then the operator's trigger decision at the plan-review checkpoint with the corrected table.
