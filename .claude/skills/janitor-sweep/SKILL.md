@@ -149,7 +149,9 @@ EXTRA_CONFIG=""
 LIST_ARGS=()
 if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
     # empty when the workspace has its own manifest (the normal case)
-    LIST_ARGS=(${EXTRA_CONFIG:+--config-dir "$EXTRA_CONFIG"})
+    if [ -n "$EXTRA_CONFIG" ]; then
+        LIST_ARGS+=(--config-dir "$EXTRA_CONFIG")
+    fi
     python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 else
     # Every arm is terminal: the sweep is FAILED and nothing is enumerated.

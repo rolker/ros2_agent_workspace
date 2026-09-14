@@ -98,8 +98,13 @@ if ! source "$ROOT/.agent/scripts/manifest_fallback.sh"; then
     echo "FAILED: manifest fallback unusable — the reason is on stderr"
     exit 1
 fi
+LIST_ARGS=()
 if extra=$(manifest_config_dir "$ROOT"); then
-    python3 "$ROOT/.agent/scripts/list_overlay_repos.py" ${extra:+--config-dir "$extra"}
+    # empty when the workspace has its own manifest (the normal case)
+    if [ -n "$extra" ]; then
+        LIST_ARGS+=(--config-dir "$extra")
+    fi
+    python3 "$ROOT/.agent/scripts/list_overlay_repos.py" "${LIST_ARGS[@]}"
 else
     # Captured before anything else runs — read inside an arm, $? is no longer
     # reliably the status `case` branched on.
