@@ -363,12 +363,27 @@ fi
 # WORKSPACE_MANIFEST_GIT_BASE points the derived clone url at a local fixture,
 # so this stays hermetic: no network, ever.
 make_manifest_origin() {
-    # $1 = owner, $2 = repo, $3 = demo repo url to declare
+    # $1 = owner, $2 = repo, $3 = demo repo url to declare,
+    # $4 = config_path to DECLARE in bootstrap.yaml (default: config — where
+    #      the pointer says bootstrap.yaml itself sits), $5 = git_url to
+    #      declare (default: this fixture's own url), $6 = branch to declare
+    #      (default: main). A real manifest repo carries the bootstrap.yaml the
+    #      pointer names, and the helper reads it as authoritative after the
+    #      clone, exactly as setup_layers.sh does — so the fixture has one.
     local owner="$1" name="$2" demo_url="$3"
+    local declared_config_path="${4:-config}"
     local work="$TMPDIR_ROOT/manifest_work/$owner/$name"
     local bare="$TMPDIR_ROOT/manifest_origins/$owner/$name.git"
-    mkdir -p "$work/config/repos" "$(dirname "$bare")"
-    cat > "$work/config/repos/core.repos" <<EOF
+    local declared_url="${5:-file://$TMPDIR_ROOT/manifest_origins/$owner/$name.git}"
+    local declared_branch="${6:-main}"
+    mkdir -p "$work/config" "$work/$declared_config_path/repos" "$(dirname "$bare")"
+    cat > "$work/config/bootstrap.yaml" <<EOF
+git_url: $declared_url
+branch: $declared_branch
+layer: core
+config_path: $declared_config_path
+EOF
+    cat > "$work/$declared_config_path/repos/core.repos" <<EOF
 repositories:
   demo_repo:
     type: git
@@ -477,6 +492,60 @@ else
     else
         fail "manifest refresh failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
     fi
+fi
+
+# --- 6h4c. the cloned bootstrap.yaml is authoritative about config_path ------
+# The pointer path can only say WHERE bootstrap.yaml sits. setup_layers.sh
+# reads git_url/branch/config_path out of the file itself (config_path
+# defaulting to `config`), so a manifest repo that keeps its .repos somewhere
+# other than beside its bootstrap.yaml used to be reported as "the bootstrap
+# pointer and the manifest repo disagree" — loud, but blaming a disagreement
+# that was really this derivation's limit.
+root=$(make_root bootstrap_config_path)
+origin=$(make_origin bootstrap_config_path)
+make_manifest_origin cfgowner testmanifest "file://$origin" "manifests"
+echo "https://raw.githubusercontent.com/cfgowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+path=${out%%$'\t'*}
+if [ "$rc" -eq 0 ] && [ -f "$path/README.md" ]; then
+    pass "bootstrap.yaml's own config_path is honoured, not the pointer's path"
+else
+    fail "bootstrap config_path: rc=$rc out='$out' ($(stderr_text))"
+fi
+
+# --- 6h4d. ...and a git_url it does not agree with is named accurately -------
+# A fork whose bootstrap names a different repo would otherwise enumerate from
+# a manifest this workspace never uses, or be reported as a missing directory.
+root=$(make_root bootstrap_url_disagrees)
+origin=$(make_origin bootstrap_url_disagrees)
+make_manifest_origin urlowner testmanifest "file://$origin" "config" \
+    "https://github.com/someoneelse/othermanifest.git"
+echo "https://raw.githubusercontent.com/urlowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "is not the one its own bootstrap names"; then
+    pass "a bootstrap.yaml naming a different manifest repo → exit 5, with the real reason"
+else
+    fail "bootstrap url disagreement: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
+# --- 6h4e. ...and so is a branch it does not agree with ----------------------
+root=$(make_root bootstrap_branch_disagrees)
+origin=$(make_origin bootstrap_branch_disagrees)
+make_manifest_origin branchowner testmanifest "file://$origin" "config" "" "jazzy"
+echo "https://raw.githubusercontent.com/branchowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "the pointer is stale"; then
+    pass "a bootstrap.yaml declaring a different branch → exit 5, naming both branches"
+else
+    fail "bootstrap branch disagreement: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
 fi
 
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---

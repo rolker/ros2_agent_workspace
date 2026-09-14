@@ -12,7 +12,10 @@
 #
 # What this does: derive the manifest repo and branch from the TRACKED
 # `configs/project_bootstrap.url` pointer, shallow-clone it into the scratch
-# cache, and print the config directory to read `.repos` files from. Callers
+# cache, read the now-local `bootstrap.yaml` the pointer names — which is
+# authoritative about `git_url:`/`branch:`/`config_path:`, as it is for
+# `setup_layers.sh` — and print the config directory to read `.repos` files
+# from. Callers
 # pass that to `list_overlay_repos.py --config-dir <dir>`, which ADDS it to the
 # normal search path rather than replacing it — a workspace that has a real
 # `configs/manifest` never takes this path at all.
@@ -27,7 +30,9 @@
 #       3) ;;  # no manifest AND no usable bootstrap pointer — nothing to read
 #       5) ;;  # the manifest repo could not be USED (reason on stderr): the
 #              # clone or the cache/lock failed, the derived git base was
-#              # refused, or the pointer and the manifest repo disagree
+#              # refused, or the pointer and the manifest repo disagree — the
+#              # cloned `bootstrap.yaml` names a different repo or branch, its
+#              # `config_path` is unsafe, or there is no `<config_path>/repos`
 #       6) ;;  # a CACHED manifest clone could not be refreshed (reason on
 #              # stderr). Its own outcome, not a warning on top of rc 0: the
 #              # cached copy may be arbitrarily stale, and a caller that
@@ -226,13 +231,84 @@ manifest_config_dir() {
         fi
     fi
 
+    # The raw pointer's path can only say WHERE bootstrap.yaml sits; the file
+    # itself is authoritative about everything else, and `setup_layers.sh`
+    # treats it that way (`git_url:`/`branch:`/`config_path:`, the last
+    # defaulting to `config`). Deriving all three from the path instead meant a
+    # bootstrap whose `config_path` differs from where bootstrap.yaml lives
+    # looked for the repos in the wrong place and blamed the operator for a
+    # "disagreement" that was really this derivation's limit. Now that the
+    # clone is local, reading it costs no network and no YAML parser — the same
+    # `grep | cut | awk` setup_layers.sh uses.
+    local bootstrap_file="$clone_dir/$config_path/bootstrap.yaml"
+    local declared_url declared_branch declared_config_path
+    if [[ -f "$bootstrap_file" ]]; then
+        declared_url=$(grep "^git_url:" "$bootstrap_file" | cut -d '#' -f 1 | awk '{print $2}')
+        declared_branch=$(grep "^branch:" "$bootstrap_file" | cut -d '#' -f 1 | awk '{print $2}')
+        declared_config_path=$(grep "^config_path:" "$bootstrap_file" | cut -d '#' -f 1 | awk '{print $2}')
+        # setup_layers.sh defaults an absent config_path to `config` because
+        # the url is all it has. Here the pointer already told us where
+        # bootstrap.yaml sits, which is a better inference than a constant —
+        # so an absent key keeps the derived path rather than overriding it
+        # with `config` (identical on any layout where bootstrap.yaml is at
+        # `config/`, which is every one in use).
+        declared_config_path="${declared_config_path:-$config_path}"
+
+        if [[ "$declared_config_path" == /* || "$declared_config_path" == *..* ]]; then
+            _manifest_fallback_say "$bootstrap_file declares config_path '$declared_config_path', which is absolute or contains '..' — refusing to read repos from it"
+            return 5
+        fi
+        # The url and branch are what the clone ALREADY used, so a mismatch
+        # cannot be honoured by rewriting a variable — it means this clone is
+        # the wrong repo or the wrong branch, and the operator needs to be told
+        # which two values disagree rather than sent to look for a missing
+        # directory. The HOST is exempt when WORKSPACE_MANIFEST_GIT_BASE is
+        # set: redirecting the host is that variable's entire purpose (a
+        # mirror, or the hermetic tests), so only the <owner>/<repo> it points
+        # at has to agree.
+        if [[ -n "$declared_branch" && "$declared_branch" != "$branch" ]]; then
+            _manifest_fallback_say "the bootstrap pointer names branch '$branch', but $config_path/bootstrap.yaml in that repo declares branch '$declared_branch' — the pointer is stale, or it points into the wrong branch"
+            return 5
+        fi
+        if [[ -n "$declared_url" ]]; then
+            local want="$declared_url" have="$git_url"
+            if [[ -n "${WORKSPACE_MANIFEST_GIT_BASE:-}" ]]; then
+                want=$(_manifest_fallback_repo_path "$declared_url")
+                have=$(_manifest_fallback_repo_path "$git_url")
+            fi
+            if [[ "$want" != "$have" ]]; then
+                _manifest_fallback_say "the bootstrap pointer derives '$(redact_url "$git_url")', but $config_path/bootstrap.yaml in that repo declares git_url '$(redact_url "$declared_url")' — the manifest repo this workspace points at is not the one its own bootstrap names"
+                return 5
+            fi
+        fi
+        config_path="$declared_config_path"
+    fi
+
     if [[ ! -d "$clone_dir/$config_path/repos" ]]; then
-        _manifest_fallback_say "$(redact_url "$git_url") ($branch) has no '$config_path/repos' directory — the bootstrap pointer and the manifest repo disagree"
+        if [[ -f "$bootstrap_file" ]]; then
+            _manifest_fallback_say "$(redact_url "$git_url") ($branch) has no '$config_path/repos' directory, the config_path its own bootstrap.yaml declares — the manifest repo's layout and its bootstrap disagree"
+        else
+            _manifest_fallback_say "$(redact_url "$git_url") ($branch) has no '$config_path/repos' directory, and no '$config_path/bootstrap.yaml' to declare a different config_path — the bootstrap pointer and the manifest repo disagree"
+        fi
         return 5
     fi
 
     printf '%s\n' "$clone_dir/$config_path/repos"
     return 0
+}
+
+# The <owner>/<repo> tail of a git url, for comparing two urls that may name
+# different HOSTS legitimately (WORKSPACE_MANIFEST_GIT_BASE redirects the host
+# on purpose). Handles both `scheme://host/owner/repo[.git]` and the scp-style
+# `git@host:owner/repo[.git]`.
+_manifest_fallback_repo_path() {
+    local u="${1%/}"
+    u="${u%.git}"
+    u="${u//:/\/}"
+    local repo="${u##*/}"
+    u="${u%/*}"
+    local owner="${u##*/}"
+    printf '%s/%s' "$owner" "$repo"
 }
 
 # Non-interactive, wall-clock-bounded git, for the same reasons
