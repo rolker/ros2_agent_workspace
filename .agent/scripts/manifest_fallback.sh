@@ -80,6 +80,13 @@ if ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/nul
     return 2
 fi
 
+# One funnel for every diagnostic, so a new message cannot forget to redact.
+# Paths are rewritten only when the CALLER has set $REDACT_PATH_PREFIXES
+# (resolve_repo_checkout.sh does, from its own $MAIN_ROOT/$HOME); sourced from
+# a skill that has not, the messages keep their absolute paths and lose only
+# credentials.
+_manifest_fallback_say() { echo "manifest_fallback: $(redact_text "$1")" >&2; }
+
 # manifest_config_dir <workspace_root>
 # See the exit-code table above.
 manifest_config_dir() {
@@ -113,7 +120,7 @@ manifest_config_dir() {
         bootstrap_url=$(tr -d '[:space:]' < "$pointer_file")
     fi
     if [[ -z "$bootstrap_url" ]]; then
-        echo "manifest_fallback: no configs/manifest and no configs/project_bootstrap.url under $root — nothing to enumerate repos from" >&2
+        _manifest_fallback_say "no configs/manifest and no configs/project_bootstrap.url under $root — nothing to enumerate repos from"
         return 3
     fi
 
@@ -123,7 +130,7 @@ manifest_config_dir() {
     # failure path). Anything else is reported as unsupported rather than
     # guessed at.
     if [[ ! "$bootstrap_url" =~ ^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)/bootstrap\.yaml$ ]]; then
-        echo "manifest_fallback: '$(redact_url "$bootstrap_url")' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can" >&2
+        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can"
         return 3
     fi
     owner="${BASH_REMATCH[1]}"
@@ -139,7 +146,7 @@ manifest_config_dir() {
        || [[ ! "$repo" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
        || [[ ! "$branch" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
        || [[ "$config_path" == /* || "$config_path" == *..* ]]; then
-        echo "manifest_fallback: '$(redact_url "$bootstrap_url")' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess" >&2
+        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess"
         return 3
     fi
 
@@ -150,7 +157,7 @@ manifest_config_dir() {
     # never be read as a git OPTION or as a stray local path.
     local git_base="${WORKSPACE_MANIFEST_GIT_BASE:-https://github.com}"
     if [[ ! "$git_base" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] || [[ "$git_base" == *..* ]]; then
-        echo "manifest_fallback: WORKSPACE_MANIFEST_GIT_BASE '$(redact_url "$git_base")' is not a <scheme>://<host>/<path> url — refusing to hand it to git clone" >&2
+        _manifest_fallback_say "WORKSPACE_MANIFEST_GIT_BASE '$(redact_url "$git_base")' is not a <scheme>://<host>/<path> url — refusing to hand it to git clone"
         return 5
     fi
     git_url="${git_base%/}/$owner/$repo.git"
@@ -158,7 +165,7 @@ manifest_config_dir() {
     clone_dir="$cache/$repo"
 
     if ! mkdir -p "$cache" 2>/dev/null; then
-        echo "manifest_fallback: cannot create the manifest cache at $cache" >&2
+        _manifest_fallback_say "cannot create the manifest cache at $cache"
         return 5
     fi
 
@@ -167,11 +174,11 @@ manifest_config_dir() {
     # flock the run proceeds unlocked and says so.
     if command -v flock >/dev/null 2>&1; then
         if ! { exec 8>"$cache/.$repo.lock" && flock -w 120 8; }; then
-            echo "manifest_fallback: could not lock the manifest cache for $repo within 120s" >&2
+            _manifest_fallback_say "could not lock the manifest cache for $repo within 120s"
             return 5
         fi
     else
-        echo "manifest_fallback: flock not available — the manifest cache is unlocked for this run" >&2
+        _manifest_fallback_say "flock not available — the manifest cache is unlocked for this run"
     fi
 
     local out cached_url
@@ -190,7 +197,7 @@ manifest_config_dir() {
         # rather than reused as-is.
         cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
         if [[ "$cached_url" != "$git_url" ]]; then
-            echo "manifest_fallback: cached manifest clone at $clone_dir points at '$(redact_url "${cached_url:-<none>}")', the bootstrap pointer derives '$(redact_url "$git_url")' — re-cloning" >&2
+            _manifest_fallback_say "cached manifest clone at $clone_dir points at '$(redact_url "${cached_url:-<none>}")', the bootstrap pointer derives '$(redact_url "$git_url")' — re-cloning"
             rm -rf "$clone_dir"
         fi
     fi
@@ -207,20 +214,20 @@ manifest_config_dir() {
         # FAILED(manifest refresh: <reason>).
         if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1) \
            || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1); then
-            echo "manifest_fallback: could not refresh the cached manifest repo at $clone_dir ($(redact_text "$out")) — the cached copy may be stale, so this is a failure, not a fallback" >&2
+            _manifest_fallback_say "could not refresh the cached manifest repo at $clone_dir ($out) — the cached copy may be stale, so this is a failure, not a fallback"
             return 6
         fi
     else
         rm -rf "$clone_dir"
         if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1); then
-            echo "manifest_fallback: could not clone the manifest repo $(redact_url "$git_url") at '$branch': $(redact_text "$out")" >&2
+            _manifest_fallback_say "could not clone the manifest repo $(redact_url "$git_url") at '$branch': $out"
             rm -rf "$clone_dir"
             return 5
         fi
     fi
 
     if [[ ! -d "$clone_dir/$config_path/repos" ]]; then
-        echo "manifest_fallback: $(redact_url "$git_url") ($branch) has no '$config_path/repos' directory — the bootstrap pointer and the manifest repo disagree" >&2
+        _manifest_fallback_say "$(redact_url "$git_url") ($branch) has no '$config_path/repos' directory — the bootstrap pointer and the manifest repo disagree"
         return 5
     fi
 

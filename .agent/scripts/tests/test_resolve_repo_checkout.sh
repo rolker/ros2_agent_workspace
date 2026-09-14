@@ -724,6 +724,44 @@ else
     fail "manifest fallback redaction: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 10d. git's OWN captured output is scrubbed, and so are local paths ------
+# The resolver redacted $REPO_URL and then interpolated git's captured $out
+# verbatim — and git echoes the remote url, userinfo included, in many clone
+# and fetch errors, so the message leaked through its own second half. The
+# same strings carry absolute paths that name the host. Both now go through
+# redact_text: git's output here names a repository path under the workspace
+# root, which must come back as <workspace>/...
+root=$(make_root redaction_captured_output)
+write_manifest "$root" "demo_repo" "file://$root/origins/absent.git"
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "<workspace>/origins/absent.git" \
+   && ! stderr_text | grep -q "$root/origins/absent.git"; then
+    pass "git's captured output is scrubbed of local paths before it reaches the report"
+else
+    fail "captured-output redaction: rc=$rc out='$out', stderr='$(stderr_text)'"
+fi
+
+# The same for a message this script composes itself, on the layer branch.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "⏭️  SKIP: composed-path redaction case (running as root; chmod cannot deny)"
+else
+root=$(make_root redaction_layer_path)
+origin=$(make_origin redaction_layer_path)
+write_manifest "$root" "demo_repo" "file://$origin"
+mkdir -p "$root/layers/main/demo_ws/src/demo_repo"
+touch "$root/layers/main/demo_ws/src/demo_repo/package.xml"
+chmod 000 "$root/layers/main/demo_ws/src/demo_repo"
+out=$(run_resolver "$root" demo_repo); rc=$?
+chmod 755 "$root/layers/main/demo_ws/src/demo_repo"
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "<workspace>/layers/main/demo_ws/src/demo_repo"; then
+    pass "a local path in a composed message is reported as <workspace>/..., not the host's"
+else
+    fail "layer path redaction: rc=$rc out='$out', stderr='$(stderr_text)'"
+fi
+fi
+
 echo ""
 echo "Passed: $TEST_PASS  Failed: $TEST_FAIL"
 [ "$TEST_FAIL" -eq 0 ]

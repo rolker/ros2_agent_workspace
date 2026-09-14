@@ -93,6 +93,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # .agent/scripts/ -> .agent/ -> workspace root
 TREE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Failure messages name the url so the operator can see which remote failed,
+# and the caller funnels this stderr into a report that must stay free of
+# credentials. A manifest url is not supposed to carry userinfo, but "supposed
+# to" is not a guarantee — `redact_url` strips any `user[:password]@` from a
+# url, and `redact_text` does the same anywhere inside a captured command
+# output. Shared with manifest_fallback.sh (which prints into the same report)
+# rather than duplicated, and its absence is a failure: a run that carried on
+# without it would print the very thing the helper exists to remove.
+if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
+    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    exit 5
+fi
+# shellcheck source=redact.sh
+source "$SCRIPT_DIR/redact.sh"
+
+# One funnel for every diagnostic, so a new message cannot forget to redact.
+# Path rewriting joins in once $MAIN_ROOT is known (below); until then
+# redact_text still strips credentials out of anything printed.
+say() { echo "resolve_repo_checkout.sh: $(redact_text "$1")" >&2; }
+
 usage() {
     echo "usage: resolve_repo_checkout.sh <repo-name>" >&2
     echo "  <repo-name> is a single path segment, as it appears in a .repos manifest" >&2
@@ -108,32 +128,18 @@ fi
 # it to one path segment before it can mean anything else.
 REPO_NAME="$1"
 if [[ ! "$REPO_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9._+-]*$ ]] || [[ "$REPO_NAME" == "." || "$REPO_NAME" == ".." ]]; then
-    echo "resolve_repo_checkout.sh: '$REPO_NAME' is not a valid repo name (one path segment: letters, digits, . _ + -, not starting with '.' or '-')" >&2
+    say "'$REPO_NAME' is not a valid repo name (one path segment: letters, digits, . _ + -, not starting with '.' or '-')"
     usage
     exit 2
 fi
 
 TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/resolve_repo_checkout.XXXXXX") || {
-    echo "resolve_repo_checkout.sh: could not create a temp dir" >&2
+    say "could not create a temp dir"
     exit 5
 }
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-# Failure messages name the url so the operator can see which remote failed,
-# and the caller funnels this stderr into a report that must stay free of
-# credentials. A manifest url is not supposed to carry userinfo, but "supposed
-# to" is not a guarantee — `redact_url` strips any `user[:password]@` from a
-# url, and `redact_text` does the same anywhere inside a captured command
-# output. Shared with manifest_fallback.sh (which prints into the same report)
-# rather than duplicated, and its absence is a failure: a run that carried on
-# without it would print the very thing the helper exists to remove.
-if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
-    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
-    exit 5
-fi
-# shellcheck source=redact.sh
-source "$SCRIPT_DIR/redact.sh"
 
 # Unattended network git, precisely:
 #   - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/true stop git's own username and
@@ -158,7 +164,7 @@ GIT_NET=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/true
 if command -v timeout >/dev/null 2>&1; then
     GIT_NET=(timeout 300 "${GIT_NET[@]}")
 else
-    echo "resolve_repo_checkout.sh: timeout(1) not available — network git operations are non-interactive but not wall-clock bounded" >&2
+    say "timeout(1) not available — network git operations are non-interactive but not wall-clock bounded"
 fi
 
 # Main workspace root: from a worktree, the common git dir points at the main
@@ -169,6 +175,18 @@ if common_dir=$(git -C "$TREE_ROOT" rev-parse --path-format=absolute --git-commo
     candidate="$(dirname "$common_dir")"
     [[ -d "$candidate" ]] && MAIN_ROOT="$candidate"
 fi
+
+# Everything this script prints is a reason string the caller funnels into a
+# sweep report — one the sweep's own contract requires to be free of host
+# identity — so absolute paths are rewritten to placeholders and git's captured
+# output is scrubbed of credentials. git echoes the FULL remote url, userinfo
+# included, in many clone and fetch errors, so a message that redacts $REPO_URL
+# and then interpolates $out verbatim leaks through its own second half. Most
+# specific prefix first: the worktree root sits UNDER the main root.
+REDACT_PATH_PREFIXES=()
+[[ "$TREE_ROOT" != "$MAIN_ROOT" ]] && REDACT_PATH_PREFIXES+=("$TREE_ROOT=<worktree>")
+REDACT_PATH_PREFIXES+=("$MAIN_ROOT=<workspace>")
+[[ -n "${HOME:-}" && "$HOME" != "/" && "$HOME" != "$MAIN_ROOT" ]] && REDACT_PATH_PREFIXES+=("$HOME=~")
 
 # --- (a) an existing layer checkout wins -------------------------------------
 # A bare `-d` test is not enough: `vcs import` leaves an empty `src/<repo>`
@@ -182,18 +200,18 @@ for candidate in "$MAIN_ROOT"/layers/main/*/src/"$REPO_NAME"; do
     # emptiness first would quietly downgrade a permissions fault to "fall back
     # to a clone" and audit a different tree than the operator has on disk.
     if [[ ! -r "$candidate" || ! -x "$candidate" ]]; then
-        echo "resolve_repo_checkout.sh: the layer checkout at $candidate is not readable (permissions?)" >&2
+        say "the layer checkout at $candidate is not readable (permissions?)"
         exit 5
     fi
     if [[ -z "$(ls -A "$candidate" 2>/dev/null)" ]]; then
-        echo "resolve_repo_checkout.sh: $candidate exists but is empty (partial 'vcs import'?) — falling back to a clone" >&2
+        say "$candidate exists but is empty (partial 'vcs import'?) — falling back to a clone"
         continue
     fi
     # `cd` can still fail on an unreadable directory; its status must reach the
     # exit code rather than being swallowed by a command substitution inside
     # printf's format argument.
     if ! abs_path=$(cd "$candidate" && pwd); then
-        echo "resolve_repo_checkout.sh: cannot enter the layer checkout at $candidate (permissions?)" >&2
+        say "cannot enter the layer checkout at $candidate (permissions?)"
         exit 5
     fi
     printf '%s\t%s\n' "$abs_path" "layer"
@@ -203,7 +221,7 @@ done
 # --- (b) otherwise resolve the URL from the workspace manifests ---------------
 LIST_SCRIPT="$MAIN_ROOT/.agent/scripts/list_overlay_repos.py"
 if [[ ! -f "$LIST_SCRIPT" ]]; then
-    echo "resolve_repo_checkout.sh: cannot find $LIST_SCRIPT" >&2
+    say "cannot find $LIST_SCRIPT"
     exit 6
 fi
 
@@ -234,14 +252,14 @@ if [[ -f "$SCRIPT_DIR/manifest_fallback.sh" ]]; then
         # enumerable after that, the EMPTY verdict below reports exit 3.
     fi
 else
-    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/manifest_fallback.sh — no manifest fallback for a host without layers/" >&2
+    say "cannot find $SCRIPT_DIR/manifest_fallback.sh — no manifest fallback for a host without layers/"
 fi
 
 # stdout and stderr are kept apart: folding them together turns any benign
 # stderr noise on a *successful* run into unparseable JSON, i.e. a readable
 # manifest reported as exit 6.
 if ! repos_json=$(python3 "$LIST_SCRIPT" --format json "${EXTRA_CONFIG[@]}" 2>"$TMP_DIR/list.err"); then
-    echo "resolve_repo_checkout.sh: could not read the repo manifests: $(tr '\n' ' ' < "$TMP_DIR/list.err")" >&2
+    say "could not read the repo manifests: $(tr '\n' ' ' < "$TMP_DIR/list.err")"
     exit 6
 fi
 
@@ -284,7 +302,7 @@ print("OK\t%s\t%s" % (url, matches[0].get("version") or ""))
 ' "$REPO_NAME" 2>"$TMP_DIR/lookup.err")
 
 if [[ -z "$lookup" ]]; then
-    echo "resolve_repo_checkout.sh: could not interpret the manifest listing: $(tr '\n' ' ' < "$TMP_DIR/lookup.err")" >&2
+    say "could not interpret the manifest listing: $(tr '\n' ' ' < "$TMP_DIR/lookup.err")"
     exit 6
 fi
 
@@ -293,28 +311,28 @@ detail=${lookup#*$'\t'}
 
 case "$verdict" in
     BADJSON)
-        echo "resolve_repo_checkout.sh: manifest listing was not valid JSON: $detail" >&2
+        say "manifest listing was not valid JSON: $detail"
         exit 6
         ;;
     EMPTY)
-        echo "resolve_repo_checkout.sh: no repo manifest configured under $MAIN_ROOT/configs, and none could be derived from configs/project_bootstrap.url — run 'make setup-all'" >&2
+        say "no repo manifest configured under $MAIN_ROOT/configs, and none could be derived from configs/project_bootstrap.url — run 'make setup-all'"
         exit 3
         ;;
     NOTFOUND)
-        echo "resolve_repo_checkout.sh: '$REPO_NAME' is not listed in any of the $detail configured repos (underlay.repos is excluded from this search by list_overlay_repos.py — a repo declared only there is expected to land here)" >&2
+        say "'$REPO_NAME' is not listed in any of the $detail configured repos (underlay.repos is excluded from this search by list_overlay_repos.py — a repo declared only there is expected to land here)"
         exit 4
         ;;
     AMBIGUOUS)
-        echo "resolve_repo_checkout.sh: '$REPO_NAME' is declared with conflicting urls: $detail — resolve the manifests, do not guess" >&2
+        say "'$REPO_NAME' is declared with conflicting urls: $detail — resolve the manifests, do not guess"
         exit 7
         ;;
     NOURL)
-        echo "resolve_repo_checkout.sh: '$REPO_NAME' is listed in $detail with no 'url:' key — the manifest entry is malformed" >&2
+        say "'$REPO_NAME' is listed in $detail with no 'url:' key — the manifest entry is malformed"
         exit 6
         ;;
     OK) ;;
     *)
-        echo "resolve_repo_checkout.sh: unexpected manifest lookup result '$verdict'" >&2
+        say "unexpected manifest lookup result '$verdict'"
         exit 6
         ;;
 esac
@@ -328,7 +346,7 @@ REPO_VERSION=${detail#*$'\t'}
 if [[ ! "$REPO_URL" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] \
    && [[ ! "$REPO_URL" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^[:space:]]+$ ]] \
    && [[ ! "$REPO_URL" =~ ^/[^[:space:]]*$ ]]; then
-    echo "resolve_repo_checkout.sh: '$REPO_NAME' has an unrecognised url '$(redact_url "$REPO_URL")' — the manifest entry is malformed" >&2
+    say "'$REPO_NAME' has an unrecognised url '$(redact_url "$REPO_URL")' — the manifest entry is malformed"
     exit 6
 fi
 
@@ -354,7 +372,7 @@ if [[ -n "$REPO_VERSION" ]]; then
         version_ok=1
     fi
     if [[ "$version_ok" -ne 1 ]]; then
-        echo "resolve_repo_checkout.sh: '$REPO_NAME' pins version '$REPO_VERSION', which is neither a full commit SHA nor a ref-safe branch/tag name — the manifest entry is malformed" >&2
+        say "'$REPO_NAME' pins version '$REPO_VERSION', which is neither a full commit SHA nor a ref-safe branch/tag name — the manifest entry is malformed"
         exit 6
     fi
 fi
@@ -366,7 +384,7 @@ CACHE_DIR="$MAIN_ROOT/.agent/scratchpad/janitor-repos"
 TARGET="$CACHE_DIR/$REPO_NAME"
 
 if ! mkdir -p "$CACHE_DIR" 2>/dev/null; then
-    echo "resolve_repo_checkout.sh: cannot create clone cache at $CACHE_DIR" >&2
+    say "cannot create clone cache at $CACHE_DIR"
     exit 5
 fi
 
@@ -389,11 +407,11 @@ if command -v flock >/dev/null 2>&1; then
     if exec 9>"$CACHE_DIR/.$REPO_NAME.lock" && flock -w "$lock_wait" 9; then
         :
     else
-        echo "resolve_repo_checkout.sh: could not lock the clone cache for $REPO_NAME within ${lock_wait}s — another run may be wedged on $CACHE_DIR/.$REPO_NAME.lock" >&2
+        say "could not lock the clone cache for $REPO_NAME within ${lock_wait}s — another run may be wedged on $CACHE_DIR/.$REPO_NAME.lock"
         exit 5
     fi
 else
-    echo "resolve_repo_checkout.sh: flock not available — the clone cache is unlocked for this run" >&2
+    say "flock not available — the clone cache is unlocked for this run"
 fi
 
 # The pinned ref, as a fetch refspec. Empty `version:` means "whatever the
@@ -419,14 +437,14 @@ clone_fresh() {
            && out=$(verify_pin); then
             return 0
         fi
-        echo "resolve_repo_checkout.sh: clone of $(redact_url "$REPO_URL") at version '$REPO_VERSION' failed: $out" >&2
+        say "clone of $(redact_url "$REPO_URL") at version '$REPO_VERSION' failed: $out"
         rm -rf "$TARGET"
         return 1
     fi
     if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1); then
         return 0
     fi
-    echo "resolve_repo_checkout.sh: clone of $(redact_url "$REPO_URL") failed: $out" >&2
+    say "clone of $(redact_url "$REPO_URL") failed: $out"
     rm -rf "$TARGET"
     return 1
 }
@@ -452,14 +470,14 @@ if [[ -d "$TARGET/.git" ]]; then
     # remote's code under the new remote's name.
     cached_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
     if [[ "$cached_url" != "$REPO_URL" ]]; then
-        echo "resolve_repo_checkout.sh: cached clone of $REPO_NAME points at '$(redact_url "${cached_url:-<none>}")', manifest says '$(redact_url "$REPO_URL")' — re-cloning" >&2
+        say "cached clone of $REPO_NAME points at '$(redact_url "${cached_url:-<none>}")', manifest says '$(redact_url "$REPO_URL")' — re-cloning"
         clone_fresh || exit 5
     elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$FETCH_REF" 2>&1) \
          || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1) \
          || ! refresh_out=$(verify_pin); then
         # A shallow fetch of a pinned SHA is not served by every host; a
         # re-clone is the honest recovery, and only its failure is exit 5.
-        echo "resolve_repo_checkout.sh: could not refresh the existing clone at $TARGET ($refresh_out) — re-cloning" >&2
+        say "could not refresh the existing clone at $TARGET ($refresh_out) — re-cloning"
         clone_fresh || exit 5
     fi
 else
