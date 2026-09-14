@@ -589,3 +589,36 @@ confirmations rather than new information.
 ### Notes
 - No human review comments and no conversation comments on this PR; Copilot is the only GitHub-side source. Per the workspace's multi-model review model that is a complete review round, not a gap.
 - Nothing new was raised by Copilot that the local timeline had not already seen, except the report-name collision nit. The signal in this round is that five items deferred across rounds 3 and 4 were independently re-raised at the current head — a deferral the operator directed for some of them (the resolver design questions), and a "next round" deferral for the redaction pass. The redaction pair and the version-pin ambiguity are the three worth doing before merge: two are credential/report-hygiene defects in a report the sweep is designed to hand around, and the third silently audits the wrong code.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-14 08:58 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-569 at `fc33a3d`
+**PR**: #625
+**Addressed**: the `## Integrated Review` of 2026-09-14 08:34 -04:00 (PR #625 at `9dc555f`), all seven open actions — the operator directed that all seven land in this PR
+**Commits**: `486ea97`, `f0dde4c`, `d797c69`, `38e144d`, `20f64c4`, `d774eb4`, `972eb3f`, `fc33a3d`
+
+### Actions
+- [x] Credentials in the manifest helper's url diagnostics — a new shared `.agent/scripts/redact.sh` holds `redact_url` (moved out of the resolver, not copied) plus a `redact_text` for strings that merely contain urls; `manifest_fallback.sh` routes all seven of its url-bearing messages through it, and both callers refuse to run when the helper is missing rather than printing around it — `.agent/scripts/redact.sh`, `.agent/scripts/manifest_fallback.sh` (`486ea97`)
+- [x] git's own captured output interpolated verbatim, and local paths riding into the report — every diagnostic in both scripts now prints through one `say()` funnel that applies `redact_text`, so a message added later cannot forget; `$TREE_ROOT`/`$MAIN_ROOT`/`$HOME` come back as `<worktree>`/`<workspace>`/`~` — `.agent/scripts/resolve_repo_checkout.sh:186`, `.agent/scripts/manifest_fallback.sh:88` (`f0dde4c`)
+- [x] Conflicting `version:` pins taken as a silent first-match — the ambiguity check keys on the `(url, version)` pair, and the exit-7 message names both pins and their source files; two manifests that agree stay a normal resolve — `.agent/scripts/resolve_repo_checkout.sh:288-296`, plus the exit-7 vocabulary in the script header, `AGENTS.md` and `audit-project` (`d797c69`)
+- [x] The layer-checkout glob accepts its match without reading the manifests — taken as the contract branch of the review's either/or, deliberately: a healthy workspace's remote differs in *form* from the manifest url (ssh vs https) and its branch differs from the pin during any feature work, so verifying would manufacture findings on working trees. What was missing is the statement, now in the resolver's mode contract, the `AGENTS.md` row, `audit-project`'s `REPO_MODE` paragraph and the sweep's report template — `.agent/scripts/resolve_repo_checkout.sh:27-48` (`38e144d`)
+- [x] `audit-project`'s `ROOT` wrong from a layer worktree — new `.agent/scripts/workspace_root.sh` resolves it (validated `$WORKSPACE_ROOT`, else the script's own location, then a hop to the main checkout when that root is a worktree, since `layers/` and `configs/manifest` live only there); empty stdout and exit 1 when there is no usable root. All three skills carrying the broken `git --git-common-dir` opener were changed, not just the one the finding cited — `.claude/skills/audit-project/SKILL.md`, `.claude/skills/janitor-sweep/SKILL.md`, `.claude/skills/issue-triage/SKILL.md` (`20f64c4`)
+- [x] The cloned `bootstrap.yaml` not honoured — after the clone the helper reads it with the same `grep | cut | awk` `setup_layers.sh` uses: its `config_path` decides where the `.repos` are read from, and a `git_url`/`branch` that disagrees is a named failure instead of a report of a missing directory. The host is exempt while `WORKSPACE_MANIFEST_GIT_BASE` is set (only `<owner>/<repo>` must agree) — redirecting the host is that variable's purpose. An absent `config_path:` keeps the derived path rather than `setup_layers.sh`'s `config` constant, since the pointer already said where the file is — `.agent/scripts/manifest_fallback.sh:230-285` (`d774eb4`)
+- [x] Report filename collision — the name carries the pid, stays sortable, and still matches the `*-sweep.md` retention glob — `.claude/skills/janitor-sweep/SKILL.md:391` (`972eb3f`)
+
+### Tests
+- `.agent/scripts/tests/test_resolve_repo_checkout.sh`: 42 → **45 cases**, all passing. New: the redaction unit cases (`redact_url`/`redact_text`, userinfo and path prefixes), `redact.sh`'s source guard, an unrecognised manifest url reported redacted, a credential-carrying `WORKSPACE_MANIFEST_GIT_BASE` reported redacted, git's captured output scrubbed of local paths, a composed message's path scrubbed, conflicting version pins → exit 7 naming both, agreeing manifests → *not* a conflict, and three `bootstrap.yaml` cases (`config_path` honoured, a `git_url` disagreement, a `branch` disagreement). The manifest fixtures now carry a `bootstrap.yaml`, as a real manifest repo does.
+- `.agent/scripts/tests/test_workspace_root.sh`: **new, 7 cases**, all passing — including the layer-worktree case asserted *against* what `git --git-common-dir` answers there.
+- `run_script_tests.sh` (the whole suite): 26 shell test files + 220 pytest cases, all green.
+- Manual, beyond the hermetic suite: the resolver against this host's real workspace (`marine_control` → mode `layer`), and an end-to-end manifest-fallback run in a bare sandbox against the **real** bootstrap pointer — the manifest repo cloned, its real `bootstrap.yaml` validated, `marine_control` resolved as mode `clone`.
+
+### Notes
+- `AGENTS.md` gained two script-reference rows (`redact.sh`, `workspace_root.sh`) and three edits to existing rows (exit 7, the mode guarantees, the authoritative `bootstrap.yaml`). It is an Ask-First file; the PR already carries operator-approved `AGENTS.md` edits for this work, and these document scripts this same PR introduces — worth naming at the merge checkpoint alongside the re-confirmation list the round-4 review flagged.
+- One shellcheck directive was added (`SC2034` on a test's `REDACT_PATH_PREFIXES`, which is read by a dynamically-sourced helper shellcheck cannot follow). Nothing else was suppressed.
+- `plan.md` is in sync: exit-5/exit-7 vocabularies, report filename, workspace-root resolution, case counts, and Files-to-Change rows for both new scripts (`fc33a3d`).
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes, fresh context).
