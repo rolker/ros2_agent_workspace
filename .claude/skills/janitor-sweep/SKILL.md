@@ -205,17 +205,32 @@ report-only skill that will run repeatedly:
   a run (`ls -1t "$REPORT_DIR"/*-sweep.md | tail -n +21 | xargs -r rm -f`). The
   reports are small, but nothing else will ever prune them.
 - `.agent/scratchpad/janitor-repos/` and `.agent/scratchpad/manifest-repo/` —
-  disposable shallow clones, safe to `rm -rf` at any time; the next run
-  re-creates what it needs. Say so in the report footer so an operator short of
-  disk knows what is safe to delete (this host has hit 100% before).
+  disposable shallow clones that self-heal: the next run re-creates what it
+  needs, so the whole-directory `rm -rf` is the reclaim to reach for. It is
+  safe **when no sweep or audit is running on this host** — not at any time.
+  `resolve_repo_checkout.sh` states the contract these clones are held under
+  (see its "Concurrency" header): the per-repo `flock` serialises the
+  clone/refresh only and is released when the script exits, so the caller reads
+  the checkout **unlocked**, and concurrent audits of the same repo on one host
+  are not safe. Deleting a cache out from under a running audit is the same
+  hazard from the other side: the audit reads a vanished or half-recreated tree
+  and the sweep reports a phantom finding (`MISSING: no root AGENTS.md`) that
+  is indistinguishable from a real one. Say the condition — not a bare "safe to
+  delete" — in the report footer, so an operator short of disk knows both what
+  to delete and when (this host has hit 100% before, and routinely runs several
+  agent sessions at once). Closing the window properly would take a lock the
+  caller holds for the audit's duration; that is a change to
+  `resolve_repo_checkout.sh`'s caller contract, deliberately out of scope for a
+  report-only skill.
 
   **These, not the reports, are what fills a disk.** The reports are a few KB
   each and capped at 20; the caches are one shallow working tree per repo the
   sweep has *ever* resolved — including repos since dropped from the manifest,
   which no later run will ever touch again. They are deliberately left
   uncapped: pruning by age would delete a clone a concurrent audit is reading,
-  and the cheap, safe reclaim is the whole-directory `rm -rf` above. So the
-  footer names the two directories **with their current sizes**
+  and the whole-directory `rm -rf` above is the cheap reclaim — under the same
+  quiescence condition, since it deletes strictly more. So the footer names the
+  two directories **with their current sizes**
   (`du -sh "$ROOT/.agent/scratchpad/janitor-repos" "$ROOT/.agent/scratchpad/manifest-repo"`),
   rather than leaving the operator to discover the number when the disk is
   already full.
@@ -506,8 +521,11 @@ Report format:
 Reports here are kept for the last 20 runs. The shallow clones under
 `.agent/scratchpad/janitor-repos/` (<size>) and
 `.agent/scratchpad/manifest-repo/` (<size>) are caches, never pruned by this
-skill and the only output here that grows without bound — deleting either
-directory is always safe.
+skill and the only output here that grows without bound. Deleting either
+directory whole is safe while no sweep or audit is running on this host — they
+are re-cloned on demand. Do not delete one mid-run: a sweep or audit reads its
+checkout unlocked, and would report a phantom finding on the tree that vanished
+under it.
 ```
 
 Fill the **Checks** line from the status table, not from impression. If any

@@ -93,8 +93,11 @@ long-lived run still needs:
   is gone — they are the durable output of a run, not a temp file.
 - `.agent/scratchpad/janitor-repos/`, `.agent/scratchpad/manifest-repo/` —
   shallow clones. These self-heal (a missing or repointed clone is re-cloned),
-  so the safe reclaim is deleting a **whole** directory, never individual files
-  by age out from under a clone another agent is reading.
+  so the reclaim is deleting a **whole** directory, never individual files by
+  age out from under a clone another agent is reading. Delete it only while no
+  sweep or audit is running on this host: `resolve_repo_checkout.sh` holds its
+  per-repo lock across the clone/refresh only, so a run reads its checkout
+  unlocked and a tree that vanishes mid-audit surfaces as a phantom finding.
 
 ## Alternative: `/tmp`
 For truly ephemeral files (cleaned up within the same command), use `/tmp` instead.
