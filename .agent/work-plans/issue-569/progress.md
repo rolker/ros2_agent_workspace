@@ -671,3 +671,59 @@ The plan records that the AGENTS.md instruction-file approval exists only as a v
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** → **address-findings** (five mechanical must-fix) → re-dispatch **review-code**. The diff is not pushed until a pre-push review comes back approved.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-14 09:28 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-569 at `6d5275d`   <!-- PR #625 open at `9dc555f`; round-5 and these fixes are unpushed -->
+**Addressed**: `## Local Review (Pre-Push)` of 2026-09-14 09:09 -04:00 (round 5, verdict changes-requested, at `47e832a`)
+**Commits**: `1edc09b`, `e4f3bd6`, `5afc0a8`, `7372911`, `70e930d`, `677be5b`, `6d5275d`
+
+**Scope of this pass, set by the host**: all five must-fix completely, plus
+only those suggestions that are trivial *and* sit in a file already open for a
+must-fix. The remaining 14 suggestions are deliberately left **unchecked** in
+the round-5 review entry above — deferred by the host to keep this pass short,
+for the operator to see at the publish checkpoint. None was judged invalid.
+
+**Verification**: `run_script_tests.sh` green — 26 shell suites (resolver
+45 → **56** cases, `workspace_root` 7 → **10**) plus 220 pytest; full
+`pre-commit` (shellcheck included) green over `47e832a..HEAD`.
+
+### Actions
+- [x] (must-fix) The "or set WORKSPACE_ROOT" remedy now works on the path that prints it: the inline walk-up starts at `$WORKSPACE_ROOT` when set, so the first probe reaches a copy of the script that can read and validate it — all four sites, and the message names where the walk actually started — `.claude/skills/janitor-sweep/SKILL.md`, `.claude/skills/issue-triage/SKILL.md`, `.claude/skills/audit-project/SKILL.md` (two sites) (`1edc09b`)
+- [x] (must-fix) Both branches of the `git_url` cross-check compare repo IDENTITIES via the new `_manifest_fallback_url_key` (normalised through `_manifest_fallback_repo_path`, host included unless `WORKSPACE_MANIFEST_GIT_BASE` redirects it), so scp-form / no-`.git` / trailing-slash urls no longer hard-fail at exit 5 — `.agent/scripts/manifest_fallback.sh` (`5afc0a8`)
+- [x] (must-fix) …and the previously untested branch is now tested: 8 direct cases over the key on both branches (the no-`GIT_BASE` branch is unreachable end-to-end without the network, since the derived url is then github.com), plus an end-to-end case with an scp-form declared `git_url` — `.agent/scripts/tests/test_resolve_repo_checkout.sh` (`5afc0a8`)
+- [x] (must-fix) `test_workspace_root.sh` is hermetic against an ambient `$WORKSPACE_ROOT` (unset once at the top; the cases that exercise it set it per invocation) — 10/10 pass with it exported — `.agent/scripts/tests/test_workspace_root.sh` (`e4f3bd6`)
+- [x] (must-fix) A missing or unloadable `redact.sh` returns **5** (the resolver's code for the identical condition), not the caller-bug 2; the `source` rc is checked rather than inferred; all three callers check the source status and carry a `*)` arm, so the condition can no longer surface as exit 3 "run `make setup-all`". Exit tables updated in the script header, `AGENTS.md` (both exit-5 rows) and the calling skills; the resolver's own unchecked `source redact.sh` is checked too — `.agent/scripts/manifest_fallback.sh`, `.agent/scripts/resolve_repo_checkout.sh`, both skills, `AGENTS.md`, `.claude/skills/audit-project/SKILL.md` (`7372911`)
+- [x] (must-fix) `REDACT_PATH_PREFIXES` is set before sourcing `manifest_fallback.sh` at both skill sites (`$ROOT` then `$HOME`, most specific first), so the manifest diagnostics reach the report and the triage output without this host's absolute paths — `.claude/skills/janitor-sweep/SKILL.md`, `.claude/skills/issue-triage/SKILL.md` (`70e930d`)
+- [x] (suggestion) The header's usage block is the skills' snippet verbatim again — it kept a third shape (`&& break`, which walks on past a workspace whose script refused) — `.agent/scripts/workspace_root.sh` (`1edc09b`)
+- [x] (suggestion) The walk is `[ -f ]` + `bash`, not `[ -x ]`: a lost exec bit (noexec mount, unpacked archive, CIFS) no longer makes it walk past the workspace — all three skills and the test (`1edc09b`, `e4f3bd6`)
+- [x] (suggestion) "The same hop resolve_repo_checkout.sh makes" corrected — this script additionally gates the hop on the destination being a workspace root — `.agent/scripts/workspace_root.sh` (`1edc09b`)
+- [x] (suggestion) The main-checkout hop redirecting even an explicitly-set `$WORKSPACE_ROOT` is named as the deliberate property it is (the variable chooses WHICH workspace, not which checkout) — `.agent/scripts/workspace_root.sh` (`1edc09b`)
+- [x] (suggestion) The resolver's `manifest_config_dir` rc gained the missing `*)` arm — the mechanism behind must-fix 4 — `.agent/scripts/resolve_repo_checkout.sh` (`7372911`)
+- [x] (suggestion) `WORKSPACE_MANIFEST_GIT_BASE` narrowing the cross-check precisely when it redirects the trust root is named as a known property, in the code and in `AGENTS.md` (`5afc0a8`)
+- [x] (suggestion) Both `AGENTS.md` exit-5 enumerations pick up the causes the scripts' own headers list — the `redact.sh` refusal, the unsafe declared `config_path`, the `git_url`/`branch` disagreement, and the unsourceable/unrecognised fallback (`5afc0a8`, `7372911`)
+- [x] (suggestion) "Authoritative about `git_url:`/`branch:`/`config_path:`" no longer overstates: only `config_path` is honoured, the other two are hard-failing cross-checks — `.agent/scripts/manifest_fallback.sh`, `AGENTS.md` (`6d5275d`)
+- [x] (suggestion) § Documentation & Instruction Impact names all three skills that carry the shared step-1 opener, not only `audit-project` — `.agent/work-plans/issue-569/plan.md` (`677be5b`)
+
+### Deferred to the publish checkpoint (host decision, not a judgement on the finding)
+These 14 stay **unchecked** in the round-5 entry so the operator sees them
+whole. Two notes on their current state:
+
+- The `walk_up_from` finding is **half addressed**: the helper is the skills'
+  snippet verbatim again (`e4f3bd6`); the separate claim that case 3's
+  "layer worktree" fixture is not the layout `worktree_create.sh` produces was
+  not investigated and stays open.
+- The `$BOOTSTRAP_URL` hermeticity finding is the same class as must-fix 3 and
+  is the strongest candidate to take next — it was left only because
+  `test_resolve_repo_checkout.sh`'s fallback cases were not otherwise edited
+  for a must-fix.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review these fixes)
+
+    .agent/scripts/dispatch_subagent.sh --mode in-process --issue 569 --skill review-code
+
+The diff is still unpushed; the host performs the push.
