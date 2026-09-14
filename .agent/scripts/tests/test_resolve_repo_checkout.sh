@@ -20,8 +20,21 @@
 # Every failure case also asserts that **stdout is empty**: the whole point of
 # the script's exit-code vocabulary is that a caller never receives an empty
 # string as if it were a path (#609).
+#
+# Hermetic includes the AMBIENT ENVIRONMENT, not just the filesystem. Every
+# variable the scripts under test read is unset once here, and the cases that
+# exercise one set it per invocation: an inherited `$BOOTSTRAP_URL` overrides
+# the tracked pointer the manifest-fallback cases build their fixture around
+# (11 of these cases fail with one exported), `$WORKSPACE_ROOT` and
+# `$WORKSPACE_MANIFEST_GIT_BASE` redirect the root and the derived clone url
+# out of the temp tree, and `$REDACT_PATH_PREFIXES` rewrites the diagnostics
+# the failure cases match on. None of it is the operator's fault when it
+# happens — the suite must not read the environment it was launched from.
 
 set -uo pipefail
+
+unset WORKSPACE_ROOT BOOTSTRAP_URL WORKSPACE_MANIFEST_GIT_BASE \
+      RESOLVE_LOCK_TIMEOUT REDACT_PATH_PREFIXES
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"   # .../.agent/scripts
