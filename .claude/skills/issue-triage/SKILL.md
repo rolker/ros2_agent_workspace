@@ -77,6 +77,15 @@ rules forbid. So there is exactly one enumeration site, and it is on the
 fallback's success path:
 
 ```bash
+# `manifest_fallback.sh` routes every diagnostic through `redact.sh`, which
+# rewrites absolute paths only when the CALLER says which prefixes to strip.
+# Unset, its reasons keep this host's real paths — and they are transcribed
+# verbatim into a report the triage output, and from there into notes and
+# issue comments, carries them off this host. Most specific first.
+REDACT_PATH_PREFIXES=("$ROOT=<workspace>")
+if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && [ "$HOME" != "$ROOT" ]; then
+    REDACT_PATH_PREFIXES+=("$HOME=~")
+fi
 # The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
 # through is missing or will not load". Unchecked, that surfaces later as
 # `manifest_config_dir: command not found`, which is not a code any arm below

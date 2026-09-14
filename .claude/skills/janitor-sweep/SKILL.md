@@ -124,6 +124,15 @@ manifests have to be cloned before any repo can be enumerated. That is
 it needs" covers:
 
 ```bash
+# `manifest_fallback.sh` routes every diagnostic through `redact.sh`, which
+# rewrites absolute paths only when the CALLER says which prefixes to strip.
+# Unset, its reasons keep this host's real paths — and they are transcribed
+# verbatim into a report the "keep the report free of host identity and
+# absolute local paths" rule below forbids them in. Most specific first.
+REDACT_PATH_PREFIXES=("$ROOT=<workspace>")
+if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && [ "$HOME" != "$ROOT" ]; then
+    REDACT_PATH_PREFIXES+=("$HOME=~")
+fi
 # The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
 # through is missing or will not load". Unchecked, that surfaces later as
 # `manifest_config_dir: command not found`, which is not a code any arm below
