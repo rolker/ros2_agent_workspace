@@ -48,8 +48,12 @@ checks), so this is the normal case, not an edge one.
 # the script to read it, and the remedy printed below would be inert on
 # exactly the path that prints it. `[ -f ]` + `bash` rather than `[ -x ]`:
 # exec bits are lost on a noexec mount, an unpacked archive or a CIFS share,
-# and a missing +x is not a reason to walk past the workspace.
-d="${WORKSPACE_ROOT:-$(pwd)}"; ROOT=""
+# and a missing +x is not a reason to walk past the workspace. $WORKSPACE_ROOT
+# is normalised to an ABSOLUTE path before the walk: `dirname .` is `.`, so a
+# relative value would make the loop below spin forever. A value that cannot
+# be entered at all falls back to $(pwd) so the walk still terminates — the
+# failure is then reported below, naming the $WORKSPACE_ROOT that was set.
+d=$(cd "${WORKSPACE_ROOT:-$(pwd)}" 2>/dev/null && pwd) || d=$(pwd); ROOT=""
 while [ "$d" != "/" ]; do
     if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
         ROOT=$(bash "$d/.agent/scripts/workspace_root.sh") || ROOT=""

@@ -40,8 +40,10 @@
 # skills carry verbatim — it starts at $WORKSPACE_ROOT when set, so that
 # variable is a usable remedy from a directory with no workspace above it, and
 # it stops at the FIRST copy found rather than walking past a workspace whose
-# script refused:
-#   d="${WORKSPACE_ROOT:-$(pwd)}"; ROOT=""
+# script refused. $WORKSPACE_ROOT is normalised to an ABSOLUTE path first,
+# because `dirname .` is `.`: a relative value would make the walk spin
+# forever, on exactly the remedy the skills print:
+#   d=$(cd "${WORKSPACE_ROOT:-$(pwd)}" 2>/dev/null && pwd) || d=$(pwd); ROOT=""
 #   while [ "$d" != "/" ]; do
 #       if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
 #           ROOT=$(bash "$d/.agent/scripts/workspace_root.sh") || ROOT=""

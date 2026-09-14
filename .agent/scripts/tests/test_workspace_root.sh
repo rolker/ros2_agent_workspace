@@ -47,11 +47,13 @@ make_root() {
 # (which is what makes "or set WORKSPACE_ROOT" a remedy from a directory with
 # no workspace above it), find the first copy of the script at or above there,
 # and let it have the last word. `[ -f ]` + `bash`, not `[ -x ]`: a lost exec
-# bit is not a reason to walk past the workspace.
+# bit is not a reason to walk past the workspace. $WORKSPACE_ROOT is normalised
+# to an ABSOLUTE path first: `dirname .` is `.`, so a relative value would make
+# this loop spin forever (case 11).
 walk_up_from() {
     (
         cd "$1" || exit 1
-        d="${WORKSPACE_ROOT:-$(pwd)}"
+        d=$(cd "${WORKSPACE_ROOT:-$(pwd)}" 2>/dev/null && pwd) || d=$(pwd)
         while [ "$d" != "/" ]; do
             if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
                 bash "$d/.agent/scripts/workspace_root.sh"
@@ -181,6 +183,33 @@ if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
     pass "a WORKSPACE_ROOT that is not a workspace fails the walk too, with empty stdout"
 else
     fail "bad remedy: rc=$rc out='$out' (expected non-zero / empty)"
+fi
+
+# --- 11. a RELATIVE $WORKSPACE_ROOT terminates instead of hanging -----------
+# `dirname .` is `.`, so a walk that started at a relative $WORKSPACE_ROOT
+# would spin forever — a silent hang on exactly the remedy the three skills
+# print. The walk normalises to an absolute path first. Both halves run under
+# `timeout`, so a regression FAILS (rc 124) rather than wedging the suite.
+root=$(make_root relative)
+out=$(WORKSPACE_ROOT="relative" timeout 20 bash -c \
+      "$(declare -f walk_up_from); walk_up_from \"$TMPDIR_ROOT\"" \
+      2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 0 ] && [ "$out" = "$root" ]; then
+    pass "a relative WORKSPACE_ROOT is normalised and resolves (no hang)"
+else
+    fail "relative root: rc=$rc out='$out' (expected 0 / '$root'; rc 124 = the walk hung), stderr='$(cat "$TMPDIR_ROOT/stderr")'"
+fi
+
+# The same, where the relative value names no workspace at all: it must reach
+# the "no root" answer, not loop.
+mkdir -p "$TMPDIR_ROOT/nowhere/deep"
+out=$(WORKSPACE_ROOT="." timeout 20 bash -c \
+      "$(declare -f walk_up_from); walk_up_from \"$TMPDIR_ROOT/nowhere/deep\"" \
+      2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] && [ -z "$out" ]; then
+    pass "a relative WORKSPACE_ROOT naming no workspace terminates non-zero, empty stdout"
+else
+    fail "relative no-root: rc=$rc out='$out' (expected non-zero and not 124 / empty)"
 fi
 
 echo ""
