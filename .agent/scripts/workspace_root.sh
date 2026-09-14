@@ -23,17 +23,30 @@
 #   3. From that root, hop to the MAIN checkout when it is a git worktree —
 #      `layers/` and the `configs/manifest` symlink exist only there, and every
 #      caller's contract says "anchored at the main workspace root, never the
-#      current worktree". This is the same hop resolve_repo_checkout.sh makes.
+#      current worktree". resolve_repo_checkout.sh makes the same `git
+#      --git-common-dir` hop; here it is additionally gated on the destination
+#      being a workspace root, so a hop that lands somewhere unusable keeps
+#      the root found above rather than replacing it with one.
+#      Note this redirects even an explicitly-set $WORKSPACE_ROOT when that
+#      root is a worktree: the callers' contract is the main checkout, and a
+#      worktree cannot satisfy it — the variable chooses WHICH workspace, not
+#      which checkout of it.
 #
 # A workspace root is recognised by holding both `.agent/scripts/` and
 # `configs/` — the two directories every caller addresses through it.
 #
 # Usage (executed; callers walk up for it because a script cannot be called
-# from a directory that has not been found yet):
-#   d=$(pwd); ROOT=""
+# from a directory that has not been found yet). This is the snippet the three
+# skills carry verbatim — it starts at $WORKSPACE_ROOT when set, so that
+# variable is a usable remedy from a directory with no workspace above it, and
+# it stops at the FIRST copy found rather than walking past a workspace whose
+# script refused:
+#   d="${WORKSPACE_ROOT:-$(pwd)}"; ROOT=""
 #   while [ "$d" != "/" ]; do
-#       [ -x "$d/.agent/scripts/workspace_root.sh" ] \
-#           && { ROOT=$("$d/.agent/scripts/workspace_root.sh") && break; }
+#       if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
+#           ROOT=$(bash "$d/.agent/scripts/workspace_root.sh") || ROOT=""
+#           break
+#       fi
 #       d=$(dirname "$d")
 #   done
 #

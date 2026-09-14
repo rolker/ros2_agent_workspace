@@ -49,11 +49,18 @@ checkout.
 # standing in. `workspace_root.sh` has the last word: it validates
 # $WORKSPACE_ROOT when set, and hops a worktree to the MAIN checkout, where
 # `layers/` and the `configs/manifest` symlink actually live. The walk is
-# inline because a script cannot be called from a directory not yet found.
-d=$(pwd); ROOT=""
+# inline because a script cannot be called from a directory not yet found —
+# and it STARTS at $WORKSPACE_ROOT when that is set, which is what makes "set
+# WORKSPACE_ROOT" a real remedy: the variable is read only *inside* the
+# script, so a walk that always began at $(pwd) could never reach a copy of
+# the script to read it, and the remedy printed below would be inert on
+# exactly the path that prints it. `[ -f ]` + `bash` rather than `[ -x ]`:
+# exec bits are lost on a noexec mount, an unpacked archive or a CIFS share,
+# and a missing +x is not a reason to walk past the workspace.
+d="${WORKSPACE_ROOT:-$(pwd)}"; ROOT=""
 while [ "$d" != "/" ]; do
-    if [ -x "$d/.agent/scripts/workspace_root.sh" ]; then
-        ROOT=$("$d/.agent/scripts/workspace_root.sh") || ROOT=""
+    if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
+        ROOT=$(bash "$d/.agent/scripts/workspace_root.sh") || ROOT=""
         break
     fi
     d=$(dirname "$d")
@@ -62,8 +69,8 @@ done
 
 An empty `$ROOT` means no workspace was found above you (a project repo cloned
 somewhere else entirely). The **named-repo** branch below cannot run without
-one — report `FAILED: no workspace root above <pwd> — run the audit from the
-workspace, or set WORKSPACE_ROOT` and stop. The **current-directory** branch
+one — report `FAILED: no workspace root above <where the walk started> — run
+the audit from the workspace, or set WORKSPACE_ROOT to one` and stop. The **current-directory** branch
 still works: it reads the tree in front of it, and the two layer-dependent
 checks report SKIPPED exactly as they do in `clone` mode.
 
@@ -104,7 +111,7 @@ nothing.
 ```bash
 # Prints "<path><TAB><layer|clone>"; every failure exits non-zero with a reason
 if [ -z "$ROOT" ]; then
-    echo "FAILED: no workspace root above $(pwd) — run from the workspace, or set WORKSPACE_ROOT"
+    echo "FAILED: no workspace root above ${WORKSPACE_ROOT:-$(pwd)} — run from the workspace, or set WORKSPACE_ROOT to one"
     exit 1
 fi
 if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" <repo-name>); then
