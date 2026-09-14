@@ -656,6 +656,74 @@ else
     fail "worktree: could not create the test worktree"
 fi
 
+# --- 10. credentials never reach stderr (and so never reach the report) ------
+# Both scripts funnel their failure reasons into a sweep report that is written
+# to disk and handed around. A manifest url is not supposed to carry userinfo
+# and `WORKSPACE_MANIFEST_GIT_BASE` comes from the ambient environment, so
+# "supposed to" is not a guarantee. The redaction is shared (redact.sh) so the
+# two cannot drift apart.
+( set -uo pipefail
+  # shellcheck source=../redact.sh
+  source "$REAL_SCRIPTS_DIR/redact.sh"
+  [ "$(redact_url 'https://bob:hunter2@github.com/o/r.git')" = 'https://<redacted>@github.com/o/r.git' ] || exit 1
+  [ "$(redact_url 'ssh://bob:hunter2@example.com/o/r.git')" = 'ssh://<redacted>@example.com/o/r.git' ] || exit 1
+  # scp-form has no password field; leave it readable.
+  [ "$(redact_url 'git@github.com:o/r.git')" = 'git@github.com:o/r.git' ] || exit 1
+  [ "$(redact_url 'https://github.com/o/r.git')" = 'https://github.com/o/r.git' ] || exit 1
+  # Captured git output: the url is mid-sentence, on any line, and there may be
+  # more than one. redact_url's whole-string anchor does not match there.
+  got=$(redact_text "fatal: could not read from https://bob:hunter2@github.com/o/r.git
+remote: denied for ssh://bob:hunter2@example.com/o/r.git")
+  case "$got" in *hunter2*) exit 1 ;; esac
+  case "$got" in *'<redacted>@github.com'*) ;; *) exit 1 ;; esac
+  case "$got" in *'<redacted>@example.com'*) ;; *) exit 1 ;; esac
+  # Local paths carry host identity into the same report.
+  # shellcheck disable=SC2034  # read by redact_text, in the file sourced above
+  REDACT_PATH_PREFIXES=("/home/someone/ws=<workspace>" "/home/someone=~")
+  [ "$(redact_text 'failed at /home/someone/ws/.agent/scratchpad/x')" = 'failed at <workspace>/.agent/scratchpad/x' ] || exit 1
+  [ "$(redact_text 'failed at /home/someone/elsewhere')" = 'failed at ~/elsewhere' ] || exit 1
+  # No prefixes configured, and no url: the string is returned unchanged.
+  unset REDACT_PATH_PREFIXES
+  [ "$(redact_text 'plain reason, nothing to strip')" = 'plain reason, nothing to strip' ] || exit 1
+) && pass "redact_url/redact_text strip userinfo and local path prefixes" \
+  || fail "redaction helpers: see .agent/scripts/redact.sh"
+
+# redact.sh executed rather than sourced would define two functions and exit 0
+# having done nothing — the silent success both its callers exist to refuse.
+out=$(bash "$REAL_SCRIPTS_DIR/redact.sh" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 2 ] && [ -z "$out" ] && stderr_text | grep -q "must be sourced"; then
+    pass "redact.sh executed → exit 2 with a reason, never a silent 0"
+else
+    fail "redact.sh source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(stderr_text)'"
+fi
+
+# ...and the resolver actually uses it: a manifest url in no recognised form is
+# reported with its userinfo stripped, without ever reaching the network.
+root=$(make_root redaction_resolver)
+write_manifest "$root" "demo_repo" "ftp://bob:hunter2@example.com/o/r.git"
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 6 ] && [ -z "$out" ] && ! stderr_text | grep -q "hunter2" \
+   && stderr_text | grep -q "<redacted>@example.com"; then
+    pass "an unrecognised manifest url is reported with its credentials redacted"
+else
+    fail "resolver redaction: rc=$rc out='$out' (expected 6 / empty), stderr='$(stderr_text)'"
+fi
+
+# ...and so does the manifest fallback, on the one url it takes from the
+# ambient environment. A base carrying `..` is refused before any clone, so
+# this stays hermetic while still exercising the message.
+root=$(make_root redaction_manifest_fallback)
+echo "https://raw.githubusercontent.com/testowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="https://bob:hunter2@example.com/../mirror" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] && ! stderr_text | grep -q "hunter2" \
+   && stderr_text | grep -q "WORKSPACE_MANIFEST_GIT_BASE"; then
+    pass "a WORKSPACE_MANIFEST_GIT_BASE carrying credentials is reported redacted"
+else
+    fail "manifest fallback redaction: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
 echo ""
 echo "Passed: $TEST_PASS  Failed: $TEST_FAIL"
 [ "$TEST_FAIL" -eq 0 ]

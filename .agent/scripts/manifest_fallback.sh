@@ -17,7 +17,8 @@
 # normal search path rather than replacing it — a workspace that has a real
 # `configs/manifest` never takes this path at all.
 #
-# Usage (sourced — this file defines functions and runs nothing on its own):
+# Usage (sourced — this file defines functions and runs nothing on its own, and
+# it sources `redact.sh` beside it, which must be present):
 #   source /path/to/.agent/scripts/manifest_fallback.sh
 #   extra_config_dir=$(manifest_config_dir "$ROOT"); rc=$?
 #   case "$rc" in
@@ -57,6 +58,26 @@
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "manifest_fallback.sh must be sourced, not executed: source ${BASH_SOURCE[0]} && manifest_config_dir <workspace-root>" >&2
     exit 2
+fi
+
+# Credentials must never reach the sweep report, and this helper prints urls
+# that came from the ambient environment (`WORKSPACE_MANIFEST_GIT_BASE`) into
+# exactly that report. The redaction is shared with resolve_repo_checkout.sh
+# rather than duplicated — two copies of the regex drift, and the one that
+# drifts is the one that leaks. A caller that already sourced redact.sh (the
+# resolver does) keeps its definitions; a missing helper is refused rather than
+# printed around, because the failure mode of "carry on" is a leak.
+if ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/null 2>&1; then
+    _manifest_fallback_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -f "$_manifest_fallback_dir/redact.sh" ]]; then
+        # shellcheck source=redact.sh
+        source "$_manifest_fallback_dir/redact.sh"
+    fi
+    unset _manifest_fallback_dir
+fi
+if ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/null 2>&1; then
+    echo "manifest_fallback.sh: cannot find redact.sh beside it — refusing to source a helper that would print urls unredacted" >&2
+    return 2
 fi
 
 # manifest_config_dir <workspace_root>
@@ -102,7 +123,7 @@ manifest_config_dir() {
     # failure path). Anything else is reported as unsupported rather than
     # guessed at.
     if [[ ! "$bootstrap_url" =~ ^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)/bootstrap\.yaml$ ]]; then
-        echo "manifest_fallback: '$bootstrap_url' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can" >&2
+        echo "manifest_fallback: '$(redact_url "$bootstrap_url")' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can" >&2
         return 3
     fi
     owner="${BASH_REMATCH[1]}"
@@ -118,7 +139,7 @@ manifest_config_dir() {
        || [[ ! "$repo" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
        || [[ ! "$branch" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
        || [[ "$config_path" == /* || "$config_path" == *..* ]]; then
-        echo "manifest_fallback: '$bootstrap_url' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess" >&2
+        echo "manifest_fallback: '$(redact_url "$bootstrap_url")' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess" >&2
         return 3
     fi
 
@@ -129,7 +150,7 @@ manifest_config_dir() {
     # never be read as a git OPTION or as a stray local path.
     local git_base="${WORKSPACE_MANIFEST_GIT_BASE:-https://github.com}"
     if [[ ! "$git_base" =~ ^(https?|ssh|git|file)://[^[:space:]]+$ ]] || [[ "$git_base" == *..* ]]; then
-        echo "manifest_fallback: WORKSPACE_MANIFEST_GIT_BASE '$git_base' is not a <scheme>://<host>/<path> url — refusing to hand it to git clone" >&2
+        echo "manifest_fallback: WORKSPACE_MANIFEST_GIT_BASE '$(redact_url "$git_base")' is not a <scheme>://<host>/<path> url — refusing to hand it to git clone" >&2
         return 5
     fi
     git_url="${git_base%/}/$owner/$repo.git"
@@ -169,7 +190,7 @@ manifest_config_dir() {
         # rather than reused as-is.
         cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
         if [[ "$cached_url" != "$git_url" ]]; then
-            echo "manifest_fallback: cached manifest clone at $clone_dir points at '${cached_url:-<none>}', the bootstrap pointer derives '$git_url' — re-cloning" >&2
+            echo "manifest_fallback: cached manifest clone at $clone_dir points at '$(redact_url "${cached_url:-<none>}")', the bootstrap pointer derives '$(redact_url "$git_url")' — re-cloning" >&2
             rm -rf "$clone_dir"
         fi
     fi
@@ -186,20 +207,20 @@ manifest_config_dir() {
         # FAILED(manifest refresh: <reason>).
         if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1) \
            || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1); then
-            echo "manifest_fallback: could not refresh the cached manifest repo at $clone_dir ($out) — the cached copy may be stale, so this is a failure, not a fallback" >&2
+            echo "manifest_fallback: could not refresh the cached manifest repo at $clone_dir ($(redact_text "$out")) — the cached copy may be stale, so this is a failure, not a fallback" >&2
             return 6
         fi
     else
         rm -rf "$clone_dir"
         if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1); then
-            echo "manifest_fallback: could not clone the manifest repo $git_url at '$branch': $out" >&2
+            echo "manifest_fallback: could not clone the manifest repo $(redact_url "$git_url") at '$branch': $(redact_text "$out")" >&2
             rm -rf "$clone_dir"
             return 5
         fi
     fi
 
     if [[ ! -d "$clone_dir/$config_path/repos" ]]; then
-        echo "manifest_fallback: $git_url ($branch) has no '$config_path/repos' directory — the bootstrap pointer and the manifest repo disagree" >&2
+        echo "manifest_fallback: $(redact_url "$git_url") ($branch) has no '$config_path/repos' directory — the bootstrap pointer and the manifest repo disagree" >&2
         return 5
     fi
 

@@ -48,7 +48,8 @@
 #   5  could not produce a checkout: a clone or refresh failed (including the
 #      manifest repo's own clone), a layer checkout exists but cannot be read,
 #      or the local scaffolding the clone needs could not be set up (temp dir,
-#      cache directory, or the per-repo lock)
+#      cache directory, the per-repo lock, or the sibling `redact.sh` this
+#      script's diagnostics are routed through)
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
 #      `url:` key, a URL in no recognised form, or a `version:` that is
 #      neither a full commit SHA nor a ref-safe branch/tag name) — distinct
@@ -122,15 +123,17 @@ trap cleanup EXIT
 # Failure messages name the url so the operator can see which remote failed,
 # and the caller funnels this stderr into a report that must stay free of
 # credentials. A manifest url is not supposed to carry userinfo, but "supposed
-# to" is not a guarantee — strip any `user[:password]@` before printing.
-redact_url() {
-    local url="$1"
-    if [[ "$url" =~ ^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@(.*)$ ]]; then
-        printf '%s<redacted>@%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
-    else
-        printf '%s' "$url"
-    fi
-}
+# to" is not a guarantee — `redact_url` strips any `user[:password]@` from a
+# url, and `redact_text` does the same anywhere inside a captured command
+# output. Shared with manifest_fallback.sh (which prints into the same report)
+# rather than duplicated, and its absence is a failure: a run that carried on
+# without it would print the very thing the helper exists to remove.
+if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
+    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    exit 5
+fi
+# shellcheck source=redact.sh
+source "$SCRIPT_DIR/redact.sh"
 
 # Unattended network git, precisely:
 #   - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/true stop git's own username and
