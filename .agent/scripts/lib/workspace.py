@@ -58,12 +58,18 @@ def get_workspace_root():
     return str(workspace_root)
 
 
-def get_overlay_repos(include_underlay=False):
+def get_overlay_repos(include_underlay=False, extra_config_dirs=None):
     """
     Get a list of all repositories defined in workspace .repos files.
 
     Args:
         include_underlay (bool): If True, include repositories from underlay.repos
+        extra_config_dirs (list): Additional directories to search for `.repos`
+            files, searched AFTER the workspace's own. Additive on purpose:
+            `configs/manifest` is a symlink into the layer tree, so a host with
+            no `layers/` has no manifests at all, and a caller can hand us a
+            cloned manifest's config dir (see manifest_fallback.sh) without
+            hiding any manifest the workspace does have.
 
     Returns:
         list: List of dictionaries containing repository information:
@@ -85,6 +91,7 @@ def get_overlay_repos(include_underlay=False):
         os.path.join(workspace_root, "configs", "manifest", "repos"),
         os.path.join(workspace_root, "configs"),
     ]
+    config_dirs.extend(extra_config_dirs or [])
 
     # Sorted: glob order is filesystem order, which decided *which* manifest
     # error a caller saw first, and whether a lookup reached a valid manifest
@@ -115,7 +122,7 @@ def get_overlay_repos(include_underlay=False):
     return repos_list
 
 
-def get_optional_layers(workspace_root=None):
+def get_optional_layers(workspace_root=None, extra_config_dirs=None):
     """Layer names that are allowed to be absent (configs/manifest/optional_layers.txt).
 
     setup_layers.sh treats these layers as optional: if `vcs import` fails (a
@@ -123,13 +130,34 @@ def get_optional_layers(workspace_root=None):
     exits 0. Anything that reports on missing repos must know that, or it flags
     a supported host configuration as broken.
 
+    Args:
+        workspace_root (str|Path): the workspace to read; defaults to this
+            checkout's root.
+        extra_config_dirs (list): the same `--config-dir` values handed to
+            `get_overlay_repos` — a cloned manifest's `repos` directory, from
+            manifest_fallback.sh. `configs/manifest` is a symlink into the
+            gitignored layer tree, so on a host with no `layers/` the file is
+            only reachable through that clone; without searching it this
+            returns an empty set there and every inaccessible optional-layer
+            repo is reported as a failure on every run, forever. In the
+            manifest repo `optional_layers.txt` sits BESIDE the `repos`
+            directory (`configs/manifest/optional_layers.txt` vs
+            `configs/manifest/repos/`), so each dir and its parent are both
+            searched. The workspace's own file always wins; the clone is a
+            fallback, never an override.
+
     Format: one layer name per line; `#` comments and blank lines ignored —
     kept byte-compatible with setup_layers.sh's is_optional_layer().
     """
     if workspace_root is None:
         workspace_root = get_workspace_root()
-    optional_file = Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"
-    if not optional_file.exists():
+    candidates = [Path(workspace_root) / "configs" / "manifest" / "optional_layers.txt"]
+    for config_dir in extra_config_dirs or []:
+        candidates.append(Path(config_dir) / "optional_layers.txt")
+        candidates.append(Path(config_dir).parent / "optional_layers.txt")
+
+    optional_file = next((c for c in candidates if c.is_file()), None)
+    if optional_file is None:
         return set()
     layers = set()
     for line in optional_file.read_text().splitlines():

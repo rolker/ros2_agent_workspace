@@ -6,7 +6,7 @@ This script scans the configs/ directory for .repos files and outputs a JSON
 list of all repositories defined across all layers (excluding underlay.repos).
 
 Usage:
-    python3 list_overlay_repos.py
+    python3 list_overlay_repos.py [--config-dir DIR]
 
 Output:
     JSON array containing:
@@ -34,11 +34,25 @@ def main():
         "--include-underlay", action="store_true", help="Include repositories from underlay.repos"
     )
     parser.add_argument("--format", choices=["json", "names"], default="json", help="Output format")
+    parser.add_argument(
+        "--config-dir",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help=(
+            "Additional directory to search for .repos files, in addition to the "
+            "workspace's own configs/. Repeatable. Used when configs/manifest is "
+            "absent (no layers/ on this host) and the manifest repo has been "
+            "cloned instead — see .agent/scripts/manifest_fallback.sh."
+        ),
+    )
 
     args = parser.parse_args()
 
     try:
-        repos = get_overlay_repos(include_underlay=args.include_underlay)
+        repos = get_overlay_repos(
+            include_underlay=args.include_underlay, extra_config_dirs=args.config_dir
+        )
     except WorkspaceConfigError as exc:
         # Printing `[]` for an unparseable manifest hands every consumer an
         # empty list that is indistinguishable from "no repos configured" (#609).

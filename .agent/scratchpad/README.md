@@ -79,9 +79,25 @@ EOF
 # Clean up your specific temporary files by pattern
 rm .agent/scratchpad/issue_body.* 2>/dev/null || true
 
-# Or clean up old files (older than 1 day)
-find .agent/scratchpad -type f -mtime +1 -delete
+# Or clean up old loose files (older than 1 day) — top level only, so it
+# cannot reach into a subdirectory that is a managed cache (see below)
+find .agent/scratchpad -maxdepth 1 -type f -mtime +1 -delete
 ```
+
+**Not everything here is loose scratch.** Some subdirectories are caches with
+their own retention rules, and an age sweep run over them deletes the half a
+long-lived run still needs:
+
+- `.agent/scratchpad/janitor/` — `/janitor-sweep`'s reports, kept for the last
+  20 runs by the skill itself. Nothing else prunes them, and a deleted report
+  is gone — they are the durable output of a run, not a temp file.
+- `.agent/scratchpad/janitor-repos/`, `.agent/scratchpad/manifest-repo/` —
+  shallow clones. These self-heal (a missing or repointed clone is re-cloned),
+  so the reclaim is deleting a **whole** directory, never individual files by
+  age out from under a clone another agent is reading. Delete it only while no
+  sweep or audit is running on this host: `resolve_repo_checkout.sh` holds its
+  per-repo lock across the clone/refresh only, so a run reads its checkout
+  unlocked and a tree that vanishes mid-audit surfaces as a phantom finding.
 
 ## Alternative: `/tmp`
 For truly ephemeral files (cleaned up within the same command), use `/tmp` instead.

@@ -28,14 +28,132 @@ workspace-level tracking.
 
 ### 1. Enumerate repositories
 
+Enumerate against the **main workspace root**, never the current directory:
+`configs/` lives only in the main checkout, so a worktree-relative run
+enumerates **zero** repos on a host that has dozens — and would then trip the
+empty-list guard below as a false FAILED with the wrong remedy. This skill is
+routinely run from a worktree (directly, and as one of `janitor-sweep`'s four
+checks), so this is the normal case, not an edge one.
+
 ```bash
-python3 .agent/scripts/list_overlay_repos.py
+# The workspace root is the nearest ancestor that HOLDS the workspace
+# (`.agent/scripts/` + `configs/`) — not whatever repo you happen to be
+# standing in. `workspace_root.sh` has the last word: it validates
+# $WORKSPACE_ROOT when set, and hops a worktree to the MAIN checkout, where
+# `layers/` and the `configs/manifest` symlink actually live. The walk is
+# inline because a script cannot be called from a directory not yet found —
+# and it STARTS at $WORKSPACE_ROOT when that is set, which is what makes "set
+# WORKSPACE_ROOT" a real remedy: the variable is read only *inside* the
+# script, so a walk that always began at $(pwd) could never reach a copy of
+# the script to read it, and the remedy printed below would be inert on
+# exactly the path that prints it. `[ -f ]` + `bash` rather than `[ -x ]`:
+# exec bits are lost on a noexec mount, an unpacked archive or a CIFS share,
+# and a missing +x is not a reason to walk past the workspace. $WORKSPACE_ROOT
+# is normalised to an ABSOLUTE path before the walk: `dirname .` is `.`, so a
+# relative value would make the loop below spin forever. A value that cannot
+# be entered at all falls back to $(pwd) so the walk still terminates — the
+# failure is then reported below, naming the $WORKSPACE_ROOT that was set.
+d=$(cd "${WORKSPACE_ROOT:-$(pwd)}" 2>/dev/null && pwd) || d=$(pwd); ROOT=""
+while [ "$d" != "/" ]; do
+    if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
+        ROOT=$(bash "$d/.agent/scripts/workspace_root.sh") || ROOT=""
+        break
+    fi
+    d=$(dirname "$d")
+done
+if [ -z "$ROOT" ]; then
+    echo "FAILED(workspace root: none above ${WORKSPACE_ROOT:-$(pwd)} — run from the workspace, or set WORKSPACE_ROOT to one)"
+    exit 1
+fi
 ```
+
+(This resolves the workspace from a *layer* worktree too, where the earlier
+`git --git-common-dir` form answered with the project repo's own root — which
+has neither the manifests nor the scripts this skill goes on to call.)
+
+Enumerate through the fallback, **never** with a bare
+`list_overlay_repos.py "$ROOT/..."` call of its own. Where `$ROOT/configs/manifest`
+is absent — a fresh clone or a container, where `layers/` does not exist and
+`configs/manifest` is a symlink into it — the manifests have to be cloned
+first, and an enumeration that runs before that prints `[]` at **exit 0**,
+which the empty-list guard below then maps to the one remedy this skill's own
+rules forbid. So there is exactly one enumeration site, and it is on the
+fallback's success path:
+
+```bash
+# `manifest_fallback.sh` routes every diagnostic through `redact.sh`, which
+# rewrites absolute paths only when the CALLER says which prefixes to strip.
+# Unset, its reasons keep this host's real paths — and they are transcribed
+# verbatim into a report the triage output, and from there into notes and
+# issue comments, carries them off this host. Most specific first.
+REDACT_PATH_PREFIXES=("$ROOT=<workspace>")
+if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && [ "$HOME" != "$ROOT" ]; then
+    REDACT_PATH_PREFIXES+=("$HOME=~")
+fi
+# The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
+# through is missing or will not load". Unchecked, that surfaces later as
+# `manifest_config_dir: command not found`, which is not a code any arm below
+# claims. Check it here, where the reason is still on stderr.
+if ! source "$ROOT/.agent/scripts/manifest_fallback.sh"; then
+    echo "FAILED: manifest fallback unusable — the reason is on stderr"
+    exit 1
+fi
+LIST_ARGS=()
+if extra=$(manifest_config_dir "$ROOT"); then
+    # empty when the workspace has its own manifest (the normal case)
+    if [ -n "$extra" ]; then
+        LIST_ARGS+=(--config-dir "$extra")
+    fi
+    python3 "$ROOT/.agent/scripts/list_overlay_repos.py" "${LIST_ARGS[@]}"
+else
+    # Captured before anything else runs — read inside an arm, $? is no longer
+    # reliably the status `case` branched on.
+    rc=$?
+    case "$rc" in
+        3) echo "FAILED: no repo manifest configured — run 'make setup-all'" ;;
+        5) echo "FAILED: manifest repo unreachable — the reason is on stderr" ;;
+        6) echo "FAILED: manifest refresh — the reason is on stderr" ;;
+        *) echo "FAILED: manifest fallback exited unexpectedly (exit $rc)" ;;
+    esac
+fi
+```
+
+Every failure arm is terminal — none falls through to an enumeration, which
+would report zero repos as a clean triage. rc 6 (a cached manifest clone that
+could not be refreshed) is terminal too, and for the opposite reason: the
+cached manifest is readable, so the triage would run to completion over a repo
+list this host could not verify and report it as a finished scan.
 
 This outputs a JSON list of `{name, url, version, source_file}` for all overlay repos.
 Parse the `owner/repo` from each URL.
 
 If `--repo` was specified, filter to just that repository.
+
+**An empty list is a failure, not an empty answer.** With the root anchored and
+the manifest fallback attempted, an empty list means nothing is configured at
+all — and `list_overlay_repos.py` prints `[]` at **exit 0** in that state. A
+triage that scanned zero repos reports no stale issues, which reads identically
+to "there are none" (#609). So:
+
+- Empty list → stop and report
+  **`FAILED: no repo manifest configured — run 'make setup-all'`**. Do not
+  produce a triage report.
+- Non-zero exit from the script → **`FAILED: manifest unreadable`** with its
+  stderr. Also not an empty list.
+- `manifest_config_dir` exit **5** — the bootstrap pointer names a manifest
+  repo this host could not clone (unreachable remote, no credentials, a
+  pointer and a manifest that disagree) → **`FAILED: manifest repo
+  unreachable`** with its stderr reason. Never `make setup-all`: that
+  command's own first step is this same clone, so it cannot fix it. Exit
+  **3** — no `configs/manifest` *and* no usable bootstrap pointer — is the
+  one state whose remedy really is `make setup-all`.
+- `--repo <name>` that matches nothing in a manifest that *was* read → report
+  that the repo is not listed, rather than triaging an empty set.
+
+Every report this skill produces states how many repos were scanned, so a
+partial scan is never indistinguishable from a clean one. A repo whose
+`gh issue list` errors (auth, rate limit, network) is named and makes the run
+**FAILED** — never an all-clear over the repos that happened to answer.
 
 ### 2. Fetch open issues per repo
 
