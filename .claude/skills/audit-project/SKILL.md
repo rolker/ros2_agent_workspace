@@ -118,8 +118,10 @@ if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" <repo-name>); th
     # exit 2 = usage (including a repo name that is not a single path segment)
     # exit 3 = no repo manifest configured at all (run `make setup-all`)
     # exit 4 = repo not listed in any manifest that was read
-    # exit 5 = no checkout produced: a clone/refresh failed, or the temp dir,
-    #          cache directory or per-repo lock could not be set up
+    # exit 5 = no checkout produced: a clone/refresh failed, the temp dir,
+    #          cache directory or per-repo lock could not be set up, or a
+    #          helper it needs locally (redact.sh, manifest_fallback.sh) is
+    #          missing, will not load, or answered unrecognisably
     # exit 6 = manifest unreadable, or the entry is malformed (no url:, a url
     #          in no recognised form, or an unsafe version:)
     # exit 7 = declared in two manifests with a conflicting url or version:

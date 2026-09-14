@@ -465,6 +465,35 @@ else
     fail "source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h4a. ...and without its redact.sh it returns 5, never 2 ---------------
+# 2 already means "you executed this file instead of sourcing it". Reusing it
+# for "the redact.sh I route diagnostics through is missing" made the two
+# indistinguishable to a caller, and neither of the two callers checked the
+# `source` status at all: the condition surfaced as `manifest_config_dir:
+# command not found` and was then reported as exit 3, "no repo manifest
+# configured — run make setup-all". 5 is what resolve_repo_checkout.sh already
+# answers for the identical condition.
+mkdir -p "$TMPDIR_ROOT/no_redact"
+cp "$REAL_SCRIPTS_DIR/manifest_fallback.sh" "$TMPDIR_ROOT/no_redact/"
+out=$(bash -c "source '$TMPDIR_ROOT/no_redact/manifest_fallback.sh'" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] && stderr_text | grep -q "cannot load redact.sh"; then
+    pass "manifest_fallback.sh sourced without redact.sh → 5 (the resolver's code), not 2"
+else
+    fail "redact guard: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
+# A redact.sh that EXISTS but will not load is the same answer: the rc of the
+# `source` is checked, not inferred from the file being present.
+mkdir -p "$TMPDIR_ROOT/bad_redact"
+cp "$REAL_SCRIPTS_DIR/manifest_fallback.sh" "$TMPDIR_ROOT/bad_redact/"
+printf 'redact_url() {\n' > "$TMPDIR_ROOT/bad_redact/redact.sh"
+out=$(bash -c "source '$TMPDIR_ROOT/bad_redact/manifest_fallback.sh'" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] && stderr_text | grep -q "cannot load redact.sh"; then
+    pass "a redact.sh that will not load → 5 as well, never a half-defined shell"
+else
+    fail "redact load failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
 # --- 6h4b. a cached manifest that cannot be REFRESHED is a failure ----------
 # The cached clone is still readable, which is exactly why a refresh failure
 # needs its own answer: returning 0 with a stderr warning let the caller

@@ -21,8 +21,9 @@
 # `configs/manifest` never takes this path at all.
 #
 # Usage (sourced — this file defines functions and runs nothing on its own, and
-# it sources `redact.sh` beside it, which must be present):
-#   source /path/to/.agent/scripts/manifest_fallback.sh
+# it sources `redact.sh` beside it, which must be present). The `source` itself
+# can fail (exit 5, below), so its status is checked rather than assumed:
+#   source /path/to/.agent/scripts/manifest_fallback.sh || exit 5   # see below
 #   extra_config_dir=$(manifest_config_dir "$ROOT"); rc=$?
 #   case "$rc" in
 #       0) ;;  # usable: EMPTY string means "the workspace's own manifest is
@@ -32,7 +33,14 @@
 #              # clone or the cache/lock failed, the derived git base was
 #              # refused, or the pointer and the manifest repo disagree — the
 #              # cloned `bootstrap.yaml` names a different repo or branch, its
-#              # `config_path` is unsafe, or there is no `<config_path>/repos`
+#              # `config_path` is unsafe, or there is no `<config_path>/repos`.
+#              # Also returned by the SOURCE of this file when `redact.sh`
+#              # beside it is missing or will not load — the same "a required
+#              # local piece is unusable" answer resolve_repo_checkout.sh
+#              # gives that condition, and deliberately NOT 2, which means
+#              # "you executed this file instead of sourcing it": one is a
+#              # caller bug, the other an unusable install, and a caller that
+#              # reads 2 for both reports the wrong remedy
 #       6) ;;  # a CACHED manifest clone could not be refreshed (reason on
 #              # stderr). Its own outcome, not a warning on top of rc 0: the
 #              # cached copy may be arbitrarily stale, and a caller that
@@ -56,6 +64,11 @@
 # The clone is a cache, not state: `rm -rf .agent/scratchpad/manifest-repo` at
 # any time and the next run re-creates it.
 
+# Exit codes at SOURCE time (manifest_config_dir's own are in the table above):
+#   2  executed rather than sourced — a caller bug
+#   5  `redact.sh` beside this file is missing or would not load, so the
+#      diagnostics this helper prints into a report could not be redacted
+#
 # Sourced, not executed — the mirror image of resolve_repo_checkout.sh's guard.
 # Run directly, this file would define two functions and exit 0 having done
 # nothing at all: a silent success, from a script whose whole job is to refuse
@@ -72,18 +85,27 @@ fi
 # drifts is the one that leaks. A caller that already sourced redact.sh (the
 # resolver does) keeps its definitions; a missing helper is refused rather than
 # printed around, because the failure mode of "carry on" is a leak.
+_manifest_fallback_redact_rc=0
 if ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/null 2>&1; then
     _manifest_fallback_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     if [[ -f "$_manifest_fallback_dir/redact.sh" ]]; then
+        # A `source` that FAILED (a truncated or edited-in-place redact.sh) can
+        # still leave a half-defined shell: the rc is checked rather than
+        # inferred from whether the two names happen to exist.
         # shellcheck source=redact.sh
-        source "$_manifest_fallback_dir/redact.sh"
+        source "$_manifest_fallback_dir/redact.sh" || _manifest_fallback_redact_rc=$?
+    else
+        _manifest_fallback_redact_rc=1
     fi
     unset _manifest_fallback_dir
 fi
-if ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/null 2>&1; then
-    echo "manifest_fallback.sh: cannot find redact.sh beside it — refusing to source a helper that would print urls unredacted" >&2
-    return 2
+if [[ "$_manifest_fallback_redact_rc" -ne 0 ]] \
+   || ! declare -F redact_url >/dev/null 2>&1 || ! declare -F redact_text >/dev/null 2>&1; then
+    unset _manifest_fallback_redact_rc
+    echo "manifest_fallback.sh: cannot load redact.sh beside it — refusing to source a helper that would print urls unredacted (exit 5)" >&2
+    return 5
 fi
+unset _manifest_fallback_redact_rc
 
 # One funnel for every diagnostic, so a new message cannot forget to redact.
 # Paths are rewritten only when the CALLER has set $REDACT_PATH_PREFIXES

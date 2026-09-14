@@ -77,15 +77,25 @@ rules forbid. So there is exactly one enumeration site, and it is on the
 fallback's success path:
 
 ```bash
-source "$ROOT/.agent/scripts/manifest_fallback.sh"
+# The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
+# through is missing or will not load". Unchecked, that surfaces later as
+# `manifest_config_dir: command not found`, which is not a code any arm below
+# claims. Check it here, where the reason is still on stderr.
+if ! source "$ROOT/.agent/scripts/manifest_fallback.sh"; then
+    echo "FAILED: manifest fallback unusable — the reason is on stderr"
+    exit 1
+fi
 if extra=$(manifest_config_dir "$ROOT"); then
     python3 "$ROOT/.agent/scripts/list_overlay_repos.py" ${extra:+--config-dir "$extra"}
 else
-    case $? in
+    # Captured before anything else runs — read inside an arm, $? is no longer
+    # reliably the status `case` branched on.
+    rc=$?
+    case "$rc" in
         3) echo "FAILED: no repo manifest configured — run 'make setup-all'" ;;
         5) echo "FAILED: manifest repo unreachable — the reason is on stderr" ;;
         6) echo "FAILED: manifest refresh — the reason is on stderr" ;;
-        *) echo "FAILED: manifest fallback exited unexpectedly" ;;
+        *) echo "FAILED: manifest fallback exited unexpectedly (exit $rc)" ;;
     esac
 fi
 ```

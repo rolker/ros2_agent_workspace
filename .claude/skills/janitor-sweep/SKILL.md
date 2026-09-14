@@ -124,7 +124,14 @@ manifests have to be cloned before any repo can be enumerated. That is
 it needs" covers:
 
 ```bash
-source "$ROOT/.agent/scripts/manifest_fallback.sh"
+# The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
+# through is missing or will not load". Unchecked, that surfaces later as
+# `manifest_config_dir: command not found`, which is not a code any arm below
+# claims. Check it here, where the reason is still on stderr.
+if ! source "$ROOT/.agent/scripts/manifest_fallback.sh"; then
+    echo "FAILED(manifest fallback unusable — the reason is on stderr)"
+    exit 1
+fi
 EXTRA_CONFIG=""
 LIST_ARGS=()
 if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
@@ -132,12 +139,15 @@ if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
     LIST_ARGS=(${EXTRA_CONFIG:+--config-dir "$EXTRA_CONFIG"})
     python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 else
-    # Both arms are terminal: the sweep is FAILED and nothing is enumerated.
-    case $? in
+    # Every arm is terminal: the sweep is FAILED and nothing is enumerated.
+    # The status is captured before anything else runs — read inside an arm it
+    # is no longer reliably the one `case` branched on.
+    rc=$?
+    case "$rc" in
         3) echo "FAILED(no repo manifest configured — run 'make setup-all')" ;;
         5) echo "FAILED(manifest repo unreachable — the reason is on stderr)" ;;
         6) echo "FAILED(manifest refresh — the reason is on stderr)" ;;
-        *) echo "FAILED(manifest fallback: unexpected exit)" ;;
+        *) echo "FAILED(manifest fallback: unexpected exit $rc)" ;;
     esac
 fi
 ```

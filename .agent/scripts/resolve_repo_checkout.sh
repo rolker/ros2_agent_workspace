@@ -68,7 +68,11 @@
 #      manifest repo's own clone), a layer checkout exists but cannot be read,
 #      or the local scaffolding the clone needs could not be set up (temp dir,
 #      cache directory, the per-repo lock, or the sibling `redact.sh` this
-#      script's diagnostics are routed through)
+#      script's diagnostics are routed through). Also: `manifest_fallback.sh`
+#      could not be SOURCED (its own `redact.sh` is missing or will not load),
+#      or it answered with a status this script does not recognise — neither
+#      is evidence that no manifest is configured, which is what falling
+#      through to exit 3 would have claimed
 #   6  manifest unreadable, or the repo's manifest entry is malformed (no
 #      `url:` key, a URL in no recognised form, or a `version:` that is
 #      neither a full commit SHA nor a ref-safe branch/tag name) — distinct
@@ -127,8 +131,16 @@ if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
     echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
     exit 5
 fi
+# The `source` status is checked for the same reason its absence is: a
+# truncated or half-edited redact.sh leaves the functions undefined, and a run
+# that carried on would print the very thing they exist to remove.
 # shellcheck source=redact.sh
-source "$SCRIPT_DIR/redact.sh"
+if ! source "$SCRIPT_DIR/redact.sh" \
+   || ! declare -F redact_url >/dev/null 2>&1 \
+   || ! declare -F redact_text >/dev/null 2>&1; then
+    echo "resolve_repo_checkout.sh: $SCRIPT_DIR/redact.sh would not load — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    exit 5
+fi
 
 # One funnel for every diagnostic, so a new message cannot forget to redact.
 # Path rewriting joins in once $MAIN_ROOT is known (below); until then
@@ -256,8 +268,18 @@ fi
 # when the workspace has its own manifest, which is the normal case.
 EXTRA_CONFIG=()
 if [[ -f "$SCRIPT_DIR/manifest_fallback.sh" ]]; then
+    # The SOURCE can fail on its own (exit 5: the `redact.sh` it routes its
+    # diagnostics through is missing or will not load). Unchecked, the failure
+    # surfaced as `manifest_config_dir: command not found` — rc 127, which no
+    # arm below claimed, so the run fell through to an enumeration that found
+    # nothing and reported exit 3, "no repo manifest configured — run
+    # `make setup-all`": a remedy for a condition that is not the one that
+    # occurred.
     # shellcheck source=manifest_fallback.sh
-    source "$SCRIPT_DIR/manifest_fallback.sh"
+    if ! source "$SCRIPT_DIR/manifest_fallback.sh"; then
+        say "could not source $SCRIPT_DIR/manifest_fallback.sh (its own reason is above) — the manifest fallback is unusable"
+        exit 5
+    fi
     if fallback_dir=$(manifest_config_dir "$MAIN_ROOT"); then
         [[ -n "$fallback_dir" ]] && EXTRA_CONFIG=(--config-dir "$fallback_dir")
     else
@@ -269,9 +291,17 @@ if [[ -f "$SCRIPT_DIR/manifest_fallback.sh" ]]; then
         # exit 5 already covers "a clone or refresh failed", and resolving a
         # repo out of a manifest we could not verify is the false green the
         # exit vocabulary exists to prevent.
-        [[ "$fallback_rc" -eq 5 || "$fallback_rc" -eq 6 ]] && exit 5
         # rc 3 — no manifest and no usable pointer. Fall through: if nothing is
-        # enumerable after that, the EMPTY verdict below reports exit 3.
+        # enumerable after that, the EMPTY verdict below reports exit 3. Any
+        # OTHER code is unexpected and must not fall through as if it were 3:
+        # an unrecognised answer from the fallback is not evidence that no
+        # manifest is configured.
+        case "$fallback_rc" in
+            5|6) exit 5 ;;
+            3)   ;;
+            *)   say "manifest_config_dir returned an unexpected status ($fallback_rc) — refusing to read that as 'no manifest configured'"
+                 exit 5 ;;
+        esac
     fi
 else
     say "cannot find $SCRIPT_DIR/manifest_fallback.sh — no manifest fallback for a host without layers/"
