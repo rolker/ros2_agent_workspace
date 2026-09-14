@@ -145,6 +145,47 @@ recorded as "Round 3 —" clauses in the Files-to-Change rows below; the
 remaining round-4 suggestions (trust model, lock scope, and the rest) are
 recorded in `progress.md` for the re-review.
 
+### Plan revision 2026-09-14 (post-`## Local Review (Pre-Push)`, round 5)
+
+Round 5 graded **changes-requested** with five must-fix, all mechanical, and
+22 suggestions. The operator scoped this pass to the five must-fix plus any
+trivial suggestion sitting in a file already being edited for one; the rest
+stay open in `progress.md` for the publish checkpoint. The five:
+
+- **A remedy that cannot work is not a remedy.** The three skills printed "run
+  from the workspace, or set `WORKSPACE_ROOT`" on the one path where setting
+  the variable changed nothing: it is read *inside* `workspace_root.sh`, and
+  the inline walk-up that locates the script always started at `$(pwd)`. The
+  walk now starts at `$WORKSPACE_ROOT` when set (and `[ -f ]` + `bash`, so a
+  lost exec bit does not make it walk past the workspace).
+- **Url FORM must not decide the manifest cross-check.** With
+  `WORKSPACE_MANIFEST_GIT_BASE` unset — the branch every real host takes, and
+  the only one no end-to-end test can reach without the network — the cloned
+  `bootstrap.yaml`'s `git_url` was compared as a raw string, so scp-form, a
+  missing `.git` or a trailing `/` hard-failed at exit 5 as "not the one its
+  own bootstrap names". Both branches now compare through
+  `_manifest_fallback_url_key`; the host stays part of the key unless the base
+  was deliberately redirected.
+- **Hermetic includes the environment.** `test_workspace_root.sh` failed 4 of
+  its 7 cases with an ambient `$WORKSPACE_ROOT` — the environment the three
+  skills now tell operators to create. It is unset once at the top, and
+  `walk_up_from` is the skills' snippet verbatim again.
+- **An unusable install is not a caller bug.** A missing `redact.sh` returned
+  2, which already means "you executed this file instead of sourcing it"; the
+  resolver answers 5 for the identical condition. It is 5 now, the `source` rc
+  is checked rather than inferred, and all three callers check the source
+  status and carry a `*)` arm — unchecked, the condition surfaced as
+  `command not found` and was reported as exit 3, "run `make setup-all`".
+- **Set `REDACT_PATH_PREFIXES` where the diagnostics are consumed.** Both
+  skills sourced `manifest_fallback.sh` without it, so absolute host paths
+  reached a report the same file forbids them in.
+
+Trivial suggestions taken in the same files: the header usage block is the
+skills' snippet verbatim (it kept a third shape), the "same hop
+`resolve_repo_checkout.sh` makes" claim is corrected, the
+`WORKSPACE_MANIFEST_GIT_BASE` narrowing is named as a known property, and both
+`AGENTS.md` exit-5 enumerations pick up causes the scripts' own headers listed.
+
 ## Approach
 
 1. **[D1] Fix the repo-location gap at its source, not in the janitor.** `audit-project`
@@ -334,18 +375,18 @@ recorded in `progress.md` for the re-review.
 
 | File | Change |
 |------|--------|
-| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract (including named FAILED evidence for each of the four checks), report format, timestamped local report write, known limitations, deferred publishing-and-trigger note. Round 4 — check 1 runs from `$ROOT` so all four checks grade the same tree; rc 6 from the manifest fallback is `FAILED(manifest refresh: ...)`; the retention note names the clone caches as the unbounded output Round 5 — the same `workspace_root.sh` opener; the report filename carries the pid; the report template says what the per-repo mode means |
-| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; clones the manifest's pinned version, verifies a cached clone's origin, validates the `version:` pin before it reaches git and verifies a SHA pin after the fact (round 2), serialises the shared cache with a **bounded** `flock` wait (round 2), sources `manifest_fallback.sh` so a host with no `layers/` still has manifests (round 2), validates the repo name before it reaches a path handed to `rm -rf`; prints `path\tmode` and nothing at all on a failure path; fails loud with the distinct exit codes in [R1] Round 5 — a conflicting `version:` pin is as ambiguous as a conflicting url (exit 7); every diagnostic prints through one `say()` funnel that applies `redact_text`, so git's captured output cannot leak the userinfo the message's first half redacted and `$MAIN_ROOT`/`$HOME` do not travel into the report; the contract states what mode `layer` does and does not guarantee (the checkout is accepted as is — comparing its origin or ref against the manifests would manufacture findings on healthy workspaces) |
-| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — the hermetic cases in [R5] |
+| `.claude/skills/janitor-sweep/SKILL.md` | New — the sweep procedure, per-check status contract (including named FAILED evidence for each of the four checks), report format, timestamped local report write, known limitations, deferred publishing-and-trigger note. Round 4 — check 1 runs from `$ROOT` so all four checks grade the same tree; rc 6 from the manifest fallback is `FAILED(manifest refresh: ...)`; the retention note names the clone caches as the unbounded output Round 5 — the same `workspace_root.sh` opener; the report filename carries the pid; the report template says what the per-repo mode means. Round 5 fixes — the walk-up honours `$WORKSPACE_ROOT`; the `source` status is checked; `REDACT_PATH_PREFIXES` is set, so the manifest diagnostics reach the report without this host's paths |
+| `.agent/scripts/resolve_repo_checkout.sh` | New — layer-checkout-or-shallow-clone resolver; clones the manifest's pinned version, verifies a cached clone's origin, validates the `version:` pin before it reaches git and verifies a SHA pin after the fact (round 2), serialises the shared cache with a **bounded** `flock` wait (round 2), sources `manifest_fallback.sh` so a host with no `layers/` still has manifests (round 2), validates the repo name before it reaches a path handed to `rm -rf`; prints `path\tmode` and nothing at all on a failure path; fails loud with the distinct exit codes in [R1] Round 5 — a conflicting `version:` pin is as ambiguous as a conflicting url (exit 7); every diagnostic prints through one `say()` funnel that applies `redact_text`, so git's captured output cannot leak the userinfo the message's first half redacted and `$MAIN_ROOT`/`$HOME` do not travel into the report; the contract states what mode `layer` does and does not guarantee (the checkout is accepted as is — comparing its origin or ref against the manifests would manufacture findings on healthy workspaces). Round 5 fixes — the `source` status of both helpers is checked, and an unrecognised status from the manifest fallback exits 5 with the status named instead of falling through as if it were "no manifest configured" |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New — the hermetic cases in [R5]. Round 5 fixes — url-form equivalence on both cross-check branches (the no-`GIT_BASE` branch directly, since no end-to-end case can reach it without the network), and the missing/unloadable `redact.sh` refusal |
 | `.agent/scripts/redact.sh` | New (round 5) — `redact_url` / `redact_text`, shared by the resolver and the manifest fallback because both print into the same handed-around report; two copies of the regex drift, and the one that drifts is the one that leaks |
-| `.agent/scripts/workspace_root.sh`, `.agent/scripts/tests/test_workspace_root.sh` | New (round 5) — resolve the workspace root properly (validated `$WORKSPACE_ROOT`, else the script's own location, then a hop to the main checkout when that root is a worktree) instead of asking the operator to remember to pass it; 7 hermetic cases including the layer-worktree case the old derivation got wrong |
-| `.claude/skills/audit-project/SKILL.md` | All five `layers/main/...` sites: step 1 uses the resolver; the AGENTS.md currency check and the report `**Location**` header accept a clone path; the optional `colcon test` and step 7's "correct layer" report SKIPPED in `clone` mode Round 5 — `$ROOT` comes from `workspace_root.sh` instead of `git --git-common-dir`, which returned the *project repo's* root from the documented layer worktree; the mode's meaning (what a `layer` checkout was and was not verified against) is stated for the report header |
-| `AGENTS.md` | Script-reference row for `resolve_repo_checkout.sh` (instruction file — **operator-approved**) |
+| `.agent/scripts/workspace_root.sh`, `.agent/scripts/tests/test_workspace_root.sh` | New (round 5) — resolve the workspace root properly (validated `$WORKSPACE_ROOT`, else the script's own location, then a hop to the main checkout when that root is a worktree) instead of asking the operator to remember to pass it; 10 hermetic cases including the layer-worktree case the old derivation got wrong. Round 5 fixes — the documented walk-up starts at `$WORKSPACE_ROOT`, so the remedy the skills print is real; the suite is hermetic against an ambient one |
+| `.claude/skills/audit-project/SKILL.md` | All five `layers/main/...` sites: step 1 uses the resolver; the AGENTS.md currency check and the report `**Location**` header accept a clone path; the optional `colcon test` and step 7's "correct layer" report SKIPPED in `clone` mode Round 5 — `$ROOT` comes from `workspace_root.sh` instead of `git --git-common-dir`, which returned the *project repo's* root from the documented layer worktree; the mode's meaning (what a `layer` checkout was and was not verified against) is stated for the report header. Round 5 fixes — the walk-up honours `$WORKSPACE_ROOT` at both remedy sites; the exit-5 comment names the local-helper causes |
+| `AGENTS.md` | Script-reference rows for `resolve_repo_checkout.sh`, `workspace_root.sh`, `manifest_fallback.sh`, `redact.sh` and `field_mode.sh` (instruction file — **operator-approved**; Script Reference rows only, no rule or policy text). Round 5 fixes — the `manifest_fallback.sh` row states the url-identity comparison and the source-time exit 5, and both exit-5 enumerations name the causes the scripts' headers list |
 | `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`, `.agent/AGENT_ONBOARDING.md` | Add `janitor-sweep` to the skill enumeration (instruction files — **operator-approved**) |
 | `.agent/knowledge/skill_workflows.md` | Add `janitor-sweep` to the Utility-skills table |
 | `.agent/knowledge/principles_review_guide.md` | [R9] clarifying clause on the durable-findings consequences-map row — stating only what is true: three of the four periodic skills persist nothing at all |
-| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run. Round 4 — one enumeration site, on the fallback's success path (the bare call ahead of it printed `[]` at exit 0 on a no-`layers/` host), plus the rc 6 arm Round 5 — the same `workspace_root.sh` opener |
-| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep. Round 3 — re-clone a cached manifest whose `origin` no longer matches the url the current pointer derives, validate `WORKSPACE_MANIFEST_GIT_BASE` before it reaches `git clone`, and refuse to be executed rather than exiting 0 having done nothing. Round 4 — the early return recognises every layout `get_overlay_repos` reads (`configs/manifest/repos` **and** `configs/*.repos`), and a cached clone that could not be refreshed is its own exit **6** rather than rc 0 with a stale-cache warning Round 5 — every url-bearing message is redacted through the shared helper, and the cloned `bootstrap.yaml` is read as authoritative for `git_url:`/`branch:`/`config_path:` (the same keys `setup_layers.sh` reads), so a manifest repo whose `.repos` do not sit beside its bootstrap is no longer reported as a missing directory |
+| `.claude/skills/issue-triage/SKILL.md` | Empty-manifest / unreadable-manifest / failed-per-repo-list guards in step 1 — the janitor chains it, and the guard belongs in the skill every caller shares — with the enumeration anchored at `$ROOT` so the guard cannot fire on a worktree run. Round 4 — one enumeration site, on the fallback's success path (the bare call ahead of it printed `[]` at exit 0 on a no-`layers/` host), plus the rc 6 arm Round 5 — the same `workspace_root.sh` opener. Round 5 fixes — the walk-up honours `$WORKSPACE_ROOT`; the `source` status is checked; `REDACT_PATH_PREFIXES` is set before sourcing |
+| `.agent/scripts/manifest_fallback.sh` | New (round 2) — derive the manifest repo from the tracked bootstrap pointer and shallow-clone it, so a host with no `layers/` has manifests to read; sourceable, used by the resolver and the sweep. Round 3 — re-clone a cached manifest whose `origin` no longer matches the url the current pointer derives, validate `WORKSPACE_MANIFEST_GIT_BASE` before it reaches `git clone`, and refuse to be executed rather than exiting 0 having done nothing. Round 4 — the early return recognises every layout `get_overlay_repos` reads (`configs/manifest/repos` **and** `configs/*.repos`), and a cached clone that could not be refreshed is its own exit **6** rather than rc 0 with a stale-cache warning Round 5 — every url-bearing message is redacted through the shared helper, and the cloned `bootstrap.yaml` is read as authoritative for `git_url:`/`branch:`/`config_path:` (the same keys `setup_layers.sh` reads), so a manifest repo whose `.repos` do not sit beside its bootstrap is no longer reported as a missing directory. Round 5 fixes — the declared and derived urls are compared as repo identities rather than as strings (url form no longer decides the answer), and a missing or unloadable `redact.sh` returns **5**, not the caller-bug 2 |
 | `.agent/scripts/field_mode.sh` | Round 2 — factor the URL classification into `is_field_url`; `is_field_mode` calls it. One allowlist for both a checkout and a bare manifest url |
 | `.agent/scripts/list_overlay_repos.py`, `.agent/scripts/lib/workspace.py` | Round 2 — `--config-dir` / `extra_config_dirs`, **additive** to the normal search path, for reading a cloned manifest's `.repos` files. Round 3 — `get_optional_layers(..., extra_config_dirs=)` reads `optional_layers.txt` from the same effective config dir, so the optional-layer exclusion is not silently empty on a host with no `layers/` |
 | `.agent/scripts/tests/test_field_mode.sh`, `.agent/scripts/tests/test_workspace_lib.py` | Round 2 — `is_field_url` over the same URL table as `is_field_mode`; `extra_config_dirs` additive and tolerant of a stale path |
@@ -360,7 +401,7 @@ and the clone cache — verified, no change.
 | Human control and transparency | Report-only, and in this slice publish-nothing: no PRs, no per-finding issues, no GitHub write at all — one local report file per run, which the operator triages into work. |
 | Enforcement over documentation | The sweep is still hand-run this slice — a recorded sequencing choice, not a gap. The one mechanically enforceable piece (repo resolution, including its false-green paths) gets a script and a test. |
 | A change includes its consequences | Step 7 lands all four skill-list sites, the script table, and the consequences-map clause in this PR. |
-| Test what breaks | The resolver is tested across every exit it can return (2 through 7) and both resolution modes, including the manifest fallback (its origin check, its refused git base, and its sourced-only guard), the `version:` validation, the SHA-pin path and the clone-cache lock, and (round 5) the credential/path redaction, the version-pin ambiguity and the authoritative `bootstrap.yaml` — 45 hermetic cases, plus 7 more for `workspace_root.sh`. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
+| Test what breaks | The resolver is tested across every exit it can return (2 through 7) and both resolution modes, including the manifest fallback (its origin check, its refused git base, and its sourced-only guard), the `version:` validation, the SHA-pin path and the clone-cache lock, and (round 5) the credential/path redaction, the version-pin ambiguity and the authoritative `bootstrap.yaml` — 56 hermetic cases, plus 10 more for `workspace_root.sh`. The report's degraded behaviour is procedure, not code — stated as explicit report rows rather than claimed as tested. |
 | Only what's needed | Chains existing detectors; adds one small script. No scheduler, no rotation state, no new infra. |
 | Workspace vs. project separation | Rotation is derived from `.repos` manifests and a remote AGENTS.md probe — no repo names hardcoded (ADR-0003). |
 | Improve incrementally | Sweep now, trigger later, as the operator scoped it; the two deferred limitations ([R4], [R8]) are named where the trigger decision will meet them. |
@@ -387,7 +428,10 @@ and the clone cache — verified, no change.
 ## Documentation & Instruction Impact
 
 - **Stale docs** (land in this PR): `.claude/skills/audit-project/SKILL.md` (step 1 becomes
-  inaccurate the moment the resolver lands); `AGENTS.md` script table;
+  inaccurate the moment the resolver lands) — and, from round 5, the same step-1
+  opener in `.claude/skills/janitor-sweep/SKILL.md` and
+  `.claude/skills/issue-triage/SKILL.md`, which share that snippet verbatim, so
+  all three move together whenever it changes; `AGENTS.md` script table;
   `.agent/knowledge/skill_workflows.md`; the three framework adapter skill lists;
   `.agent/knowledge/principles_review_guide.md` ([R9]).
 - All instruction-file edits above are **operator-approved** for this PR (2026-09-11),
