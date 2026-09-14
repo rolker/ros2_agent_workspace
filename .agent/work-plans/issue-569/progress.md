@@ -727,3 +727,40 @@ Lifecycle: **Implementation** → **review-code** (re-review these fixes)
     .agent/scripts/dispatch_subagent.sh --mode in-process --issue 569 --skill review-code
 
 The diff is still unpushed; the host performs the push.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-14 09:40 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-569 at `5ac4c79`
+**Mode**: pre-push (targeted re-read of the round-5 fix pass, `47e832a..HEAD`; PR #625 open at `9dc555f`, 19 commits unpushed)
+**Depth**: Deep (credential handling, AGENTS.md + three SKILL.md governance triggers — carried from round 5)
+**Must-fix**: 2 | **Suggestions**: 11 new (14 deferred from round 5 still open, not re-litigated)
+**Round**: 6 | **Ship**: recommended — must-fix fell 5 → 2, both are precise one-line corrections with no design question in them: normalise a relative $WORKSPACE_ROOT at five copies of one snippet, and correct one sentence in the plan. Another full round is not what either needs; the hang fix does need a regression case and a re-read of that one change.
+
+**All five round-5 must-fixes are genuinely closed** — verified independently at every site, not taken from the implementation entry. The walk-up snippet is now byte-identical across all four copies (diffed mechanically). The `git_url` cross-check goes through `_manifest_fallback_url_key` on BOTH branches, and the branch no end-to-end case can reach without the network is unit-tested directly (8 cases). `test_workspace_root.sh` passes 10/10 with an ambient $WORKSPACE_ROOT exported. `redact.sh` unusable answers 5 at all three callers, each checking the `source` rc and carrying a `*)` arm; `manifest_config_dir` returns only 0/3/5/6 and every caller covers all four. `REDACT_PATH_PREFIXES` is set before every source site, most-specific-first, and no path through the changed code prints a url or host path outside the redacting funnel.
+
+**Verified clean, on the record**: shellcheck `--severity=warning` clean on all six changed shell files; full `pre-commit` green over `47e832a..HEAD`; `test_resolve_repo_checkout.sh` 56/56 and `test_workspace_root.sh` 10/10. The round-6 AGENTS.md delta is exactly one hunk replacing two Script Reference rows — no rule, policy, boundary or procedure text touched.
+
+### Findings
+- [ ] (must-fix) NEW defect from this fix pass, cross-confirmed by both adversarial lenses and reproduced: a RELATIVE $WORKSPACE_ROOT makes the walk-up loop forever — `dirname .` is `.`, so `while [ "$d" != "/" ]` never fires. `d=$(pwd)` was always absolute; `${WORKSPACE_ROOT:-$(pwd)}` is not. It is a silent hang, on exactly the remedy the three skills now print ("set WORKSPACE_ROOT to one"), and no case covers it. Normalise once per copy: `d=$(cd "${WORKSPACE_ROOT:-$(pwd)}" 2>/dev/null && pwd) || d=$(pwd)` — `.claude/skills/janitor-sweep/SKILL.md:95`, `.claude/skills/issue-triage/SKILL.md:52`, `.claude/skills/audit-project/SKILL.md:60`, `.agent/scripts/workspace_root.sh:44`, `.agent/scripts/tests/test_workspace_root.sh:54`
+- [ ] (must-fix) The plan's AGENTS.md row says the edits are "Script Reference rows only, no rule or policy text" — false of the shipped branch: `origin/main..HEAD` also adds an `is_field_url` usage block and a paragraph to § Worktree Workflow → Field Mode (`AGENTS.md:193-208`). It is descriptive helper semantics, not a permission change — but this sentence is what the operator reads at the Ask-First re-confirmation the plan itself gates on, so it must describe the delta it actually covers — `.agent/work-plans/issue-569/plan.md:384`
+- [ ] (suggestion) The url key lowercases the host but not `<owner>/<repo>`, so a bootstrap differing only in owner case still hard-fails at exit 5 — the same false-RED class must-fix 2 closed, on the one axis the new tests assert for the host and not for the path — `.agent/scripts/manifest_fallback.sh:362,376`
+- [ ] (suggestion) The new "a redact.sh that will not load" case does not exercise the rc check it was added for: its fixture leaves both functions undefined, so the pre-existing `declare -F` guard alone answers 5 (verified by deleting the rc capture and re-running) — `.agent/scripts/tests/test_resolve_repo_checkout.sh:487-495`
+- [ ] (suggestion) The new `*)` arm — the one that closes the rc-127 fall-through to exit 3 — has no test; a fixture whose `manifest_config_dir` returns 4 would pin it — `.agent/scripts/resolve_repo_checkout.sh:302`
+- [ ] (suggestion) Added this pass, in the condition class this pass fixed elsewhere: the resolver's two `redact.sh` refusals print the absolute `$SCRIPT_DIR/redact.sh` through a bare `echo`, while `manifest_fallback.sh:107` — added this pass for the identical condition — deliberately names no path. The resolver's stderr is transcribed into the sweep report — `.agent/scripts/resolve_repo_checkout.sh:131,141`
+- [ ] (suggestion) Within one copy-paste block the failure arms disagree: the new `if ! source` arm exits, the four `case "$rc"` arms only echo. True of the snippet only because `fi` is the last statement in the fence — `.claude/skills/janitor-sweep/SKILL.md:156-159`, `.claude/skills/issue-triage/SKILL.md:104-107`
+- [ ] (suggestion) `mkdir -p "$REPORT_DIR" || echo "FAILED(...)"` does not exit, unlike every other FAILED arm the file requires to be terminal, and it prints an absolute host path — `.claude/skills/janitor-sweep/SKILL.md:108`
+- [ ] (suggestion) The file-ABSENT sibling of must-fix 4 still only `say`s and falls through to the empty-enumeration exit 3; the source-failure sibling now exits 5. Weaker than must-fix 4 (falling through is defensible when the workspace has its own manifest), but the two arms of one `if` answer differently — `.agent/scripts/resolve_repo_checkout.sh:306-308`
+- [ ] (suggestion) The `redact.sh` row still says the callers refuse "when it is **missing**"; this pass widened both to "missing or will not load" and gave the condition exit 5. It is the only row describing this contract without an exit code — `AGENTS.md:587`
+- [ ] (suggestion) The `workspace_root.sh` row was not touched and now understates two properties the header newly calls out as deliberate: the main-checkout hop is gated on the destination being a workspace root, and it redirects even an explicitly-set $WORKSPACE_ROOT — `AGENTS.md:584`
+- [ ] (suggestion) § Documentation & Instruction Impact names only the AGENTS.md script table; the Field Mode addition belongs in it too (twin of must-fix 2) — `.agent/work-plans/issue-569/plan.md:428-436`
+- [ ] (suggestion) `${extra:+--config-dir "$extra"}` expands unquoted, so a $ROOT containing a space word-splits the path; the resolver's own equivalent is already array-safe — `.claude/skills/issue-triage/SKILL.md:98`, `.claude/skills/janitor-sweep/SKILL.md:147`
+
+### Carried forward, not re-litigated
+The 14 suggestions the host deferred in round 5 remain open and unchecked in that entry. One of them was **reproduced** here and is worth taking with the must-fix pass, since it is the exact sibling of round-5 must-fix 3: `test_resolve_repo_checkout.sh` is not hermetic against an ambient `$BOOTSTRAP_URL` — **11 of 56 cases fail** with it exported (`WORKSPACE_ROOT` and `WORKSPACE_MANIFEST_GIT_BASE` are both clean, 56/56). It stays a suggestion rather than rising: unlike $WORKSPACE_ROOT, nothing in these skills tells an operator to set $BOOTSTRAP_URL.
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** → **address-findings** (two mechanical must-fix; add a relative-$WORKSPACE_ROOT regression case alongside the first) → a targeted re-read of that change, not a seventh full round. The diff is not pushed until a pre-push review comes back approved.
