@@ -431,6 +431,12 @@ Report format:
 #### Project governance — <repo> (mode: layer/clone)
 - ...
 
+<!-- The mode is not decoration: `clone` means the manifests chose the tree
+     (their url, their pinned version), `layer` means the operator's working
+     tree was audited as is, with its origin and checked-out ref deliberately
+     unverified against the manifests. A reader deciding whether a finding
+     applies to the pinned code or to this host's code needs that. -->
+
 #### Issue staleness
 - ...
 

@@ -28,6 +28,25 @@
 # so layer-dependent checks (a `colcon test` run, "is it in the expected
 # layer?") must report SKIPPED rather than OK.
 #
+# And the two modes carry different guarantees, which a report naming the mode
+# is also naming:
+#   clone  — the manifests decided it. The url is the one they declare, the
+#            tree is at the `version:` they pin (verified after the fact for a
+#            SHA pin), and a cached clone whose origin no longer matches is
+#            re-cloned.
+#   layer  — the operator's working tree, accepted AS IS. Its origin and its
+#            checked-out ref are NOT compared against the manifests, so a
+#            renamed or re-pointed repo, or one sitting at an old pin or on a
+#            feature branch, is audited under the manifest name. That is
+#            deliberate, not an oversight: a layer checkout is the code the
+#            operator actually has, auditing anything else would be auditing
+#            the wrong tree, and its remote legitimately differs in FORM from
+#            the manifest url (ssh vs https for the same repo) while its branch
+#            legitimately differs from the pin during any feature work — so a
+#            comparison here would produce false findings on healthy
+#            workspaces. What the caller owes the reader is the mode, so the
+#            reader knows which of these two the finding came from.
+#
 # Exit codes — every failure is named, and none of them is an empty success
 # (#609's false-green lesson):
 #   0  resolved

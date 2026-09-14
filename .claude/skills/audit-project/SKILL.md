@@ -101,7 +101,17 @@ REPO_MODE=${resolved##*$'\t'}
 Each of those exits is a distinct FAILED reason to report — none of them is
 "repo not found", and none is a reason to continue with an unset `REPO_PATH`.
 
-Record `REPO_MODE` — the audit's report header names it, and in `clone` mode
+Record `REPO_MODE` — the audit's report header names it, and it tells the
+reader what the audited tree *is*. A `clone` was chosen by the manifests: their
+url, their pinned `version:`. A `layer` checkout is the operator's working tree
+taken **as is** — the resolver does not compare its origin or its checked-out
+ref against the manifests (a healthy workspace differs legitimately in url form
+and sits on feature branches, so the comparison would manufacture findings), so
+a `layer` finding is a finding about the code on this host, which may be ahead
+of, behind, or on a different branch from what the manifests pin. Name the mode
+in the report header for exactly that reason.
+
+In `clone` mode
 the two genuinely layer-dependent checks (the optional `colcon test` run in
 step 5, and step 7's "correct layer") must report **SKIPPED (no layer
 checkout)**, never OK. A check that could not run is never rendered as a pass.
