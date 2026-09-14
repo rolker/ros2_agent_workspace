@@ -127,3 +127,76 @@ Status-line + References addendums; `CLAUDE.md:23-34` carries its own References
 ### Notes
 - Nothing pushed, per the sub-agent handoff contract.
 - Next: `review-plan` re-review of the revised plan, then the operator's trigger decision at the plan-review checkpoint with the corrected table.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-09-14 14:20 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `3c2c78a`
+**PR**: PR-less (`--issue` mode, worktree `feature/issue-628`)
+**Verdict**: changes-requested
+
+Independent review — dispatched as a fresh-context sub-agent (handoff header
+present); not the plan author. Round 2, against the revision at `3c2c78a`.
+
+**All five round-1 must-fixes are genuinely closed in the plan text.** (1)
+project-repo deliverables restored as sub-issues (5)/(6) with the close
+condition on #628 stated (both repos verified `git@github.com:rolker/…`;
+`unh_marine_autonomy` has no `docs/roadmap.md` and carries exactly the eight
+flat `docs/*.md` pages the plan lists; the BizzyBoat roadmap is 703 lines with
+no parent line). (2) the trigger table gained commit-identity and
+credential-surface columns and a "what is *not* a discriminator" paragraph —
+`check_pr_authors.py` does inspect each commit's **primary author email**
+(`check_pr_authors.py:115-127`), so the PR-author/commit-identity separation is
+correct. (3) the #626 gate is stated with the right class (its items are open
+and unchecked). (4) `CLAUDE.md` added — its References list is at
+`CLAUDE.md:23-34` as claimed. (5) the ADR-0015 addendum is decided in this PR.
+Four of the six should-fixes are applied; the ADR-split decline and the
+per-repo-discovery-file deferral are recorded.
+
+Every other checkable claim holds: repo is PUBLIC; 19 ADRs with 0019 highest and
+no `docs/roadmap.md` / `.agent/templates/roadmap.md`; PR #257 MERGED 2026-02-26
+while #249 is OPEN; the sweep does resolve repos via `resolve_repo_checkout.sh`
++ `manifest_fallback.sh` and works with no `layers/` (SKILL.md:124-127, 197);
+`GITHUB_TOKEN` repo-scoping and Actions-free-on-public are correct; the
+Routine's cloud/GitHub-scoping and Pro 5 / Max 15 / Team 25 caps (with the
+inconsistent tier floor) match `.agent/knowledge/research_digest.md:124,132`;
+`~/.config/ros2-agent/claude-oauth-token` exists.
+
+**One trigger-table cell does not survive checking** (finding 1) and the
+operator decides from that table at this checkpoint.
+
+### Evaluation
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | Rev 2 adds two cross-repo issue filings and one ADR addendum; no scope creep beyond what the issue body already routes. |
+| Issue alignment | Good | Project-repo deliverables restored; umbrella close condition stated. |
+| File targeting | Good | `CLAUDE.md` and ADR-0015 now listed; both Ask-First files named in the approval scope. |
+| Consequences | Needs work | Findings 3, 8. |
+| Documentation & Instruction impact | Good | Present, non-silent, instruction items framed as operator-decided candidates. |
+| Principle alignment | Needs work | Documentation accuracy: findings 1, 3, 4, 6. |
+| ADR compliance | Needs work | The ADR-0015 addendum wording sits at ADR-0012's boundary — finding 5. |
+| ROS conventions | N/A | Workspace documentation plan. |
+
+### Findings
+- [ ] (must-fix) **Trigger table, Reach: the gitcloud half of anacron's unique-reach claim is wrong, and reach is named the first of the three real discriminators.** `janitor-sweep` deliberately **excludes** non-GitHub-origin repos (`is_field_url` rule, `.claude/skills/janitor-sweep/SKILL.md:271-287`), and all 44 repos in `configs/manifest/repos/*.repos` are `github.com` — so no mechanism sweeps gitcloud repos today and none would gain them. Anacron's unique reach is `layers/` alone, and the sweep is explicitly built not to assume `layers/` exists (SKILL.md:38, 197). Correct the cell and state what `layers/` actually buys a sweep before the operator chooses — `plan.md` Trigger comparison (anacron row, "The real discriminators" paragraph)
+- [ ] (must-fix) **The round-1 suggestion deferred *to the operator at this review* — whether the discovery declaration needs a new per-repo file — is not in the plan.** It lives only in progress.md; the operator reads `plan.md` at the checkpoint, so as written it will not be decided. Add it to Open Questions (the change itself is one clause in Approach step 1: have the ADR state the principle without mandating a separate file, given `.agents/README.md`, root `AGENTS.md`, `deployment.yaml`, `review-context.yaml` already exist and ADR-0017's own Negative is "one more per-repo file") — `plan.md` Open Questions, Approach step 1
+- [ ] (suggestion) **#249's disposition omits its live children.** #249's final comment (2026-02-26) records Phase 2 as *not started* and names [#263](https://github.com/rolker/ros2_agent_workspace/issues/263) (simplify scripts/Makefile — the same "not 42 scripts" body property the plan maps to a roadmap entry) and [#264](https://github.com/rolker/ros2_agent_workspace/issues/264) as where to resume, with #265/#266 spun off; **all four are OPEN**. Also, "its one operator comment" understates — #249 carries nine comments. Name #263/#264 (and #265/#266) in the roadmap's #249 disposition so `Closes #249` does not orphan them — `plan.md` step 9
+- [ ] (suggestion) **Stale line refs in the #626 gate.** The plan copies #626's file:line references, which #626 itself stamps "as of `d7b8baf`". `resolve_repo_checkout.sh:131,141` and `janitor-sweep/SKILL.md:108` still land correctly, but the lock-open sites are now `resolve_repo_checkout.sh:466` and `manifest_fallback.sh:205`, not `:436` / `:181`. Cite #626 rather than re-stating line numbers, or re-stamp them — `plan.md` Approach step 1
+- [ ] (suggestion) **The ADR-0015 addendum wording sits at ADR-0012's boundary.** ADR-0012 permits a Status-line note and a References entry; the quoted block is a three-sentence paragraph that asserts what ADR-0015's Decision "does not contemplate" — a scope qualification a later reader could contest, where ADR-0012's own examples are pure pointers. Keep the Status line to the pointer plus a References entry and carry the third-actor reasoning in ADR-0020 itself; say in the plan which sentence lands where — `plan.md` Approach step 2
+- [ ] (suggestion) **Attribution:** Context says "Per the operator's decisions comment (2026-09-14) … sequenced into **six** sub-issues". That comment enumerates four ((1)–(4)); (5) and (6) come from the issue body's project-repo deliverables and the round-1 review. Reword so no decision is attributed to the operator that was not stated (AGENTS.md § Documentation Accuracy) — `plan.md` Context
+- [ ] (suggestion) **Credential surface is ranked unevenly.** The Routine is "Smallest" while anacron — which mints nothing and keeps every credential on the host — is unranked; a cloud Routine holds a standing GitHub connection on Anthropic-managed infrastructure, which is not obviously smaller. Drop the superlatives and state the axis (new stored secrets: 2 / 0 / 0, plus where each existing credential lives) — `plan.md` Trigger comparison
+- [ ] (suggestion) **`principles_review_guide.md`'s ADR Applicability table stops at ADR-0013** — 0011, 0012 and 0014–0019 have no row. The Consequences table answers "Add an ADR → the ADR table … | Yes", so an ADR-0020 row would be the first in six; decide that deliberately, and have Files to Change name both edits (it currently names only the Consequences Map row) — `plan.md` Files to Change, Consequences table row 1
+
+### Note for the operator checkpoint
+The corrected table is now fair on cost, commit identity and credential surface —
+the three round-1 defects are genuinely fixed. **Do not decide the trigger from
+the Reach row as written**: it credits anacron with seeing gitcloud repos, and
+the sweep excludes non-GitHub origins by design while every manifest repo is on
+GitHub. On the evidence checked, the honest discriminators are **cadence
+exactness** (Actions only), **credential surface** (Actions adds two standing
+secrets; the other two add none), and **whether a sweep should see the local
+`layers/` tree at all** (anacron only) — that last one is a design question the
+plan has not answered. Separately, the per-repo-discovery-file question was
+deferred to you at this review but never made it into the plan text (finding 2).
