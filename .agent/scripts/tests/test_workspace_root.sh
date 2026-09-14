@@ -10,8 +10,17 @@
 #
 # Every failure case also asserts that stdout is EMPTY: a caller must read a
 # root or nothing, never an empty string at exit 0 (#609).
+#
+# Hermetic includes the AMBIENT ENVIRONMENT, not just the filesystem: an
+# inherited $WORKSPACE_ROOT is read by the script under test and by the walk-up
+# snippet, and every case that does not set it deliberately would otherwise
+# resolve to the operator's own workspace and fail — in exactly the environment
+# the three skills now tell operators to create. It is unset here once; the
+# cases that exercise it set it per invocation.
 
 set -uo pipefail
+
+unset WORKSPACE_ROOT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -34,15 +43,18 @@ make_root() {
     echo "$root"
 }
 
-# The walk-up the skills use verbatim: find any copy of the script above you,
-# then let it have the last word.
+# The walk-up the skills use verbatim: start at $WORKSPACE_ROOT when it is set
+# (which is what makes "or set WORKSPACE_ROOT" a remedy from a directory with
+# no workspace above it), find the first copy of the script at or above there,
+# and let it have the last word. `[ -f ]` + `bash`, not `[ -x ]`: a lost exec
+# bit is not a reason to walk past the workspace.
 walk_up_from() {
     (
         cd "$1" || exit 1
-        d=$(pwd)
+        d="${WORKSPACE_ROOT:-$(pwd)}"
         while [ "$d" != "/" ]; do
-            if [ -x "$d/.agent/scripts/workspace_root.sh" ]; then
-                "$d/.agent/scripts/workspace_root.sh"
+            if [ -f "$d/.agent/scripts/workspace_root.sh" ]; then
+                bash "$d/.agent/scripts/workspace_root.sh"
                 exit $?
             fi
             d=$(dirname "$d")
@@ -135,6 +147,40 @@ if [ "$rc" -eq 2 ] && [ -z "$out" ] && grep -q "must be executed" "$TMPDIR_ROOT/
     pass "workspace_root.sh sourced → exit 2 with a reason, never a silent 0"
 else
     fail "source guard: rc=$rc out='$out' (expected 2 / empty), stderr='$(cat "$TMPDIR_ROOT/stderr")'"
+fi
+
+# --- 7. the "or set WORKSPACE_ROOT" remedy works where it is printed --------
+# The walk-up is what locates the script, and $WORKSPACE_ROOT is only read
+# INSIDE it — so from a directory with no workspace above it at all, a walk
+# that started at $(pwd) could never reach a copy of the script to read the
+# variable, and the remedy the three skills print there was inert. The walk
+# starts at $WORKSPACE_ROOT when set; these two cases are the remedy and its
+# absence, from the same directory.
+root=$(make_root remedy)
+mkdir -p "$TMPDIR_ROOT/nowhere/deep"
+out=$(WORKSPACE_ROOT="$root" walk_up_from "$TMPDIR_ROOT/nowhere/deep" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 0 ] && [ "$out" = "$root" ]; then
+    pass "with no workspace above cwd, setting WORKSPACE_ROOT resolves — the printed remedy works"
+else
+    fail "remedy: rc=$rc out='$out' (expected 0 / '$root'), stderr='$(cat "$TMPDIR_ROOT/stderr")'"
+fi
+
+out=$(walk_up_from "$TMPDIR_ROOT/nowhere/deep" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    pass "with no workspace above cwd and WORKSPACE_ROOT unset → non-zero, empty stdout"
+else
+    fail "no root: rc=$rc out='$out' (expected non-zero / empty)"
+fi
+
+# A WORKSPACE_ROOT that is not a workspace is not taken on faith by the walk
+# either: the script it reaches (or does not) must refuse, never answer with
+# whatever it walked up to.
+out=$(WORKSPACE_ROOT="$TMPDIR_ROOT/not_a_workspace" \
+      walk_up_from "$TMPDIR_ROOT/nowhere/deep" 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    pass "a WORKSPACE_ROOT that is not a workspace fails the walk too, with empty stdout"
+else
+    fail "bad remedy: rc=$rc out='$out' (expected non-zero / empty)"
 fi
 
 echo ""
