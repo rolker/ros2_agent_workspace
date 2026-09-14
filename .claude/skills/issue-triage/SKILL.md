@@ -36,12 +36,29 @@ routinely run from a worktree (directly, and as one of `janitor-sweep`'s four
 checks), so this is the normal case, not an edge one.
 
 ```bash
-ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
-    && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
+# The workspace root is the nearest ancestor that HOLDS the workspace
+# (`.agent/scripts/` + `configs/`) — not whatever repo you happen to be
+# standing in. `workspace_root.sh` has the last word: it validates
+# $WORKSPACE_ROOT when set, and hops a worktree to the MAIN checkout, where
+# `layers/` and the `configs/manifest` symlink actually live. The walk is
+# inline because a script cannot be called from a directory not yet found.
+d=$(pwd); ROOT=""
+while [ "$d" != "/" ]; do
+    if [ -x "$d/.agent/scripts/workspace_root.sh" ]; then
+        ROOT=$("$d/.agent/scripts/workspace_root.sh") || ROOT=""
+        break
+    fi
+    d=$(dirname "$d")
+done
+if [ -z "$ROOT" ]; then
+    echo "FAILED(workspace root: none above $(pwd) — run from the workspace, or set WORKSPACE_ROOT)"
+    exit 1
+fi
 ```
 
-(In a *layer* worktree that resolves to the project repo's own root, so pass
-the workspace root explicitly or run from the workspace itself.)
+(This resolves the workspace from a *layer* worktree too, where the earlier
+`git --git-common-dir` form answered with the project repo's own root — which
+has neither the manifests nor the scripts this skill goes on to call.)
 
 Enumerate through the fallback, **never** with a bare
 `list_overlay_repos.py "$ROOT/..."` call of its own. Where `$ROOT/configs/manifest`

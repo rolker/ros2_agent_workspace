@@ -44,13 +44,35 @@ inside the project repo there), and `configs/manifest` exists only in the main
 checkout.
 
 ```bash
-ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
-    && ROOT=$(dirname "$ROOT") || ROOT=$(pwd)
+# The workspace root is the nearest ancestor that HOLDS the workspace
+# (`.agent/scripts/` + `configs/`) — not whatever repo you happen to be
+# standing in. `workspace_root.sh` has the last word: it validates
+# $WORKSPACE_ROOT when set, and hops a worktree to the MAIN checkout, where
+# `layers/` and the `configs/manifest` symlink actually live. The walk is
+# inline because a script cannot be called from a directory not yet found.
+d=$(pwd); ROOT=""
+while [ "$d" != "/" ]; do
+    if [ -x "$d/.agent/scripts/workspace_root.sh" ]; then
+        ROOT=$("$d/.agent/scripts/workspace_root.sh") || ROOT=""
+        break
+    fi
+    d=$(dirname "$d")
+done
 ```
 
-In a *layer* worktree that resolves to the project repo's own root, so pass the
-workspace root explicitly (or run the audit from the workspace) when auditing
-a named repo from inside one.
+An empty `$ROOT` means no workspace was found above you (a project repo cloned
+somewhere else entirely). The **named-repo** branch below cannot run without
+one — report `FAILED: no workspace root above <pwd> — run the audit from the
+workspace, or set WORKSPACE_ROOT` and stop. The **current-directory** branch
+still works: it reads the tree in front of it, and the two layer-dependent
+checks report SKIPPED exactly as they do in `clone` mode.
+
+This replaces an earlier `git --git-common-dir` derivation that answered with
+*whatever repo you were standing in*: in a layer worktree that is the project
+repo's own root, where `.agent/scripts/` and `configs/` do not exist — so
+`resolve_repo_checkout.sh` was unfindable and the `case` below misread a
+genuine layer checkout as mode `clone`. Asking the operator to remember to pass
+the root is not a fix; finding it is.
 
 **No repo name given** — audit the current directory. Verify it is a project
 repo (at least one `package.xml`) before auditing it, and **observe** the mode
@@ -81,6 +103,10 @@ nothing.
 
 ```bash
 # Prints "<path><TAB><layer|clone>"; every failure exits non-zero with a reason
+if [ -z "$ROOT" ]; then
+    echo "FAILED: no workspace root above $(pwd) — run from the workspace, or set WORKSPACE_ROOT"
+    exit 1
+fi
 if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" <repo-name>); then
     # exit 2 = usage (including a repo name that is not a single path segment)
     # exit 3 = no repo manifest configured at all (run `make setup-all`)
@@ -190,10 +216,10 @@ built layer workspace, which a clone is not:
 # layer mode only; in clone mode report "SKIPPED (no layer checkout)"
 # Addressed through $ROOT for the same reason step 1 is: a relative
 # .agent/scripts/ or layers/ does not exist beside you in a layer worktree.
-# $ROOT alone does not rescue that case — step 1's caveat applies here too:
-# in a LAYER worktree $ROOT resolves to the project repo's own root, where
-# these paths are exactly as absent, so pass the workspace root explicitly
-# (or run the audit from the workspace) before this command means anything.
+# Step 1's $ROOT is the real workspace root (workspace_root.sh), including
+# from inside a layer worktree, so these paths resolve there too — but check
+# it is non-empty first: no workspace was found means no layer workspace to
+# build in, which is SKIPPED, not a failure to paper over.
 # setup.bash must be sourced in the same shell — agents run each command in a fresh subprocess
 source "$ROOT/.agent/scripts/setup.bash" && cd "$ROOT/layers/main/<layer>_ws" \
     && colcon test --packages-select <package> && colcon test-result --verbose
