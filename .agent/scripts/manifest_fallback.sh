@@ -265,17 +265,26 @@ manifest_config_dir() {
         # directory. The HOST is exempt when WORKSPACE_MANIFEST_GIT_BASE is
         # set: redirecting the host is that variable's entire purpose (a
         # mirror, or the hermetic tests), so only the <owner>/<repo> it points
-        # at has to agree.
+        # at has to agree. Note that this is also the one condition under which
+        # the cross-check is NARROWER precisely because the trust root was
+        # redirected — a known property of pointing the base elsewhere, not an
+        # oversight.
+        #
+        # Both comparisons go through _manifest_fallback_url_key, so url FORM
+        # never decides the answer. Comparing the strings raw (which is what
+        # the unset branch used to do) hard-failed at exit 5 on every url form
+        # `setup_layers.sh` accepts and this derivation does not emit —
+        # scp-form `git@host:owner/repo.git`, a url with no `.git`, a trailing
+        # `/` — reporting a workspace whose bootstrap agrees perfectly as "not
+        # the one its own bootstrap names".
         if [[ -n "$declared_branch" && "$declared_branch" != "$branch" ]]; then
             _manifest_fallback_say "the bootstrap pointer names branch '$branch', but $config_path/bootstrap.yaml in that repo declares branch '$declared_branch' — the pointer is stale, or it points into the wrong branch"
             return 5
         fi
         if [[ -n "$declared_url" ]]; then
-            local want="$declared_url" have="$git_url"
-            if [[ -n "${WORKSPACE_MANIFEST_GIT_BASE:-}" ]]; then
-                want=$(_manifest_fallback_repo_path "$declared_url")
-                have=$(_manifest_fallback_repo_path "$git_url")
-            fi
+            local want have
+            want=$(_manifest_fallback_url_key "$declared_url")
+            have=$(_manifest_fallback_url_key "$git_url")
             if [[ "$want" != "$have" ]]; then
                 _manifest_fallback_say "the bootstrap pointer derives '$(redact_url "$git_url")', but $config_path/bootstrap.yaml in that repo declares git_url '$(redact_url "$declared_url")' — the manifest repo this workspace points at is not the one its own bootstrap names"
                 return 5
@@ -295,6 +304,38 @@ manifest_config_dir() {
 
     printf '%s\n' "$clone_dir/$config_path/repos"
     return 0
+}
+
+# The comparison key for two git urls that should name the same manifest repo.
+# Normalised through _manifest_fallback_repo_path so url FORM never decides the
+# answer. The HOST is part of the key unless WORKSPACE_MANIFEST_GIT_BASE is set
+# — redirecting the host is that variable's entire purpose, and comparing hosts
+# then would refuse every mirror it exists to allow.
+_manifest_fallback_url_key() {
+    local path host
+    path=$(_manifest_fallback_repo_path "$1")
+    if [[ -n "${WORKSPACE_MANIFEST_GIT_BASE:-}" ]]; then
+        printf '%s' "$path"
+    else
+        host=$(_manifest_fallback_url_host "$1")
+        printf '%s/%s' "$host" "$path"
+    fi
+}
+
+# The host of a git url, lowercased, with any `user[:pass]@` userinfo and any
+# `:port` removed. Handles `scheme://[userinfo@]host[:port]/...` and the
+# scp-style `[user@]host:owner/repo`; anything else has no host and answers
+# empty, which compares equal only to another url with no host.
+_manifest_fallback_url_host() {
+    local u="$1" hostport=""
+    if [[ "$u" =~ ^[A-Za-z][A-Za-z0-9+.-]*://([^/]*)(/|$) ]]; then
+        hostport="${BASH_REMATCH[1]}"
+    elif [[ "$u" == *:* ]]; then
+        hostport="${u%%:*}"
+    fi
+    hostport="${hostport##*@}"
+    hostport="${hostport%%:*}"
+    printf '%s' "${hostport,,}"
 }
 
 # The <owner>/<repo> tail of a git url, for comparing two urls that may name

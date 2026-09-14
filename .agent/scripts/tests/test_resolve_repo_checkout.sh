@@ -548,6 +548,67 @@ else
     fail "bootstrap branch disagreement: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h4f. url FORM never decides the git_url cross-check --------------------
+# The declared url and the derived one must be compared as REPO IDENTITIES,
+# not as strings: `setup_layers.sh` accepts an scp-form url, a url with no
+# `.git`, and a trailing `/`, and this derivation emits none of those — so a
+# raw string compare hard-failed at exit 5 on a bootstrap that agrees
+# perfectly, reporting it as "not the one its own bootstrap names".
+root=$(make_root bootstrap_url_forms)
+origin=$(make_origin bootstrap_url_forms)
+make_manifest_origin formowner testmanifest "file://$origin" "config" \
+    "git@github.com:formowner/testmanifest.git"
+echo "https://raw.githubusercontent.com/formowner/testmanifest/main/config/bootstrap.yaml" \
+    > "$root/configs/project_bootstrap.url"
+out=$(WORKSPACE_MANIFEST_GIT_BASE="file://$TMPDIR_ROOT/manifest_origins" \
+      "$root/.agent/scripts/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+    pass "an scp-form git_url in bootstrap.yaml agrees with the derived url, not exit 5"
+else
+    fail "scp-form git_url: rc=$rc out='$out' (expected 0), stderr='$(stderr_text)'"
+fi
+
+# --- 6h4g. ...on BOTH branches, including the default (no GIT_BASE) ----------
+# With WORKSPACE_MANIFEST_GIT_BASE unset — the branch every real host takes,
+# and the one no end-to-end case can reach without the network, since the
+# derived url is then github.com — the comparison key is exercised directly.
+# The HOST is part of the key there (it is not redirected), and dropped when
+# the variable IS set, which is that variable's whole purpose.
+url_key_case() {
+    # $1 = WORKSPACE_MANIFEST_GIT_BASE value ("" = unset), $2, $3 = the urls,
+    # $4 = "agree"|"differ", $5 = description
+    local got
+    got=$(
+        if [ -n "$1" ]; then export WORKSPACE_MANIFEST_GIT_BASE="$1"; else unset WORKSPACE_MANIFEST_GIT_BASE; fi
+        # shellcheck source=/dev/null
+        source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+        a=$(_manifest_fallback_url_key "$2")
+        b=$(_manifest_fallback_url_key "$3")
+        [ "$a" = "$b" ] && echo agree || echo "differ ($a vs $b)"
+    )
+    case "$got" in
+        "$4"*) pass "url key: $5" ;;
+        *)     fail "url key: $5 — expected $4, got '$got'" ;;
+    esac
+}
+
+url_key_case "" "https://github.com/o/r.git" "git@github.com:o/r.git" agree \
+    "scp-form and https name the same repo (GIT_BASE unset)"
+url_key_case "" "https://github.com/o/r.git" "https://github.com/o/r" agree \
+    "a missing .git does not change the identity (GIT_BASE unset)"
+url_key_case "" "https://github.com/o/r.git" "https://github.com/o/r/" agree \
+    "a trailing slash does not change the identity (GIT_BASE unset)"
+url_key_case "" "https://github.com/o/r.git" "https://GitHub.com/o/r.git" agree \
+    "the host is compared case-insensitively (GIT_BASE unset)"
+url_key_case "" "https://github.com/o/r.git" "https://gitlab.com/o/r.git" differ \
+    "a DIFFERENT host still disagrees when the base was not redirected"
+url_key_case "" "https://github.com/o/r.git" "https://github.com/other/r.git" differ \
+    "a different owner still disagrees (GIT_BASE unset)"
+url_key_case "file:///tmp/mirror" "https://github.com/o/r.git" "file:///tmp/mirror/o/r.git" agree \
+    "with GIT_BASE set the host is exempt — only <owner>/<repo> must agree"
+url_key_case "file:///tmp/mirror" "https://github.com/o/r.git" "file:///tmp/mirror/o/other.git" differ \
+    "with GIT_BASE set a different repo still disagrees"
+
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
 # The early return has to recognise EVERY layout get_overlay_repos reads
 # (configs/manifest/repos AND configs/*.repos). Recognising only the first made
