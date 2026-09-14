@@ -388,13 +388,16 @@ flagged for review"). A missing or unparseable header is
 Write the full report to a **timestamped** file:
 
 ```bash
-REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-sweep.md"
+REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-sweep.md"
 ```
 
 Generate the timestamp with `date`; never hand-type one (AGENTS.md
 § Documentation Accuracy). A date-only name would let a second run the same day
 overwrite the first run's report — the runs are the record, so they must
-accumulate.
+accumulate. Seconds are not enough on their own for the same reason: two runs
+finishing within one second would collide, so the pid disambiguates them. The
+name stays sortable, and `*-sweep.md` still matches it (the retention sweep at
+step 3 globs on that suffix).
 
 This write depends on neither network nor auth, so a sweep that reached step 4
 produces its record wherever the filesystem is writable. It is the sweep's
