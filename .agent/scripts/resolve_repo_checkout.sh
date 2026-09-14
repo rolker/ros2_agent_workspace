@@ -55,9 +55,12 @@
 #      neither a full commit SHA nor a ref-safe branch/tag name) — distinct
 #      from 4, which means the manifests were fine and simply do not name
 #      this repo
-#   7  the repo is declared in more than one manifest with DIFFERENT urls —
-#      ambiguous, so which one to audit is the operator's call, not a silent
-#      first-match
+#   7  the repo is declared in more than one manifest with a different url OR a
+#      different `version:` pin — ambiguous, so which one to audit is the
+#      operator's call, not a silent first-match. The pin counts because two
+#      manifests agreeing on the url and disagreeing on the version describe
+#      two different trees, and picking one of them silently audits code the
+#      operator did not name
 #
 # Clones land in <main-workspace-root>/.agent/scratchpad/janitor-repos/<repo>
 # (gitignored). The cache is anchored at the MAIN workspace root, not the
@@ -288,10 +291,17 @@ if not matches:
     print("NOTFOUND\t%d" % len(repos))
     raise SystemExit(0)
 
-urls = {(r.get("url") or "") for r in matches}
-if len(urls) > 1:
+# The url alone is not the identity of a checkout: two manifests naming the
+# same repo at the same url but DIFFERENT `version:` pins describe two
+# different trees, and taking matches[0] in sorted-manifest order would clone
+# whichever one sorted first and audit the wrong branch or commit — silently,
+# where the conflicting-url case is loud. Same asymmetry, same answer.
+pins = {((r.get("url") or ""), (r.get("version") or "")) for r in matches}
+if len(pins) > 1:
     print("AMBIGUOUS\t%s" % " | ".join(
-        "%s (%s)" % (r.get("url") or "<no url>", r.get("source_file") or "?") for r in matches))
+        "%s at '%s' (%s)" % (r.get("url") or "<no url>",
+                             r.get("version") or "<no version>",
+                             r.get("source_file") or "?") for r in matches))
     raise SystemExit(0)
 
 url = matches[0].get("url") or ""
@@ -323,7 +333,7 @@ case "$verdict" in
         exit 4
         ;;
     AMBIGUOUS)
-        say "'$REPO_NAME' is declared with conflicting urls: $detail — resolve the manifests, do not guess"
+        say "'$REPO_NAME' is declared with conflicting urls or version pins: $detail — resolve the manifests, do not guess"
         exit 7
         ;;
     NOURL)

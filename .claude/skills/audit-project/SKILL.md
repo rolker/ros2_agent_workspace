@@ -89,7 +89,8 @@ if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" <repo-name>); th
     #          cache directory or per-repo lock could not be set up
     # exit 6 = manifest unreadable, or the entry is malformed (no url:, a url
     #          in no recognised form, or an unsafe version:)
-    # exit 7 = declared in two manifests with conflicting urls — do not guess
+    # exit 7 = declared in two manifests with a conflicting url or version:
+    #          pin — two different trees, so do not guess
     echo "FAILED: could not resolve <repo-name> (see stderr)"
     exit 1
 fi

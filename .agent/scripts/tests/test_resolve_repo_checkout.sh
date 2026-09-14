@@ -585,6 +585,53 @@ else
     fail "ambiguous: rc=$rc out='$out' (expected 7 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 7b. ...and the same url with conflicting VERSION pins is just as ambiguous
+# The url is not the identity of a checkout. Two manifests naming this repo at
+# one url and two different `version:` pins describe two different trees, and
+# keying the ambiguity check on the url alone took matches[0] in sorted-manifest
+# order — cloning whichever sorted first and auditing the wrong branch, silently,
+# where the conflicting-url case is loud. The message must name both pins and
+# the files they came from, so the operator can resolve it without hunting.
+root=$(make_root ambiguous_version)
+origin=$(make_origin ambiguous_version release)
+write_manifest "$root" "demo_repo" "file://$origin" "main"
+cat > "$root/configs/other.repos" <<EOF
+repositories:
+  demo_repo:
+    type: git
+    url: file://$origin
+    version: release
+EOF
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 7 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "conflicting urls or version pins" \
+   && stderr_text | grep -q "main" && stderr_text | grep -q "release" \
+   && stderr_text | grep -q "test.repos" && stderr_text | grep -q "other.repos"; then
+    pass "same url with conflicting version pins → exit 7, naming both pins and their manifests"
+else
+    fail "ambiguous version: rc=$rc out='$out' (expected 7 / empty), stderr='$(stderr_text)'"
+fi
+
+# ...and the same pin declared twice is NOT ambiguous: agreeing manifests are
+# not a conflict, and turning them into one would fail every workspace that
+# declares a repo in two layers at the same version.
+root=$(make_root agreeing_manifests)
+origin=$(make_origin agreeing_manifests)
+write_manifest "$root" "demo_repo" "file://$origin" "main"
+cat > "$root/configs/other.repos" <<EOF
+repositories:
+  demo_repo:
+    type: git
+    url: file://$origin
+    version: main
+EOF
+out=$(run_resolver "$root" demo_repo); rc=$?
+if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+    pass "the same (url, version) in two manifests is not a conflict"
+else
+    fail "agreeing manifests: rc=$rc out='$out' (expected 0 / a path), stderr='$(stderr_text)'"
+fi
+
 # --- 8. usage errors ---------------------------------------------------------
 root=$(make_root usage)
 "$root/.agent/scripts/resolve_repo_checkout.sh" >/dev/null 2>&1; rc=$?
