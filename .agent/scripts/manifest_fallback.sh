@@ -12,10 +12,12 @@
 #
 # What this does: derive the manifest repo and branch from the TRACKED
 # `configs/project_bootstrap.url` pointer, shallow-clone it into the scratch
-# cache, read the now-local `bootstrap.yaml` the pointer names — which is
-# authoritative about `git_url:`/`branch:`/`config_path:`, as it is for
-# `setup_layers.sh` — and print the config directory to read `.repos` files
-# from. Callers
+# cache, read the now-local `bootstrap.yaml` the pointer names — the same three
+# keys `setup_layers.sh` reads — and print the config directory to read `.repos`
+# files from. Only `config_path:` is HONOURED (it decides where the `.repos`
+# are read from); `git_url:` and `branch:` are hard-failing cross-checks
+# against what the clone already used, since a disagreement there cannot be
+# honoured by rewriting a variable — it means this clone is the wrong repo. Callers
 # pass that to `list_overlay_repos.py --config-dir <dir>`, which ADDS it to the
 # normal search path rather than replacing it — a workspace that has a real
 # `configs/manifest` never takes this path at all.
