@@ -622,3 +622,52 @@ confirmations rather than new information.
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review the fixes, fresh context).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-14 09:09 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-569 at `8a27c96`
+**Mode**: pre-push (unpushed round-5 commits `486ea97..8a27c96`; PR #625 open at `9dc555f`)
+**Depth**: Deep (925 lines / 12 files, AGENTS.md + three SKILL.md governance triggers, and a credential-handling change — a Deep security promotion trigger)
+**Must-fix**: 5 | **Suggestions**: 22
+**Round**: 5 | **Ship**: continue — must-fix rose 3 → 5 and two are correctness defects, not polish: a false RED that hard-fails the whole no-`layers/` path on url forms `setup_layers.sh` accepts (in an untested branch), and a test suite that fails 4 of 7 in exactly the environment these skills now tell operators to create. Two more are *incomplete fixes of this round's own items* — the "set WORKSPACE_ROOT" remedy that cannot work, and the two skills whose manifest diagnostics still carry absolute host paths into a report the same file forbids them in. Every item is mechanical with an obvious correction and none is a design question, so this is one short fix pass plus a targeted re-read, not another full round.
+
+**Verified clean, on the record**: shellcheck `--severity=warning` and full `pre-commit` clean on the diff; `run_script_tests.sh` green (26 shell files incl. 45/45 resolver + 7/7 workspace_root, 220 pytest). Independently against the REAL workspace: zero `(url, version)` conflicts across the 35 manifest repos, so the new exit 7 cannot regress this host; and `configs/manifest/bootstrap.yaml` declares `git_url: https://github.com/rolker/unh_marine_autonomy.git` + `branch: jazzy`, byte-identical to what the fallback derives. All seven Integrated Review items are genuinely closed. The `SC2034` directive flagged for scrutiny is **not** a finding: one line, precisely commented, on a *test* variable read inside a dynamically-sourced helper shellcheck cannot follow, with existing precedent in `framework_config.sh`. The AGENTS.md edits are exactly three Script Reference rows (2 added, 2 edited, net 6 lines) — no rule or policy text touched.
+
+### Findings
+- [ ] (must-fix) The "or set WORKSPACE_ROOT" remedy is inert on the path it is printed for — the inline walk-up is what locates the script, and $WORKSPACE_ROOT is only read inside it — `.claude/skills/janitor-sweep/SKILL.md:97`, `.claude/skills/issue-triage/SKILL.md:54`, `.claude/skills/audit-project/SKILL.md:66,107`
+- [ ] (must-fix) With WORKSPACE_MANIFEST_GIT_BASE unset, the bootstrap.yaml `git_url` is compared as a raw string, so scp-form / no-`.git` / trailing-slash urls hard-fail at exit 5 as "not the one its own bootstrap names"; `_manifest_fallback_repo_path` exists for exactly this and is applied only in the other branch, which is the only one tested — `.agent/scripts/manifest_fallback.sh:273-283`
+- [ ] (must-fix) The suite is not hermetic against an ambient `$WORKSPACE_ROOT` despite its header claiming so — 4 of 7 cases fail with it set, in the environment the three skills now tell operators to create — `.agent/scripts/tests/test_workspace_root.sh:14-21`
+- [ ] (must-fix) A missing `redact.sh` returns 2, colliding with the documented "2 = executed rather than sourced"; the resolver uses 5 for the identical condition, and with the `source` rc unchecked and no `*)` arm the condition surfaces as exit 3 "run make setup-all" — the wrong remedy — `.agent/scripts/manifest_fallback.sh:85`, `.agent/scripts/resolve_repo_checkout.sh:260-275`
+- [ ] (must-fix) Both skills source `manifest_fallback.sh` without setting `REDACT_PATH_PREFIXES`, so its diagnostics keep absolute host paths and are then transcribed into a report the same file requires free of them — `.claude/skills/janitor-sweep/SKILL.md:120`, `.claude/skills/issue-triage/SKILL.md:73`
+- [ ] (suggestion) Two shapes of one snippet ship together: the header's usage block keeps walking on failure (`&& break`), the three skills and the test break unconditionally — `.agent/scripts/workspace_root.sh:33-38`
+- [ ] (suggestion) The `[ -x ]` gate makes the walk depend on exec bits (noexec volume, archive unpack, CIFS); `[ -f ]` + `bash "$d/…"` removes it — three SKILL.md walk-ups
+- [ ] (suggestion) The new retention sentence cites "step 3" (retention is step 1, `:174-176`) and leans on name-sortability where retention is `ls -1t` — `.claude/skills/janitor-sweep/SKILL.md:399-400`
+- [ ] (suggestion) "Authoritative about git_url:/branch:/config_path:" overstates — only `config_path` is honoured; the other two are hard-failing cross-checks — `.agent/scripts/manifest_fallback.sh:13-17`, `AGENTS.md:585`
+- [ ] (suggestion) The branch check conflates the branch serving bootstrap.yaml with the branch to clone the manifest at; `setup_layers.sh` never compares them, so a config it supports is refused as "the pointer is stale" — `.agent/scripts/manifest_fallback.sh:269-272`
+- [ ] (suggestion) A password containing a literal `@` leaks its tail in both functions, and the tests exercise only the simple form — `.agent/scripts/redact.sh:41,57`
+- [ ] (suggestion) `REDACT_PATH_PREFIXES` splits on the FIRST `=`, so a workspace path containing `=` corrupts every diagnostic (reproduced) — `.agent/scripts/redact.sh:59-65`
+- [ ] (suggestion) A failed `exec 9>`/`exec 8>` makes bash print the absolute lock path to stderr before the `say()` branch runs, bypassing the funnel — `.agent/scripts/resolve_repo_checkout.sh:436`, `.agent/scripts/manifest_fallback.sh:181`
+- [ ] (suggestion) fds 8/9 are inherited by git children, so a helper that outlives the script holds the advisory lock past exit; `flock -o` or an explicitly-closed `{fd}>` removes the class — both scripts
+- [ ] (suggestion) The manifest-cache lock drops when the function returns (every call site is a command substitution), so the returned repos dir is read unlocked — documented for janitor-repos, not for manifest-repo — `.agent/scripts/manifest_fallback.sh:178,181`
+- [ ] (suggestion) `declared_config_path` is remote-controlled and checked only for leading `/` and `..`; a committed symlink still escapes the clone dir — `.agent/scripts/manifest_fallback.sh:257-260`
+- [ ] (suggestion) Nothing says `git clone` writes a credential-bearing url verbatim into the scratch clones' `.git/config` — the actionable half of the "safe to delete" note — `.agent/scripts/redact.sh:25-27`, `.claude/skills/janitor-sweep/SKILL.md:176-185`
+- [ ] (suggestion) "The same hop resolve_repo_checkout.sh makes" is untrue — the new script added an `is_workspace_root` guard the resolver lacks — `.agent/scripts/workspace_root.sh:26`
+- [ ] (suggestion) No `*)` catch-all on the `manifest_config_dir` rc, unlike both skills (the mechanism behind must-fix 4) — `.agent/scripts/resolve_repo_checkout.sh:260-275`
+- [ ] (suggestion) `walk_up_from` is not the skills' snippet verbatim as the header claims, and case 3's "layer worktree" fixture is not the layout `worktree_create.sh` produces — `.agent/scripts/tests/test_workspace_root.sh:37-52,80-97`
+- [ ] (suggestion) Same non-hermetic class as must-fix 3: the fallback cases inherit an ambient `$BOOTSTRAP_URL` — `.agent/scripts/tests/test_resolve_repo_checkout.sh:497-548`
+- [ ] (suggestion) Both exit-5 enumerations omit causes the scripts' own headers list: the missing-`redact.sh` refusal, the unsafe declared `config_path`, and the git_url/branch disagreement — `AGENTS.md:583,584`
+- [ ] (suggestion) `WORKSPACE_MANIFEST_GIT_BASE` narrows the url cross-check precisely when it redirects the trust root — sound, but worth naming as a known property — `.agent/scripts/manifest_fallback.sh:273-283`
+- [ ] (suggestion) No mention of the main-checkout hop or `$WORKSPACE_ROOT`, though the consequences map routes "Worktree scripts" here — `.agent/WORKTREE_GUIDE.md`
+- [ ] (suggestion) The main-checkout hop silently redirects even an explicitly-set `$WORKSPACE_ROOT` — a consequential default worth one clause — `.agent/scripts/workspace_root.sh:80-85`
+- [ ] (suggestion) The `grep|cut|awk` parse inherits `setup_layers.sh`'s brittleness but turns a parse quirk into a hard failure it does not — `.agent/scripts/manifest_fallback.sh:246-248`
+- [ ] (suggestion) § Documentation & Instruction Impact names only `audit-project` among the skills; round 5 changed three — `.agent/work-plans/issue-569/plan.md:387-394`
+
+### Operator item (not a code finding)
+The plan records that the AGENTS.md instruction-file approval exists only as a verbal 2026-09-11 checkpoint and must be **re-confirmed at PR time**; round 5 adds a third drift (two new Script Reference rows, two edited) to that list. This belongs at the merge checkpoint, not in this review.
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** → **address-findings** (five mechanical must-fix) → re-dispatch **review-code**. The diff is not pushed until a pre-push review comes back approved.
