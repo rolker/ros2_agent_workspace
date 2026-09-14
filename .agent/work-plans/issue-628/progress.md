@@ -21,3 +21,18 @@ issue: 628
 - [ ] Confirm the discovery mechanism degrades gracefully (not an error) for the large majority of project repos that will not have the discovery file for some time — mirror ADR-0017's incremental-rollout stance ("repos without the file simply behave as before"). Not stated in the issue; should be an explicit test case in the plan.
 - [ ] The trigger-mechanism decision (Claude Code Routine vs. anacron vs. GH Actions cron) has real constraints already on record in #569 (laptop often off rules out plain cron; a cloud Routine "cannot reach gitcloud or `layers/`", which matters for project-repo health docs living on gitcloud-mirrored repos) — the ADR needs to actually settle this, not leave it open, per ADR-0001's "capture decisions" bar.
 - [ ] If discovery-schema resolution needs a new shared script (parallel to `field_mode.sh` / `manifest_fallback.sh`), add it to `AGENTS.md`'s Script Reference table per the consequences map row for `.agent/scripts/` changes — not currently in the deliverables list.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-14 13:53 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `864294d`
+**Branch**: feature/issue-628 at `864294d`
+**Phases**: 4 sub-issues (Part of #628); this worktree delivers (1) — ADR + workspace `docs/roadmap.md` + roadmap template
+
+### Open questions
+- [ ] Trigger mechanism: GH Actions weekly cron / Claude Code cloud Routine / anacron on the laptop (or an Actions+anacron split) — the plan's comparison table is the ADR's input; the operator's answer becomes the ADR's Decision.
+- [ ] Is `.agent/templates/roadmap.md` in sub-issue (1) or a later one? Plan puts it in (1) so the loop section is not written twice; reversible at review.
+- [ ] `AGENTS.md` is Ask First — approving the plan approves exactly two additions (a planning-documents pointer and `docs/roadmap.md` in References).
+- [ ] Confirm this PR closes #249 (the workspace roadmap is the direction that issue asked for) — it is a closing keyword in the PR body. Note: PR #257 actually MERGED 2026-02-26; it is #249 that has been idle, not a stalled draft PR as the issue body states.
