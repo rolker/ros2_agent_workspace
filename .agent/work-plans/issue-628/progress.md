@@ -724,3 +724,43 @@ ride the PR they were found in.
   and progress.md is not a surface GitHub's parser reads — but plan or progress
   text pasted into a PR body inherits the hazard, so the publish step should
   scrub from the plan/PR body, not copy these lines.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-17 12:19 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-628 at `acf89a3`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1740 changed lines, 11 files, governance/instruction files in the diff)
+**Must-fix**: 2 | **Suggestions**: 0
+**Round**: 2 | **Ship**: recommended — both must-fixes are one-token record corrections in the plan's as-built notes, produced by the last round-1 fix shifting `ROADMAP.md` by a line; fix them and ship rather than spend another round
+
+**Specialists**: Static Analysis (pre-commit over the changed files, clean; no Markdown linter profile — content review only), Governance + Scope + Attribution, Claude Adversarial Lens A (facts, links, internal consistency) — both sub-specialists returned **no findings**. Copilot and Local Adversarial: off (default).
+
+### Findings
+- [ ] (must-fix) As-built size check still says `ROADMAP.md` is 138 lines; it is 139 after the round-1 structural fix (`7aba3d7`) — still inside the 150-line bound, but the recorded measurement is wrong — `.agent/work-plans/issue-628/plan.md:356`
+- [ ] (must-fix) As-built cites the six placeholder rows as `ROADMAP.md:58-63`; the same fix shifted them to `ROADMAP.md:59-64` — `.agent/work-plans/issue-628/plan.md:360`
+
+### Round-1 findings re-verified against source
+All nine round-1 items are genuinely resolved, each checked against the file rather than the checkbox:
+- No commit message in `main..HEAD` puts a closing keyword before an issue number (re-grepped over full commit bodies).
+- Placeholder accounting corrected: nine `#TBD — filed at publish` occurrences, six in `ROADMAP.md` and three in the draft.
+- `.agent/templates/roadmap.md:36-40` — Health-document line is now a `<...>` placeholder, no live link.
+- `plan.md:129,290` — pointer accounting states one uniform shipped shape, two lines in each of four files.
+- `planning_document_vocabulary.md:46` — the kinds table's roadmap loop cross-refers to the template's *How this roadmap stays useful*.
+- `planning_document_vocabulary.md:268-276` — states plainly that `ALLOWED_SKILLS` holds `research` and `inspiration-tracker` only and that adding the sweep belongs to the sweep-split sub-issue.
+- `planning_document_vocabulary.md:66-69` — two-root rule now hedged to match the non-binding header.
+- `ROADMAP.md:9-16` — parent/children render as a short field pair, narrative moved below.
+- `README.md:79` — `ROADMAP.md` now named in § Documentation "For All Users".
+
+### Verified clean
+- **Scope**: exactly two References lines added in each of `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`; no other hunk in any of the four. `README.md` carries the two approved pointer lines; `principles_review_guide.md` the single Consequences Map row.
+- **Attribution**: every operator quote in the draft and the plan matches the #628 comments verbatim, with the right dates; the cited permalink resolves to the comment carrying its quoted text; nothing attributed beyond what was said.
+- **Facts**: nineteen ADRs, the three still-`Proposed` ADRs (0005/0008/0009), the ADR-applicability gap (0011, 0012, 0014–0019), `ALLOWED_SKILLS`, and every issue state cited (#249 #263 #264 #265 #266 #569 #609 #610 #626 #627 #628, plus the two cross-repo `unh_marine_autonomy` issues) all match source.
+- **Links**: every relative link and in-page anchor in the three new documents resolves from its own file's location; `README.md#vision` exists.
+- **SHAs**: every 7-hex commit sha cited in `plan.md`/`progress.md` resolves; the only other hex strings are GitHub comment IDs inside permalinks.
+- **Project-agnosticism (ADR-0003)**: the kinds table, the two-root rule and the template are stated generically; the two project repos appear only as labelled worked examples.
+- **"Published expectation, not a requirement; absence is never a finding"** holds in the draft, the roadmap, the template and the new Consequences Map row.
+- `ROADMAP.md` is 139 lines, inside the 150-line bound. Pre-commit over all changed files: clean.
