@@ -6,10 +6,11 @@ autonomy software it hosts has its own roadmaps in its own repos. Durable
 direction lives here; specific bounded work lives in issues, referenced by
 number.
 
-**Parent roadmap**: none — this is a root.
-**Roadmaps beneath this one**: none in this repo. Project roots carry their own;
-the framework repo (`unh_marine_autonomy`) is the first one expected to, with the
-BizzyBoat roadmap
+**Parent roadmap**: none — this is a root.<br>
+**Roadmaps beneath this one**: none in this repo.
+
+Project roots carry their own. The framework repo (`unh_marine_autonomy`) is the
+first one expected to, with the BizzyBoat roadmap
 ([`unh_echoboats_project11`](https://github.com/rolker/unh_echoboats_project11/blob/main/docs/roadmap.md)
 — still at its pre-existing `docs/roadmap.md` path until the rename to a root
 `ROADMAP.md` lands) beneath it.
