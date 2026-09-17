@@ -326,3 +326,29 @@ discussed more before landing in a ADR."*
 ## Estimated Scope
 
 Umbrella #628: five PRs in this repo ((1), (2), (3), (4), (7)), plus two issues filed in project repos ((5), (6)). **This worktree: one PR** — three new documents (the design draft, the roadmap template, the workspace roadmap) and **six** small edits (`README.md`; **one** row in `.agent/knowledge/principles_review_guide.md`; `AGENTS.md`; `CLAUDE.md`; `.github/copilot-instructions.md`; `.agent/instructions/gemini-cli.instructions.md`), plus filing sub-issues (2)–(7). Four of those six files are Ask First (`AGENTS.md` and the three adapters) and carry the five pointer additions approved at the round-3 checkpoint. Rev 4's eight edits became six: the ADR-0015 addendum and the ADR Applicability row both left with the ADR.
+
+## Implementation notes (as built, 2026-09-17)
+
+Two places where the implementation differs from the plan text above, recorded
+inline per the plan-first workflow rather than left for review to discover.
+
+- **`AGENTS.md` carries one References list, not two.** Approach step 7 and the
+  Open Questions bullet read the operator's "five pointer additions" as "one
+  References block per file, two in `AGENTS.md`". `AGENTS.md` has exactly one
+  `## References` heading (`AGENTS.md:616`, verified 2026-09-17) and no second
+  list of document pointers, so the two additions in that file are the **two
+  document lines** added to that single list — `docs/roadmap.md` and
+  `docs/design/planning_document_vocabulary.md` — matching what each of the
+  three adapters got. Net effect: eight lines across four files, both new
+  documents named in every list, exactly the set of files the operator approved
+  and nothing else touched in them. No separate "Planning documents" section was
+  added to `AGENTS.md`; a new section would have been a sixth change to an Ask
+  First file.
+- **Sub-issues (2)–(7) are not filed by this worktree.** Approach step 8 files
+  them; the host files GitHub issues at the publish checkpoint instead, so the
+  implementation used the placeholder `#TBD — filed at publish` wherever an
+  unfiled sub-issue is referenced — seven rows in `docs/roadmap.md` and three
+  mentions in the design draft (the two enforcement closers and the promotion
+  sub-issue). Those placeholders are what the host replaces with real numbers;
+  they are the only `#TBD` tokens in the tree. Step 9's PR body and the #628
+  comment likewise belong to the publish step.
