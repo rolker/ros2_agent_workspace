@@ -7,7 +7,8 @@ direction lives here; specific bounded work lives in issues, referenced by
 number.
 
 **Parent roadmap**: none — this is a root.<br>
-**Roadmaps beneath this one**: none in this repo.
+**Roadmaps beneath this one**: none in this repo.<br>
+**Last reviewed**: 2026-09-17 — stamped when the forcing function last fired.
 
 Project roots carry their own. The framework repo (`unh_marine_autonomy`) is the
 first one expected to, with the BizzyBoat roadmap
@@ -51,6 +52,10 @@ verbatim in substance:
 
 ## Active threads
 
+*No `Owner` or `Priority` column: every item here has the same owner (Roland,
+with agent help), and the flagship thread this cycle is the roadmap + health
+loop — which is why it is first.*
+
 ### The roadmap + health loop (this document's own reason to exist)
 
 | Item | Issue | Status | Notes |
@@ -75,10 +80,6 @@ first. This thread is what stops a green result from meaning nothing.
 | `issue-triage` silently truncates repos with >100 open issues | [#627](https://github.com/rolker/ros2_agent_workspace/issues/627) | planned | A detector that under-reports without saying so |
 | `merge_pr.sh` reports "CI checks failed" for a repo with no CI | [#610](https://github.com/rolker/ros2_agent_workspace/issues/610) | planned | Merge-gate honesty |
 
-*Background, not a pending item: the false-green sweep across `sync` / `pull` /
-`validate` landed and closed as
-[#609](https://github.com/rolker/ros2_agent_workspace/issues/609).*
-
 ### Simplification and documentation consolidation (#249 Phase 2)
 
 | Item | Issue | Status | Notes |
@@ -94,6 +95,15 @@ first. This thread is what stops a green result from meaning nothing.
 |---|---|---|---|
 | Backfill the ADR Applicability table in `.agent/knowledge/principles_review_guide.md` | — | planned | The table runs 0001–0010 then 0013: **0011, 0012 and 0014–0019 have no row at all** (verified 2026-09-17). Exactly the quiet drift the roadmap + health loop exists to surface |
 | Resolve the three ADRs still `Proposed` while cited as binding | — | planned | 0005 (layered enforcement), 0008 (ROS 2 conventions), 0009 (Python packaging), verified 2026-09-17 |
+
+## Recently completed
+
+Kept for one cycle — one sweep — then pruned out. Empty is a normal state.
+
+| Item | Issue | Completed |
+|---|---|---|
+| Staleness detectors chained into one local sweep report | [#569](https://github.com/rolker/ros2_agent_workspace/issues/569) | [PR#625](https://github.com/rolker/ros2_agent_workspace/pull/625) merged 2026-09-14. #569 itself stays open for the trigger |
+| False-green sweep across `sync` / `pull` / `validate` | [#609](https://github.com/rolker/ros2_agent_workspace/issues/609) | Closed 2026-08-24 |
 
 ## Deferred
 
@@ -113,7 +123,8 @@ thing a consolidation pass reverts by accident while tidying.
 
 - Specific bug fixes and features — those are issues.
 - The autonomy software itself — that lives in the project repos' own roadmaps.
-- Anything already merged. History is git's job, not this document's.
+- Anything merged more than a cycle ago. *Recently completed* holds the last
+  cycle's worth and is pruned; beyond that, history is git's job.
 
 ## How this roadmap stays useful
 
