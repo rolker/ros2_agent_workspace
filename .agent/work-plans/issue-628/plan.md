@@ -237,7 +237,7 @@ Approach step 7 for why.
 (7)): `docs/decisions/0020-planning-document-kinds-and-the-two-root-rule.md`,
 replaced by the design draft above; and the ADR-0012 addendum on
 `docs/decisions/0015-dispatch-handoff-context-contract.md`. Rev 4's ten rows
-are nine here, and rev 4's eight small edits are six.
+are nine here, and rev 4's eight small edits became six at rev 5, and seven as built once the inspiration-tracker skill was repointed in review.
 
 ## Principles Self-Check
 
