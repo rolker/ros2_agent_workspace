@@ -329,3 +329,40 @@ this would widen the Ask-First approval from three additions to five), and one
 is a gap in the table that sub-issue (2) is contracted to read literally (the
 health row names no file). Nothing in the six decisions you recorded on #628 is
 misstated in the plan.
+
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 11:12 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-628 at `13d5224`
+**Addressed**: `## Plan Review` round 3 (2026-09-17 11:02 -04:00, plan rev 3 at `ee41296`, review entry `0161442`) — verdict changes-requested, 4 must-fix + 6 suggestions
+**Commits**: `6df07fc`, `4de4c72`, `8d4ce46`, `134ba1d`, `3e7b8d1`, `0493f1d`, `02eaa30`, `13d5224`
+**Work product**: `.agent/work-plans/issue-628/plan.md` rev 4, plan head `02eaa30`
+
+Plan-only revision per the operator's round-3 decision (2026-09-17 comment on
+#628: fix all ten, then a fourth plan review). Nothing in the plan was
+implemented. Every claim added was verified against source or against the
+GitHub record before it was written; the four suggestions that are one-clause
+record corrections were grouped into one commit (`3e7b8d1`) because splitting
+four one-line fixes in the same paragraph-set would have produced commits that
+cannot be reasoned about independently anyway.
+
+### Actions
+- [x] (must-fix 1) Operator quote now cited to its source — the verbatim #628 comment of 2026-09-17 ("Operator note recorded late", issuecomment-5716595167); quote retained, ADR-0003 named as the standing authority — `plan.md` Approach step 1
+- [x] (must-fix 2) "Generic ROS 2 project conventions" replaced with "common open-source documentation practice, plus the paths this workspace already uses", in all three places, with an explicit note that it is deliberately *not* a ROS 2 convention (ADR-0008 scopes those to naming/packaging/licensing/messages/launch); new ADR-0008 row in ADR Compliance records the check — `plan.md` Approach step 1, Principles Self-Check, ADR Compliance
+- [x] (must-fix 3) Adapter fan-out widened to all three adapters (`CLAUDE.md:23-34`, `.github/copilot-instructions.md:112-121`, `.agent/instructions/gemini-cli.instructions.md:81-90` — same list, verified); Ask-First scope restated as the **five** pointer additions the operator approved in the round-3 comment — `plan.md` Approach step 7, Files to Change (2 new rows), Consequences row 3, Documentation Impact, Open Questions, Estimated Scope
+- [x] (must-fix 4) Health row given a literal path, `docs/health.md`, so every row of the kind → expected-location table is a path and sub-issue (2)'s "exactly the table's paths" contract holds; (2) probes it, (3) writes it and cannot rename it without amending the table. No per-repo declaration file added (operator ruled that out) — `plan.md` Approach step 1 table, sub-issue (2) and (3) rows
+- [x] (suggestion 5) #609 removed from the open direction-setting threads — CLOSED 2026-08-24 (verified); #569/#626/#627/#610 re-verified OPEN — `plan.md` Approach step 4
+- [x] (suggestion 6) ADR-0012's test now quoted as written ("if someone reads only the edited ADR without knowing about the change, will they get a misleading picture of what was originally decided?", ADR-0012 § "How to tell the difference") — `plan.md` Approach step 2
+- [x] (suggestion 7) Sub-issue (5)'s gate on (2) for the `kind:` marker format stated explicitly, matching how (6) states its gate on (3) — `plan.md` sub-issue table row (5)
+- [x] (suggestion 8) `.agent/templates/adr_template.md` § "Blank ADR template" named as ADR-0020's source structure, extended with Alternatives considered / References (both present in ADR-0019) — `plan.md` Approach step 1, Files to Change
+- [x] (suggestion 9) "Superseding #249" replaced with "absorbs #249's direction", consistent with "#249 stays open, `Part of #249`, no closing keyword" — `plan.md` Approach step 4, Files to Change
+- [x] (suggestion 10) Overlay set corrected to **35** github.com entries, not 44: `get_overlay_repos` ignores `underlay.repos` (`.agent/scripts/lib/workspace.py:86,106`), which holds 9 of the 44. Conclusion unchanged — `plan.md` Trigger comparison
+
+### Deferred
+None — all ten findings were actioned.
+
+### Next
+Fourth plan review (`review-plan`) against plan rev 4 at `02eaa30`, per the operator's round-3 decision. Not dispatched from here.
