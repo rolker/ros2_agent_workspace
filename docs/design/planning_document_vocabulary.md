@@ -201,11 +201,15 @@ and general open-source practice. The survey itself lives under
 Row by row:
 
 - **vision — settled on a `## Vision` section in `README.md`.** This is the
-  better-evidenced of the two candidates: no surveyed ROS 2 project has a
-  `VISION.md`, all state their mission in the README, and this workspace itself
-  already uses `README.md` § Vision. The `VISION.md` alternative rested on a
-  single instance — the framework repo's, untouched since January — which is
-  thin support for a published recommendation.
+  better-evidenced of the two candidates: none of the **external** ROS 2
+  projects surveyed below has a `VISION.md`, all state their mission in the
+  README, and this workspace itself already uses `README.md` § Vision. The
+  `VISION.md` alternative rests on in-house instances only — the framework repo
+  `rolker/agent_workspace`, untouched since January, and `unh_marine_autonomy`,
+  whose `VISION.md`
+  [unh_marine_autonomy#394](https://github.com/rolker/unh_marine_autonomy/issues/394)
+  folds into `README.md` § Vision — which is thin support for a published
+  recommendation.
 - **roadmap — settled on a root `ROADMAP.md`.** Three candidates were on the
   table: `docs/roadmap.md` (the BizzyBoat instance this workspace actually
   reads), a root `ROADMAP.md` (what Kubernetes sub-projects publish; the sibling
