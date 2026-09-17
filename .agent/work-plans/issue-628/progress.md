@@ -649,3 +649,78 @@ plan pass before implementation.
 - Project-agnosticism (ADR-0003): `unh_marine_autonomy` / `unh_echoboats_project11` appear only as worked examples.
 - The design-collection consistency review appears once, as a pointer to the #628 discussion, unspecified.
 - "Published expectation, not a requirement; absence is never a finding" is held consistently, including in the new Consequences Map row.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 12:14 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-628 at `73fd775`
+**Addressed**: `## Local Review (Pre-Push)` round 1, 2026-09-17 12:05 -04:00, verdict changes-requested (2 must-fix + 7 suggestions), reviewed at `1545690`
+**Commits**: 818640c, 52ca2ec, f873977, 00fc7d7, bb1e85d, 419e2a9, 2a47d14, 7aba3d7, 73fd775
+
+All nine open actions are fixed in this PR — none filed as a follow-up
+issue, per the operator's standing rule that review-found small defects
+ride the PR they were found in.
+
+### Actions
+- [x] (must-fix) The commit body carrying a live closing keyword for #249 — the
+  host reworded that commit before this pass (`9e00462` → `1545690`), and
+  `git log main..HEAD` now matches no closing-keyword token. The review entry
+  cited the old sha twice — as the branch head reviewed and as the offending
+  commit — and neither resolved any more, so both citations were repaired to
+  `1545690` and the finding's own text de-tokenised (it quoted the keyword
+  verbatim). Correcting a dangling sha citation inside the entry being checked
+  off is the established repair on this branch: progress.md is append-only for
+  *entries*, not for a reference that has stopped resolving — `818640c`
+- [x] (must-fix) As-built placeholder count — six rows in `ROADMAP.md`
+  (`ROADMAP.md:58-63`, one per unfiled sub-issue) plus three mentions in the
+  design draft, nine in all, not seven plus three — `plan.md:350-355`, `52ca2ec`
+- [x] (suggestion) Roadmap template shipped a live `docs/health.md` link while
+  telling the author to omit it; the line is now a `<...>` placeholder in the
+  same form as the two fields above it — `.agent/templates/roadmap.md:36-40`,
+  `f873977`
+- [x] (suggestion) Five-pointer accounting made consistent: both passages now
+  state the shipped shape, two lines in each of four files, eight in all —
+  `plan.md:129,290`, `00fc7d7`
+- [x] (suggestion) Kinds table's "On its own loop (see below)" now cross-refers
+  to the roadmap template's *How this roadmap stays useful*, the section that
+  actually describes the cadence — `planning_document_vocabulary.md:46`,
+  `bb1e85d`
+- [x] (suggestion) The `research`-skill convention sentence now states that
+  `worktree_create.sh`'s `ALLOWED_SKILLS` holds `research` and
+  `inspiration-tracker` only (verified 2026-09-17) and that adding
+  `janitor-sweep` belongs to the sweep-split sub-issue — worded without a new
+  `#TBD` token, so the placeholder count stays at nine —
+  `planning_document_vocabulary.md:268-275`, `419e2a9`
+- [x] (suggestion) Two-root rule softened from "is permitted to presume" to "a
+  skill *may* assume these two roots — and, on this draft's proposal, only
+  these two", keeping the limiting sense while matching the header's
+  non-binding framing — `planning_document_vocabulary.md:66-69`, `2a47d14`
+- [x] (suggestion) "Roadmaps beneath this one" is now the answer alone, with the
+  forward-looking narrative as its own paragraph below and a `<br>` on the
+  parent line so the two render as a field pair; `ROADMAP.md` is 139 lines,
+  inside the 150-line bound — `ROADMAP.md:9-16`, `7aba3d7`
+- [x] (suggestion) `README.md` § Documentation "For All Users" now names
+  `ROADMAP.md` beside `ARCHITECTURE.md` and `AGENTS.md`. Fixed rather than
+  raised: `README.md` is not an Ask First file, and the operator's rule is to
+  fix review-found defects in the PR. The Ask-First scope across `AGENTS.md`
+  and the three adapters is untouched, and the plan's as-built notes record the
+  second `README.md` pointer — `README.md:79`, `73fd775`
+
+### Checks
+- `pre-commit run --files <changed>` from `/home/roland/project11/.venv` on every
+  commit: all hooks pass, none skipped for cause. No code changed, so no package
+  tests apply.
+- Re-verified after the last fix: nine `#TBD — filed at publish` placeholders
+  intact (six in `ROADMAP.md`, three in the draft); `ROADMAP.md` 139 lines;
+  `git log main..HEAD` carries no closing-keyword token; the new
+  `../../.agent/templates/roadmap.md` link resolves from `docs/design/`.
+
+### Noted, not actioned
+- Four **older** progress.md entries (the issue-review and plan-review rounds,
+  lines 38, 68, 85, 185) quote closing-keyword phrasing verbatim in their own
+  finding text. They pre-date this pass, they are historical appended entries,
+  and progress.md is not a surface GitHub's parser reads — but plan or progress
+  text pasted into a PR body inherits the hazard, so the publish step should
+  scrub from the plan/PR body, not copy these lines.
