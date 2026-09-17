@@ -351,7 +351,10 @@ correctly in the scope that has only a roadmap.
   [ADR-0005](../decisions/0005-layered-enforcement-strategy.md)'s own test ("if a
   rule isn't in CI, it's a suggestion, not a rule") they are suggestions, and as
   draft text they are proposals besides. The conventional-path reader
-  ([#634](https://github.com/rolker/ros2_agent_workspace/issues/634)) makes the two-root rule checkable; the trigger
+  ([#634](https://github.com/rolker/ros2_agent_workspace/issues/634)) makes the documents the two-root rule talks about *discoverable* — it validates
+  nothing and raises no finding, and discovery is the precondition for a check
+  rather than the check itself, so enforcement stays owed to a scoped
+  follow-up; the trigger
   ([#636](https://github.com/rolker/ros2_agent_workspace/issues/636)) gives the read-both rule its forcing function.
 - **The commit-publish path does not go live until the redaction class on
   [#626](https://github.com/rolker/ros2_agent_workspace/issues/626) is closed.**
