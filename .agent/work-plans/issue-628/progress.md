@@ -823,3 +823,42 @@ Copilot R1 was submitted against `92526cf`, one commit behind head; every R1 ite
 - The two false positives in the Integrated Review were left as dismissals; no past progress entry was edited.
 - `ROADMAP.md` was not touched in this pass and stays at its pre-existing size, inside the 150-line bound. Per the first finding's fix, the count is measured at publish rather than recorded here.
 - New relative links in `.claude/skills/inspiration-tracker/SKILL.md` resolve from that file's location.
+
+## Local Review
+**Status**: complete
+**When**: 2026-09-17 13:58 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**PR**: #638 at `aa05f55`
+**Mode**: post-PR (re-review after address-findings)
+**Depth**: Standard (reason: governance-touching files; docs-only, 12 files)
+**Scope**: verification of the ten `## Integrated Review` findings (entry `23b874f`) against source in `b1b3882`..`883b7f3`, regression check on those commits, plus a light whole-diff sanity pass
+**Must-fix**: 1 | **Suggestions**: 1
+**Round**: 2 (post-PR) | **Ship**: recommended — must-fix fell 3 → 1; the one open item is a two-file factual sentence rewrite with the correct wording already determined, not a design question
+
+### Findings
+- [ ] (must-fix) Regression from `c7f58d6`: the `VISION.md` evidence sentence now calls `rolker/agent_workspace` "the framework repo ... untouched since January". Verified: that repo has **no `VISION.md`** at root or under `docs/` (its root holds `README.md`/`AGENTS.md`/`ARCHITECTURE.md`; `docs/` holds `PRINCIPLES.md`, `ROADMAP.md`, `decisions/` — checked 2026-09-17), and the draft itself uses "the framework repo" for `unh_marine_autonomy` at lines 14-15 and 31-32 and calls `rolker/agent_workspace` "the sibling" at lines 221 and 233. The stale instance is `unh_marine_autonomy`'s `VISION.md`, last committed 2026-01-15 ("Establish Framework Vision"), which is what the pre-fix sentence and the Context section both said. As written the sentence contradicts its own document and cites a file that does not exist. Name `unh_marine_autonomy` as the sole in-house `VISION.md` instance, untouched since January, folded into README § Vision by unh_marine_autonomy#394; drop `rolker/agent_workspace` from this sentence (it is cited correctly elsewhere as the sibling, for its `docs/ROADMAP.md`) — `docs/design/planning_document_vocabulary.md:210-216` and the same sentence at `.agent/work-plans/issue-628/plan.md:103`
+- [ ] (suggestion) The as-built size record still reads "still **inside** step 4's 150-line first-cut bound" while `ROADMAP.md` measures exactly 150 — the inside/at distinction the round-1 finding named. The sibling record twelve lines below already says "which it still meets", which is the accurate form; match it — `.agent/work-plans/issue-628/plan.md:356`
+
+### Verified resolved
+All ten Integrated Review findings check out against source, one atomic commit each:
+- Size check: both hand-typed counts replaced with the bound plus a `wc -l`-at-publish statement (`b1b3882`).
+- Placeholder note rewritten in the past tense, naming `92526cf` and the six real links; no `#TBD` survives outside that record and the progress timeline — grep-confirmed (`82e74ce`).
+- `inspiration-tracker` repointed to root `ROADMAP.md` **Deferred** at all three prose mentions plus the Guidelines line; the append snippet is a 3-cell row matching the `Item | Issue | Deferred because` header in both the template and the instance; both new relative links resolve (`cd1210e`).
+- Kind singular `decision` in the expected-location table and its row-by-row prose; no `| decisions` row remains (`371c891`).
+- Read-both rule qualified "once one exists" in both the draft and the template, each with its reason (`919b0f2`).
+- Org-board fallback now `gh project list --owner <org>`; the retired REST form named only as retired (`534cd38`).
+- Identity form rendered as runnable `git -c user.name=… -c user.email=…` in draft and plan (`0e8f5b4`).
+- #634 restated as making documents *discoverable*, enforcement left to a follow-up (`3e08c76`).
+- One clause separating the canonical in-repo probe from #634's discovery fallbacks, "absence is never a finding" intact (`883b7f3`).
+- The `VISION.md` scoping fix (`c7f58d6`) addressed the finding as stated but introduced the must-fix above.
+
+### Regression checks
+- No closing keyword precedes an issue number anywhere in `main..HEAD` commit messages.
+- `wc -l ROADMAP.md` = 150, at step 4's 150-line bound.
+- Every relative markdown link introduced by this PR resolves on disk; the only unresolved targets are the four pre-existing `.agent/project_knowledge/` pointers, a gitignored optional symlink documented in place as "may not exist".
+- Ask-First files (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`) each carry exactly two added References lines and nothing else.
+- Only checkbox ticks were made to the prior Integrated Review entry — no past progress text edited.
+- All ten fix commits are authored by the agent identity and carry the runtime-model `Co-Authored-By` trailer; tree is clean; no trailing whitespace in changed files.
+- Operator decisions recorded on #628 were not re-opened by any finding above.
