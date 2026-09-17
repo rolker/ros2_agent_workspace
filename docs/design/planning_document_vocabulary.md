@@ -332,10 +332,16 @@ sweep excludes them by URL before its rotation is built.
 ## The one rule stated in every roadmap
 
 > Before choosing the next piece of work, read the roadmap and the health
-> document together. The roadmap says where you want to go; health says what will
-> stop you. Work that appears in both goes first.
+> document together, once a health document exists. The roadmap says where you
+> want to go; health says what will stop you. Work that appears in both goes
+> first.
 
-That sentence is what makes the two documents a loop rather than two files.
+That sentence is what makes the two documents a loop rather than two files. The
+qualification is not a hedge: no `docs/health.md` exists anywhere yet — the sweep
+that writes one is
+[#635](https://github.com/rolker/ros2_agent_workspace/issues/635) — and a
+missing health document is normal, never a finding, so the rule has to read
+correctly in the scope that has only a roadmap.
 
 ## Consequences
 

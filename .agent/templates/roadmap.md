@@ -128,8 +128,11 @@ been admitted yet.>
   for the workspace it is the periodic sweep. A roadmap with no forcing function
   goes stale silently, so name the one that applies and say plainly if it is not
   running yet.
-- **Read it together with the health document.** The roadmap says where you want
-  to go; health says what will stop you. Work appearing in both goes first.
+- **Read it together with the health document** once one exists. The roadmap
+  says where you want to go; health says what will stop you. Work appearing in
+  both goes first. Drop the qualification once this scope has a health
+  document; until then it is what keeps the line honest, since a missing health
+  document is normal and is never a finding.
 - **Leftovers land here at wrap-up** — things that came up, are not bounded
   enough for an issue, and are not going to be done next time.
 - **Prune periodically.** If a deferred item has sat for months with no pull
