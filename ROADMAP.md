@@ -56,12 +56,12 @@ verbatim in substance:
 | Item | Issue | Status | Notes |
 |---|---|---|---|
 | Planning-document vocabulary + two-root rule (draft + this roadmap) | #628 | in progress | The draft in [`docs/design/`](docs/design/planning_document_vocabulary.md); this is its first roadmap instance |
-| Conventional-path discovery in `janitor-sweep` / `audit-project` | #TBD — filed at publish | planned | Probes exactly the draft's expected-location table; graceful absence is the headline requirement |
-| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | #TBD — filed at publish | planned | Writes `docs/health.md` in each graded repo. Gated on the redaction class in #626 |
-| The trigger — weekly cloud Routine under `Janitor Sweep Agent` | #TBD — filed at publish | planned | The last step of #569, which stays open until it lands. Must first confirm the run cap and that the GitHub connection reaches every overlay repo with write access |
-| `unh_marine_autonomy`: `VISION.md` folded into README § Vision, root `ROADMAP.md`, kind markers | #TBD — filed at publish | planned | Filed in that repo, not here |
-| `unh_echoboats_project11`: roadmap parent line, move to root `ROADMAP.md`, health placement | #TBD — filed at publish | planned | Filed in that repo, not here; the move is a rename, so history is preserved |
-| Promote the vocabulary draft to an ADR | #TBD — filed at publish | planned | Gated on the reader, the sweep, and a second ROS 2 project exercising the rule |
+| Conventional-path discovery in `janitor-sweep` / `audit-project` | [#634](https://github.com/rolker/ros2_agent_workspace/issues/634) | planned | Probes exactly the draft's expected-location table; graceful absence is the headline requirement |
+| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | [#635](https://github.com/rolker/ros2_agent_workspace/issues/635) | planned | Writes `docs/health.md` in each graded repo. Gated on the redaction class in #626 |
+| The trigger — weekly cloud Routine under `Janitor Sweep Agent` | [#636](https://github.com/rolker/ros2_agent_workspace/issues/636) | planned | The last step of #569, which stays open until it lands. Must first confirm the run cap and that the GitHub connection reaches every overlay repo with write access |
+| `unh_marine_autonomy`: `VISION.md` folded into README § Vision, root `ROADMAP.md`, kind markers | [unh_marine_autonomy#394](https://github.com/rolker/unh_marine_autonomy/issues/394) | planned | Filed in that repo, not here |
+| `unh_echoboats_project11`: roadmap parent line, move to root `ROADMAP.md`, health placement | [unh_echoboats_project11#492](https://github.com/rolker/unh_echoboats_project11/issues/492) | planned | Filed in that repo, not here; the move is a rename, so history is preserved |
+| Promote the vocabulary draft to an ADR | [#637](https://github.com/rolker/ros2_agent_workspace/issues/637) | planned | Gated on the reader, the sweep, and a second ROS 2 project exercising the rule |
 | Scheduled staleness/drift sweep (the parent thread) | [#569](https://github.com/rolker/ros2_agent_workspace/issues/569) | in progress | Hand-run once; stays open until the trigger lands |
 
 ### Honest reporting from the tooling

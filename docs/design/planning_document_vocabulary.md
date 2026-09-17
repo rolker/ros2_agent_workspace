@@ -325,8 +325,8 @@ That sentence is what makes the two documents a loop rather than two files.
   [ADR-0005](../decisions/0005-layered-enforcement-strategy.md)'s own test ("if a
   rule isn't in CI, it's a suggestion, not a rule") they are suggestions, and as
   draft text they are proposals besides. The conventional-path reader
-  (`#TBD` — filed at publish) makes the two-root rule checkable; the trigger
-  (`#TBD` — filed at publish) gives the read-both rule its forcing function.
+  ([#634](https://github.com/rolker/ros2_agent_workspace/issues/634)) makes the two-root rule checkable; the trigger
+  ([#636](https://github.com/rolker/ros2_agent_workspace/issues/636)) gives the read-both rule its forcing function.
 - **The commit-publish path does not go live until the redaction class on
   [#626](https://github.com/rolker/ros2_agent_workspace/issues/626) is closed.**
   #626 (OPEN) carries unfixed items in exactly the class that would be published:
@@ -377,7 +377,7 @@ grounds of ADR fatigue from decisions issued while a design was still evolving.
 What is deferred is the *binding status*, not the capture.
 
 Promotion to a numbered ADR under `docs/decisions/` is tracked as its own
-sub-issue (`#TBD` — filed at publish), gated on three things:
+sub-issue ([#637](https://github.com/rolker/ros2_agent_workspace/issues/637)), gated on three things:
 
 1. The conventional-path reader has landed, so the rule is exercised by code.
 2. The sweep actually writes a health document, so the publish path is exercised.
