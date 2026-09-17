@@ -235,3 +235,97 @@ two questions the round-2 review left at the checkpoint.
 ### Notes
 - Nothing deferred; all eight findings actioned.
 - Not pushed (host performs pushes). The plan is rev 3; the round-2 review's own closing note asked for a third plan review before implementation, and the operator's 2026-09-14 comment says the same.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-09-17 11:02 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `ee41296`
+**PR**: PR-less (`--issue` mode, worktree `feature/issue-628`)
+**Verdict**: changes-requested
+
+Independent review — dispatched as a fresh-context sub-agent, read the plan
+cold; not the plan author. Round 3, against plan rev 3 at `ee41296`.
+
+**All eight round-2 findings are genuinely closed in the plan text**, each
+re-verified against source rather than taken from the `## Implementation`
+entry: the anacron reach cell no longer claims gitcloud reach and now states
+what `layers/` actually buys (the two layer-dependent `audit-project` checks,
+`audit-project/SKILL.md:152-156,254`, and grading the working tree vs the
+manifest-pinned ref); `janitor-sweep` does exclude non-GitHub origins by url
+before the rotation (`SKILL.md:273`) and all 44 `url:` entries under
+`configs/manifest/repos/` are `github.com`; the discovery question is now in
+`plan.md` (Open Questions + Approach step 1 + the (2) row), recorded as
+decided; #249's disposition names #263/#264/#265/#266 (**all four OPEN**, as is
+#249, verified) and the nine-comment correction is in; the #626 gate cites the
+issue instead of restating its `file:line` refs and every item it describes is
+open and unchecked in #626; the ADR-0015 addendum is cut to a Status pointer
+plus a References entry with the third-actor argument moved into ADR-0020; the
+Context attribution now credits the operator with four sub-issues and the issue
+body/round-1 review with (5)/(6); the credential column states new-stored-secret
+counts (2/0/0) with no superlatives; the `principles_review_guide.md` ADR row is
+decided and both edits are named in Files to Change.
+
+Every other checkable claim re-verified and holding: 19 ADRs with 0019 highest
+so 0020 is free; no `docs/roadmap.md` and no `.agent/templates/roadmap.md`; the
+ADR Applicability table runs 0001–0010 then 0013, so exactly eight rows are
+missing (0011, 0012, 0014–0019); `CLAUDE.md`'s References list is at
+`CLAUDE.md:23-34`; `check_pr_authors.py:115-127` reads `authors[0]`, the
+primary commit author; `research_digest.md:124` carries the Pro 5 / Max 15 /
+Team 25 caps with the "floor reported inconsistently" hedge and `:132` the
+cloud-hosted/GitHub-scoped line; both workspace and `rolker/agent_workspace` are
+PUBLIC, the sibling's default branch is `main`, and `update_roadmap.sh` does
+exactly what the plan says (grep for a literal `#<N>` in `ROADMAP.md` /
+`docs/ROADMAP.md`, table Status column → `done` or `- [ ]` → `- [x]`, `trap
+'exit 0' EXIT`); `unh_marine_autonomy` has no `docs/roadmap.md` and exactly the
+eight flat `docs/*.md` pages listed, and its `VISION.md` objective 2 is
+`Reliable Seafloor Mapping ("Safety First")`; the BizzyBoat roadmap is 703 lines
+with no parent line; #391 and #393 are OPEN; PR #257 MERGED 2026-02-26.
+
+**The six operator decisions named at this checkpoint are all stated correctly
+in the plan** and none is re-opened here: umbrella/(1)-only, weekly Claude Code
+cloud Routine, `Janitor Sweep Agent`, #249 open with `Part of #249` and no
+closing keyword, conventional expected locations published as a table that is a
+recommendation and not a requirement with no per-repo file or schema and absence
+never an error, project-agnosticism with the two projects as examples only, and
+the design-collection consistency review as a discussion item with no sub-issue.
+Findings 1 and 2 below are about *how the plan sources* that last pair, not
+about the decisions themselves.
+
+### Evaluation
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | Three new documents, five small edits, five issue filings — one PR. Sub-issue boundaries are clean and (3)/(4) work is consistently pushed out of (1). |
+| Issue alignment | Good | Every "Deliverables (this repo)" bullet is assigned to a numbered sub-issue; the project-repo bullets survive as (5)/(6) with the umbrella close condition stated. |
+| File targeting | Needs work | Finding 3 — the two other framework adapters carry the same References list the plan's own step-7 rationale is built on. |
+| Consequences | Needs work | Finding 3; finding 7 (an unstated sub-issue dependency). |
+| Documentation & instruction impact | Good | Present and non-silent; instruction items framed as operator-decided candidates, correctly deferred to (3). |
+| Principle alignment | Concern | Documentation accuracy: findings 1, 2, 6, 5. |
+| ADR compliance | Needs work | ADR-0003 is handled well in substance; ADR-0008 does not support the justification the plan requires (finding 2). ADR-0012 test paraphrased (finding 6). |
+| ROS conventions | N/A | Workspace documentation plan. |
+
+### Findings
+- [ ] (must-fix) **An operator quote in the plan exists nowhere in the record.** Approach step 1 attributes to the operator, dated 2026-09-17: *"Keep in mind that project11 is the project a lot of this is being developed against, but this workspace is meant to be agnostic to the actual project..."*. It is in none of #628's six comments, in no other issue (`gh search issues`), and nowhere in the repo except `plan.md` itself. The **substance is right and is not in question** — it restates ADR-0003 — but the plan tells the ADR author to carry this quote into an Accepted ADR as the justification for the table. Per AGENTS.md § Documentation Accuracy ("never attribute … to a person who didn't state them"), either cite where it was said or replace it with the verifiable 14:54Z #628 comment already quoted two sentences later, plus ADR-0003 — `plan.md` Approach step 1
+- [ ] (must-fix) **"Generic ROS 2 project conventions" is not a claim any ROS 2 source supports, and the plan requires the ADR to make it.** Approach step 1: the table "is stated as **generic ROS 2 project conventions** … and **must be justified as such in the ADR**". Nothing in the ROS 2 documentation or the REPs locates a `VISION.md`, a `docs/roadmap.md` or an ADR directory; ADR-0008's Decision scopes "ROS 2 official conventions" to naming, packaging, licensing, message design and launch structure from docs.ros.org and the REPs. The honest and equally sufficient justification is *common open-source documentation practice, plus the paths this workspace already uses* — which is what the parenthetical in that same sentence already says. Requiring a ROS-2-convention justification invites a fabricated citation in a durable document — `plan.md` Approach step 1, Principles Self-Check ("Workspace vs. project separation"), ADR Compliance (ADR-0003 row)
+- [ ] (must-fix) **The framework-adapter fan-out stops one file short — and the rationale given does not distinguish the ones left out.** Step 7 adds the roadmap to `CLAUDE.md`'s References because it "would otherwise be the one References list in the repo that does not name the roadmap". `.github/copilot-instructions.md:112-121` and `.agent/instructions/gemini-cli.instructions.md:81-90` carry the same list, with the same entries, and the Consequences Map row the plan invokes names `.github/copilot-instructions.md` **explicitly** ("`AGENTS.md` → Framework adapters if affected (`.github/copilot-instructions.md`, etc.)"). Either add both rows or state why only the Claude adapter — and note both are instruction files, so the Ask-First approval sentence that currently scopes approval to "exactly these three additions" would have to widen to five — `plan.md` Approach step 7, Files to Change, Consequences table row 3
+- [ ] (must-fix) **The health row of the kind → expected-location table is not a path, but sub-issue (2) is told to probe "exactly the paths in" that table.** The cell reads "beside the roadmap (`docs/`), named by the sweep" — no filename. The table is defined as the single reader spec so that (2) cannot drift from it; with this row underspecified, (2) must invent the name, which is the drift the single-source design exists to prevent. (1) writes the table and (3) writes the document, so the name has to be settled in (1) or the row has to say explicitly that the name is (3)'s to fix and (2) globs — `plan.md` Approach step 1 (table), sub-issue (2) row
+- [ ] (suggestion) **#609 is CLOSED** (verified), but Approach step 4 lists it among the "open direction-setting threads" the roadmap draws from. The wording is "#609 follow-ups", which may be intended, but as printed it will read as an open thread. #569, #626, #627 and #610 are all OPEN as claimed — `plan.md` Approach step 4
+- [ ] (suggestion) **ADR-0012's test is paraphrased inside quotation marks.** Approach step 2 cites *"does this change what was decided?"*. ADR-0012's actual test is "if someone reads only the edited ADR without knowing about the change, will they get a misleading picture of what was originally decided?" The conclusion (addendum, no supersede) is correct under either phrasing — quote the real one or drop the quotation marks — `plan.md` Approach step 2
+- [ ] (suggestion) **Sub-issue (5) depends on (2) and does not say so.** (5) puts a one-line `kind:` marker on eight pages, but the marker convention and its template ship in (2) — the (6) row states its gate on (3) explicitly, so the asymmetry reads as an omission rather than a decision — `plan.md` Sub-issue sequence table, rows (5) and (2)
+- [ ] (suggestion) **The new ADR is not said to come from `.agent/templates/adr_template.md`**, which exists and which every prior ADR follows. One clause in step 1 — `plan.md` Approach step 1, Files to Change
+- [ ] (suggestion) **"Superseding #249" is used unqualified where the operator's decision is that #249 stays open.** Approach step 4 and the Files to Change row both say `docs/roadmap.md` supersedes #249; step 9 correctly explains that it absorbs the direction while #249 remains the Phase-2 tracker. The two readings are reconcilable but the short form is the one that gets pasted into a PR body — say "absorbs #249's direction" where the long explanation is not adjacent — `plan.md` Approach step 4, Files to Change
+- [ ] (suggestion) **"all 44 `url:` entries" counts a manifest the sweep does not read.** `underlay.repos` holds 9 of the 44; `get_overlay_repos` excludes it, so the set the rotation sees is 35. Every one of both sets is `github.com`, so the conclusion is unaffected — the number is just not the one the claim is about — `plan.md` Trigger comparison ("No mechanism reaches the gitcloud repos")
+
+### Note for the operator checkpoint
+Rev 3 is close. The four must-fixes are all one- or two-sentence edits and none
+re-opens a decision you have made: two are sourcing problems in the paragraph
+that argues project-agnosticism (an operator quote that is not in the record,
+and a "ROS 2 convention" justification no ROS 2 source supports — the *point* is
+right, ADR-0003 already says it), one is a consequence the plan's own rationale
+implies but stops short of (the Copilot and Gemini adapters carry the identical
+References list, and the Consequences Map names the Copilot one by name — note
+this would widen the Ask-First approval from three additions to five), and one
+is a gap in the table that sub-issue (2) is contracted to read literally (the
+health row names no file). Nothing in the six decisions you recorded on #628 is
+misstated in the plan.
