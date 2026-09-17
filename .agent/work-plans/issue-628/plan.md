@@ -241,6 +241,38 @@ operator chose.
 - **Does this PR close #249? — DECIDED (operator, 2026-09-14): no.** The PR says `Part of #249`; #249 stays open as the Phase-2 tracker until #263/#264/#265/#266 close. The roadmap still absorbs its four body properties and states the disposition of the three items from its comment, and now names those four children as well (step 9).
 - **Splitting ADR-0020 into a taxonomy ADR and a mechanism ADR** was offered at plan review and **declined by the operator (2026-09-14)**. Recorded as an option in Approach step 1, not taken; re-openable if the trigger decision later proves volatile.
 
+## Discussion item on the umbrella — NOT a deliverable of this worktree
+
+**Design-collection consistency review.** Raised by the operator on #628
+(2026-09-17, while reviewing the world-store design draft
+[rolker/unh_marine_autonomy#391](https://github.com/rolker/unh_marine_autonomy/issues/391)).
+Recorded here because it arrived as a scope expansion of this umbrella and
+would otherwise be lost; **explicitly out of scope for this PR, and
+deliberately not specified in ADR-0020** — the operator: *"It should be
+discussed more before landing in a ADR."*
+
+- **What was observed**: the vocabulary and two-root rule give a collection a
+  shape, but no process walks it. A detailed design that contradicts its parent
+  today has nowhere to put the finding except the child document.
+- **The concrete case in hand**: `unh_marine_autonomy`'s `VISION.md` objective 2
+  is "Reliable Seafloor Mapping (\"Safety First\")" (verified 2026-09-17), and
+  the world-store design draft (#391) carries an owed review of six
+  safety-motivated decisions on the grounds that they were agent-driven on what
+  are mapping vessels. That is a detailed design questioning the vision, with no
+  process to carry it up.
+- **The proposed shape, as the operator stated it**: a periodic pass (janitor
+  cadence or on demand) walking the collection top-down — vision → roadmap →
+  design drafts / architecture pages → ADRs — with a per-document verdict of
+  *consistent / drifted / exposes a parent issue*, recorded in the health
+  document beside the roadmap; **"exposes a parent issue" opens an amendment to
+  the parent — including the vision — rather than being suppressed**.
+- **Status**: discussion item on #628. Nothing in this worktree's deliverables
+  depends on it or specifies it, and **no sub-issue is filed for it** (operator's
+  instruction). The project-side counterpart already exists as
+  [rolker/unh_marine_autonomy#393](https://github.com/rolker/unh_marine_autonomy/issues/393)
+  (OPEN, verified 2026-09-17), which restructures that repo's docs to line up
+  with this vocabulary.
+
 ## Estimated Scope
 
 Umbrella #628: four PRs in this repo, plus two issues filed in project repos ((5), (6)). **This worktree: one PR** — three new documents and six small edits (`README.md`; **two** rows in `.agent/knowledge/principles_review_guide.md`; `AGENTS.md`; `CLAUDE.md`; the ADR-0015 addendum), plus filing sub-issues (2)–(6).
