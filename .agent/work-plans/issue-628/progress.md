@@ -928,3 +928,32 @@ verified against source before editing; none was deferred.
 - `pre-commit run --files` on every changed file: all hooks pass (no-op skips for the language-specific hooks; these are Markdown-only changes).
 - Eight tracked files outside `.agent/work-plans/` link to the draft by path, confirmed with `git grep -l 'docs/design/planning_document_vocabulary.md' -- ':!.agent/work-plans'` at edit time — the count is not written into the document.
 - No push, no GitHub writes, no history rewrite.
+
+## Local Review
+**Status**: complete
+**When**: 2026-09-17 14:26 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: approved
+
+**PR**: #638 at `5764d1d`
+**Mode**: post-PR (re-review after address-findings)
+**Depth**: Standard (reason: eight-finding fix pass across a skill, the plan and the design draft; Markdown-only)
+**Must-fix**: 0 | **Suggestions**: 1
+**Round**: 3 | **Ship**: recommended — all eight round-2 findings verified resolved against source, no must-fix remains, and the one suggestion is a second copy of an as-built count that does not mislead a reader of the Estimated Scope section
+
+Scope: (a) the eight `## Integrated Review` (round 2, `b3e1d86`) findings against fix commits `5ae0e2f`..`fd71449`; (b) the two `inspiration-tracker` edits read end to end in the whole skill; (c) regression checks; (d) a light whole-diff pass. One fresh-context adversarial specialist read the skill and the whole diff cold and returned no findings. Static analysis: Markdown-only diff, no linter profile; the Implementation entry records a clean `pre-commit run --files`.
+
+Verified resolved, one by one against source, not against the commit messages:
+1. Roadmap row never committed — step 9 stages root `ROADMAP.md` beside the digest, step 10's PR body names the new rows (`SKILL.md:286-296,311-312`). The guard is correct for the flow: cwd at step 9 is the skill worktree root (a `--type workspace` worktree, so the root file is present), `git diff --quiet` compares tree against index so it fires exactly when step 8 wrote and did not stage, and it is a true no-op when nothing was written or the file was already staged.
+2. Deferred row placeholder — step 7's Add-to-roadmap branch now asks for the condition that would bring the item back and proposes one from the digest entry; step 8 writes it verbatim and forbids publishing the template's own placeholder (`SKILL.md:250-256,271-275`). Step numbering and the Add/Skip/Defer choice are untouched — the prompt is text inside one bullet, not a new step — and the emitted row's three cells match the real Deferred table (`ROADMAP.md:110`) and the template (`.agent/templates/roadmap.md:114`).
+3. As-built scope now seven files, naming the consumer migration (`plan.md:329`).
+4. Singular `decision` kind, plural directory, in the plan's table copy (`plan.md:90`).
+5. Canonical-probe-vs-fallback clause carried across (`plan.md:95`).
+6. All three "rows still open" passages rewritten as rationale for the settled rows (`plan.md:99,107,247`).
+7. Graceful-absence test restated as a regression guard (`plan.md:257`).
+8. Promotion gate carries the pointer updates, with the `git grep` that enumerates them instead of a count that ages (`docs/design/planning_document_vocabulary.md:422-428`).
+
+Regression checks, all pass: every relative link in the changed files resolves (the four `.agent/project_knowledge/` hits are the gitignored optional symlink, documented as "may not exist", and pre-existing); no closing keyword before an issue number anywhere in `main..HEAD` commit messages; `wc -l ROADMAP.md` = 150, which meets the 150-line first-cut bound; the four Ask-First files show exactly two added References lines each and nothing else (eight lines, the shape the plan records); the round-2 entry's eight findings differ from their previous text only by the checkbox tick, so the append-only timeline (ADR-0013) holds; working tree clean. The draft's own link enumeration checks out — eight tracked files outside `.agent/work-plans/` link to it.
+
+### Findings
+- [ ] (suggestion) A second copy of the as-built edit count survives the round-2 fix: "Rev 4's ten rows are nine here, and rev 4's eight small edits are six" still reads as a present-tense claim that this slice edits six files, where the Estimated Scope two sections later now correctly says seven. Round 2 named only line 328, so this one was not in scope of the fix; the sentence is historical (what rev 4 dropped), so it misleads no one reading the as-built record itself. One clause — that a seventh arrived in round-1 review — closes it, and it can ride any later commit — `.agent/work-plans/issue-628/plan.md:240`
