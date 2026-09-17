@@ -247,7 +247,9 @@ Research checkpoint — findings gathered, decisions pending."
 Then, for each **new or changed** item not already decided in the digest,
 ask the user to choose:
 
-- **Add to roadmap** — append to the "To Consider" section of `docs/ROADMAP.md`
+- **Add to roadmap** — append to the **Deferred** section of the root
+  `ROADMAP.md` ("Leftovers land here — things that came up, are not bounded
+  enough for an issue, and are not being done next")
 - **Skip** (with reason) — record in digest, won't be re-prompted
 - **Defer** — record in digest, will be re-prompted on next run
 
@@ -255,16 +257,19 @@ Items with existing decisions are shown as a summary at the end.
 
 ### 8. Act on decisions
 
-**Add to roadmap**: Append items to the "To Consider" section of `docs/ROADMAP.md`,
-grouped under a heading for this project and date. Do NOT create GitHub issues —
-issues are created later when work is ready to begin, typically during a
-`/brainstorm` session that reviews the roadmap.
+**Add to roadmap**: Append items as rows in the **Deferred** table of the root
+`ROADMAP.md` — the section for things that came up, are not bounded enough for an
+issue, and are not being done next. Do NOT create GitHub issues — issues are
+created later when work is ready to begin, typically during a `/brainstorm`
+session that reviews the roadmap.
 
 ```markdown
-### From <name> (YYYY-MM-DD)
-
-- **<title>** — <brief description>. Source: <repo> — <file or pattern>
+| <title> — <brief description>. Source: <repo> — <file or pattern> (from <name>, YYYY-MM-DD) | — | <the condition that would bring it back> |
 ```
+
+Root `ROADMAP.md` is the expected location for a roadmap per
+[`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
+its shape comes from [`.agent/templates/roadmap.md`](../../../.agent/templates/roadmap.md).
 
 **Skip/Defer**: Record in digest only.
 
@@ -344,7 +349,7 @@ When invoked with `add` or `add <url>`:
 - **Interactive, not autonomous** — always present findings and let the user
   decide. Never add to roadmap without confirmation.
 - **Discovery, not implementation** — this skill identifies and triages
-  enhancements. Findings go to the roadmap's "To Consider" section. GitHub
+  enhancements. Findings go to the root `ROADMAP.md`'s **Deferred** section. GitHub
   issues are created later (during `/brainstorm`) when work is ready to begin.
 - **One project per run** — check one project at a time for focused review.
 - **Single PR per run** — each run produces at most one PR (the digest
