@@ -17,17 +17,23 @@ has a `VISION.md` untouched since January and no roadmap. Folded in: the
 publish + trigger decision deferred from #569, because where a sweep's
 findings live is a question about the structure they sit beside.
 
-Per the operator's decisions comment (2026-09-14), **#628 is an umbrella**
-and the deliverables are sequenced into six sub-issues (`Part of #628`) — four
-independently mergeable in this repo, plus two filed in the project repos the
-issue routes them to. **This worktree delivers sub-issue (1) only.**
+**#628 is an umbrella** and the deliverables are sequenced into six sub-issues
+(`Part of #628`). The operator's decisions comment (2026-09-14) makes #628 the
+umbrella and enumerates **four** of them — (1) the ADR + the workspace
+`docs/roadmap.md`, (2) discovery, (3) the sweep split + publish, (4) the
+trigger — all in this repo, and assigns (1) to this worktree. Sub-issues **(5)**
+and **(6)** are **not** from that comment: they are the issue body's own
+"Deliverables (project repos — separate issues there, linked from here)",
+restored as explicit sub-issues by the round-1 plan review. **This worktree
+delivers sub-issue (1) only.**
 
 Factual correction for the record: the issue body describes #249 as "tracked
 on a draft PR, idle since Feb 26". [PR #257](https://github.com/rolker/ros2_agent_workspace/pull/257)
 in fact **merged** 2026-02-26 (created 2026-02-25); what has been idle since
 is [#249](https://github.com/rolker/ros2_agent_workspace/issues/249) itself,
-which has had no follow-on work. The supersede-and-close conclusion is
-unchanged.
+whose Phase 2 has not started. #249 is **not closed by this work** (operator,
+2026-09-14) — the roadmap absorbs the direction it asked for while #249 stays
+open as the Phase-2 tracker; see Approach step 9.
 
 ## Sub-issue sequence (filed as part of this work)
 
