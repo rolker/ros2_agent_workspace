@@ -419,6 +419,14 @@ sub-issue ([#637](https://github.com/rolker/ros2_agent_workspace/issues/637)), g
    the two-root rule** — the rule is *claimed* to be project-agnostic, and one
    project cannot demonstrate that.
 
+Promotion also **carries the pointer updates**: moving this page to a numbered
+ADR changes its path, so every tracked file that links to it by path — the
+roadmap, the roadmap template, the principles review guide, the instruction
+files and the `inspiration-tracker` skill — moves with it in the same PR.
+Enumerate them at the time with
+`git grep -l 'docs/design/planning_document_vocabulary.md'` rather than
+trusting this list, which ages.
+
 The promotion also carries a cross-reference addendum on ADR-0015 under
 [ADR-0012](../decisions/0012-permit-cross-reference-addendums-in-adrs.md) —
 which permits an ADR pointing at another **ADR**, not at a draft, which is why
