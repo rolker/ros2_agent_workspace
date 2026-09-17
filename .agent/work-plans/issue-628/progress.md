@@ -901,3 +901,30 @@ Eight open findings, three must-fix. All three must-fix items are small and loca
 2. `.agent/work-plans/issue-628/plan.md` — as-built scope: seven edits, naming the consumer migration; singular `decision` in the table copy; carry the draft's canonical-probe-vs-fallback clause; rewrite the three "rows still open" passages as rationale for the settled rows; restate the graceful-absence test as a regression guard.
 3. `docs/design/planning_document_vocabulary.md` — add the pointer-migration clause to the #637 promotion gate.
 4. Re-run `/review-code` pre-push, push, and let Copilot re-review before merge.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 14:21 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #638 at `fd71449`
+**Addressed**: `## Integrated Review` (round 2), 2026-09-17 14:11 -04:00, at PR #638 / `cb0fe52`
+**Commits**: 5ae0e2f, f6b9bab, 6c02796, 59d3a6c, d040650, cf56dc3, 88f76d6, fd71449
+
+Operator decision 2026-09-17: fix all eight findings in this PR. All eight were
+verified against source before editing; none was deferred.
+
+### Actions
+- [x] (must-fix) Roadmap row never committed — step 9 now stages root `ROADMAP.md` conditionally beside the digest, and step 10's PR body names the new Deferred rows — `.claude/skills/inspiration-tracker/SKILL.md` (5ae0e2f)
+- [x] (must-fix) Deferred row published the template placeholder — step 7's "Add to roadmap" choice now asks for the condition that would bring the item back, proposing one derived from the digest entry, and step 8 writes it verbatim — `.claude/skills/inspiration-tracker/SKILL.md` (f6b9bab)
+- [x] (must-fix) As-built Estimated Scope said six edited files; the branch diff has seven — corrected, with the `inspiration-tracker` skill named as the round-1 consumer migration — `.agent/work-plans/issue-628/plan.md` (88f76d6)
+- [x] (low) Plural `decisions` kind in the plan's copy of the table — singular kind, plural directory, matching the shipped draft — `.agent/work-plans/issue-628/plan.md` (6c02796)
+- [x] (low) Graceful-absence paragraph missing the canonical-probe-vs-fallback clause — carried across from the draft — `.agent/work-plans/issue-628/plan.md` (59d3a6c)
+- [x] (low) Three passages still called the vision and roadmap rows open/provisional — rewritten as rationale for the settled rows; the rev-4 history sentence now records that the rows were settled afterwards — `.agent/work-plans/issue-628/plan.md` (d040650)
+- [x] (low) "(2)'s graceful-absence test is the enforcement" — restated as a regression guard on the project-agnostic guarantee — `.agent/work-plans/issue-628/plan.md` (cf56dc3)
+- [x] (low) #637 promotion gate silent on the link migration — one clause added, naming the `git grep` that enumerates the linking files at promotion time rather than a count that ages — `docs/design/planning_document_vocabulary.md` (fd71449)
+
+### Verification
+- `pre-commit run --files` on every changed file: all hooks pass (no-op skips for the language-specific hooks; these are Markdown-only changes).
+- Eight tracked files outside `.agent/work-plans/` link to the draft by path, confirmed with `git grep -l 'docs/design/planning_document_vocabulary.md' -- ':!.agent/work-plans'` at edit time — the count is not written into the document.
+- No push, no GitHub writes, no history rewrite.
