@@ -630,7 +630,7 @@ plan pass before implementation.
 
 ### Findings
 - [x] (must-fix) HEAD commit body contains a live closing keyword naming #249 while describing the reword that removed it; merged to `main` this closes the issue the operator decided stays open — fix with `git commit --amend` on HEAD (the sha is cited nowhere, so no re-remap) — `commit 1545690` message body, line 3 (fixed by the host before this pass: the reworded commit is `1545690`; the branch carries no closing-keyword token)
-- [ ] (must-fix) As-built says "seven rows in `ROADMAP.md`" carry `#TBD — filed at publish`; there are six (`ROADMAP.md:58-63`), so the total is 9, not 10 — `.agent/work-plans/issue-628/plan.md:351`
+- [x] (must-fix) As-built says "seven rows in `ROADMAP.md`" carry `#TBD — filed at publish`; there are six (`ROADMAP.md:58-63`), so the total is 9, not 10 — `.agent/work-plans/issue-628/plan.md:351`
 - [ ] (suggestion) The template's Health-document line shows a live `docs/health.md` link while its own parenthetical says to omit the link until one exists — copy-paste propagates a dangling link — `.agent/templates/roadmap.md:36`
 - [ ] (suggestion) The "five pointer additions" accounting is self-inconsistent — `AGENTS.md` counted as two *lines*, each adapter as one *block* though each landed two lines; the shipped diff is 2 lines × 4 files — `.agent/work-plans/issue-628/plan.md:129,290`
 - [ ] (suggestion) Kinds table says the roadmap is edited "On its own loop (see below)", but no section on this page describes a roadmap's own cadence — it lives in the template — `docs/design/planning_document_vocabulary.md:46`

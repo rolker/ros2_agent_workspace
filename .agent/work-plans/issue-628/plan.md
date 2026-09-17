@@ -348,8 +348,9 @@ inline per the plan-first workflow rather than left for review to discover.
 - **Sub-issues (2)–(7) are not filed by this worktree.** Approach step 8 files
   them; the host files GitHub issues at the publish checkpoint instead, so the
   implementation used the placeholder `#TBD — filed at publish` wherever an
-  unfiled sub-issue is referenced — seven rows in `ROADMAP.md` and three
-  mentions in the design draft (the two enforcement closers and the promotion
-  sub-issue). Those placeholders are what the host replaces with real numbers;
-  they are the only `#TBD` tokens in the tree. Step 9's PR body and the #628
+  unfiled sub-issue is referenced — six rows in `ROADMAP.md` (`ROADMAP.md:58-63`,
+  one per unfiled sub-issue) and three mentions in the design draft (the two
+  enforcement closers and the promotion sub-issue), nine occurrences in all.
+  Those placeholders are what the host replaces with real numbers; they are the
+  only `#TBD` tokens in the tree. Step 9's PR body and the #628
   comment likewise belong to the publish step.
