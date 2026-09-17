@@ -796,3 +796,30 @@ Copilot R1 was submitted against `92526cf`, one commit behind head; every R1 ite
 ### Notes
 - Nothing in this round touches the operator decisions recorded on #628 (design draft not an ADR; conventional paths with no per-repo file; root `ROADMAP.md`; README § Vision; `docs/health.md`; project-agnostic per ADR-0003; two References lines per instruction file; the consistency review as a discussion item only). No finding was accepted that would revisit one.
 - All ten open findings are documentation-accuracy or consumer-consistency fixes confined to files already in this PR, plus one three-line change to `.claude/skills/inspiration-tracker/SKILL.md`. Per the operator's standing rule, review-found small defects are fixed in this PR rather than filed.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 13:53 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**PR**: #638 at `883b7f3`
+**Addressed**: `## Integrated Review` (2026-09-17 13:38 -04:00, at `23b874f`) — all ten open findings, none deferred
+**Commits**: `b1b3882` `82e74ce` `cd1210e` `371c891` `c7f58d6` `919b0f2` `534cd38` `0e8f5b4` `3e08c76` `883b7f3`
+
+### Actions
+- [x] (cross-confirmed, must-fix) As-built size check: both hand-typed counts replaced with the bound plus a statement that the count is re-measured (`wc -l`) at publish, per AGENTS.md § Documentation Accuracy — `.agent/work-plans/issue-628/plan.md:356,372` (`b1b3882`)
+- [x] (must-fix) Placeholder note rewritten in the past tense as a publish-time staging record, naming `92526cf` and the six real links that replaced the nine `#TBD` tokens — `.agent/work-plans/issue-628/plan.md:376-391` (`82e74ce`)
+- [x] (must-fix) `inspiration-tracker` repointed from the non-existent `docs/ROADMAP.md` "To Consider" to the root `ROADMAP.md` **Deferred** section, with the append format changed from a bullet list to the Deferred table's row shape (verified against `.agent/templates/roadmap.md` and the workspace instance) and two links to the vocabulary draft and the template. Three prose mentions fixed (steps 7, 8 and Guidelines); the digest-template line already read `ROADMAP.md` and needed no change — `.claude/skills/inspiration-tracker/SKILL.md:250-272,352` (`cd1210e`)
+- [x] (low) Kind label made singular `decision` in the expected-location table and its row-by-row prose, in the draft and the plan; the path `docs/decisions/` is unchanged and the row now says so — `docs/design/planning_document_vocabulary.md:114,232` (`371c891`)
+- [x] (low) `VISION.md` evidence scoped to the **external** projects surveyed, and both in-house instances named (`rolker/agent_workspace`, and `unh_marine_autonomy` whose `VISION.md` unh_marine_autonomy#394 folds into README § Vision); same sentence fixed in the plan — `docs/design/planning_document_vocabulary.md:204-213` and `.agent/work-plans/issue-628/plan.md:103` (`c7f58d6`)
+- [x] (low) Read-both rule qualified "once a health document exists" in the draft's canonical statement and in the template, each with one clause saying why (no `docs/health.md` exists yet; a missing one is never a finding) — `docs/design/planning_document_vocabulary.md:334-345` and `.agent/templates/roadmap.md:130-135` (`919b0f2`)
+- [x] (low) Org-board discovery fallback now specifies `gh project list --owner <org>`; the retired REST endpoint is named only as retired (HTTP 404, verified 2026-09-17) and the "both are worth a look" parenthetical is gone — `.agent/work-plans/issue-628/plan.md:56` (`534cd38`)
+- [x] (low) Identity form rendered as runnable syntax `git -c user.name=… -c user.email=…` in the draft and the plan's trigger table — `docs/design/planning_document_vocabulary.md:297` and `.agent/work-plans/issue-628/plan.md:154` (`0e8f5b4`)
+- [x] (low) "#634 makes the two-root rule checkable" restated as making the documents *discoverable*, with discovery named as the precondition for a check and enforcement left to a scoped follow-up — `docs/design/planning_document_vocabulary.md:344` (`3e08c76`)
+- [x] (low) One clause added separating the canonical in-repo probe from #634's optional discovery fallbacks (org board, `homepage`, README links), keeping "absence is never a finding" intact — `docs/design/planning_document_vocabulary.md:120-131` (`883b7f3`)
+
+### Verification
+- Pre-commit over every file changed in this pass: clean.
+- The two false positives in the Integrated Review were left as dismissals; no past progress entry was edited.
+- `ROADMAP.md` was not touched in this pass and stays at its pre-existing size, inside the 150-line bound. Per the first finding's fix, the count is measured at publish rather than recorded here.
+- New relative links in `.claude/skills/inspiration-tracker/SKILL.md` resolve from that file's location.
