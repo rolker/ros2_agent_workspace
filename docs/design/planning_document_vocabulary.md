@@ -122,9 +122,14 @@ per-repo declaration file and no schema** — the operator decided this
 
 So the table says what the workspace skills will look for, which is what lets a
 project *choose* to be found. **A project that keeps a document somewhere else is
-not in violation, produces no error, and is flagged by no check** — the skills
-simply do not find it and behave exactly as they do today. Absence is never a
-finding.
+not in violation, produces no error, and is flagged by no check** — the skills'
+canonical probe is these in-repo paths and nothing else, so they simply do not
+find it and behave exactly as they do today. A skill may additionally *discover*
+a document kept elsewhere — an org-level project board, the repo's `homepage`
+field, a README link
+([#634](https://github.com/rolker/ros2_agent_workspace/issues/634)) — but those
+fallbacks are discovery only: they add no requirement, no check and no finding
+either way. Absence is never a finding.
 
 **It is deliberately not called a ROS 2 convention.** Nothing in the ROS 2
 documentation or in the REPs locates a vision, a roadmap, an ADR directory or a
