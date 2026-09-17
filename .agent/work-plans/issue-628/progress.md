@@ -366,3 +366,129 @@ None — all ten findings were actioned.
 
 ### Next
 Fourth plan review (`review-plan`) against plan rev 4 at `02eaa30`, per the operator's round-3 decision. Not dispatched from here.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-09-17 11:17 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `02eaa30`
+**PR**: PR-less (`--issue` mode, worktree `feature/issue-628`, branch head `41eb290`)
+**Verdict**: approve-with-suggestions
+
+Independent review — dispatched as a fresh-context sub-agent, read the plan
+cold; not the plan author. Round 4, against plan rev 4 at `02eaa30`.
+
+**All ten round-3 findings are genuinely closed in the plan text**, each
+re-verified against source rather than taken from the `## Implementation`
+entry:
+
+1. (must-fix) The operator quote is now cited to
+   [issuecomment-5716595167](https://github.com/rolker/ros2_agent_workspace/issues/628#issuecomment-5716595167)
+   — that comment exists on #628, dated 2026-09-17T15:04:26Z, and carries the
+   quoted sentence verbatim; ADR-0003 is named as the standing authority.
+2. (must-fix) "Generic ROS 2 project conventions" is gone from all three sites
+   (Approach step 1, Principles Self-Check, ADR Compliance), replaced by
+   "common open-source documentation practice, plus the paths this workspace
+   already uses", with an explicit *not* a ROS 2 convention statement. The
+   ADR-0008 scoping claim checks out: 0008's Decision §1 names naming,
+   packaging, licensing, message design and launch file structure
+   (`0008-follow-ros2-official-conventions.md:29-34`). A new ADR-0008 row in
+   ADR Compliance records the check as deliberately not claimed.
+3. (must-fix) The adapter fan-out now covers all three named adapters, and the
+   cited line ranges are right: `CLAUDE.md:23-34`, `.github/copilot-instructions.md:112-121`,
+   `.agent/instructions/gemini-cli.instructions.md:81-90` are each that file's
+   `## References` list. The stated pre-existing difference is real — the two
+   non-Claude lists omit `README.md` § Vision and `docs/decisions/`. Ask-First
+   scope is restated as the five additions the operator approved in
+   [issuecomment-5716624829](https://github.com/rolker/ros2_agent_workspace/issues/628#issuecomment-5716624829),
+   quoted correctly.
+4. (must-fix) Every row of the kind → expected-location table is now a literal
+   path, health included (`docs/health.md`), and the (2) and (3) rows are
+   consistent with it — (2) probes it, (3) writes it and cannot rename it
+   without amending the table.
+5. (suggestion) #609 is CLOSED (verified) and the plan now says so explicitly
+   instead of listing it as an open thread; #569, #626, #627, #610 re-verified
+   OPEN.
+6. (suggestion) ADR-0012's test is now quoted as written — matches
+   `0012-permit-cross-reference-addendums-in-adrs.md:62-64` word for word.
+7. (suggestion) Sub-issue (5)'s gate on (2) is stated, symmetric with (6)'s
+   gate on (3).
+8. (suggestion) `.agent/templates/adr_template.md` § "Blank ADR template"
+   (line 62) is named as the source structure; its four sections are
+   Status/Context/Decision/Consequences as the plan says, and ADR-0019 does
+   carry both `## Alternatives considered` (:119) and `## References` (:136).
+9. (suggestion) "Superseding #249" is gone; the plan says "absorbs #249's
+   direction" in both places, with the long explanation at step 9. No
+   closing-keyword token appears anywhere in the plan text (grepped).
+10. (suggestion) The count is now 35, and it is correct: the seven files under
+    `configs/manifest/repos/` hold 44 `url:` entries, `underlay.repos` holds 9,
+    and `get_overlay_repos` skips it unless `include_underlay`
+    (`.agent/scripts/lib/workspace.py:86,106`). All 44 are `github.com`, so the
+    conclusion holds either way.
+
+**Other claims re-verified this round and holding**: 19 ADRs, 0019 highest, so
+0020 is free; exactly three are still `Proposed` (0005, 0008, 0009); no
+`docs/roadmap.md`, no `docs/health.md`, no `.agent/templates/roadmap.md`;
+`README.md:3` is `## Vision`; the ADR Applicability table runs 0001–0010 then
+0013, so exactly eight rows are missing (0011, 0012, 0014–0019); the
+Consequences Map row invoked by step 7 is `principles_review_guide.md:44` and
+does name the Copilot adapter explicitly; `check_pr_authors.py:112-127` reads
+`authors[0]`, the primary commit author; `research_digest.md:124` carries the
+Pro 5 / Max 15 / Team 25 caps with the "floor reported inconsistently" hedge
+and `:132` the cloud-hosted / GitHub-repo-scoped line; `audit-project/SKILL.md:152-156`
+and `:252-255` are the two SKIPPED-not-OK layer-dependent checks;
+`janitor-sweep/SKILL.md:273` excludes non-GitHub origins via `is_field_url`
+before the rotation, and `:38` carries the no-`layers/` assumption;
+`worktree_create.sh:387` has `ALLOWED_SKILLS=("research" "inspiration-tracker")`,
+so (3)'s addition is needed; ADR-0015 has both a `## Status` section (already
+carrying an ADR-0019 qualifier, so the addendum matches existing practice) and
+a `## References` section, and its "nothing publishes from inside the sandbox"
+line is at `:19`; #626 is OPEN with every redaction-class item unchecked and
+stamped "as of `d7b8baf`", exactly as the plan describes; PR #257 MERGED
+2026-02-26 (created 2026-02-25); #249 OPEN with 9 comments and #263/#264/#265/#266
+all OPEN; `unh_marine_autonomy` has `VISION.md` last touched 2026-01-15, no
+`docs/roadmap.md`, and exactly the eight flat `docs/*.md` pages listed;
+`unh_echoboats_project11`'s `docs/roadmap.md` is 703 lines with "How this
+roadmap stays useful" at :683 and no parent line; `rolker/agent_workspace` is
+public, default branch `main`, and carries `docs/ROADMAP.md` and
+`.agent/scripts/update_roadmap.sh`; uma #391 and #393 are OPEN.
+
+**All the operator decisions named for this round are stated correctly in the
+plan and none is re-opened here**: umbrella with this worktree = (1) only;
+weekly Claude Code cloud Routine; `Janitor Sweep Agent`; #249 open with
+`Part of #249` and no closing keyword; discovery = conventional expected
+locations published as a kind → location table that is an expectation and not
+a requirement, no per-repo file, no schema, absence never an error, health =
+`docs/health.md`; framed as common open-source documentation practice and not
+as a ROS 2 convention, project-agnostic per ADR-0003 with the two project
+repos as examples; the design-collection consistency review as a discussion
+item with no sub-issue; Ask-First = the five approved pointer additions.
+
+### Evaluation
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | Three new documents, eight small edits, five issue filings — one PR. (3)/(4) work is consistently pushed out of (1). |
+| Issue alignment | Good | Every "Deliverables (this repo)" bullet maps to a numbered sub-issue; the project-repo bullets survive as (5)/(6) with a stated umbrella-close condition. |
+| File targeting | Good | All ten rows in Files to Change verified to exist with the cited line ranges. Finding 1 is a completeness note about a fourth adapter, not a wrong target. |
+| Consequences | Good | Consequences Map rows all traced to `principles_review_guide.md`; cross-sub-issue consequences ((2)'s script row, (3)'s exception-clause rewrite) are recorded where they land. |
+| Documentation & instruction impact | Good | Present and non-silent; the one instruction-level rule is framed as a candidate and correctly deferred to (3). |
+| Principle alignment | Good | The documentation-accuracy problems that drove round 3 are fixed at source; every quote in rev 4 is now traceable. |
+| ADR compliance | Good | 0001/0003/0004/0005/0006/0008/0012/0013/0014/0015/0017/0018/0019 all addressed; the 0004/0005 deferral is stated rather than silent. |
+| ROS conventions | N/A | Workspace documentation plan. |
+
+### Findings
+- [ ] (suggestion) **A fourth framework adapter exists and carries its own References list.** `AGENTS.md:11` lists `.agent/AGENT_ONBOARDING.md` as the "Other" adapter, and it has a `## References` list at `:109`. Step 7 says "all three framework adapters" and "each adapter that carries one" as if that enumerated the set, which is the same gap round 3 flagged one adapter further out. The operator's approval caps the work at five additions, so the fix is one clause naming AGENT_ONBOARDING.md as knowingly out — and there is a real distinguishing reason to give: its list is a different, shorter one (it also omits `docs/decisions/` and `.agent/knowledge/`), unlike the three that are identical entry-for-entry — `plan.md` Approach step 7, Files to Change, Documentation & Instruction Impact
+- [ ] (suggestion) **The chosen Routine row does not answer the cross-repo *write* question the Actions row is charged for.** Sub-issue (3) commits a health document into each repo it grades, and the Actions row is scored 2 new secrets precisely because "the built-in `GITHUB_TOKEN` is scoped to the repo running the workflow". The Routine row answers only that no *new* secret is stored, with no statement of whether the operator's existing GitHub connection reaches the 35 repos a health document would be committed to — and `research_digest.md:132` calls Routines "GitHub-repo-scoped". The decision is the operator's and is not re-opened; this is the same "confirm before relying on it" caveat the (4) row already carries for the daily run cap, applied to the axis the choice was actually made on — `plan.md` Trigger comparison (Routine row, credential-surface cell), sub-issue (4) row
+
+### Note for the operator checkpoint
+Rev 4 converges. All four must-fixes and all six suggestions from round 3 are
+closed in the plan text, verified against source rather than against the
+implementation entry, and nothing you decided on #628 is misstated. The two
+items above are both suggestions and neither blocks implementation: one is a
+one-clause completeness note (a fourth adapter file exists — `AGENT_ONBOARDING.md` —
+and the plan should say it is deliberately out rather than imply three is the
+whole set; no sixth edit is proposed), and one asks the trigger table to say
+whether the cloud Routine's GitHub connection actually reaches the 35 repos it
+will have to commit health documents into, which is the axis the trigger was
+chosen on. Either can be folded in during implementation or waived.
