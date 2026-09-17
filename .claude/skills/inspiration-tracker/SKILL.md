@@ -272,7 +272,8 @@ session that reviews the roadmap.
 ```
 
 The third column carries that reason verbatim — never publish the template's
-own placeholder text into the roadmap.
+own placeholder text into the roadmap. After appending, set `ROADMAP_APPENDED=1`
+for this run; step 9 stages the roadmap only on that flag.
 
 Root `ROADMAP.md` is the expected location for a roadmap per
 [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
@@ -284,16 +285,22 @@ its shape comes from [`.agent/templates/roadmap.md`](../../../.agent/templates/r
 
 Update the digest to move items from "Pending Review" to their final
 sections (Roadmapped, Skipped, or Deferred). Commit the update — and stage
-root `ROADMAP.md` in the same commit when step 8 appended a **Deferred** row
-to it. The skill worktree is removed once the run is over, so a roadmap row
-left unstaged is silently lost along with the decision it records:
+root `ROADMAP.md` in the same commit **only when step 8 of this run appended a
+Deferred row**. The skill worktree is removed once the run is over, so a
+roadmap row left unstaged is silently lost along with the decision it records.
+Do not stage on the mere presence of a diff: step 3 may re-enter a worktree
+left by an incomplete run, and a pre-existing or unrelated roadmap edit must
+not ride this digest commit. Track whether step 8 wrote, and stage on that:
 
 ```bash
 git add .agent/knowledge/inspiration_<name>_digest.md
-# Only when step 8 wrote to the roadmap — a no-op otherwise.
-git diff --quiet -- ROADMAP.md || git add ROADMAP.md
+# ROADMAP_APPENDED is set to 1 by step 8 when, and only when, it appended a row in this run.
+if [ "${ROADMAP_APPENDED:-0}" = "1" ]; then git add ROADMAP.md; fi
 git commit -m "docs: record inspiration-tracker decisions for <name>"
 ```
+
+If the worktree shows a `ROADMAP.md` diff that this run did not make, leave it
+unstaged and say so in the run summary.
 
 ### 10. Push and create PR
 
