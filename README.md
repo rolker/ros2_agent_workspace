@@ -16,6 +16,8 @@ What "better packages" means in practice:
 
 The workspace infrastructure is project-agnostic by design. While its primary project is UNH marine autonomy, the tooling generalizes to any ROS 2 project. This is intentional — it makes the workspace useful beyond its origin, encourages contributions from other domains, and ensures the infrastructure doesn't become coupled to any single project.
 
+What that goal turns into next is in [`ROADMAP.md`](ROADMAP.md) — the roadmap beneath this vision.
+
 ## About
 
 This repository provides management of multiple layered ROS 2 workspaces, configured for use with AI agents. It is developed by the Center for Coastal and Ocean Mapping / Joint Hydrographic Center (CCOM/JHC) at the University of New Hampshire (UNH) -- a national center of expertise in ocean mapping and hydrographic sciences.
@@ -75,6 +77,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ### For All Users
 - [Architecture Guide](ARCHITECTURE.md)               - Understanding the layered workspace system
 - [AGENTS.md](AGENTS.md)                              - Shared workspace rules and development workflow
+- [ROADMAP.md](ROADMAP.md)                            - What's next for the workspace, and what's deferred
 
 ## Structure
 

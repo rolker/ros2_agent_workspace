@@ -247,7 +247,13 @@ Research checkpoint — findings gathered, decisions pending."
 Then, for each **new or changed** item not already decided in the digest,
 ask the user to choose:
 
-- **Add to roadmap** — append to the "To Consider" section of `docs/ROADMAP.md`
+- **Add to roadmap** — append to the **Deferred** section of the root
+  `ROADMAP.md` ("Leftovers land here — things that came up, are not bounded
+  enough for an issue, and are not being done next"). Then ask one follow-up:
+  **what condition would bring this back?** — the **Deferred because** column
+  of that table. Propose a one-line reason derived from the digest entry for
+  the user to accept or reword; a row with no real reason is a dropped item
+  that has not been admitted yet (`.agent/templates/roadmap.md`).
 - **Skip** (with reason) — record in digest, won't be re-prompted
 - **Defer** — record in digest, will be re-prompted on next run
 
@@ -255,23 +261,53 @@ Items with existing decisions are shown as a summary at the end.
 
 ### 8. Act on decisions
 
-**Add to roadmap**: Append items to the "To Consider" section of `docs/ROADMAP.md`,
-grouped under a heading for this project and date. Do NOT create GitHub issues —
-issues are created later when work is ready to begin, typically during a
-`/brainstorm` session that reviews the roadmap.
+**Add to roadmap**: Append items as rows in the **Deferred** table of the root
+`ROADMAP.md` — the section for things that came up, are not bounded enough for an
+issue, and are not being done next. Do NOT create GitHub issues — issues are
+created later when work is ready to begin, typically during a `/brainstorm`
+session that reviews the roadmap.
 
 ```markdown
-### From <name> (YYYY-MM-DD)
-
-- **<title>** — <brief description>. Source: <repo> — <file or pattern>
+| <title> — <brief description>. Source: <repo> — <file or pattern> (from <name>, YYYY-MM-DD) | — | <the reason the user accepted in step 7> |
 ```
+
+The third column carries that reason verbatim — never publish the template's
+own placeholder text into the roadmap. **Insert and stage in the same
+invocation**, and insert into the table, not at the end of the file:
+
+1. **Check the roadmap exists first.** A skill worktree re-entered from a run
+   that predates the workspace roadmap has no root `ROADMAP.md`; never create
+   one here — that would commit a bare row as the workspace roadmap. If the
+   file is absent, remove and recreate the skill worktree (step 3) and
+   re-run.
+2. **Insert the rendered row as the last row of the `## Deferred` table** —
+   i.e. immediately before the `## What's not on this roadmap` heading (the
+   Edit tool, or `sed -i '/^## What.s not on this roadmap/i <row>' ROADMAP.md`).
+   Never `>> ROADMAP.md`: that appends after the file's footer and produces an
+   orphan row outside any table.
+3. **Stage in that same command**: `… && git add ROADMAP.md`. Agent Bash calls
+   run in fresh subshells (AGENTS.md § Agent Commit Identity, subshell caveat),
+   so nothing set here survives to step 9; staging now, on the row this run
+   just wrote, is what keeps it from being lost when the skill worktree is
+   removed — and it never sweeps up an unrelated `ROADMAP.md` edit left in a
+   re-entered worktree.
+
+Root `ROADMAP.md` is the expected location for a roadmap per
+[`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
+its shape comes from [`.agent/templates/roadmap.md`](../../../.agent/templates/roadmap.md).
 
 **Skip/Defer**: Record in digest only.
 
 ### 9. Update digest with decisions
 
 Update the digest to move items from "Pending Review" to their final
-sections (Roadmapped, Skipped, or Deferred). Commit the update:
+sections (Roadmapped, Skipped, or Deferred). Commit the update. Any Deferred
+row step 8 appended to root `ROADMAP.md` is **already staged** (step 8 stages
+in the same invocation that appends), so this commit carries it without a
+separate decision here. Do not `git add ROADMAP.md` on the presence of a diff:
+step 3 may re-enter a worktree left by an incomplete run, and a pre-existing or
+unrelated roadmap edit must not ride this digest commit — if one shows as
+unstaged, leave it and say so in the run summary.
 
 ```bash
 git add .agent/knowledge/inspiration_<name>_digest.md
@@ -290,6 +326,9 @@ cat << 'EOF' > "$BODY_FILE"
 ## Inspiration Tracker: <name>
 
 <Brief summary of findings and decisions>
+
+<When items went to the roadmap: name them and say that this PR also
+carries the new **Deferred** rows in root `ROADMAP.md`.>
 
 ---
 **Authored-By**: `$AGENT_NAME`
@@ -344,7 +383,7 @@ When invoked with `add` or `add <url>`:
 - **Interactive, not autonomous** — always present findings and let the user
   decide. Never add to roadmap without confirmation.
 - **Discovery, not implementation** — this skill identifies and triages
-  enhancements. Findings go to the roadmap's "To Consider" section. GitHub
+  enhancements. Findings go to the root `ROADMAP.md`'s **Deferred** section. GitHub
   issues are created later (during `/brainstorm`) when work is ready to begin.
 - **One project per run** — check one project at a time for focused review.
 - **Single PR per run** — each run produces at most one PR (the digest

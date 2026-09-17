@@ -82,6 +82,8 @@ Available workflow skills: `run-issue`, `review-issue`, `plan-task`, `review-pla
 
 - [`AGENTS.md`](../../AGENTS.md) — Shared workspace rules (all agents)
 - [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) — System design and layering
+- [`../../ROADMAP.md`](../../ROADMAP.md) — Workspace roadmap: what's next, what's deferred
+- [`../../docs/design/planning_document_vocabulary.md`](../../docs/design/planning_document_vocabulary.md) — Planning-document kinds and the two-root rule (draft)
 - [`../WORKTREE_GUIDE.md`](../WORKTREE_GUIDE.md) — Detailed worktree patterns
 - [`../AI_IDENTITY_STRATEGY.md`](../AI_IDENTITY_STRATEGY.md) — Multi-framework identity
 - [`../WORKFORCE_PROTOCOL.md`](../WORKFORCE_PROTOCOL.md) — Multi-agent coordination
