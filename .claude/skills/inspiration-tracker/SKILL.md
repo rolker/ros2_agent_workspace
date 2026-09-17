@@ -249,7 +249,11 @@ ask the user to choose:
 
 - **Add to roadmap** — append to the **Deferred** section of the root
   `ROADMAP.md` ("Leftovers land here — things that came up, are not bounded
-  enough for an issue, and are not being done next")
+  enough for an issue, and are not being done next"). Then ask one follow-up:
+  **what condition would bring this back?** — the **Deferred because** column
+  of that table. Propose a one-line reason derived from the digest entry for
+  the user to accept or reword; a row with no real reason is a dropped item
+  that has not been admitted yet (`.agent/templates/roadmap.md`).
 - **Skip** (with reason) — record in digest, won't be re-prompted
 - **Defer** — record in digest, will be re-prompted on next run
 
@@ -264,8 +268,11 @@ created later when work is ready to begin, typically during a `/brainstorm`
 session that reviews the roadmap.
 
 ```markdown
-| <title> — <brief description>. Source: <repo> — <file or pattern> (from <name>, YYYY-MM-DD) | — | <the condition that would bring it back> |
+| <title> — <brief description>. Source: <repo> — <file or pattern> (from <name>, YYYY-MM-DD) | — | <the reason the user accepted in step 7> |
 ```
+
+The third column carries that reason verbatim — never publish the template's
+own placeholder text into the roadmap.
 
 Root `ROADMAP.md` is the expected location for a roadmap per
 [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
