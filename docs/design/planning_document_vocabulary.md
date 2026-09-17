@@ -294,7 +294,7 @@ A dedicated bot identity — **`Janitor Sweep Agent`**, committing on a
 holds `research` and `inspiration-tracker` only (verified 2026-09-17). Adding
 `janitor-sweep` to it belongs to the sweep-split sub-issue that builds the
 publish path this section describes, not to this draft. Set per commit with
-`git -c user.name/user.email` per AGENTS.md § Agent Commit Identity, so `check-commit-identity.py` and `check_pr_authors.py` both pass and
+`git -c user.name=… -c user.email=…` per AGENTS.md § Agent Commit Identity, so `check-commit-identity.py` and `check_pr_authors.py` both pass and
 the PR is unmistakably automated.
 
 ### A human still reviews before merge
