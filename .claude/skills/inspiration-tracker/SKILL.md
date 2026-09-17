@@ -276,10 +276,15 @@ its shape comes from [`.agent/templates/roadmap.md`](../../../.agent/templates/r
 ### 9. Update digest with decisions
 
 Update the digest to move items from "Pending Review" to their final
-sections (Roadmapped, Skipped, or Deferred). Commit the update:
+sections (Roadmapped, Skipped, or Deferred). Commit the update — and stage
+root `ROADMAP.md` in the same commit when step 8 appended a **Deferred** row
+to it. The skill worktree is removed once the run is over, so a roadmap row
+left unstaged is silently lost along with the decision it records:
 
 ```bash
 git add .agent/knowledge/inspiration_<name>_digest.md
+# Only when step 8 wrote to the roadmap — a no-op otherwise.
+git diff --quiet -- ROADMAP.md || git add ROADMAP.md
 git commit -m "docs: record inspiration-tracker decisions for <name>"
 ```
 
@@ -295,6 +300,9 @@ cat << 'EOF' > "$BODY_FILE"
 ## Inspiration Tracker: <name>
 
 <Brief summary of findings and decisions>
+
+<When items went to the roadmap: name them and say that this PR also
+carries the new **Deferred** rows in root `ROADMAP.md`.>
 
 ---
 **Authored-By**: `$AGENT_NAME`
