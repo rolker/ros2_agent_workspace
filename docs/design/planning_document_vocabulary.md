@@ -266,9 +266,13 @@ sitting there. The next two sections are that answer.
 ### Commit identity
 
 A dedicated bot identity — **`Janitor Sweep Agent`**, committing on a
-`skill/janitor-*` branch — the same convention the `research` skill already uses.
-Set per commit with `git -c user.name/user.email` per AGENTS.md § Agent Commit
-Identity, so `check-commit-identity.py` and `check_pr_authors.py` both pass and
+`skill/janitor-*` branch — the skill-worktree branch convention that the
+`research` skill already uses. That convention is gated by an allowlist, and
+`janitor-sweep` is **not on it today**: `worktree_create.sh`'s `ALLOWED_SKILLS`
+holds `research` and `inspiration-tracker` only (verified 2026-09-17). Adding
+`janitor-sweep` to it belongs to the sweep-split sub-issue that builds the
+publish path this section describes, not to this draft. Set per commit with
+`git -c user.name/user.email` per AGENTS.md § Agent Commit Identity, so `check-commit-identity.py` and `check_pr_authors.py` both pass and
 the PR is unmistakably automated.
 
 ### A human still reviews before merge
