@@ -55,7 +55,7 @@ from #628, so closing the umbrella does not lose them — see step 7 and step 8.
    - **Gate, stated in the ADR's Consequences: the commit-publish path does not go live until the redaction class on [#626](https://github.com/rolker/ros2_agent_workspace/issues/626) is closed.** #626 carries open, unfixed items in exactly the class that would be published: absolute host paths and credentials reaching stderr that the sweep report transcribes — the resolver's two `redact.sh` refusals (`.agent/scripts/resolve_repo_checkout.sh:131,141`), a failed `exec 9>`/`exec 8>` lock open that bash reports before the `say()` funnel runs (`resolve_repo_checkout.sh:436`, `manifest_fallback.sh:181`), and the `mkdir -p "$REPORT_DIR"` arm (`.claude/skills/janitor-sweep/SKILL.md:108`) — plus two `redact.sh` defects that leak on hostile input (a password containing `@`; a workspace path containing `=`). Deciding "publish means commit" must not read as authorising an unredacted host path into a *public* repo. The ADR decides the destination; #626 is the gate on switching it on, and (3)/(4) must not ship the path before it closes.
    - **Commit identity for the unattended publish path** — a dedicated bot identity (`Janitor Sweep Agent`) committing on a `skill/janitor-*` branch, the convention the `research` skill already uses, so both `check-commit-identity.py` and `check_pr_authors.py` pass and the PR is unmistakably automated. This answers the question #569's 2026-09-11 comment deferred out of that slice.
    - **An unattended PR is still reviewed by a human before merge** — "green CI is not review" (AGENTS.md § Merging) applies unchanged; stated explicitly because this is the workspace's first fully unattended PR-opening path.
-   - **The trigger** — the ADR weighs the three candidates (table below) and **records the operator's choice made at plan review**; ADR-0001's bar is to capture the decision, not to leave it open.
+   - **The trigger — decided: a weekly Claude Code cloud Routine** (operator, 2026-09-14 round-2 plan-review comment on #628). The ADR records that as its Decision, with the three candidates and the axes they differ on (table below) as its Context, so a later supersede can see what was weighed. ADR-0001's bar is to capture the decision, not to leave it open — it is captured here, not deferred to (4); (4) wires what this ADR decides.
    - **The one rule stated in every roadmap** — before choosing the next piece of work, read the roadmap and the health document together: the roadmap says where you want to go, health says what will stop you; work appearing in both goes first.
 
    **Recorded option, not taken (operator, 2026-09-14): splitting ADR-0020 in two** — a taxonomy ADR (kinds, two-root rule, discovery) and a mechanism ADR (publish=commit, bot identity, trigger, human-review gate), so that superseding the trigger later does not churn the taxonomy. The operator declined the split for now; it stays one ADR. Noted here so a future supersede knows the seam was seen and where it runs: the mechanism half is the "Publish means commit" / "Commit identity" / "The trigger" bullets above.
@@ -82,13 +82,52 @@ from #628, so closing the umbrella does not lose them — see step 7 and step 8.
    - (iii) is **largely already answered**: `ARCHITECTURE.md` exists at the workspace root; what #249 asks for beyond it is the *consult-and-update cadence*, which is what the Consequences Map and this ADR's roadmap+health rule provide. Recorded in the roadmap rather than dropped.
    - (i) and (ii) are **explicitly carried forward, not closed by this PR** — listed in the roadmap's "What's not on this roadmap" / deferred section with (ii) flagged as a decision to protect, not revisit. If the operator would rather #249 stay open to hold (i), drop the keyword to "Part of #249" — the Open Question below.
 
-## Trigger comparison — for the ADR, operator decides at plan review
+## Trigger comparison — the ADR's input; the decision is recorded below
 
-| Mechanism | Reach | Cadence reliability | Commit identity | Credential surface | Cost |
+**Decided by the operator at the round-2 plan-review checkpoint (2026-09-14,
+comment on #628): the trigger is a weekly Claude Code cloud Routine.** Their
+stated grounds, quoted: *"Smallest credential surface on a public repo (no new
+secret stored anywhere), exact cadence, GitHub-only reach (already the rotation
+rule)."* ADR-0020 records that as its Decision; the table below stays in this
+plan as the input the decision was made from, so the ADR's Context can carry
+the alternatives and why they were not taken (ADR-0001's bar).
+
+| Mechanism | Reach | Cadence reliability | Commit identity | Credential surface (new stored secrets) | Cost |
 |---|---|---|---|---|---|
-| **GH Actions weekly cron** (workspace repo) | GitHub repos only, on a fresh clone — works because the sweep already resolves repos via `resolve_repo_checkout.sh` + the manifest fallback. **Cannot reach gitcloud repos or `layers/`.** | Exact and unconditional — independent of whether the laptop is on | Bot identity set per-commit with `git -c user.name/user.email` (AGENTS.md § Agent Commit Identity). Same chore as the other two rows | **Largest.** Two standing secrets on a **public** repo: the Claude subscription token (`CLAUDE_CODE_OAUTH_TOKEN`), and a **cross-repo write credential** (PAT or GitHub App token) — health documents are committed to the repos they grade, and the built-in `GITHUB_TOKEN` is scoped to the repo running the workflow | Actions minutes free on a public repo; the agent run itself draws the same subscription usage as the other two |
-| **Claude Code cloud Routine** | Same GitHub-only reach — **cannot reach gitcloud or `layers/`** (recorded on #569; independently confirmed in the #624 research digest, which notes Routines are cloud-hosted and GitHub-repo-scoped) | Scheduled; daily run caps by plan (Pro 5 / Max 15 / Team 25 per the digest — the tier floor is reported inconsistently across secondary sources, so verify against current docs before designing around it) | Same per-commit `-c` chore, and it satisfies the same checks: `check_pr_authors.py` inspects each commit's **primary author email**, not the account that opened the PR | **Smallest.** Uses the operator's existing Claude auth and its existing GitHub connection; no new secret stored in any repo | Draws subscription usage; no separate infra charge |
-| **anacron on the dev laptop** | **Full reach** — the only option that sees gitcloud repos *and* a real `layers/` tree, which is what project-repo health documents for the field/mirror repos need | Runs missed jobs at next boot, so laptop-off is tolerated — but the interval is boot-dependent, not calendar-exact | Same per-commit `-c` chore | Mints nothing new — the host's existing `gh` auth and the OAuth token already at `~/.config/ros2-agent/claude-oauth-token` | No infra charge; draws the same subscription usage |
+| **GH Actions weekly cron** (workspace repo) | The GitHub-origin repos the manifests declare, on a fresh clone — works because the sweep already resolves repos via `resolve_repo_checkout.sh` + the manifest fallback. No `layers/` tree | Exact and unconditional — independent of whether the laptop is on | Bot identity set per-commit with `git -c user.name/user.email` (AGENTS.md § Agent Commit Identity). Same chore as the other two rows | **2 new.** Both stored on a **public** repo: the Claude subscription token (`CLAUDE_CODE_OAUTH_TOKEN`), and a **cross-repo write credential** (PAT or GitHub App token) — health documents are committed to the repos they grade, and the built-in `GITHUB_TOKEN` is scoped to the repo running the workflow | Actions minutes free on a public repo; the agent run itself draws the same subscription usage as the other two |
+| **Claude Code cloud Routine** ← **chosen** | Same set of repos; no `layers/` tree (Routines are cloud-hosted and GitHub-repo-scoped — `.agent/knowledge/research_digest.md:124,132`) | Scheduled; daily run caps by plan (Pro 5 / Max 15 / Team 25 per the digest — the tier floor is reported inconsistently across secondary sources, so verify against current docs before designing around it) | Same per-commit `-c` chore, and it satisfies the same checks: `check_pr_authors.py` inspects each commit's **primary author email** (`check_pr_authors.py:115-127`), not the account that opened the PR | **0 new.** Runs on Anthropic-managed cloud infrastructure under the operator's existing Claude auth and its existing GitHub connection; nothing is stored in any repo, and no credential moves onto the dev host that is not there already | Draws subscription usage; no separate infra charge |
+| **anacron on the dev laptop** | Same set of repos, **plus the local `layers/` tree** — see "what `layers/` buys a sweep" below | Runs missed jobs at next boot, so laptop-off is tolerated — but the interval is boot-dependent, not calendar-exact | Same per-commit `-c` chore | **0 new.** Every credential stays on the dev host, where it already is: the host's `gh` auth (`~/.config/gh/hosts.yml`) and the OAuth token at `~/.config/ros2-agent/claude-oauth-token` | No infra charge; draws the same subscription usage |
+
+**No mechanism reaches the gitcloud repos, and none would.** `janitor-sweep`
+excludes non-GitHub origins by URL before the rotation is built
+(`is_field_url`, `.claude/skills/janitor-sweep/SKILL.md` step 2 of the
+repo-enumeration section), and every one of the 44 `url:` entries in
+`configs/manifest/repos/*.repos` is on `github.com` (verified 2026-09-17). An
+earlier revision of this table credited anacron with "full reach — the only
+option that sees gitcloud repos *and* a real `layers/` tree"; the gitcloud half
+of that was wrong and is corrected here.
+
+**What `layers/` actually buys a sweep** — the whole of anacron's unique reach,
+and it is narrow. The sweep and `audit-project` are built not to assume
+`layers/` exists (`janitor-sweep/SKILL.md:38,197`), and
+`resolve_repo_checkout.sh` falls back to a manifest-pinned clone. Two things
+differ when a layer checkout is present:
+
+1. **The two layer-dependent `audit-project` checks run instead of reporting
+   SKIPPED** — the optional `colcon test` run (step 5, which needs a built
+   layer workspace) and the "is it in the expected layer?" cross-reference
+   (step 7). In `clone` mode both are SKIPPED, never OK
+   (`audit-project/SKILL.md:152-156,254`).
+2. **What is graded is the operator's working tree as it stands** — feature
+   branches, uncommitted edits and all — rather than the ref the manifest pins.
+   `resolve_repo_checkout.sh` documents this as a deliberate difference in
+   guarantee, not a better or worse one: a `clone` was decided by the manifests,
+   a `layer` checkout is accepted as is.
+
+Whether a health document *should* grade one developer's working tree is a
+design question, not just a reach one. The chosen Routine answers it by
+default: health documents describe the pinned, pushed state, which is also the
+state a reader of the committed document can check.
 
 **What is *not* a discriminator.** All three run the same Claude Code agent over
 the same sweep, so all three draw subscription usage and all three need
@@ -100,23 +139,18 @@ disqualified on identity grounds. A *separate* question, which applies only to
 the Routine, is the **GitHub account that opens the PR** — the operator's
 connected user rather than a bot account. That is a legibility point ("is this
 PR unmistakably automated?"), not a compliance one; it fails no check in this
-repo. A previous revision of this table scored those two as one near-
-disqualifying objection against the Routine; corrected here.
+repo. The `skill/janitor-*` branch and the `Janitor Sweep Agent` commit author
+are what make the PR legible as automated under the chosen mechanism.
 
-**The real discriminators** are therefore three: **reach** (only anacron sees
-gitcloud and `layers/`), **cadence exactness** (only Actions is calendar-exact
-and laptop-independent), and **credential surface** (Actions adds a standing
-cross-repo write credential to a public repo; the Routine and anacron add
-nothing new).
-
-Weekly is the cadence the diff argument points to (the issue's own "weekly is a
-diff, quarterly is another baseline"). A split — Actions weekly for the
-workspace scope, anacron for the project scopes that need `layers/` and gitcloud
-— is available if the operator wants full reach without depending on the laptop,
-at the cost of two mechanisms to maintain. **This plan deliberately does not
-pre-decide.** The operator chooses at plan review from the table above, and the
-choice becomes ADR-0020's Decision (ADR-0001's bar: capture the decision, do not
-leave it open).
+**The real discriminators**, with the superlatives dropped and each axis stated
+plainly, are two: **cadence exactness** (Actions is calendar-exact and
+laptop-independent; the Routine is scheduled but rate-capped per plan; anacron
+is boot-dependent) and **new stored secrets** (Actions 2, both on a public repo;
+Routine 0; anacron 0) — the third, **whether the sweep should see the local
+`layers/` tree at all**, is the design question above rather than a straight
+capability win. Weekly is the cadence the diff argument points to (the issue's
+own "weekly is a diff, quarterly is another baseline"), and weekly is what the
+operator chose.
 
 ## Files to Change
 
@@ -173,7 +207,7 @@ leave it open).
 
 ## Open Questions
 
-- **Trigger mechanism** — GH Actions weekly cron / Claude Code cloud Routine / anacron on the laptop (or the Actions+anacron split). The comparison table above — **corrected in this revision** so that cost, commit identity and credential surface are scored on the same basis in all three rows — is the ADR's input; the operator's answer becomes the ADR's Decision. The plan does not pre-decide.
+- **Trigger mechanism — DECIDED (operator, 2026-09-14): a weekly Claude Code cloud Routine.** No longer open. The comparison table above is retained as the ADR's Context — corrected in this revision so that reach, cost, commit identity and credential surface are scored on the same basis in all three rows (the anacron row no longer claims gitcloud reach, which no mechanism has, and the credential column states new-stored-secret counts instead of superlatives).
 - **Is `.agent/templates/roadmap.md` in (1) or a later sub-issue?** The plan puts it in (1) because `docs/roadmap.md` is its first instance and the loop section would otherwise be written twice. Reversible at review.
 - **`AGENTS.md` *and* `CLAUDE.md` are Ask First** — approving this plan approves exactly the three References-level additions in step 7 (two in `AGENTS.md`, one in `CLAUDE.md`) and nothing more.
 - **Does this PR close #249?** The plan says yes, on the checked basis in step 9: the roadmap carries #249's four body properties plus the disposition of the three items from its operator comment, two of which are carried forward rather than answered. If the operator would rather #249 stay open to hold the "README contains everything concisely" question, the keyword drops to `Part of #249` and nothing else in the plan changes.
