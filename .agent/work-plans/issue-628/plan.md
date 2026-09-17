@@ -373,12 +373,20 @@ inline per the plan-first workflow rather than left for review to discover.
   bound, which it still meets — the count is re-measured at publish, not
   recorded here.
 
-- **Sub-issues (2)–(7) are not filed by this worktree.** Approach step 8 files
-  them; the host files GitHub issues at the publish checkpoint instead, so the
-  implementation used the placeholder `#TBD — filed at publish` wherever an
-  unfiled sub-issue is referenced — six rows in `ROADMAP.md` (`ROADMAP.md:59-64`,
-  one per unfiled sub-issue) and three mentions in the design draft (the two
-  enforcement closers and the promotion sub-issue), nine occurrences in all.
-  Those placeholders are what the host replaces with real numbers; they are the
-  only `#TBD` tokens in the tree. Step 9's PR body and the #628
-  comment likewise belong to the publish step.
+- **Sub-issues (2)–(7) were filed by the host at publish, not by this worktree.**
+  Approach step 8 files them; the host files GitHub issues at the publish
+  checkpoint instead, so implementation carried the placeholder
+  `#TBD — filed at publish` wherever an unfiled sub-issue was referenced — six
+  rows in `ROADMAP.md`, one per unfiled sub-issue, and three mentions in the
+  design draft (the two enforcement closers and the promotion sub-issue), nine
+  occurrences in all. All nine were replaced with real links in `92526cf`:
+  [#634](https://github.com/rolker/ros2_agent_workspace/issues/634),
+  [#635](https://github.com/rolker/ros2_agent_workspace/issues/635),
+  [#636](https://github.com/rolker/ros2_agent_workspace/issues/636),
+  [#637](https://github.com/rolker/ros2_agent_workspace/issues/637),
+  [unh_marine_autonomy#394](https://github.com/rolker/unh_marine_autonomy/issues/394)
+  and
+  [unh_echoboats_project11#492](https://github.com/rolker/unh_echoboats_project11/issues/492).
+  No `#TBD` token survives in the tree outside this plan's own record of the
+  staging step and the progress timeline's dated entries. Step 9's PR body and
+  the #628 comment likewise belonged to the publish step.
