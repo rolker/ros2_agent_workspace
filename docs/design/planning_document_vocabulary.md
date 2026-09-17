@@ -92,7 +92,8 @@ The operator's standing constraint, recorded on
 > should be able to work with various different ros2 projects."
 
 **Worked examples, not sources.** `unh_marine_autonomy` is a project root: it
-carries a `VISION.md`, and its roadmap would name the BizzyBoat roadmap in
+states its purpose in a `VISION.md` today (to be folded into a `README.md`
+§ Vision), and its roadmap would name the BizzyBoat roadmap in
 `unh_echoboats_project11` beneath it — a roadmap naming the roadmap beneath it.
 These are the first instances this workspace will check the rule against. They
 are not where the rule comes from, and any ROS 2 project can be the project root.
@@ -106,10 +107,10 @@ per-repo declaration file and no schema** — the operator decided this
 
 | Kind | Expected location | Status of this row |
 |---|---|---|
-| vision | `VISION.md` at the repo root | **Open** — see evidence below |
-| roadmap | `docs/roadmap.md` | **Open** — see evidence below |
+| vision | a `## Vision` section in `README.md` at the repo root | Settled by operator decision, 2026-09-17 — the better-evidenced of the two candidates (see evidence below) |
+| roadmap | `ROADMAP.md` at the repo root | Settled by operator decision, 2026-09-17 — the general open-source convention (see evidence below) |
 | decisions | `docs/decisions/` | Settled — MADR's own literal recommendation |
-| health | `docs/health.md` (beside the roadmap) | This workspace's own choice; no convention either way |
+| health | `docs/health.md` | This workspace's own choice; no external convention exists either way |
 
 **This is a published expectation, not a requirement.** The operator, 2026-09-17:
 
@@ -129,17 +130,27 @@ status document, and
 [ADR-0008](../decisions/0008-follow-ros2-official-conventions.md)'s Decision
 scopes "ROS 2 official conventions" to naming, packaging, licensing, message
 design and launch structure. The table's justification is **common open-source
-documentation practice plus the paths this workspace already uses** — a root
-`VISION.md` in the framework repo, `docs/` for prose, an ADR directory beneath
-it. Its force comes from being *published* (a project can meet it to be found),
-not from any external authority.
+documentation practice plus the paths this workspace already uses** — a
+`README.md` § Vision, a root `ROADMAP.md` of the kind Kubernetes sub-projects
+publish, `docs/` for prose, an ADR directory beneath it. Its force comes from
+being *published* (a project can meet it to be found), not from any external
+authority.
 
 **Every row is a literal path, including health.** The reader that probes these
 paths is a separate piece of work, and it is contracted to probe *exactly* this
 table — so the health document's name is fixed here rather than left to the
-writer to invent.
+writer to invent. The vision row is the one that is not a file of its own: the
+reader looks for a `## Vision` heading inside `README.md`.
 
-### Evidence, and why two rows stay open
+**Why the health document is not at the root beside the roadmap.** An earlier
+revision described it as living "beside the roadmap", which the roadmap's move
+to the repo root would have dragged to a root `HEALTH.md`. It stays at
+`docs/health.md`, stated plainly as **a workspace choice with no external
+convention behind it**: it is generated output that is replaced wholesale each
+run, and the root is reserved for the documents a human is expected to open
+first.
+
+### Evidence, and how the two contested rows were settled
 
 Backed by a documentation-conventions survey run 2026-09-17 over ROS 2 projects
 and general open-source practice. The survey itself lives under
@@ -167,8 +178,9 @@ and general open-source practice. The survey itself lives under
   [`docs/community/roadmaps.md`](https://github.com/ros-navigation/docs.nav2.org/blob/rolling/docs/community/roadmaps.md)
   in the separate `docs.nav2.org` repo; MoveIt's is a
   [page on moveit.ai](https://moveit.ai/documentation/contributing/roadmap/).
-  This is the strongest evidence *against* an in-repo table, and the reason two
-  rows stay open. The one living in-repo Markdown design document found in the
+  This is the strongest evidence *against* an in-repo table, and the reason the
+  vision and roadmap rows were contested rather than obvious. The one living
+  in-repo Markdown design document found in the
   ROS 2 set is gz-sim's
   [`doc/architecture_design.md`](https://github.com/gazebosim/gz-sim/blob/main/doc/architecture_design.md)
   — which is also the shape this page takes.
@@ -186,16 +198,19 @@ and general open-source practice. The survey itself lives under
 
 Row by row:
 
-- **vision — open.** The better-evidenced alternative is a `## Vision` **section
-  in `README.md`**: no surveyed ROS 2 project has a `VISION.md`, all state their
-  mission in the README, and this workspace itself uses `README.md` § Vision. The
-  `VISION.md` row rests on a single instance — the framework repo's, untouched
-  since January — which is thin support for a published recommendation.
-- **roadmap — open, three ways.** `docs/roadmap.md` (the BizzyBoat instance this
-  workspace actually reads, and what `docs/roadmap.md` here now follows), a root
-  `ROADMAP.md` (Kubernetes sub-projects; the sibling `rolker/agent_workspace`
-  uses `docs/ROADMAP.md`), or an external board / docs site (ros2 core, Nav2,
-  `ros-maritime/community`).
+- **vision — settled on a `## Vision` section in `README.md`.** This is the
+  better-evidenced of the two candidates: no surveyed ROS 2 project has a
+  `VISION.md`, all state their mission in the README, and this workspace itself
+  already uses `README.md` § Vision. The `VISION.md` alternative rested on a
+  single instance — the framework repo's, untouched since January — which is
+  thin support for a published recommendation.
+- **roadmap — settled on a root `ROADMAP.md`.** Three candidates were on the
+  table: `docs/roadmap.md` (the BizzyBoat instance this workspace actually
+  reads), a root `ROADMAP.md` (what Kubernetes sub-projects publish; the sibling
+  `rolker/agent_workspace` uses `docs/ROADMAP.md`), or an external board / docs
+  site (ros2 core, Nav2, `ros-maritime/community`). The root file is the general
+  open-source convention and is the one form a reader can find without being
+  told where to look; an external board is not a path a probe can check at all.
 - **decisions — settled.** [MADR](https://adr.github.io/madr/) literally
   recommends creating `docs/decisions`, and it matches what this repo already
   has. No surveyed ROS 2 upstream had a named ADR practice to contradict it.
@@ -205,7 +220,21 @@ Row by row:
   precedent: that one is per package and hand-written, where this is per root and
   generated.
 
-**A provisional row costs a project nothing**: the table is published so a
+**Settled by decision, with the survey as evidence — not by the survey alone.**
+The survey above leaves the vision and roadmap rows at a genuine split, so the
+choice between the candidates is a decision rather than a finding. The operator
+made it on 2026-09-17, verbatim:
+
+> "I do favor updating our own repos to follow conventions."
+
+So the table now names the conventional form for each row, and this workspace's
+own repos are brought to it: this repository's roadmap moves to a root
+`ROADMAP.md` in the same change, and the two project repos follow (the framework
+repo's `VISION.md` folds into a README § Vision, and the BizzyBoat
+`docs/roadmap.md` is renamed to a root `ROADMAP.md`). The survey is why these
+are the candidates; the operator's preference is why these two won.
+
+**A settled row still costs a project nothing**: the table is published so a
 project *can* be found, absence is still never an error, and the reader probes
 whatever the table says at the time. If a row moves, the table and the reader
 move together.
@@ -214,9 +243,9 @@ move together.
 
 ### Publish means commit, not post
 
-The periodic sweep's durable output is a **health document committed beside the
-roadmap of the repo it grades** — `docs/health.md` — replaced each run, via a
-pull request. Git history is then the run-over-run diff, and the document is
+The periodic sweep's durable output is a **health document committed into the
+repo it grades** — `docs/health.md`, the path the table fixes — replaced each
+run, via a pull request. Git history is then the run-over-run diff, and the document is
 readable by anyone who can read the repo, rather than living in one agent's
 scratchpad.
 
@@ -329,9 +358,6 @@ That sentence is what makes the two documents a loop rather than two files.
 
 ## Open questions
 
-- **Where a vision and a roadmap actually belong** — the two rows marked Open
-  above. The survey leaves both at a genuine split; resolving them is part of the
-  promotion gate below.
 - **The design-collection consistency review** — a process that walks a
   collection top-down and can carry a finding *up* to a parent, including the
   vision — is under discussion on
@@ -353,8 +379,7 @@ sub-issue (`#TBD` — filed at publish), gated on three things:
    the two-root rule** — the rule is *claimed* to be project-agnostic, and one
    project cannot demonstrate that.
 
-The promotion also carries the resolution of the two open table rows, and a
-cross-reference addendum on ADR-0015 under
+The promotion also carries a cross-reference addendum on ADR-0015 under
 [ADR-0012](../decisions/0012-permit-cross-reference-addendums-in-adrs.md) —
 which permits an ADR pointing at another **ADR**, not at a draft, which is why
 that addendum waits.
