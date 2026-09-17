@@ -620,7 +620,7 @@ plan pass before implementation.
 **By**: Claude Code Agent (Claude Opus)
 **Verdict**: changes-requested
 
-**Branch**: feature/issue-628 at `9e00462`
+**Branch**: feature/issue-628 at `1545690`
 **Mode**: pre-push
 **Depth**: Deep (reason: 1609 changed lines, 11 files, governance/instruction files in the diff)
 **Must-fix**: 2 | **Suggestions**: 7
@@ -629,7 +629,7 @@ plan pass before implementation.
 **Specialists**: Static Analysis (pre-commit, clean; no Markdown linter profile — content review only), Governance, Plan Drift, Claude Adversarial Lens A + Lens B, plus a fact-verification pass over every issue state, ADR status, link and cited URL. Copilot and Local Adversarial: off (default).
 
 ### Findings
-- [ ] (must-fix) HEAD commit body contains the live token `Closes #249` while describing the reword that removed it; merged to `main` this closes the issue the operator decided stays open — fix with `git commit --amend` on HEAD (the sha is cited nowhere, so no re-remap) — `commit 9e00462` message body, line 3
+- [x] (must-fix) HEAD commit body contains a live closing keyword naming #249 while describing the reword that removed it; merged to `main` this closes the issue the operator decided stays open — fix with `git commit --amend` on HEAD (the sha is cited nowhere, so no re-remap) — `commit 1545690` message body, line 3 (fixed by the host before this pass: the reworded commit is `1545690`; the branch carries no closing-keyword token)
 - [ ] (must-fix) As-built says "seven rows in `ROADMAP.md`" carry `#TBD — filed at publish`; there are six (`ROADMAP.md:58-63`), so the total is 9, not 10 — `.agent/work-plans/issue-628/plan.md:351`
 - [ ] (suggestion) The template's Health-document line shows a live `docs/health.md` link while its own parenthetical says to omit the link until one exists — copy-paste propagates a dangling link — `.agent/templates/roadmap.md:36`
 - [ ] (suggestion) The "five pointer additions" accounting is self-inconsistent — `AGENTS.md` counted as two *lines*, each adapter as one *block* though each landed two lines; the shipped diff is 2 lines × 4 files — `.agent/work-plans/issue-628/plan.md:129,290`
