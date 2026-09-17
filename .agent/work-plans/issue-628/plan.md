@@ -354,6 +354,24 @@ inline per the plan-first workflow rather than left for review to discover.
   five pointer additions across `AGENTS.md` and the three adapters is
   unchanged.
 - **The roadmap lives at the repo root as `ROADMAP.md`, not `docs/roadmap.md`, and the draft's two open table rows are settled.** Plan steps 1 and 4 above specified `docs/roadmap.md` and a table with the vision and roadmap rows marked Open; both were changed after the sub-issue (1) commits landed, on the operator's in-session decision of 2026-09-17 (the host records it on #628): *"I do favor updating our own repos to follow conventions."* The file was moved with `git mv`, so its history is preserved, and every reference moved with it — the README pointer, the References lists in `AGENTS.md` and the three adapters (same line count, path only), the Consequences Map row, the template's instantiation instruction, and the draft's links. The plan text above is updated in place to the settled form; the survey remains the evidence and the operator's preference the reason. `docs/health.md` deliberately stayed put. **Size bound re-checked after the move**: `ROADMAP.md` is 139 lines, inside step 4's 150-line first-cut bound.
+- **The template carries five additive elements the plan did not anticipate.**
+  Approach step 3 describes the template as the BizzyBoat loop section plus the
+  two-root parent/children lines. After a roadmap-format evaluation on
+  2026-09-17 (Rust Project Goals, Kubernetes SIG Release, containerd, Argo CD,
+  Prometheus, the GitHub public roadmap, the sibling `rolker/agent_workspace`)
+  the operator approved folding in five tweaks, all **additive** — the ten
+  experience-derived features are unchanged: a generated `Last reviewed:` stamp
+  in the header, optional `Owner` and `Priority` columns on the active-threads
+  tables (`Issue` stays mandatory), per-theme prose codified as encouraged, a
+  capped *Recently completed* section between Active threads and Deferred, and
+  the containerd staleness caution recorded as the reason the forcing function
+  and pruning are load-bearing. The template also gained a *Where this shape
+  comes from* note naming the three source classes by URL, since the evaluation
+  file itself is gitignored. `ROADMAP.md` was brought to the revised template in
+  the same change (stamp, an omitted-columns note — one owner throughout — and
+  two genuinely completed rows) and re-checked at **150 lines**, still inside
+  step 4's bound.
+
 - **Sub-issues (2)–(7) are not filed by this worktree.** Approach step 8 files
   them; the host files GitHub issues at the publish checkpoint instead, so the
   implementation used the placeholder `#TBD — filed at publish` wherever an
