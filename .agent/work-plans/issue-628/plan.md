@@ -31,7 +31,7 @@ operator's round-4 decision requires once the rule has been exercised.
 
 **Rev 5 reframes deliverable (1).** Through rev 4 it was `ADR-0020`. At the
 round-4 plan-review checkpoint (2026-09-17) the operator approved plan rev 4
-(`02eaa30`) and directed that the first deliverable ship as a **design draft**
+(`d949b75`) and directed that the first deliverable ship as a **design draft**
 instead, on stated grounds of ADR fatigue (quoted in Open Questions below). The
 *content* is unchanged; the document kind, its status, and the record it lands
 in are. Three further consequences of that comment are carried through this

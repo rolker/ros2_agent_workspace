@@ -206,9 +206,9 @@ deferred to you at this review but never made it into the plan text (finding 2).
 **When**: 2026-09-17 10:57 -04:00
 **By**: Claude Code Agent (Claude Opus)
 
-**Branch**: feature/issue-628 at `ee41296` (plan rev 3 head; this entry's own commit follows)
+**Branch**: feature/issue-628 at `407d923` (plan rev 3 head; this entry's own commit follows)
 **Addressed**: `## Plan Review` (round 2, 2026-09-14 14:20 -04:00, against plan sha `3c2c78a`) — 2 must-fix + 6 suggestions, all eight actioned
-**Commits**: `5576551` `0ff3e13` `aee1383` `040cb38` `4bb491f` `faca3f3` `bbf7c60` `4510548` `ce8b8cc` `040f8fd` `ee41296`
+**Commits**: `5576551` `53015cc` `9949fc1` `7e08c77` `ee54bf9` `7fb955c` `cdd9101` `e24a6d7` `4683cfd` `e2b4ae3` `407d923`
 
 Plan rev 3. Beyond the eight review findings, this pass folds in the operator
 decisions recorded on #628 (2026-09-14 18:56Z and 2026-09-17), which settle the
@@ -241,12 +241,12 @@ two questions the round-2 review left at the checkpoint.
 **When**: 2026-09-17 11:02 -04:00
 **By**: Claude Code Agent (Claude Opus)
 
-**Plan**: `.agent/work-plans/issue-628/plan.md` at `ee41296`
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `407d923`
 **PR**: PR-less (`--issue` mode, worktree `feature/issue-628`)
 **Verdict**: changes-requested
 
 Independent review — dispatched as a fresh-context sub-agent, read the plan
-cold; not the plan author. Round 3, against plan rev 3 at `ee41296`.
+cold; not the plan author. Round 3, against plan rev 3 at `407d923`.
 
 **All eight round-2 findings are genuinely closed in the plan text**, each
 re-verified against source rather than taken from the `## Implementation`
@@ -336,16 +336,16 @@ misstated in the plan.
 **When**: 2026-09-17 11:12 -04:00
 **By**: Claude Code Agent (Claude Opus)
 
-**Branch**: feature/issue-628 at `13d5224`
-**Addressed**: `## Plan Review` round 3 (2026-09-17 11:02 -04:00, plan rev 3 at `ee41296`, review entry `0161442`) — verdict changes-requested, 4 must-fix + 6 suggestions
-**Commits**: `6df07fc`, `4de4c72`, `8d4ce46`, `134ba1d`, `3e7b8d1`, `0493f1d`, `02eaa30`, `13d5224`
-**Work product**: `.agent/work-plans/issue-628/plan.md` rev 4, plan head `02eaa30`
+**Branch**: feature/issue-628 at `e42cc1e`
+**Addressed**: `## Plan Review` round 3 (2026-09-17 11:02 -04:00, plan rev 3 at `407d923`, review entry `5766238`) — verdict changes-requested, 4 must-fix + 6 suggestions
+**Commits**: `ee5277c`, `fccae92`, `41d62d6`, `9f4428b`, `405e14d`, `0ff6377`, `d949b75`, `e42cc1e`
+**Work product**: `.agent/work-plans/issue-628/plan.md` rev 4, plan head `d949b75`
 
 Plan-only revision per the operator's round-3 decision (2026-09-17 comment on
 #628: fix all ten, then a fourth plan review). Nothing in the plan was
 implemented. Every claim added was verified against source or against the
 GitHub record before it was written; the four suggestions that are one-clause
-record corrections were grouped into one commit (`3e7b8d1`) because splitting
+record corrections were grouped into one commit (`405e14d`) because splitting
 four one-line fixes in the same paragraph-set would have produced commits that
 cannot be reasoned about independently anyway.
 
@@ -365,19 +365,19 @@ cannot be reasoned about independently anyway.
 None — all ten findings were actioned.
 
 ### Next
-Fourth plan review (`review-plan`) against plan rev 4 at `02eaa30`, per the operator's round-3 decision. Not dispatched from here.
+Fourth plan review (`review-plan`) against plan rev 4 at `d949b75`, per the operator's round-3 decision. Not dispatched from here.
 
 ## Plan Review
 **Status**: complete
 **When**: 2026-09-17 11:17 -04:00
 **By**: Claude Code Agent (Claude Opus)
 
-**Plan**: `.agent/work-plans/issue-628/plan.md` at `02eaa30`
-**PR**: PR-less (`--issue` mode, worktree `feature/issue-628`, branch head `41eb290`)
+**Plan**: `.agent/work-plans/issue-628/plan.md` at `d949b75`
+**PR**: PR-less (`--issue` mode, worktree `feature/issue-628`, branch head `8a0ee14`)
 **Verdict**: approve-with-suggestions
 
 Independent review — dispatched as a fresh-context sub-agent, read the plan
-cold; not the plan author. Round 4, against plan rev 4 at `02eaa30`.
+cold; not the plan author. Round 4, against plan rev 4 at `d949b75`.
 
 **All ten round-3 findings are genuinely closed in the plan text**, each
 re-verified against source rather than taken from the `## Implementation`
@@ -498,22 +498,22 @@ chosen on. Either can be folded in during implementation or waived.
 **When**: 2026-09-17 11:35 -04:00
 **By**: Claude Code Agent (Claude Opus)
 
-**Branch**: `feature/issue-628` at `a66e8b9`
+**Branch**: `feature/issue-628` at `74699fd`
 **Addressed**: the `## Plan Review` entry of 2026-09-17 11:17 -04:00 (round 4,
-against plan rev 4 at `02eaa30`, verdict approve-with-suggestions), plus the
+against plan rev 4 at `d949b75`, verdict approve-with-suggestions), plus the
 operator's decision comment "Operator decision at the plan-review checkpoint,
 round 4" on [#628](https://github.com/rolker/ros2_agent_workspace/issues/628)
 (2026-09-17).
-**Commits**: `65afc58`, `9b70e58`, `a66e8b9`
+**Commits**: `bcbf666`, `ccf9cbb`, `74699fd`
 
-Plan rev 5 at `a66e8b9`. Plan only — nothing implemented. The operator's
+Plan rev 5 at `74699fd`. Plan only — nothing implemented. The operator's
 round-4 instruction was "reframe deliverable 1 as a design draft, then
 implement", with no further plan-review round, so this revision is the last
 plan pass before implementation.
 
 ### What rev 5 changes
 
-1. **Deliverable (1) is a design draft, not ADR-0020** (`65afc58`). The page is
+1. **Deliverable (1) is a design draft, not ADR-0020** (`bcbf666`). The page is
    `docs/design/planning_document_vocabulary.md` with `Status: Draft`, creating
    `docs/design/` — `docs/` today holds only `PRINCIPLES.md` and `decisions/`
    (verified 2026-09-17). The content plan is what ADR-0020 was going to say;
@@ -531,7 +531,7 @@ plan pass before implementation.
    review entries; (7) runs last anyway. It carries the three items deferred
    out of (1): the ADR-0012 addendum on ADR-0015, the `principles_review_guide.md`
    ADR Applicability row, and the resolution of the draft's two open table rows.
-3. **The kind → expected-location table is provisional** (`9b70e58`), cited to
+3. **The kind → expected-location table is provisional** (`ccf9cbb`), cited to
    the 2026-09-17 documentation-conventions survey. The draft carries a
    condensed evidence section with the survey's **source URLs**, because the
    survey file is under `.agent/scratchpad/`, which is gitignored
@@ -591,8 +591,8 @@ plan pass before implementation.
    consistency review as a discussion item with no sub-issue filed.
 
 ### Actions
-- [x] (suggestion) A fourth framework adapter exists and carries its own References list — `.agent/AGENT_ONBOARDING.md` named as knowingly left out in Approach step 7, Files to Change and Documentation & Instruction Impact, with the two distinguishing reasons: the five-addition Ask-First cap is fully spoken for, and its References list is a different, shorter one (`AGENTS.md`, `AI_IDENTITY_STRATEGY.md`, `WORKFORCE_PROTOCOL.md`, `WORKTREE_GUIDE.md`, `ARCHITECTURE.md`, project `.agents/README.md` — no `docs/decisions/`, no `.agent/knowledge/`, no `README.md` § Vision), where the other three are identical entry for entry. Verified: `AGENTS.md:11`, `.agent/AGENT_ONBOARDING.md:109` — `a66e8b9`
-- [x] (suggestion) The chosen Routine row does not answer the cross-repo *write* question the Actions row is charged for — the credential-surface cell now carries "confirm the operator's GitHub connection reaches all 35 overlay repos, with write access, before relying on the Routine for cross-repo writes", and sub-issue (4)'s scope carries the same as one of two things to confirm before relying on the mechanism. Verified: `.agent/knowledge/research_digest.md:132` does describe Routines as "cloud-hosted and GitHub-repo-scoped". The decision itself is not re-opened — `a66e8b9`
+- [x] (suggestion) A fourth framework adapter exists and carries its own References list — `.agent/AGENT_ONBOARDING.md` named as knowingly left out in Approach step 7, Files to Change and Documentation & Instruction Impact, with the two distinguishing reasons: the five-addition Ask-First cap is fully spoken for, and its References list is a different, shorter one (`AGENTS.md`, `AI_IDENTITY_STRATEGY.md`, `WORKFORCE_PROTOCOL.md`, `WORKTREE_GUIDE.md`, `ARCHITECTURE.md`, project `.agents/README.md` — no `docs/decisions/`, no `.agent/knowledge/`, no `README.md` § Vision), where the other three are identical entry for entry. Verified: `AGENTS.md:11`, `.agent/AGENT_ONBOARDING.md:109` — `74699fd`
+- [x] (suggestion) The chosen Routine row does not answer the cross-repo *write* question the Actions row is charged for — the credential-surface cell now carries "confirm the operator's GitHub connection reaches all 35 overlay repos, with write access, before relying on the Routine for cross-repo writes", and sub-issue (4)'s scope carries the same as one of two things to confirm before relying on the mechanism. Verified: `.agent/knowledge/research_digest.md:132` does describe Routines as "cloud-hosted and GitHub-repo-scoped". The decision itself is not re-opened — `74699fd`
 
 ### Also fixed, found while revising (not a round-4 finding)
 - **A live GitHub closing-keyword token in the plan text.** Rev 4's Open
@@ -601,7 +601,7 @@ plan pass before implementation.
   auto-closed issue #249 — the exact hazard AGENTS.md § Issue-closing keywords
   names for plan text, and the operator's standing "no closing keywords
   anywhere" decision. The round-4 review's grep reported the plan clean and
-  missed it. Reworded in `65afc58`; the whole plan re-grepped clean for
+  missed it. Reworded in `bcbf666`; the whole plan re-grepped clean for
   `(close|fix|resolve)[sd]? #<N>` forms.
 
 ### Not done / open
