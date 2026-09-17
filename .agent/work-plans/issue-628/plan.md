@@ -87,7 +87,7 @@ exercised the rule.
      |---|---|---|
      | vision | a `## Vision` section in `README.md` at the repo root | Settled by operator decision, 2026-09-17 — see the evidence bullet below |
      | roadmap | `ROADMAP.md` at the repo root | Settled by operator decision, 2026-09-17 — see the evidence bullet below |
-     | decisions | `docs/decisions/` | Settled — MADR's own literal recommendation |
+     | decision | `docs/decisions/` | Settled — MADR's own literal recommendation. The kind is singular, as in the vocabulary bullet above; only the directory is plural |
      | health | `docs/health.md` | This workspace's own choice; no external convention exists either way |
 
      **Every row is a literal path, including health.** An earlier revision left the health row as "beside the roadmap (`docs/`), named by the sweep" — no filename — while sub-issue (2) is contracted to probe *exactly the paths in this table*, so (2) would have had to invent the name and the single-source design would have drifted at its first reader. The name is therefore settled here, in (1), as **`docs/health.md`**: (2) probes that path, and (3) writes the document at it. (3) does not get to choose a different name without amending this table.
