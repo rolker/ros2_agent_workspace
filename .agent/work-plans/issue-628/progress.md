@@ -200,3 +200,38 @@ secrets; the other two add none), and **whether a sweep should see the local
 `layers/` tree at all** (anacron only) — that last one is a design question the
 plan has not answered. Separately, the per-repo-discovery-file question was
 deferred to you at this review but never made it into the plan text (finding 2).
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 10:57 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-628 at `ee41296` (plan rev 3 head; this entry's own commit follows)
+**Addressed**: `## Plan Review` (round 2, 2026-09-14 14:20 -04:00, against plan sha `3c2c78a`) — 2 must-fix + 6 suggestions, all eight actioned
+**Commits**: `5576551` `0ff3e13` `aee1383` `040cb38` `4bb491f` `faca3f3` `bbf7c60` `4510548` `ce8b8cc` `040f8fd` `ee41296`
+
+Plan rev 3. Beyond the eight review findings, this pass folds in the operator
+decisions recorded on #628 (2026-09-14 18:56Z and 2026-09-17), which settle the
+two questions the round-2 review left at the checkpoint.
+
+### Actions
+- [x] (must-fix) Trigger table reach cell — the anacron row no longer claims gitcloud reach. Verified: `janitor-sweep` excludes non-GitHub origins by url via `is_field_url` before the rotation is built, and all 44 `url:` entries in `configs/manifest/repos/*.repos` are `github.com` (2026-09-17). Anacron's unique reach is the local `layers/` tree alone, now stated as what it actually buys: the two layer-dependent `audit-project` checks that are SKIPPED in `clone` mode (optional `colcon test`, "correct layer") and grading the operator's working tree rather than the manifest-pinned ref — `plan.md` § Trigger comparison
+- [x] (must-fix) The discovery question is now in `plan.md`, recorded as decided rather than open — `plan.md` Open Questions + Approach step 1 + sub-issue (2) row
+- [x] (suggestion) #249's disposition names #263/#264/#265/#266 (all OPEN, verified 2026-09-17) and the "its one operator comment" claim is corrected — #249 carries nine — `plan.md` Approach step 9
+- [x] (suggestion) The #626 gate cites #626 instead of restating its `file:line` refs, with the reason (#626 stamps them "as of `d7b8baf`"; two have already moved) — `plan.md` Approach step 1
+- [x] (suggestion) The ADR-0015 addendum is cut to a one-sentence Status pointer plus a References entry; the third-actor argument moves into ADR-0020, and step 2 names which sentence lands where — `plan.md` Approach step 2, Files to Change, ADR Compliance
+- [x] (suggestion) Context attribution fixed: the operator's 2026-09-14 comment enumerates four sub-issues; (5) and (6) come from the issue body and the round-1 review — `plan.md` Context
+- [x] (suggestion) Credential-surface superlatives dropped for the axis — new stored secrets 2 / 0 / 0, plus where each existing credential already lives (`~/.config/gh/hosts.yml`, `~/.config/ros2-agent/claude-oauth-token`, Anthropic-managed for the Routine) — `plan.md` § Trigger comparison
+- [x] (suggestion) The `principles_review_guide.md` ADR-table row is decided: ADR-0020 gets a row (the guide's own Consequences Map requires it); the eight pre-existing gaps (0011, 0012, 0014–0019, verified 2026-09-17) go on `docs/roadmap.md` as a backlog entry, not into this PR. Files to Change now names both edits to that file — `plan.md` Approach step 6, Files to Change, Consequences
+
+### Operator decisions folded in (not review findings)
+- [x] Trigger = **weekly Claude Code cloud Routine**, recorded as ADR-0020's Decision with the table retained as its Context; sub-issue (4)'s scope updated (no credential provisioning — the Routine stores no new secret)
+- [x] **#249 stays open**; the PR body says `Part of #249` and carries **no** closing keyword for any issue
+- [x] Discovery = **expected locations following common conventions**, published in ADR-0020 as an explicit kind → expected-location table framed as a **recommendation that sets expectations, not a requirement** — a project storing a document elsewhere is not in violation and produces no error or finding. No per-repo file, no schema; the synthetic-fixture and sibling-manifest-comparison items are dropped
+- [x] **Project-agnosticism (ADR-0003)**: the table is to be justified as generic ROS 2 convention and the two roots named abstractly ("the repo the manifest points at"); `unh_marine_autonomy` / `unh_echoboats_project11` are examples and first instances, never the derivation. (2)'s graceful-absence test is named as what protects a differently-laid-out project
+- [x] **Design-collection consistency review** recorded as a discussion item on the umbrella — what was observed, the `unh_marine_autonomy` `VISION.md` objective 2 "Reliable Seafloor Mapping (\"Safety First\")" vs world-store draft #391 case (verified 2026-09-17), and the proposed verdict shape — explicitly **not** a deliverable here, **not** specified in ADR-0020, and no sub-issue filed
+- [x] Sibling `rolker/agent_workspace` named as a template source: `docs/ROADMAP.md` and `.agent/scripts/update_roadmap.sh` (verified 2026-09-17, including what the script does), adopted for shape and an explicit-`#N` item format rather than ported
+
+### Notes
+- Nothing deferred; all eight findings actioned.
+- Not pushed (host performs pushes). The plan is rev 3; the round-2 review's own closing note asked for a third plan review before implementation, and the operator's 2026-09-14 comment says the same.
