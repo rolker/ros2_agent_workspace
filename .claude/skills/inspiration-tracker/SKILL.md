@@ -272,17 +272,25 @@ session that reviews the roadmap.
 ```
 
 The third column carries that reason verbatim — never publish the template's
-own placeholder text into the roadmap. **Append and stage in the same
-invocation** — agent Bash calls run in fresh subshells (AGENTS.md § Agent
-Commit Identity, subshell caveat), so nothing set here survives to step 9:
+own placeholder text into the roadmap. **Insert and stage in the same
+invocation**, and insert into the table, not at the end of the file:
 
-```bash
-printf '%s\n' "| <row as above> |" >> ROADMAP.md && git add ROADMAP.md
-```
-
-Staging here, on the row this run just wrote, is what keeps the row from
-being lost when the skill worktree is removed, and it never sweeps up an
-unrelated `ROADMAP.md` edit left in a re-entered worktree.
+1. **Check the roadmap exists first.** A skill worktree re-entered from a run
+   that predates the workspace roadmap has no root `ROADMAP.md`; never create
+   one here — that would commit a bare row as the workspace roadmap. If the
+   file is absent, remove and recreate the skill worktree (step 3) and
+   re-run.
+2. **Insert the rendered row as the last row of the `## Deferred` table** —
+   i.e. immediately before the `## What's not on this roadmap` heading (the
+   Edit tool, or `sed -i '/^## What.s not on this roadmap/i <row>' ROADMAP.md`).
+   Never `>> ROADMAP.md`: that appends after the file's footer and produces an
+   orphan row outside any table.
+3. **Stage in that same command**: `… && git add ROADMAP.md`. Agent Bash calls
+   run in fresh subshells (AGENTS.md § Agent Commit Identity, subshell caveat),
+   so nothing set here survives to step 9; staging now, on the row this run
+   just wrote, is what keeps it from being lost when the skill worktree is
+   removed — and it never sweeps up an unrelated `ROADMAP.md` edit left in a
+   re-entered worktree.
 
 Root `ROADMAP.md` is the expected location for a roadmap per
 [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
