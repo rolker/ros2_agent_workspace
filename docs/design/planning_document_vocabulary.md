@@ -111,7 +111,7 @@ per-repo declaration file and no schema** — the operator decided this
 |---|---|---|
 | vision | a `## Vision` section in `README.md` at the repo root | Settled by operator decision, 2026-09-17 — the better-evidenced of the two candidates (see evidence below) |
 | roadmap | `ROADMAP.md` at the repo root | Settled by operator decision, 2026-09-17 — the general open-source convention (see evidence below) |
-| decisions | `docs/decisions/` | Settled — MADR's own literal recommendation |
+| decision | `docs/decisions/` | Settled — MADR's own literal recommendation. The kind is singular, as in the vocabulary table above; only the directory is plural |
 | health | `docs/health.md` | This workspace's own choice; no external convention exists either way |
 
 **This is a published expectation, not a requirement.** The operator, 2026-09-17:
@@ -229,7 +229,7 @@ Row by row:
   [roadmap template](../../.agent/templates/roadmap.md) names those sources
   itself under *Where this shape comes from*, so an instantiated roadmap can be
   traced back to them without this page.
-- **decisions — settled.** [MADR](https://adr.github.io/madr/) literally
+- **decision — settled.** [MADR](https://adr.github.io/madr/) literally
   recommends creating `docs/decisions`, and it matches what this repo already
   has. No surveyed ROS 2 upstream had a named ADR practice to contradict it.
 - **health — this workspace's own choice**, with no convention behind it either
