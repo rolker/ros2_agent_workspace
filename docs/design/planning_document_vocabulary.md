@@ -213,6 +213,22 @@ Row by row:
   site (ros2 core, Nav2, `ros-maritime/community`). The root file is the general
   open-source convention and is the one form a reader can find without being
   told where to look; an external board is not a path a probe can check at all.
+- **The roadmap's *shape*, as against its location, was surveyed separately**
+  on the same day, over
+  [Rust Project Goals](https://goals.rust-lang.org/2025h2/goals.html),
+  [Kubernetes SIG Release](https://github.com/kubernetes/sig-release/blob/master/roadmap.md),
+  [containerd](https://github.com/containerd/containerd/blob/main/ROADMAP.md),
+  [Argo CD](https://github.com/argoproj/argo-cd/blob/master/docs/roadmap.md),
+  [Prometheus](https://prometheus.io/docs/introduction/roadmap/), the
+  [GitHub public roadmap](https://github.com/github/roadmap) and the sibling
+  `rolker/agent_workspace`. The finding was **tweak, not switch**: none of them
+  carries a named forcing function, a paired health document or a "what's not on
+  this roadmap" section, so the template keeps its spine and takes four additive
+  elements — a generated `Last reviewed` stamp, optional `Owner` / `Priority`
+  columns, per-theme prose and a capped *Recently completed* section. The
+  [roadmap template](../../.agent/templates/roadmap.md) names those sources
+  itself under *Where this shape comes from*, so an instantiated roadmap can be
+  traced back to them without this page.
 - **decisions — settled.** [MADR](https://adr.github.io/madr/) literally
   recommends creating `docs/decisions`, and it matches what this repo already
   has. No surveyed ROS 2 upstream had a named ADR practice to contradict it.
