@@ -492,3 +492,124 @@ whole set; no sixth edit is proposed), and one asks the trigger table to say
 whether the cloud Routine's GitHub connection actually reaches the 35 repos it
 will have to commit health documents into, which is the axis the trigger was
 chosen on. Either can be folded in during implementation or waived.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-17 11:35 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: `feature/issue-628` at `a66e8b9`
+**Addressed**: the `## Plan Review` entry of 2026-09-17 11:17 -04:00 (round 4,
+against plan rev 4 at `02eaa30`, verdict approve-with-suggestions), plus the
+operator's decision comment "Operator decision at the plan-review checkpoint,
+round 4" on [#628](https://github.com/rolker/ros2_agent_workspace/issues/628)
+(2026-09-17).
+**Commits**: `65afc58`, `9b70e58`, `a66e8b9`
+
+Plan rev 5 at `a66e8b9`. Plan only — nothing implemented. The operator's
+round-4 instruction was "reframe deliverable 1 as a design draft, then
+implement", with no further plan-review round, so this revision is the last
+plan pass before implementation.
+
+### What rev 5 changes
+
+1. **Deliverable (1) is a design draft, not ADR-0020** (`65afc58`). The page is
+   `docs/design/planning_document_vocabulary.md` with `Status: Draft`, creating
+   `docs/design/` — `docs/` today holds only `PRINCIPLES.md` and `decisions/`
+   (verified 2026-09-17). The content plan is what ADR-0020 was going to say;
+   the document kind, its status, and the record it lands in are what changed.
+   Deliberately **not** structured from the blank ADR template, which would
+   produce an ADR in everything but the directory. *Design draft* is a
+   supporting kind in the vocabulary, so the expected-location table prescribes
+   no path for it and `docs/design/` is stated as a local choice, not a claim
+   the table makes — the page is its own first worked example of the kind it
+   defines.
+2. **New sub-issue (7): promote the draft to an ADR**, gated on (2), (3) and at
+   least one ROS 2 project other than `unh_marine_autonomy` having exercised
+   the two-root rule. Numbered last rather than inserted, because (5) and (6)
+   are referred to by number in the operator's comments and in the round-3/4
+   review entries; (7) runs last anyway. It carries the three items deferred
+   out of (1): the ADR-0012 addendum on ADR-0015, the `principles_review_guide.md`
+   ADR Applicability row, and the resolution of the draft's two open table rows.
+3. **The kind → expected-location table is provisional** (`9b70e58`), cited to
+   the 2026-09-17 documentation-conventions survey. The draft carries a
+   condensed evidence section with the survey's **source URLs**, because the
+   survey file is under `.agent/scratchpad/`, which is gitignored
+   (`.gitignore:40`, verified) and cannot be cited by path. The table gains a
+   per-row status column: **vision open** (a `README.md` § Vision section has
+   more evidence behind it — no surveyed ROS 2 project has a `VISION.md`, and
+   this workspace itself uses one); **roadmap open three ways**
+   (`docs/roadmap.md` / root `ROADMAP.md` / an external board or docs site);
+   **decisions settled** (MADR literally recommends `docs/decisions/`);
+   **health = this workspace's own choice**, with REP-2004's per-package
+   quality declaration named as the nearest ROS 2 analogue and explicitly not a
+   precedent. The survey also supplies the *positive* evidence for rev 4's
+   "deliberately not a ROS 2 convention" statement, which rev 4 could only
+   assert: REP-2004 is the only REP touching documentation and never mentions
+   roadmaps, visions or ADRs.
+4. **Sub-issue (2) gains discovery fallbacks for externally hosted roadmaps** —
+   org-level GitHub Projects (`gh api orgs/<org>/projects`), the repo
+   `homepage` field, and README links matching "roadmap"/"governance". Stated
+   as extensions of *discovery* only: never a requirement, never a check, and
+   finding nothing still behaves exactly as today.
+5. **Dropped from this slice**: the ADR-0015 Status pointer + References entry,
+   and the `principles_review_guide.md` ADR Applicability row. The addendum
+   drops for a reason of its own — ADR-0012's permitted class is an ADR
+   pointing at another **ADR**, and pointing an accepted ADR's Status line at a
+   `Draft` page would put a provisional document into the binding record. The
+   third-actor argument (a scheduled trigger has no host session and *is* the
+   publisher) stays in the draft, which is the document making it. ADR-0012 is
+   therefore recorded as **not triggered** in this slice — this PR edits no ADR
+   text at all.
+6. **Consequences checked against the guide's own table, not assumed**: the
+   Consequences Map (`principles_review_guide.md:42-53`) has **no row for
+   adding a prose page under `docs/`** that is neither a principle nor an ADR,
+   so the design draft triggers no existing row. What does apply is the
+   template row (step 3 adds `.agent/templates/roadmap.md`) and the `AGENTS.md`
+   row (step 7's adapter fan-out). Stated in Consequences rather than left as a
+   silent absence; the row this PR *adds* closes the part of the gap this work
+   creates.
+7. **ADR Compliance updated for a plan that adds no ADR**: ADR-0001 is
+   triggered and answered with a deliberate deferral of *binding status* (not
+   of capture), with (7) as the named closer and its gate stated; ADR-0012
+   becomes "not triggered"; ADR-0015/0019 become "cited, not edited". ADR-0003
+   (project-agnostic), ADR-0008 ("checked and deliberately not claimed") and
+   ADR-0004/0005 (enforcement deferred, one step further now that the rules are
+   draft text) are kept and restated for the draft framing.
+8. **Pointer rows: still five, pointing at both new planning documents.** Rev
+   4's five additions named `docs/roadmap.md` alone because the other new
+   document was an ADR and `docs/decisions/` is already in those lists; the
+   draft is a new page in a new directory no list names. The plan flags
+   explicitly that it reads the operator's "five" as five *pointer additions*
+   (one References block per file, two in `AGENTS.md`), not five *lines* —
+   because it is the operator's number, not the plan's.
+9. **Every prior operator decision left intact**: trigger = weekly Claude Code
+   cloud Routine; `Janitor Sweep Agent` on `skill/janitor-*`; #249 stays open
+   with `Part of #249`; no closing keywords; discovery by conventional
+   locations with no per-repo file and no schema; project-agnostic ADR-0003
+   framing with the two project repos as examples only; the design-collection
+   consistency review as a discussion item with no sub-issue filed.
+
+### Actions
+- [x] (suggestion) A fourth framework adapter exists and carries its own References list — `.agent/AGENT_ONBOARDING.md` named as knowingly left out in Approach step 7, Files to Change and Documentation & Instruction Impact, with the two distinguishing reasons: the five-addition Ask-First cap is fully spoken for, and its References list is a different, shorter one (`AGENTS.md`, `AI_IDENTITY_STRATEGY.md`, `WORKFORCE_PROTOCOL.md`, `WORKTREE_GUIDE.md`, `ARCHITECTURE.md`, project `.agents/README.md` — no `docs/decisions/`, no `.agent/knowledge/`, no `README.md` § Vision), where the other three are identical entry for entry. Verified: `AGENTS.md:11`, `.agent/AGENT_ONBOARDING.md:109` — `a66e8b9`
+- [x] (suggestion) The chosen Routine row does not answer the cross-repo *write* question the Actions row is charged for — the credential-surface cell now carries "confirm the operator's GitHub connection reaches all 35 overlay repos, with write access, before relying on the Routine for cross-repo writes", and sub-issue (4)'s scope carries the same as one of two things to confirm before relying on the mechanism. Verified: `.agent/knowledge/research_digest.md:132` does describe Routines as "cloud-hosted and GitHub-repo-scoped". The decision itself is not re-opened — `a66e8b9`
+
+### Also fixed, found while revising (not a round-4 finding)
+- **A live GitHub closing-keyword token in the plan text.** Rev 4's Open
+  Questions opened a bullet with the verb *close* immediately before `#249`,
+  which is a live closing token: pasted into a PR body it would have
+  auto-closed issue #249 — the exact hazard AGENTS.md § Issue-closing keywords
+  names for plan text, and the operator's standing "no closing keywords
+  anywhere" decision. The round-4 review's grep reported the plan clean and
+  missed it. Reworded in `65afc58`; the whole plan re-grepped clean for
+  `(close|fix|resolve)[sd]? #<N>` forms.
+
+### Not done / open
+- **Nothing is implemented.** Plan only, per the task. No draft page, no
+  roadmap, no template, no sub-issues filed.
+- **The draft's two open table rows (vision, roadmap) are open by design**, not
+  an oversight — the survey leaves them at a genuine split and the draft
+  publishes them flagged. They resolve at (7).
+- **The "five pointer additions = five files-worth of References blocks"
+  reading** is the plan's, flagged in step 7 and in Open Questions so the
+  operator can correct it cheaply if they meant five lines.
