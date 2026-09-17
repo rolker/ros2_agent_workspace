@@ -329,7 +329,7 @@ Umbrella #628: five PRs in this repo ((1), (2), (3), (4), (7)), plus two issues 
 
 ## Implementation notes (as built, 2026-09-17)
 
-Two places where the implementation differs from the plan text above, recorded
+Three places where the implementation differs from the plan text above, recorded
 inline per the plan-first workflow rather than left for review to discover.
 
 - **`AGENTS.md` carries one References list, not two.** Approach step 7 and the
@@ -344,6 +344,15 @@ inline per the plan-first workflow rather than left for review to discover.
   and nothing else touched in them. No separate "Planning documents" section was
   added to `AGENTS.md`; a new section would have been a sixth change to an Ask
   First file.
+- **`README.md` gains a second pointer: a line in § Documentation, "For All
+  Users".** Approach step 5 specified the § Vision pointer only. The round-1
+  pre-push review found that the Documentation list names `ARCHITECTURE.md` and
+  `AGENTS.md` but not the roadmap, so the one list a reader scans for "what is
+  in this repo" was the one place the roadmap did not appear. `README.md` is not
+  an Ask First file, so this rides in the PR where it was found rather than
+  becoming an issue. Two lines in `README.md` in all; the Ask-First count of
+  five pointer additions across `AGENTS.md` and the three adapters is
+  unchanged.
 - **The roadmap lives at the repo root as `ROADMAP.md`, not `docs/roadmap.md`, and the draft's two open table rows are settled.** Plan steps 1 and 4 above specified `docs/roadmap.md` and a table with the vision and roadmap rows marked Open; both were changed after the sub-issue (1) commits landed, on the operator's in-session decision of 2026-09-17 (the host records it on #628): *"I do favor updating our own repos to follow conventions."* The file was moved with `git mv`, so its history is preserved, and every reference moved with it — the README pointer, the References lists in `AGENTS.md` and the three adapters (same line count, path only), the Consequences Map row, the template's instantiation instruction, and the draft's links. The plan text above is updated in place to the settled form; the survey remains the evidence and the operator's preference the reason. `docs/health.md` deliberately stayed put. **Size bound re-checked after the move**: `ROADMAP.md` is 138 lines, inside step 4's 150-line first-cut bound.
 - **Sub-issues (2)–(7) are not filed by this worktree.** Approach step 8 files
   them; the host files GitHub issues at the publish checkpoint instead, so the

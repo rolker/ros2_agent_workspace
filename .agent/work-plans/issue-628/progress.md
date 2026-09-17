@@ -637,7 +637,7 @@ plan pass before implementation.
 - [x] (suggestion) "the same convention the `research` skill already uses" reads as available today; `janitor-sweep` is not in `worktree_create.sh`'s `ALLOWED_SKILLS` (tracked in sub-issue (3), not flagged inline) — `docs/design/planning_document_vocabulary.md:268`
 - [x] (suggestion) Two-root rule uses binding phrasing ("permitted to presume") while the header says nothing here binds; one hedge would settle the tension — `docs/design/planning_document_vocabulary.md:60-68`
 - [x] (suggestion) "Roadmaps beneath this one: none in this repo" is followed by forward-looking narrative; the template wants this as a short structural field — `ROADMAP.md:10-15`
-- [ ] (suggestion) README § Documentation "For All Users" lists `ARCHITECTURE.md` and `AGENTS.md` but not `ROADMAP.md` — outside the operator-approved Vision-pointer scope, so raise rather than edit — `README.md:77-80`
+- [x] (suggestion) README § Documentation "For All Users" lists `ARCHITECTURE.md` and `AGENTS.md` but not `ROADMAP.md` — outside the operator-approved Vision-pointer scope, so raise rather than edit — `README.md:77-80`
 
 ### Verified clean
 - Ask-First scope: exactly two References lines added in each of `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`; no other hunk in those files.

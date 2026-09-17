@@ -77,6 +77,7 @@ This workspace supports **DevContainers**, allowing you to run the entire enviro
 ### For All Users
 - [Architecture Guide](ARCHITECTURE.md)               - Understanding the layered workspace system
 - [AGENTS.md](AGENTS.md)                              - Shared workspace rules and development workflow
+- [ROADMAP.md](ROADMAP.md)                            - What's next for the workspace, and what's deferred
 
 ## Structure
 
