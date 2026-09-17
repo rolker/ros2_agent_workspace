@@ -613,3 +613,39 @@ plan pass before implementation.
 - **The "five pointer additions = five files-worth of References blocks"
   reading** is the plan's, flagged in step 7 and in Open Questions so the
   operator can correct it cheaply if they meant five lines.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-17 12:05 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-628 at `9e00462`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1609 changed lines, 11 files, governance/instruction files in the diff)
+**Must-fix**: 2 | **Suggestions**: 7
+**Round**: 1 | **Ship**: continue — both must-fixes are mechanical, but one is a live GitHub auto-close token that must not reach `main`
+
+**Specialists**: Static Analysis (pre-commit, clean; no Markdown linter profile — content review only), Governance, Plan Drift, Claude Adversarial Lens A + Lens B, plus a fact-verification pass over every issue state, ADR status, link and cited URL. Copilot and Local Adversarial: off (default).
+
+### Findings
+- [ ] (must-fix) HEAD commit body contains the live token `Closes #249` while describing the reword that removed it; merged to `main` this closes the issue the operator decided stays open — fix with `git commit --amend` on HEAD (the sha is cited nowhere, so no re-remap) — `commit 9e00462` message body, line 3
+- [ ] (must-fix) As-built says "seven rows in `ROADMAP.md`" carry `#TBD — filed at publish`; there are six (`ROADMAP.md:58-63`), so the total is 9, not 10 — `.agent/work-plans/issue-628/plan.md:351`
+- [ ] (suggestion) The template's Health-document line shows a live `docs/health.md` link while its own parenthetical says to omit the link until one exists — copy-paste propagates a dangling link — `.agent/templates/roadmap.md:36`
+- [ ] (suggestion) The "five pointer additions" accounting is self-inconsistent — `AGENTS.md` counted as two *lines*, each adapter as one *block* though each landed two lines; the shipped diff is 2 lines × 4 files — `.agent/work-plans/issue-628/plan.md:129,290`
+- [ ] (suggestion) Kinds table says the roadmap is edited "On its own loop (see below)", but no section on this page describes a roadmap's own cadence — it lives in the template — `docs/design/planning_document_vocabulary.md:46`
+- [ ] (suggestion) "the same convention the `research` skill already uses" reads as available today; `janitor-sweep` is not in `worktree_create.sh`'s `ALLOWED_SKILLS` (tracked in sub-issue (3), not flagged inline) — `docs/design/planning_document_vocabulary.md:268`
+- [ ] (suggestion) Two-root rule uses binding phrasing ("permitted to presume") while the header says nothing here binds; one hedge would settle the tension — `docs/design/planning_document_vocabulary.md:60-68`
+- [ ] (suggestion) "Roadmaps beneath this one: none in this repo" is followed by forward-looking narrative; the template wants this as a short structural field — `ROADMAP.md:10-15`
+- [ ] (suggestion) README § Documentation "For All Users" lists `ARCHITECTURE.md` and `AGENTS.md` but not `ROADMAP.md` — outside the operator-approved Vision-pointer scope, so raise rather than edit — `README.md:77-80`
+
+### Verified clean
+- Ask-First scope: exactly two References lines added in each of `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`; no other hunk in those files.
+- Attribution: all five operator quotes verbatim against the #628 comments; the cited permalink is the comment carrying the quoted text; no decision attributed beyond what the comments say.
+- Facts: every issue state (#249 #263 #264 #265 #266 #569 #609 #610 #626 #627 #628), the "nineteen ADRs" count, the three still-`Proposed` ADRs (0005/0008/0009), the ADR-applicability gap (0011, 0012, 0014–0019 absent), the 35-repo count, and every cited external URL against the host survey — all match source.
+- Links: every relative link and anchor in the three new documents resolves from its own file's location; `ROADMAP.md` is 138 lines (inside the 150-line bound).
+- SHAs: all 28 commit shas cited in `plan.md`/`progress.md` resolve; the post-rebase remap is complete.
+- Placeholders: 9 `#TBD — filed at publish` occurrences, none malformed.
+- Project-agnosticism (ADR-0003): `unh_marine_autonomy` / `unh_echoboats_project11` appear only as worked examples.
+- The design-collection consistency review appears once, as a pointer to the #628 discussion, unspecified.
+- "Published expectation, not a requirement; absence is never a finding" is held consistently, including in the new Consequences Map row.
