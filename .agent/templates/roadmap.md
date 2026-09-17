@@ -17,10 +17,43 @@ instructions, and fill it in.
   automation find an item later without the roadmap being reformatted first;
   the sibling `rolker/agent_workspace` runs exactly that against `#<N>` tokens.
   An item with no issue yet uses `—` in that column, never a guessed number.
+- **Generate the `Last reviewed:` date, never type it** — `date '+%Y-%m-%d'` —
+  and re-stamp it whenever the forcing function actually fires, not whenever the
+  file is edited. A hand-typed date is a guess, and a stamp that moves on every
+  typo fix stops telling you whether the loop is running.
+- **The `Owner` and `Priority` columns are optional.** Leave them out when a
+  scope has a single owner or when nothing in it is singled out — an
+  always-blank or always-identical column is noise. Use `Owner` when more than
+  one person or team is accountable across the table, and `Priority`
+  (`flagship` / blank) when one thread genuinely matters more this cycle than
+  the rest. `Issue` stays mandatory either way.
+- **A short paragraph above a theme's table is encouraged** — what the theme is
+  for and why it is a theme, in two or three lines. Table rows carry the items;
+  the prose carries the reason they are together.
 - Name the parent and the children. A roadmap names the roadmaps beneath it, and
   a child roadmap names its parent; that is how a collection is walked.
 - Prioritise items against the scenarios or properties stated at the top, not
   against how recently they came up.
+
+**Where this shape comes from**
+
+- The loop section (*How this roadmap stays useful*) and the per-theme prose are
+  generalised from the BizzyBoat roadmap, which stays current because
+  deployments force a periodic read of it — field experience, not a borrowed
+  convention.
+- The mandatory `#<N>` row token comes from the sibling `rolker/agent_workspace`
+  `docs/ROADMAP.md`, which automates against exactly that token.
+- The `Last reviewed` stamp, the optional `Owner` / `Priority` columns and the
+  *Recently completed* section come from a roadmap-format evaluation run
+  2026-09-17 over established practice: per-goal owners and the flagship /
+  other split from
+  [Rust Project Goals](https://goals.rust-lang.org/2025h2/goals.html); a
+  finished-work section kept visible rather than deleted on sight from
+  [Kubernetes SIG Release `roadmap.md`](https://github.com/kubernetes/sig-release/blob/master/roadmap.md)
+  ("Done Deliverables") and the
+  [GitHub public roadmap](https://github.com/github/roadmap)'s quarter
+  progression; and the staleness caution from
+  [containerd's `ROADMAP.md`](https://github.com/containerd/containerd/blob/main/ROADMAP.md).
 
 ---
 
@@ -31,7 +64,9 @@ covers — and, explicitly, what it does not>. Durable direction lives here;
 specific bounded work lives in issues, referenced from here by number.
 
 **Parent roadmap**: <link, or "none — this is a root"><br>
-**Roadmaps beneath this one**: <links, or "none today">
+**Roadmaps beneath this one**: <links, or "none today"><br>
+**Last reviewed**: <YYYY-MM-DD — generated with `date '+%Y-%m-%d'`, stamped when
+the forcing function last fired>
 
 **Health document**: <"none yet — `docs/health.md` is the path reserved for it",
 or a link to that path once the file exists> — what is currently wrong or
@@ -51,11 +86,25 @@ These are the tie-breakers when two items look equally urgent.>
 
 ## Active threads
 
-<The work actually in motion. One table per theme if there is more than one.>
+<The work actually in motion. One table per theme if there is more than one,
+each with a short paragraph above it saying what the theme is for. `Owner` and
+`Priority` are optional columns — see the instructions above.>
 
 | Item | Issue | Status | Notes |
 |---|---|---|---|
 | <what it is, in plain words> | #<N> | in progress / planned / done | <one line: what it unblocks, or what it is waiting on> |
+
+## Recently completed
+
+<Capped. Items marked done move here keeping their `#<N>`, stay for one cycle —
+one wrap-up, or one sweep — and are then pruned out. This is the section that
+keeps a roadmap from growing into a changelog: without a designated place to
+land and a stated expiry, done items accumulate inline, which is how the
+700-line version of this document happened. Empty is a normal state.>
+
+| Item | Issue | Completed |
+|---|---|---|
+| <item> | #<N> | <YYYY-MM-DD, and the PR if there is one> |
 
 ## Deferred
 
@@ -85,6 +134,13 @@ been admitted yet.>
   enough for an issue, and are not going to be done next time.
 - **Prune periodically.** If a deferred item has sat for months with no pull
   toward it, it is dropped, not deferred. Edit it out rather than letting the
-  list grow.
+  list grow. Done items are pruned out of *Recently completed* on the same pass.
 - **Mark items done in place**, keeping the `#<N>`, so the loop is visible in
   git history rather than only in the issue tracker.
+- **The forcing function and the pruning are load-bearing, not boilerplate.**
+  containerd's maintainers rejected a prose roadmap as their primary mechanism
+  because prose roadmaps go out of date quickly, and pointed at an issue-label
+  query instead. That critique applies to this format exactly as soon as the
+  read cadence or the pruning lapses — a table can say "in progress"
+  about something that finished weeks ago. These two rules are what buys the
+  prose form; if either stops running, say so in the file.
