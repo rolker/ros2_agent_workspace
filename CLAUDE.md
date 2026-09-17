@@ -26,7 +26,7 @@ Do not edit `framework_config.sh` to match your model; the entries there are fal
 - [`README.md` Vision section](README.md#vision) — Workspace purpose and goals
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — System design and layering
 - [`docs/decisions/`](docs/decisions/) — Architecture Decision Records
-- [`docs/roadmap.md`](docs/roadmap.md) — Workspace roadmap: what's next, what's deferred
+- [`ROADMAP.md`](ROADMAP.md) — Workspace roadmap: what's next, what's deferred
 - [`docs/design/planning_document_vocabulary.md`](docs/design/planning_document_vocabulary.md) — Planning-document kinds and the two-root rule (draft)
 - [`.agent/WORKTREE_GUIDE.md`](.agent/WORKTREE_GUIDE.md) — Detailed worktree patterns
 - [`.agent/AI_IDENTITY_STRATEGY.md`](.agent/AI_IDENTITY_STRATEGY.md) — Multi-framework identity

@@ -308,7 +308,7 @@ That sentence is what makes the two documents a loop rather than two files.
   (`.agent/knowledge/principles_review_guide.md`). It has no row for adding a
   prose page under `docs/` that is neither a principle nor an ADR — this page
   triggers none. Widening it to every `docs/` kind is backlog, recorded on
-  [`docs/roadmap.md`](../roadmap.md).
+  [`ROADMAP.md`](../../ROADMAP.md).
 
 ## Options considered and not taken
 
@@ -370,7 +370,7 @@ that addendum waits.
 - [ADR-0015 — Dispatch Handoff Context Contract](../decisions/0015-dispatch-handoff-context-contract.md)
 - [ADR-0017 — Extend AGENTS.md to Project Repos](../decisions/0017-extend-agents-md-to-project-repos.md)
 - [ADR-0019 — What Contains a Dispatched Agent](../decisions/0019-what-contains-a-dispatched-agent.md)
-- [`docs/roadmap.md`](../roadmap.md) — this workspace's roadmap, the first instance of the roadmap kind here
+- [`ROADMAP.md`](../../ROADMAP.md) — this workspace's roadmap, the first instance of the roadmap kind here
 - [`.agent/templates/roadmap.md`](../../.agent/templates/roadmap.md) — the roadmap template
 - [#628](https://github.com/rolker/ros2_agent_workspace/issues/628) — the umbrella issue and the operator decisions cited above
 - [#569](https://github.com/rolker/ros2_agent_workspace/issues/569) — the janitor sweep whose publish and trigger questions this draft answers

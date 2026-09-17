@@ -16,7 +16,7 @@ What "better packages" means in practice:
 
 The workspace infrastructure is project-agnostic by design. While its primary project is UNH marine autonomy, the tooling generalizes to any ROS 2 project. This is intentional — it makes the workspace useful beyond its origin, encourages contributions from other domains, and ensures the infrastructure doesn't become coupled to any single project.
 
-What that goal turns into next is in [`docs/roadmap.md`](docs/roadmap.md) — the roadmap beneath this vision.
+What that goal turns into next is in [`ROADMAP.md`](ROADMAP.md) — the roadmap beneath this vision.
 
 ## About
 

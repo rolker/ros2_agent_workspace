@@ -10,13 +10,15 @@ number.
 **Roadmaps beneath this one**: none in this repo. Project roots carry their own;
 the framework repo (`unh_marine_autonomy`) is the first one expected to, with the
 BizzyBoat roadmap
-([`unh_echoboats_project11/docs/roadmap.md`](https://github.com/rolker/unh_echoboats_project11/blob/main/docs/roadmap.md))
-beneath it.
+([`unh_echoboats_project11`](https://github.com/rolker/unh_echoboats_project11/blob/main/docs/roadmap.md)
+— still at its pre-existing `docs/roadmap.md` path until the rename to a root
+`ROADMAP.md` lands) beneath it.
 
 **Health document**: none yet. `docs/health.md` is the path the
-[planning-document vocabulary draft](design/planning_document_vocabulary.md)
-fixes for it; the sweep that writes it is not wired up yet (see *How this roadmap
-stays useful*).
+[planning-document vocabulary draft](docs/design/planning_document_vocabulary.md)
+fixes for it — a workspace choice, with no external convention either way, and
+deliberately under `docs/` rather than beside this file at the root; the sweep
+that writes it is not wired up yet (see *How this roadmap stays useful*).
 
 *Created 2026-09-17 under
 [#628](https://github.com/rolker/ros2_agent_workspace/issues/628), absorbing the
@@ -31,8 +33,8 @@ to make AI agents effective contributors to ROS 2 projects — robust,
 well-documented, well-tested packages for real autonomous marine systems — and
 the measure of improvement is whether the *projects* improve, not whether the
 workspace gets more sophisticated. The infrastructure stays project-agnostic by
-design ([ADR-0003](decisions/0003-workspace-infrastructure-is-project-agnostic.md)),
-so it is useful beyond its origin. See [`README.md` § Vision](../README.md#vision).
+design ([ADR-0003](docs/decisions/0003-workspace-infrastructure-is-project-agnostic.md)),
+so it is useful beyond its origin. See [`README.md` § Vision](README.md#vision).
 
 ## Guiding properties
 
@@ -52,12 +54,12 @@ verbatim in substance:
 
 | Item | Issue | Status | Notes |
 |---|---|---|---|
-| Planning-document vocabulary + two-root rule (draft + this roadmap) | #628 | in progress | The draft in [`docs/design/`](design/planning_document_vocabulary.md); this is its first roadmap instance |
+| Planning-document vocabulary + two-root rule (draft + this roadmap) | #628 | in progress | The draft in [`docs/design/`](docs/design/planning_document_vocabulary.md); this is its first roadmap instance |
 | Conventional-path discovery in `janitor-sweep` / `audit-project` | #TBD — filed at publish | planned | Probes exactly the draft's expected-location table; graceful absence is the headline requirement |
-| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | #TBD — filed at publish | planned | Writes `docs/health.md` beside each roadmap. Gated on the redaction class in #626 |
+| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | #TBD — filed at publish | planned | Writes `docs/health.md` in each graded repo. Gated on the redaction class in #626 |
 | The trigger — weekly cloud Routine under `Janitor Sweep Agent` | #TBD — filed at publish | planned | The last step of #569, which stays open until it lands. Must first confirm the run cap and that the GitHub connection reaches every overlay repo with write access |
-| `unh_marine_autonomy`: `docs/roadmap.md` + kind markers | #TBD — filed at publish | planned | Filed in that repo, not here |
-| `unh_echoboats_project11`: roadmap parent line + health placement | #TBD — filed at publish | planned | Filed in that repo, not here |
+| `unh_marine_autonomy`: `VISION.md` folded into README § Vision, root `ROADMAP.md`, kind markers | #TBD — filed at publish | planned | Filed in that repo, not here |
+| `unh_echoboats_project11`: roadmap parent line, move to root `ROADMAP.md`, health placement | #TBD — filed at publish | planned | Filed in that repo, not here; the move is a rename, so history is preserved |
 | Promote the vocabulary draft to an ADR | #TBD — filed at publish | planned | Gated on the reader, the sweep, and a second ROS 2 project exercising the rule |
 | Scheduled staleness/drift sweep (the parent thread) | [#569](https://github.com/rolker/ros2_agent_workspace/issues/569) | in progress | Hand-run once; stays open until the trigger lands |
 
@@ -97,7 +99,7 @@ first. This thread is what stops a green result from meaning nothing.
 | Item | Issue | Deferred because |
 |---|---|---|
 | "The README contains everything, concisely" | [#249](https://github.com/rolker/ros2_agent_workspace/issues/249) | Under consideration, never decided. Carried forward explicitly rather than closed with #249's other items |
-| A central architecture document consulted at issue, plan and implementation time | [#249](https://github.com/rolker/ros2_agent_workspace/issues/249) | **Largely already answered** by [`ARCHITECTURE.md`](../ARCHITECTURE.md). What is still owed is the *consult-and-update cadence*, which the Consequences Map and the roadmap + health loop are meant to provide — recorded here rather than dropped |
+| A central architecture document consulted at issue, plan and implementation time | [#249](https://github.com/rolker/ros2_agent_workspace/issues/249) | **Largely already answered** by [`ARCHITECTURE.md`](ARCHITECTURE.md). What is still owed is the *consult-and-update cadence*, which the Consequences Map and the roadmap + health loop are meant to provide — recorded here rather than dropped |
 | Widening the Consequences Map to every `docs/` document kind | — | It has no row for a prose page under `docs/` that is neither a principle nor an ADR. The row this workspace needed (roadmap / health) landed under #628; the general case is not urgent |
 
 **A decision to protect, not revisit**: per-framework instruction duplication
@@ -132,5 +134,5 @@ thing a consolidation pass reverts by accident while tidying.
 
 ---
 
-Instantiated from [`.agent/templates/roadmap.md`](../.agent/templates/roadmap.md).
-Kind and structure: [`docs/design/planning_document_vocabulary.md`](design/planning_document_vocabulary.md).
+Instantiated from [`.agent/templates/roadmap.md`](.agent/templates/roadmap.md).
+Kind and structure: [`docs/design/planning_document_vocabulary.md`](docs/design/planning_document_vocabulary.md).
