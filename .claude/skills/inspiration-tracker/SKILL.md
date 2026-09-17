@@ -272,8 +272,17 @@ session that reviews the roadmap.
 ```
 
 The third column carries that reason verbatim — never publish the template's
-own placeholder text into the roadmap. After appending, set `ROADMAP_APPENDED=1`
-for this run; step 9 stages the roadmap only on that flag.
+own placeholder text into the roadmap. **Append and stage in the same
+invocation** — agent Bash calls run in fresh subshells (AGENTS.md § Agent
+Commit Identity, subshell caveat), so nothing set here survives to step 9:
+
+```bash
+printf '%s\n' "| <row as above> |" >> ROADMAP.md && git add ROADMAP.md
+```
+
+Staging here, on the row this run just wrote, is what keeps the row from
+being lost when the skill worktree is removed, and it never sweeps up an
+unrelated `ROADMAP.md` edit left in a re-entered worktree.
 
 Root `ROADMAP.md` is the expected location for a roadmap per
 [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md);
@@ -284,23 +293,18 @@ its shape comes from [`.agent/templates/roadmap.md`](../../../.agent/templates/r
 ### 9. Update digest with decisions
 
 Update the digest to move items from "Pending Review" to their final
-sections (Roadmapped, Skipped, or Deferred). Commit the update — and stage
-root `ROADMAP.md` in the same commit **only when step 8 of this run appended a
-Deferred row**. The skill worktree is removed once the run is over, so a
-roadmap row left unstaged is silently lost along with the decision it records.
-Do not stage on the mere presence of a diff: step 3 may re-enter a worktree
-left by an incomplete run, and a pre-existing or unrelated roadmap edit must
-not ride this digest commit. Track whether step 8 wrote, and stage on that:
+sections (Roadmapped, Skipped, or Deferred). Commit the update. Any Deferred
+row step 8 appended to root `ROADMAP.md` is **already staged** (step 8 stages
+in the same invocation that appends), so this commit carries it without a
+separate decision here. Do not `git add ROADMAP.md` on the presence of a diff:
+step 3 may re-enter a worktree left by an incomplete run, and a pre-existing or
+unrelated roadmap edit must not ride this digest commit — if one shows as
+unstaged, leave it and say so in the run summary.
 
 ```bash
 git add .agent/knowledge/inspiration_<name>_digest.md
-# ROADMAP_APPENDED is set to 1 by step 8 when, and only when, it appended a row in this run.
-if [ "${ROADMAP_APPENDED:-0}" = "1" ]; then git add ROADMAP.md; fi
 git commit -m "docs: record inspiration-tracker decisions for <name>"
 ```
-
-If the worktree shows a `ROADMAP.md` diff that this run did not make, leave it
-unstaged and say so in the run summary.
 
 ### 10. Push and create PR
 
