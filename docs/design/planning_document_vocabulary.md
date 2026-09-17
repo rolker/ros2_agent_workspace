@@ -209,9 +209,9 @@ Row by row:
   better-evidenced of the two candidates: none of the **external** ROS 2
   projects surveyed below has a `VISION.md`, all state their mission in the
   README, and this workspace itself already uses `README.md` § Vision. The
-  `VISION.md` alternative rests on in-house instances only — the framework repo
-  `rolker/agent_workspace`, untouched since January, and `unh_marine_autonomy`,
-  whose `VISION.md`
+  `VISION.md` alternative rests on a single in-house instance — the framework
+  repo `unh_marine_autonomy`, whose `VISION.md` was last committed in January
+  2026 and which
   [unh_marine_autonomy#394](https://github.com/rolker/unh_marine_autonomy/issues/394)
   folds into `README.md` § Vision — which is thin support for a published
   recommendation.
