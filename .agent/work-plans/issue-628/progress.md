@@ -635,7 +635,7 @@ plan pass before implementation.
 - [x] (suggestion) The "five pointer additions" accounting is self-inconsistent — `AGENTS.md` counted as two *lines*, each adapter as one *block* though each landed two lines; the shipped diff is 2 lines × 4 files — `.agent/work-plans/issue-628/plan.md:129,290`
 - [x] (suggestion) Kinds table says the roadmap is edited "On its own loop (see below)", but no section on this page describes a roadmap's own cadence — it lives in the template — `docs/design/planning_document_vocabulary.md:46`
 - [x] (suggestion) "the same convention the `research` skill already uses" reads as available today; `janitor-sweep` is not in `worktree_create.sh`'s `ALLOWED_SKILLS` (tracked in sub-issue (3), not flagged inline) — `docs/design/planning_document_vocabulary.md:268`
-- [ ] (suggestion) Two-root rule uses binding phrasing ("permitted to presume") while the header says nothing here binds; one hedge would settle the tension — `docs/design/planning_document_vocabulary.md:60-68`
+- [x] (suggestion) Two-root rule uses binding phrasing ("permitted to presume") while the header says nothing here binds; one hedge would settle the tension — `docs/design/planning_document_vocabulary.md:60-68`
 - [ ] (suggestion) "Roadmaps beneath this one: none in this repo" is followed by forward-looking narrative; the template wants this as a short structural field — `ROADMAP.md:10-15`
 - [ ] (suggestion) README § Documentation "For All Users" lists `ARCHITECTURE.md` and `AGENTS.md` but not `ROADMAP.md` — outside the operator-approved Vision-pointer scope, so raise rather than edit — `README.md:77-80`
 

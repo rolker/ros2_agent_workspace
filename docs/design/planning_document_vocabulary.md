@@ -64,8 +64,10 @@ goal changes, a roadmap changes when the plan changes, a decision never changes
 1. **The workspace root** — this repository.
 2. **The project root** — the repo a manifest entry points at.
 
-Each may carry the four core kinds. That is the whole of the structure any
-workspace skill is permitted to presume.
+Each may carry the four core kinds. That is the whole of the structure this
+draft would have a workspace skill assume: a skill *may* assume these two
+roots — and, on this draft's proposal, only these two. The header's framing
+holds; nothing here binds until it is promoted.
 
 **Below the project root, nothing is presumed.** Sub-projects, platform repos
 and component repos are discovered, never enumerated:
