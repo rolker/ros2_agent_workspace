@@ -740,8 +740,8 @@ ride the PR they were found in.
 **Specialists**: Static Analysis (pre-commit over the changed files, clean; no Markdown linter profile — content review only), Governance + Scope + Attribution, Claude Adversarial Lens A (facts, links, internal consistency) — both sub-specialists returned **no findings**. Copilot and Local Adversarial: off (default).
 
 ### Findings
-- [ ] (must-fix) As-built size check still says `ROADMAP.md` is 138 lines; it is 139 after the round-1 structural fix (`7aba3d7`) — still inside the 150-line bound, but the recorded measurement is wrong — `.agent/work-plans/issue-628/plan.md:356`
-- [ ] (must-fix) As-built cites the six placeholder rows as `ROADMAP.md:58-63`; the same fix shifted them to `ROADMAP.md:59-64` — `.agent/work-plans/issue-628/plan.md:360`
+- [x] (must-fix) As-built size check still says `ROADMAP.md` is 138 lines; it is 139 after the round-1 structural fix (`7aba3d7`) — still inside the 150-line bound, but the recorded measurement is wrong — `.agent/work-plans/issue-628/plan.md:356`
+- [x] (must-fix) As-built cites the six placeholder rows as `ROADMAP.md:58-63`; the same fix shifted them to `ROADMAP.md:59-64` — `.agent/work-plans/issue-628/plan.md:360`
 
 ### Round-1 findings re-verified against source
 All nine round-1 items are genuinely resolved, each checked against the file rather than the checkbox:
