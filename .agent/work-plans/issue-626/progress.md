@@ -160,3 +160,24 @@ The plan's diagnosis and five core redaction fixes are accurate against current 
 - [x] (must-fix) a path-prefix label containing '=' leaked the whole path — label now parsed by shape (trailing `=~` or `=<...>`), last-'=' split only as fallback; 3 new tests
 - [x] (suggestion) redact_url rewrites only the leading url — documented in its header; multi-url text goes through redact_text
 - [x] (suggestion) fd-2 window around each lock exec — documented at both sites
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 14:37 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Verdict**: approved
+
+**Branch**: feature/issue-626 at `5983b24`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant credential/path-redaction gate for the janitor-sweep report, per operator request — round 2, re-verifying the round-1 fix in `redact.sh`)
+**Must-fix**: 0 | **Suggestions**: 1
+**Round**: 2 | **Ship**: recommended — no must-fix findings; the round-1 fix (label parsed by shape) holds under two independent adversarial passes plus manual reproduction
+
+### Findings
+- [ ] (suggestion) `redact.sh`'s fallback branch (taken when a `REDACT_PATH_PREFIXES` label is neither `~` nor `<...>`-shaped) still splits on the last `=`, so a replacement/label containing `=` that isn't bracket-shaped (e.g. `"/home/x=a=b"`) silently mis-splits and leaves the real path completely unredacted, no error. Reproduced (`REDACT_PATH_PREFIXES=("/home/x=a=b")`; `redact_text 'failed at /home/x/y'` → unchanged, path leaks). Not reachable by any current caller — all three real `REDACT_PATH_PREFIXES` producers (`resolve_repo_checkout.sh:220-223`, `janitor-sweep/SKILL.md:121-123`, `issue-triage/SKILL.md:89-91`) use only shape-conforming labels (`<workspace>`, `<worktree>`, `~`) — but nothing enforces that constraint on a future caller. Consider having `redact_text` reject (loudly) a spec whose label doesn't match one of the two supported shapes, instead of falling back to an ambiguous split — `.agent/scripts/redact.sh:88-91`
+
+### Verification method
+Re-read `redact.sh`'s new shape-based label parse (`^(.+)=(~|<[^<>]*>)$`, commit `b080404`) and the fd-2-window comments (commit `7a34799`) against current HEAD. Ran the full `.agent/scripts/tests/run_script_tests.sh` (28 shell suites + 220 pytest cases, all green, including `test_redact.sh`'s 3 new round-1 regression cases). Independently reproduced 8 manual adversarial specs against `redact_text`/`redact_url` (embedded `=<...>` mid-path, literal `<`/`>` in the path, multiple `=<...>` occurrences, empty `<>` label, `~`-in-path collision, bare-`/` guard, mixed valid/invalid array entries) — all correct. Dispatched two independent fresh-context Claude Adversarial passes (Lens A: logic/edge cases; Lens B: systemic/safety) targeting the same shape regex with bash reproduction required, not abstract reasoning. Both converged: no must-fix; Lens B additionally surfaced the fallback-branch landmine above (unreachable today, real for a future non-conforming caller). Confirmed the `exec 2>/dev/null` fd-2-window comments in `resolve_repo_checkout.sh`/`manifest_fallback.sh` are doc-only (git show confirms only `#`-prefixed lines changed) and the risk they describe matches actual `trap` usage in both files (only `resolve_repo_checkout.sh`'s `trap cleanup EXIT`, an EXIT trap needing no restore). `shellcheck` is not installed in this environment — static analysis for the shell diff was not re-run this round (round 1 already ran it clean; no lines changed since besides the parse rewrite and comments).
+
+### Convergence
+Round 2, must-fix count 1 → 0 (dropped from round 1, not rising). Ship: recommended.
