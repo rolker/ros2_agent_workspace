@@ -43,7 +43,15 @@ already fixed.
    absolute path, and make it terminal.** Move `redact.sh` sourcing and
    `REDACT_PATH_PREFIXES` setup earlier in `janitor-sweep/SKILL.md` step 1
    (right after `$ROOT` is resolved), route the `mkdir` failure message
-   through `redact_text`, and `exit 1` instead of falling through.
+   through `redact_text`, and `exit 1` instead of falling through. The new
+   direct `source ".../redact.sh"` this adds must carry the same guard items
+   1-2 establish elsewhere in this same PR: check the `source`'s own exit
+   status **and** `declare -F redact_url`/`declare -F redact_text`, and fail
+   terminally (`exit 1`) with a message that names no absolute path — a bare
+   `source` here would reintroduce, in new code, the exact leak class (a
+   failed/missing helper printing bash's own unredacted, path-bearing error)
+   that items 1-2 are fixing in `resolve_repo_checkout.sh` (Plan Review
+   Finding 2).
 
 Ride-alongs (required, per operator scope):
 
@@ -55,10 +63,34 @@ Ride-alongs (required, per operator scope):
 7. **New `.agent/scripts/tests/test_redact.sh`**, in the shape of the
    existing `tests/test_*.sh` files (sourced-function tests, `pass`/`fail`
    counters, non-zero exit on any failure), covering: the `@`-in-password
-   case for both `redact_url`/`redact_text`, a `REDACT_PATH_PREFIXES` spec
-   whose value contains `=`, and the pre-existing simple-case behavior
-   (so the file also serves as the dedicated, discoverable redact.sh test
-   surface the issue named as missing).
+   case for both `redact_url`/`redact_text`, two distinct urls with
+   credentials on one line (confirming the widened match does not merge
+   them), a `REDACT_PATH_PREFIXES` spec whose value contains `=`, and the
+   pre-existing simple-case behavior (so the file also serves as the
+   dedicated, discoverable redact.sh test surface the issue named as
+   missing).
+
+   **New (not "extended") test cases for `resolve_repo_checkout.sh`'s own two
+   pre-`redact.sh` refusals** (Plan Review Finding 1): the existing
+   `no_redact`/`bad_redact` fixture at `test_resolve_repo_checkout.sh:489-503`
+   copies and **sources** `manifest_fallback.sh`, so it tests *that* script's
+   guard (`manifest_fallback.sh:107`) — it does not execute
+   `resolve_repo_checkout.sh` at all, so the two bare-echo refusals at its own
+   lines 130-131 and 141 (before this PR's wording fix) have zero coverage.
+   Add new cases that copy `resolve_repo_checkout.sh` itself into a temp
+   directory and **execute** it (matching how the script is actually invoked)
+   in two shapes: (a) `redact.sh` absent from beside the copy, and (b)
+   `redact.sh` present but edited to fail on `source` (or to not define
+   `redact_url`/`redact_text`). Assert exit 5 and that stderr contains
+   neither `$SCRIPT_DIR` nor any other absolute path, only the fixed
+   "cannot load redact.sh beside it" wording.
+
+   **New lock-open-failure test**, alongside the existing lock section (near
+   the "6k" timeout case): make the clone-cache directory (or the specific
+   `.<repo>.lock` file within it) unwritable/unopenable before invoking the
+   script, assert exit 5, and assert stderr carries the `say()`-emitted,
+   redacted "could not open the lock file" message but never a raw bash
+   `exec`/permission-denied line naming the absolute lock path.
 8. **Fix the stale `AGENTS.md` `redact.sh` Script Reference row** — Ask-First
    already confirmed by the operator via #626's own framing (this row
    directly documents the refusal contract touched by item 1/2 above).
@@ -71,14 +103,14 @@ Ride-alongs (required, per operator scope):
 | `.agent/scripts/resolve_repo_checkout.sh:465-471` | Save/restore stderr around `exec 9>"$CACHE_DIR/.$REPO_NAME.lock"`; on failure, route a redacted message through `say()` and `exit 5` instead of letting bash's own error print the raw path. |
 | `.agent/scripts/resolve_repo_checkout.sh:485,493,494,495,503,517,530,534,535` | Append `9>&-` to each `git`/`"${GIT_NET[@]}" git` invocation after the lock fd is opened, so children don't inherit fd 9. |
 | `.agent/scripts/manifest_fallback.sh:205-208` | Same save/restore pattern around `exec 8>"$cache/.$repo.lock"` (use fd 6 for the saved copy — distinct from `resolve_repo_checkout.sh`'s fd 7, in case the two are ever nested). |
-| `.agent/scripts/manifest_fallback.sh` (git calls in the manifest-clone path, e.g. `manifest_config_dir`'s clone/fetch/reset lines near :190-230) | Append `8>&-` to each, mirroring item 6. |
+| `.agent/scripts/manifest_fallback.sh:227,244,245,251` (Plan Review Finding 4, re-verified against `HEAD`: the `remote get-url origin`, `fetch`, `reset --hard`, and `clone` calls after `exec 8>` at line 205 — not the "~190-230"/"223" range/line first cited) | Append `8>&-` to each, mirroring item 6. |
 | `.agent/scripts/redact.sh:41` | `redact_url`: change `[^/@]*@` → `[^/]*@` so the greedy match reaches the *last* `@` before any `/`. |
 | `.agent/scripts/redact.sh:57` | `redact_text`: change `[^/[:space:]@]+@` → `[^/[:space:]]+@` in the `sed -E` pattern, same fix. |
 | `.agent/scripts/redact.sh:61-62` | `REDACT_PATH_PREFIXES` parsing: `prefix=${spec%%=*}` → `prefix=${spec%=*}`; `replacement=${spec#*=}` → `replacement=${spec##*=}` (split on the *last* `=`). |
-| `.claude/skills/janitor-sweep/SKILL.md` (step 1, ~lines 92-112) | Move `REDACT_PATH_PREFIXES=("$ROOT=<workspace>")` (+ `$HOME` line) and a direct `source "$ROOT/.agent/scripts/redact.sh"` to immediately after `$ROOT` is resolved, before the `mkdir -p "$REPORT_DIR"` line. Change that line to `if ! mkdir -p "$REPORT_DIR"; then echo "FAILED(report directory: cannot create $(redact_text "$REPORT_DIR"))"; exit 1; fi`. Remove the now-redundant `REDACT_PATH_PREFIXES` assignment further down in step 2 (~line 136), since it is already set (idempotent duplicate, drop it to avoid drift). |
+| `.claude/skills/janitor-sweep/SKILL.md` (step 1, ~lines 92-112 — inside step 1, not step 2; Plan Review Finding 3) | Move `REDACT_PATH_PREFIXES=("$ROOT=<workspace>")` (+ `$HOME` line) and a **guarded** direct `source "$ROOT/.agent/scripts/redact.sh"` to immediately after `$ROOT` is resolved, before the `mkdir -p "$REPORT_DIR"` line — the guard checks the `source`'s own exit status and `declare -F redact_url`/`declare -F redact_text`, and `exit 1` with a path-free message on failure (Plan Review Finding 2; see item 5 above). Change the `mkdir` line to `if ! mkdir -p "$REPORT_DIR"; then echo "FAILED(report directory: cannot create $(redact_text "$REPORT_DIR"))"; exit 1; fi`. Remove the now-redundant `REDACT_PATH_PREFIXES` assignment further down, still inside step 1 (~line 136 — the label "step 2" in an earlier draft of this plan was wrong; step 2 does not begin until line 240), since it is already set (idempotent duplicate, drop it to avoid drift). |
 | `AGENTS.md` (Script Reference, `redact.sh` row) | "Both callers **refuse to run** when it is missing rather than printing around it" → "...when it is missing **or will not load** (exit 5) rather than printing around it". |
 | `.agent/scripts/tests/test_redact.sh` (new) | New hermetic test file per item 7 above. |
-| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | Extend the existing "bad_redact"/missing-redact fixture (~lines 485-503) to assert stderr does **not** contain the absolute `$SCRIPT_DIR` path for either refusal. Add a new case near the existing lock section (~line 700, "6k") exercising an unwritable/unopenable lock-file path: assert exit 5, and assert stderr contains the `say()`-emitted, redacted message but never a raw bash `exec`/permission-denied line naming the absolute lock path. |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | **New** cases (not an extension of the existing `no_redact`/`bad_redact` fixture at ~lines 489-503, which sources `manifest_fallback.sh` and tests *its* guard, not `resolve_repo_checkout.sh`'s own — Plan Review Finding 1) that copy `resolve_repo_checkout.sh` itself into a temp dir and execute it with `redact.sh` absent, and with `redact.sh` present but broken, asserting exit 5 and no absolute path on stderr for either. Add a new case near the existing lock section (~line 700, "6k") exercising an unwritable/unopenable lock-file path: assert exit 5, and assert stderr contains the `say()`-emitted, redacted message but never a raw bash `exec`/permission-denied line naming the absolute lock path. |
 
 ## Principles Self-Check
 
