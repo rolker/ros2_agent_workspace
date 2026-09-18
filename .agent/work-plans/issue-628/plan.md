@@ -391,3 +391,33 @@ inline per the plan-first workflow rather than left for review to discover.
   No `#TBD` token survives in the tree outside this plan's own record of the
   staging step and the progress timeline's dated entries. Step 9's PR body and
   the #628 comment likewise belonged to the publish step.
+
+## Revision after merge (2026-09-18): decisions and drafts across the deployment boundary
+
+Sub-issue (1) merged as PR #638 on 2026-09-17. The next day the operator raised
+a gap in the vocabulary — verbatim in the draft's new section — that the
+design-and-state record must "mesh well with both field season tempos and off
+season", prompted by the world-store design pass
+(unh_marine_autonomy#391) relitigating seven ADRs written during the 2026 field
+season. Agreed shape, applied on this branch as a revision of the draft (not a
+new issue, not an ADR):
+
+- The decision kind gains a `Provisional` status, taking #620's proposal into
+  the draft instead of issuing it as ADR-0020; it lands in ADR-0001 at
+  promotion (#637). #620 stays open, pointing at the draft.
+- The design-draft kind names what would prove it.
+- Field half: `/wrap-up-deployment` gains a *Decisions made this deployment*
+  section — filed as #642 (2026-09-18); the review pass is held until #635.
+- Off-season half: a health row for unreviewed provisional decisions, added to
+  #635's scope on 2026-09-18 (it was not there when the draft first claimed it).
+- A review pass distinct from the sweep, its cadence named by each roadmap,
+  as the proposed home for the consistency-review discussion item (still
+  unspecified). Reframed the same day from "seasonal" to mode-based after the
+  operator asked whether the season framing was project-agnostic: the boundary
+  is deployment mode vs design mode (ADR-0014); the season is this project's
+  instance. Queue growth under frequent deployments recorded as an open
+  question, not decided.
+
+Files: `docs/design/planning_document_vocabulary.md` (kinds table decision row,
+new section, Consequences, Open questions, References) and one row in
+`ROADMAP.md` § Governance record upkeep. No instruction files touched.
