@@ -3,9 +3,11 @@
 Run Claude Code in YOLO mode inside a Docker container. Be precise about what
 that contains: the container isolates the **OS/dependency state** and the
 **build artifacts**, and it is configured without GitHub **write** auth — so
-commits happen inside, and pushes and PR creation happen from the host via the
-push gateway. It does **not** isolate the workspace files, which are
-bind-mounted read-write at the same absolute path (see
+commits happen inside, while pushes, PR creation, and issue filing happen on
+the host, performed by the host orchestrator (`dispatch_subagent.sh` /
+`/run-issue`) using its own credentials and reading the worktree's
+`progress.md` as the intent record. It does **not** isolate the workspace
+files, which are bind-mounted read-write at the same absolute path (see
 [Mount Strategy](#mount-strategy)), and it is not credential-free: it inherits
 the host's Claude Code authentication, and may carry an optional GitHub token
 whose read-only-ness is a convention, not a checked scope (see
@@ -27,12 +29,16 @@ make agent-run ISSUE=42
 #   → Claude Code launches in YOLO mode
 #   → You chat with Claude normally: give instructions, answer questions
 #   → Claude edits/builds/tests/commits freely (no permission prompts)
-#   → When done, Claude runs push_request.sh to signal readiness
+#   → Claude records intent (what to push, PR title/body, issues to file) in
+#     the worktree's progress.md
 #   → You exit Claude (Ctrl+C or /exit) → container exits
 
-# 4. Launcher detects pending push request and prompts:
-#   "Push feature/issue-42 and create PR? [y/n/diff]"
-#   → Confirm → git push + gh pr create happens on host
+# 4. Nothing runs automatically after the container exits — the launcher
+#    only prints the exit code and points at progress.md. YOU then either
+#    run the host orchestrator (`/run-issue <N>` in a host session, which
+#    reads progress.md and performs the git push, PR creation and any issue
+#    filing with the host's credentials) or publish by hand from the
+#    worktree. The container has no push transport of its own.
 ```
 
 ## Building the Image
@@ -221,14 +227,15 @@ it authenticates from `GH_TOKEN` alone, so a write-capable PAT left in
 the container. Mint that token read-only and the whole boundary holds; the
 launcher will not check it for you.
 
-Pushes and PR creation are therefore meant to happen on the host via the push
-gateway, where the user has full visibility and control — `git push` cannot
-happen anywhere else, and `gh` publication stays on the host as long as the
-forwarded token is read-only.
+Pushes, PR creation, and issue filing are therefore meant to happen on the
+host, performed by the host orchestrator (`dispatch_subagent.sh` /
+`/run-issue`) with its own credentials and full visibility — `git push`
+cannot happen anywhere else, and `gh` publication stays on the host as long
+as the forwarded token is read-only.
 
 The `.agent/` directory is mounted read-only to prevent the agent from modifying
 workspace infrastructure scripts. The exception is `.agent/scratchpad/`, which is
-read-write for push request signal files and temporary work.
+read-write for temporary work.
 
 **The host's `~/.cache/pre-commit` and `~/.claude/plugins` are deliberately
 NOT bind-mounted.** Both hold *executable* content (hook-environment
@@ -246,27 +253,22 @@ credential-less here, so they would only fail-fast on startup. The
 workspace defines no project `.mcp.json` servers, so nothing the sandbox
 needs is lost; local skills still resolve via `/skill-name`.
 
-## Push Gateway Workflow
+## Host-Orchestrator Workflow
 
 When the agent finishes work inside the container:
 
-1. **Agent** runs `push_request.sh --title "PR title"` to write a signal file
-2. **User** exits Claude (`/exit` or Ctrl+C) → container exits
-3. **Launcher** detects the pending push request and runs the push gateway
-4. **User** reviews: `[y]es push` / `[d]iff` to review / `[s]kip` / `[c]ancel`
-5. On confirmation: `git push` + `gh pr create` runs on the host
+1. **Agent** records what it did — and what should happen next (push, PR
+   title/body, any issues to file) — in the worktree's `progress.md`, per the
+   ADR-0013 entry vocabulary.
+2. **User** exits Claude (`/exit` or Ctrl+C) → container exits.
+3. **Host orchestrator** (`dispatch_subagent.sh` / `/run-issue`), running on
+   the host with its own git and `gh` credentials, reads `progress.md`'s
+   last entry and performs the `git push`, `gh pr create`, and any issue
+   filing inline.
 
-Signal files are stored in `.agent/scratchpad/push-requests/<issue>.json`.
-
-### Manual push gateway
-
-```bash
-# Process all pending requests
-.agent/scripts/push_gateway.sh
-
-# Process specific issue
-.agent/scripts/push_gateway.sh --issue 42
-```
+The container itself has no push transport (see [Security
+Model](#security-model)) — it never writes to git remotes or creates PRs or
+issues on its own.
 
 ## Read-Only GitHub Access
 
@@ -317,9 +319,10 @@ make agent-run ISSUE=42
 - `gh search` — search code, issues, PRs
 
 With a genuinely read-only PAT, agents **cannot** push, create PRs, or create
-issues from inside the container; those actions go through the push gateway on
-the host. That holds because of how you minted the token — the launcher does not
-verify it (see [Security Model](#security-model)) — so mint it read-only.
+issues from inside the container; those actions are performed by the host
+orchestrator using its own credentials. That holds because of how you minted
+the token — the launcher does not verify it (see [Security
+Model](#security-model)) — so mint it read-only.
 
 ## Troubleshooting
 
@@ -415,10 +418,10 @@ launch-time refresh with `FORCE_DEPS_REFRESH=1`.
 
 Some rosdep dependencies may not be available at all. Both the bake and the
 entrypoint run `rosdep install` best-effort and continue on failures. If a
-specific package fails to build due to missing dependencies, report them via
-`issue_request.sh` or note them for the host user. The container runs as a
-non-root user without sudo (the bake runs as root at build time, where apt is
-available).
+specific package fails to build due to missing dependencies, note it in
+`progress.md` for the host orchestrator to file as an issue, or tell the host
+user directly. The container runs as a non-root user without sudo (the bake
+runs as root at build time, where apt is available).
 
 ### Container won't start
 

@@ -3,7 +3,6 @@
 # Host-side launcher for the sandboxed agent DevContainer.
 #
 # Orchestrates: build image → validate worktree → generate mounts → launch container
-# After exit: check for pending push requests and run push gateway.
 #
 # Usage:
 #   .agent/scripts/docker_run_agent.sh --issue <N>
@@ -115,9 +114,8 @@ Prerequisites:
 Modes:
   - Interactive (default): a TTY Claude Code session you drive.
   - Dispatch (--prompt / --prompt-file): a headless `claude -p` run that
-    executes the kickoff and exits. The push-gateway post-exit step is
-    skipped; the caller (e.g. dispatch_subagent.sh) reads the worktree's
-    progress.md for the outcome.
+    executes the kickoff and exits; the caller (e.g. dispatch_subagent.sh)
+    reads the worktree's progress.md for the outcome.
 EOF
 }
 
@@ -511,18 +509,7 @@ MOUNT_ARGS+=(-v "$ROOT_DIR:$ROOT_DIR")
 # 2. Read-only overlay for .agent/ (scripts, configs, templates)
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent:$ROOT_DIR/.agent:ro")
 
-# 3. Read-write override for .agent/scratchpad/ (push requests, temp files)
-# Skipped for --print-mounts: a dry run must be inert (#602 review).
-# Written as an `if` rather than `[ ... ] && mkdir -p ...`. At this position
-# either form is safe. The difference is the block's exit status: the `&&` form
-# evaluates to the guard's status, so it is false whenever the guard is. That
-# only matters if this block ever ends a function (`set -e` then aborts the
-# caller) or ends a script (its status becomes the script's, with or without
-# `set -e`). The `if` has no such coupling and matches the two `if ! mkdir`
-# guards below.
-if [ "$PRINT_MOUNTS" = false ]; then
-    mkdir -p "$ROOT_DIR/.agent/scratchpad/push-requests"
-fi
+# 3. Read-write override for .agent/scratchpad/ (temp files)
 MOUNT_ARGS+=(-v "$ROOT_DIR/.agent/scratchpad:$ROOT_DIR/.agent/scratchpad")
 
 # 4. Anonymous volumes for build/install/log in each layer workspace
@@ -764,7 +751,7 @@ echo "  GitHub:    $([ -n "$AGENT_GH_TOKEN" ] && echo 'read-only token' || echo 
 echo "========================================="
 echo ""
 
-# Allow non-zero exit (user Ctrl+C, Claude exit, etc.) — we still check push requests
+# Allow non-zero exit (user Ctrl+C, Claude exit, etc.) — we still report it below
 EXIT_CODE=0
 docker run "${TTY_FLAGS[@]}" --rm \
     --name "$CONTAINER_NAME" \
@@ -778,50 +765,15 @@ docker run "${TTY_FLAGS[@]}" --rm \
     || EXIT_CODE=$?
 
 # ---------- Post-exit ----------
-# Dispatch mode uses progress.md as the outcome channel (the caller reads
-# the worktree's last entry), so skip the interactive push-gateway flow
-# entirely and just surface the container exit code.
-if [ "$DISPATCH_MODE" = true ]; then
-    echo ""
-    echo "Dispatch run exited with code $EXIT_CODE."
-    echo "Outcome is in the worktree's progress.md (read the last entry)."
-    exit "$EXIT_CODE"
-fi
-
-# ---------- Post-exit: check for outbox items (interactive mode) ----------
-
+# The container has no push transport of its own: git push, PR creation, and
+# issue filing all happen on the host (dispatch_subagent.sh / /run-issue),
+# using the worktree's progress.md as the intent record. Just surface the
+# container's exit code.
 echo ""
-HAS_PENDING=false
-
-# Check push requests
-PUSH_REQUEST="$ROOT_DIR/.agent/scratchpad/push-requests/$WORKTREE_ID.json"
-if [ -f "$PUSH_REQUEST" ]; then
-    STATUS=$(jq -r '.status // "pending"' "$PUSH_REQUEST" 2>/dev/null || echo "unknown")
-    if [ "$STATUS" = "pending" ]; then
-        HAS_PENDING=true
-    fi
-fi
-
-# Check issue requests
-ISSUE_DIR="$ROOT_DIR/.agent/scratchpad/issue-requests/$WORKTREE_ID"
-if [ -d "$ISSUE_DIR" ]; then
-    for req in "$ISSUE_DIR"/*.json; do
-        [ -f "$req" ] || continue
-        STATUS=$(jq -r '.status // "pending"' "$req" 2>/dev/null || echo "unknown")
-        if [ "$STATUS" = "pending" ]; then
-            HAS_PENDING=true
-            break
-        fi
-    done
-fi
-
-if [ "$HAS_PENDING" = true ]; then
-    if [ -x "$SCRIPT_DIR/push_gateway.sh" ]; then
-        "$SCRIPT_DIR/push_gateway.sh" --worktree-id "$WORKTREE_ID"
-    else
-        echo "Pending outbox items found. Run manually:"
-        echo "  .agent/scripts/push_gateway.sh --worktree-id $WORKTREE_ID"
-    fi
+if [ "$DISPATCH_MODE" = true ]; then
+    echo "Dispatch run exited with code $EXIT_CODE."
 else
-    echo "No pending outbox items. Container exited with code $EXIT_CODE."
+    echo "Container exited with code $EXIT_CODE."
 fi
+echo "Outcome is in the worktree's progress.md (read the last entry)."
+exit "$EXIT_CODE"
