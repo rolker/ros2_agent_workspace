@@ -176,7 +176,11 @@ probe_decision() {
     local repo_path="$1"
     local dir="$repo_path/docs/decisions"
     local entry
-    if [ -d "$dir" ]; then
+    if [ -d "$repo_path/docs" ] && [ ! -x "$repo_path/docs" ]; then
+        # The parent is unsearchable, so [ -d "$dir" ] below cannot even stat
+        # it: distinguish that from a genuinely missing docs/decisions.
+        echo "planning_doc_probe.sh: $repo_path/docs exists but is not searchable (permission denied) — reporting docs/decisions absent" >&2
+    elif [ -d "$dir" ]; then
         if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
             echo "planning_doc_probe.sh: $dir exists but is not listable (permission denied) — reporting absent" >&2
         elif [ -L "$dir" ] && ! _inside_repo "$repo_path" "$dir"; then

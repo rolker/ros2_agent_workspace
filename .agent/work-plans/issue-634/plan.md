@@ -329,3 +329,12 @@ Four points, all applied: the inside-repo rule now applies per entry of
 guard uses `[ -f ]` + `bash` like step 1 (exec bits are lost on noexec mounts,
 archives and CIFS shares); the plan's CLI contract and the AGENTS.md row now
 say "readable and searchable", matching the script.
+
+### Copilot round on the bash-invocation head (host-inline, 2026-09-18)
+
+Two points, both applied: `probe_decision` now distinguishes an unsearchable
+`docs/` parent from a missing `docs/decisions` (diagnostic, tested); the
+audit-project block captures the probe's exit status and renders `SKIPPED`
+on a non-zero exit instead of silently proceeding with no TSV. A `-r || -x`
+guard Copilot flagged at the same time is `probe_decision`'s own, which
+enumerates a directory and does need read; roadmap/health are `-x` only.

@@ -220,6 +220,24 @@ else
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
 
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    mkdir -p "$REPO/docs/decisions"
+    echo "# ADR" > "$REPO/docs/decisions/0001-x.md"
+    chmod 000 "$REPO/docs"
+    STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+    ACTUAL=$(probe_decision "$REPO" 2>"$STDERR_FILE")
+    chmod 755 "$REPO/docs"
+    assert_eq "unsearchable docs/ parent -> docs/decisions absent" "absent	" "$ACTUAL"
+    if grep -q "permission denied" "$STDERR_FILE"; then
+        echo "✅ PASS: unsearchable docs/ parent emits a distinct permission-denied stderr diagnostic (probe_decision)"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: unsearchable docs/ parent emitted no diagnostic (probe_decision)"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+fi
+
 REPO=$(new_repo)
 OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
 echo "# ADR" > "$OUTSIDE/0001-x.md"

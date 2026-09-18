@@ -273,7 +273,16 @@ elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ] || [ ! -r "$ROOT/.age
 else
     # -f + bash rather than -x, as step 1 does: exec bits are lost on a noexec
     # mount, an unpacked archive or a CIFS share, and the script runs fine there.
-    bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
+    PROBE_OUT=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH")
+    PROBE_RC=$?
+    if [ "$PROBE_RC" -ne 0 ]; then
+        # Exit 3 = the probe could not run at all (repo path missing, not a
+        # directory, or not readable+searchable) — no TSV was produced, so
+        # this is SKIPPED, never four "Not found" rows.
+        echo "SKIPPED (planning_doc_probe.sh could not run on $REPO_PATH — exit $PROBE_RC)"
+    else
+        printf '%s\n' "$PROBE_OUT"
+    fi
 fi
 ```
 
@@ -285,7 +294,7 @@ expected-location table is a published expectation, not a requirement: a
 repo that keeps a planning document somewhere else, or doesn't keep one at
 all, is not in violation. Report `Present` / `Not found` — deliberately not
 "Missing", the word the Governance Coverage table above uses for items that
-do drive a recommendation. A `SKIPPED` probe (either guard above) renders as
+do drive a recommendation. A `SKIPPED` probe (either guard above, or a non-zero probe exit) renders as
 a single note in the Planning Documents section instead of the four-row
 table — there is no per-kind data to show, and four blank "Not found" rows
 would misreport a probe that never ran as one that ran and found nothing.
