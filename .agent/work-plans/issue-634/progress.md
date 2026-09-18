@@ -64,3 +64,17 @@ reverse.
 - [ ] **Action needed**: the scope bullet "Ships the `kind:` marker convention and the `.agent/templates/` kind marker" references a mechanism that does not exist anywhere in the merged design draft it is supposed to implement "exactly." The draft (`docs/design/planning_document_vocabulary.md`) explicitly settled on path-only discovery and rejected a per-repo declaration file (Options considered, "Options considered and not taken"); no `kind:` marker syntax is defined in the draft, its templates (`.agent/templates/roadmap.md`, `adr_template.md`, `project_governance.md`), or anywhere else in the tracked tree (verified via `grep -rn "^kind:"`). This "kind:" marker appears to be a holdover from the *pre-draft* proposal in the parent issue (#628's original body, item 3: "a one-line `kind:` marker at the top of each document"), which the settled draft superseded. Before plan-task proceeds, this bullet needs either (a) removal from #634's scope as stale, or (b) an operator decision to add the marker convention to the design draft first (which would also require reconciling it with the "no schema" decision). Recommend surfacing this to the operator rather than plan-task silently inventing a marker syntax or silently dropping the bullet.
 - [ ] Consider splitting the externally-hosted-document discovery fallbacks (GitHub org Project board API, `homepage` field, README link matching) into a follow-up issue — they are non-blocking discovery-only per the design draft and add auth/network surface to an otherwise self-contained path-probe change.
 - [ ] Confirm during plan-task whether the probe needs factoring into a shared script (vs. skill-markdown prose only) to satisfy the issue's "explicit test case" requirement for graceful absence — the workspace currently has no test harness for markdown-only skill procedures.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-18 10:10 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Plan**: `.agent/work-plans/issue-634/plan.md` at `3baac19`
+**Branch**: feature/issue-634 at `3baac19`
+**Phases**: single
+
+### Open questions
+- [ ] Confirm the AGENTS.md Script Reference row wording before merge (Ask-First: instruction file edit).
+- [ ] Confirm `run_script_tests.sh` auto-discovers `test_*.sh` or needs the new test file added explicitly — resolve during implementation.
+- [ ] Confirm `## Vision` heading matching should be a prefix match (`^## Vision`) vs. requiring the exact bare heading — low-stakes, descriptive row only.
