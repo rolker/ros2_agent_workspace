@@ -65,8 +65,12 @@
 #   #   0 = ran successfully — presence or absence of any/all four kinds is
 #   #       NEVER a non-zero exit (absence is never a finding, per the draft)
 #   #   2 = usage error (missing or extra arguments)
-#   #   3 = repo_path does not exist or is not a readable directory — a real
-#   #       error (the probe could not run at all), not an absence finding
+#   #   3 = repo_path does not exist or is not a readable AND searchable
+#   #       directory (missing read or `x`/search permission) — a real error
+#   #       (the probe could not run at all), not an absence finding. Without
+#   #       the `x` bit nothing inside repo_path can be stat'd or opened, so
+#   #       every probe would silently read as "absent" instead of surfacing
+#   #       the real "could not run" condition.
 #
 #   # Sourced (script must be reachable by path — not on PATH by default):
 #   source /path/to/.agent/scripts/planning_doc_probe.sh
@@ -184,8 +188,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         exit 2
     fi
     repo_path="$1"
-    if [ ! -d "$repo_path" ] || [ ! -r "$repo_path" ]; then
-        echo "planning_doc_probe.sh: not a readable directory: $repo_path" >&2
+    if [ ! -d "$repo_path" ] || [ ! -r "$repo_path" ] || [ ! -x "$repo_path" ]; then
+        echo "planning_doc_probe.sh: not a readable/searchable directory: $repo_path" >&2
         exit 3
     fi
     probe_all "$repo_path"

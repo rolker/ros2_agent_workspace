@@ -308,6 +308,19 @@ bash "$SCRIPT" "$NOT_A_DIR" >/dev/null 2>&1
 STATUS=$?
 set -e
 assert_eq "CLI on a path that is a file, not a directory -> exit 3" "3" "$STATUS"
+
+if [ "$(id -u)" -ne 0 ]; then
+    UNSEARCHABLE=$(new_repo)
+    chmod 600 "$UNSEARCHABLE"
+    set +e
+    bash "$SCRIPT" "$UNSEARCHABLE" >/dev/null 2>&1
+    STATUS=$?
+    set -e
+    assert_eq "CLI on a readable-but-unsearchable (no x bit) repo_path -> exit 3" "3" "$STATUS"
+    chmod 755 "$UNSEARCHABLE"
+else
+    echo "⚠️  SKIP: unsearchable-repo_path case (running as root — permission bits are not enforced)"
+fi
 echo ""
 
 echo "=== Results ==="
