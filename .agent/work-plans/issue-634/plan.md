@@ -227,3 +227,42 @@ Single PR.
 - Full test suite (`run_script_tests.sh`) and `shellcheck --severity=warning`
   (via the pre-commit hook) both pass on the two new scripts; see the PR /
   progress.md for the run output.
+
+### Address-findings pass (Local Review Pre-Push, round 1)
+
+- **Must-fix**: `audit-project` step 7 now guards on `$ROOT` being empty
+  (reports `SKIPPED (no workspace root — planning_doc_probe.sh unreachable)`)
+  and on the probe script existing at all (`SKIPPED (planning_doc_probe.sh
+  not found under $ROOT/.agent/scripts/)`), matching step 5's identical
+  precondition. The Planning Documents report section renders that single
+  `SKIPPED` note instead of the four-row table when either guard fires.
+- `probe_vision`'s heading match gained a word-boundary check
+  (`^## Vision([[:space:]]|$)`) so `## Visionary Roadmap` no longer
+  false-positives; the header comment and a new test case
+  (`'## Visionary Roadmap' ... -> absent`) document and cover it.
+- Permission-denied paths (unreadable `README.md`, unlistable
+  `docs/decisions/`) now emit a distinct stderr diagnostic while still
+  reporting `absent` on the TSV contract (unchanged) — covered by new
+  chmod-based tests in `test_planning_doc_probe.sh` (skipped when running as
+  root, since permission bits aren't enforced there).
+- `probe_decision`'s dotfile exclusion now uses `find ... ! -name '.*'`
+  instead of relying on the caller's (unset-by-default) `dotglob` shell
+  option — covered by a new "`.gitkeep` alongside a real entry -> present"
+  test. The broken-symlink-reads-as-absent behavior (`[ -e ]` following a
+  symlink) is now documented explicitly in the function's header comment and
+  covered by a new dedicated test case.
+- `janitor-sweep`'s Check 2 rollup rule now names the Planning Documents
+  table explicitly as non-scoring, tying back to `audit-project`'s own § 7
+  rule instead of relying solely on the report-format example's HTML
+  comment.
+- Both report-format templates (`audit-project` § Report Format and
+  `janitor-sweep`'s embedded example) now show Location as empty (`—`) on
+  "Not found" rows, matching what `planning_doc_probe.sh` actually emits
+  (an empty TSV field for absent kinds), instead of showing the kind's
+  expected path as if it had been found.
+- **Skipped deliberately**: markdown-context-aware matching (skipping a
+  `## Vision` line inside a fenced code block or blockquote) — the header
+  comment now records the reason: a stateful line scanner or markdown parser
+  is a lot of complexity for a self-inflicted edge case, and since the
+  Planning Documents section is descriptive-only, the worst outcome is a
+  harmless false "present".
