@@ -69,8 +69,11 @@ redact_text() {
     local spec prefix replacement
     for spec in ${REDACT_PATH_PREFIXES[@]+"${REDACT_PATH_PREFIXES[@]}"}; do
         [[ -z "$spec" || "$spec" != *=* ]] && continue
-        prefix=${spec%%=*}
-        replacement=${spec#*=}
+        # Split on the LAST `=`, not the first: a workspace path containing
+        # `=` (rare but not forbidden) was previously split at its own first
+        # `=`, corrupting the prefix and leaving the path unmatched later.
+        prefix=${spec%=*}
+        replacement=${spec##*=}
         # A bare `/` prefix would rewrite every path separator in the string.
         [[ -z "$prefix" || "$prefix" == "/" ]] && continue
         text=${text//"$prefix"/"$replacement"}
