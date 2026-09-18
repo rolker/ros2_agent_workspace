@@ -420,8 +420,8 @@ narrowed it for navigational edits.
 4. **Conversion restores immutability** — from then on ADR-0001 and ADR-0012
    apply unchanged.
 
-**A decision made in deployment mode is provisional by default**, and its
-conversion condition is, at minimum, an off-season review. That is the honest
+**A decision made in deployment mode would be provisional by default**, with a
+conversion condition of, at minimum, an off-season review. That is the honest
 state for a field decision, and it is exactly the state ADR-0014's own "defer
 is not skip" clause asks for: deferred design is *tracked*, not dropped, and
 wrap-up is where completeness is restored.
@@ -485,7 +485,12 @@ specified.
 
 - Nothing here binds a project repo. `Provisional` is offered as a status a
   project's ADR practice *can* adopt; the workspace's own ADR-0001 gains it
-  when this draft is promoted, not before.
+  when this draft is promoted, not before — and the ADR template's status
+  line (`.agent/templates/adr_template.md`, today `Proposed | Accepted |
+  Superseded by ADR-NNNN`) gains it in the same promotion PR, so an author
+  copying the template can find it. Until then the template is deliberately
+  unchanged: a status the binding record does not recognise must not be
+  offered by the template.
 - Deployment mode's urgency contract is unchanged. Field decisions are still
   made fast and recorded in the log; the only addition is that wrap-up names
   them.
