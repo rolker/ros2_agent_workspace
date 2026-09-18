@@ -248,7 +248,7 @@ manifest_config_dir() {
         # resets to the CURRENT pointer's `$branch` on every run, so a cached
         # clone made at a different branch of the same repo is corrected
         # rather than reused as-is.
-        cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
+        cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null 8>&-)
         if [[ "$cached_url" != "$git_url" ]]; then
             _manifest_fallback_say "cached manifest clone at $clone_dir points at '$(redact_url "${cached_url:-<none>}")', the bootstrap pointer derives '$(redact_url "$git_url")' — re-cloning"
             rm -rf "$clone_dir"
@@ -265,14 +265,14 @@ manifest_config_dir() {
         # could not verify: exactly the report-level false green the callers'
         # status contract exists to prevent. Callers map 6 to
         # FAILED(manifest refresh: <reason>).
-        if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1) \
-           || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1); then
+        if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1 8>&-) \
+           || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1 8>&-); then
             _manifest_fallback_say "could not refresh the cached manifest repo at $clone_dir ($out) — the cached copy may be stale, so this is a failure, not a fallback"
             return 6
         fi
     else
         rm -rf "$clone_dir"
-        if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1); then
+        if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1 8>&-); then
             _manifest_fallback_say "could not clone the manifest repo $(redact_url "$git_url") at '$branch': $out"
             rm -rf "$clone_dir"
             return 5
