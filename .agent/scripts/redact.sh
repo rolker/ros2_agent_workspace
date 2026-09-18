@@ -20,6 +20,13 @@
 #                         in order, longest/most specific first. Callers set it
 #                         to strip host identity out of absolute paths:
 #                             REDACT_PATH_PREFIXES=("$MAIN_ROOT=<workspace>" "$HOME=~")
+#                         The <replacement> MUST be `~` or an angle-bracketed
+#                         label like `<workspace>`: that shape is how the entry
+#                         is split, so the path may contain `=` and so may a
+#                         bracketed label. A label of any other shape falls
+#                         back to splitting on the last `=`, which is only
+#                         correct when that label has no `=` in it — otherwise
+#                         the path is not matched and leaks, silently.
 #                         Unset, no path rewriting happens.
 #
 # These are hygiene, not a security boundary: a password that a remote echoes
