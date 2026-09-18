@@ -218,3 +218,26 @@ Lifecycle: **Local Review (Pre-Push)** → push / open PR → **triage-reviews**
 
 ### False positives
 - (Copilot) Claimed the new `audit-project` "Check planning documents" step (7→8 sections) risks breaking `janitor-sweep`'s "all seven checklist sections" completeness rule at SKILL.md:398-400 — verified that rule belongs to **Check 1 (`audit-workspace`)**, a wholly separate skill with its own independent 7-section checklist (`.claude/skills/audit-workspace/SKILL.md` §§1-7: Principles enforcement, ADR accuracy, Script reference table, Template validity, Consequences map currency, Instruction file consistency, Stale worktrees). `audit-project`'s step renumbering (7→8, adding "Check planning documents") is unrelated code and does not feed that rule; Check 2's own rollup rule (janitor-sweep SKILL.md ~404-410) already explicitly excludes the Planning Documents table from "produced findings." The two "seven"s are different skills' checklists that happen to share a number.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-18 11:06 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**PR**: #644 at `7399dc3`
+**Addressed**: Integrated Review, 2026-09-18 15:10 -04:00, at `f9385e0` — 2 must-fix, 1 suggestion
+**Commits**: d970d27, 8584f4b, 31b7668, 7399dc3
+
+### Actions
+- [x] CLI entry guard now also checks `[ -x ]` (search permission) on `repo_path`, not just `-d`/`-r` — a readable-but-unsearchable directory now correctly hits exit 3 instead of every probe silently reporting `absent`; new CLI test added (skipped when running as root) — `.agent/scripts/planning_doc_probe.sh`, `.agent/scripts/tests/test_planning_doc_probe.sh`
+- [x] `audit-project` step 7's guard now checks `[ -x ]` on `planning_doc_probe.sh` (subsumes the prior `[ -f ]` existence check) — a present-but-non-executable script now yields `SKIPPED` instead of a raw "Permission denied" — `.claude/skills/audit-project/SKILL.md`
+- [x] `probe_roadmap` and `probe_health` now also emit the permission-denied stderr diagnostic (extending the code to match the PR description's claim, per the reviewer's preferred option) when their target file's parent directory is unlistable; `probe_decision`'s `find` now uses `-L` so `docs/decisions` itself being a symlink to a populated directory is read correctly — `.agent/scripts/planning_doc_probe.sh`, new tests
+- [x] Added the two remaining test-only symlink gaps from Local Review round 2 while already in the test file: broken-symlink `ROADMAP.md`, broken-symlink `docs/health.md` (both already behaved correctly; test-completeness only) — `.agent/scripts/tests/test_planning_doc_probe.sh`
+
+### Verification
+- `.agent/scripts/tests/run_script_tests.sh`: 27/27 shell tests pass (incl. `test_planning_doc_probe.sh`, now 44 assertions, up from 36), 220/220 pytest.
+- `shellcheck --severity=warning` (via pre-commit) on `planning_doc_probe.sh`, `test_planning_doc_probe.sh`, `audit-project/SKILL.md`'s shell blocks: clean at every commit.
+- `plan.md`'s "Implementation notes (as built)" section updated with a new "Address-findings pass (Integrated Review, post-PR)" subsection.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
