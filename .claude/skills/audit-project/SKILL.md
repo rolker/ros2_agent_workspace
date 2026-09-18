@@ -273,15 +273,18 @@ elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ] || [ ! -r "$ROOT/.age
 else
     # -f + bash rather than -x, as step 1 does: exec bits are lost on a noexec
     # mount, an unpacked archive or a CIFS share, and the script runs fine there.
-    PROBE_OUT=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH")
-    PROBE_RC=$?
-    if [ "$PROBE_RC" -ne 0 ]; then
+    # The status is read inside the if so this stays correct under `set -e`
+    # (a bare `X=$(cmd); RC=$?` would abort the shell before RC is read).
+    # The probe's stderr diagnostics are repo-relative by contract, so they
+    # are safe to let through into the report.
+    if PROBE_OUT=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"); then
+        printf '%s\n' "$PROBE_OUT"
+    else
         # Exit 3 = the probe could not run at all (repo path missing, not a
         # directory, or not readable+searchable) — no TSV was produced, so
-        # this is SKIPPED, never four "Not found" rows.
-        echo "SKIPPED (planning_doc_probe.sh could not run on $REPO_PATH — exit $PROBE_RC)"
-    else
-        printf '%s\n' "$PROBE_OUT"
+        # this is SKIPPED, never four "Not found" rows. $? here is the
+        # probe's own status: the if-condition's exit code.
+        echo "SKIPPED (planning_doc_probe.sh could not run on this repo — exit $?)"
     fi
 fi
 ```

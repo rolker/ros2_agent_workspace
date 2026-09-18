@@ -19,6 +19,10 @@
 # https://github.com/rolker/ros2_agent_workspace/issues/643, deliberately out
 # of scope here.
 #
+# Diagnostics on stderr name paths RELATIVE to the repo only — never the
+# absolute repo_path — because audit-project and janitor-sweep pass them into
+# reports that must stay free of host-specific paths.
+#
 # The script reads the filesystem only. It writes nothing, caches nothing,
 # and creates no marker/cache file anywhere (ADR-0017's rejection of a
 # per-repo declaration file extends to this reader, per the design draft's
@@ -106,7 +110,7 @@ _inside_repo() {
 # the repo it was given, so such a file reads as absent.
 _outside() {
     if [ -L "$2" ] && ! _inside_repo "$1" "$2"; then
-        echo "planning_doc_probe.sh: $2 is a symlink resolving outside $1 — reporting $3 absent (the probe never reads outside the repo)" >&2
+        echo "planning_doc_probe.sh: $3 is a symlink resolving outside the repo — reporting absent (the probe never reads outside the repo)" >&2
         return 0
     fi
     return 1
@@ -119,7 +123,7 @@ probe_vision() {
         if _outside "$repo_path" "$readme" "README.md"; then
             :
         elif [ ! -r "$readme" ]; then
-            echo "planning_doc_probe.sh: $readme exists but is not readable (permission denied) — reporting absent" >&2
+            echo "planning_doc_probe.sh: README.md exists but is not readable (permission denied) — reporting absent" >&2
         elif grep -qE '^## Vision([[:space:]]|$)' "$readme"; then
             printf 'present\tREADME.md\n'
             return
@@ -143,7 +147,7 @@ probe_vision() {
 probe_roadmap() {
     local repo_path="$1"
     if [ -d "$repo_path" ] && [ ! -x "$repo_path" ]; then
-        echo "planning_doc_probe.sh: $repo_path exists but is not searchable (permission denied) — reporting ROADMAP.md absent" >&2
+        echo "planning_doc_probe.sh: the repo root is not searchable (permission denied) — reporting ROADMAP.md absent" >&2
     elif [ -f "$repo_path/ROADMAP.md" ]; then
         if ! _outside "$repo_path" "$repo_path/ROADMAP.md" "ROADMAP.md"; then
             printf 'present\tROADMAP.md\n'
@@ -198,17 +202,17 @@ probe_decision() {
     if [ -d "$repo_path/docs" ] && [ ! -x "$repo_path/docs" ]; then
         # The parent is unsearchable, so [ -d "$dir" ] below cannot even stat
         # it: distinguish that from a genuinely missing docs/decisions.
-        echo "planning_doc_probe.sh: $repo_path/docs exists but is not searchable (permission denied) — reporting docs/decisions absent" >&2
+        echo "planning_doc_probe.sh: docs/ exists but is not searchable (permission denied) — reporting docs/decisions absent" >&2
     elif [ -d "$dir" ]; then
         if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
-            echo "planning_doc_probe.sh: $dir exists but is not listable (permission denied) — reporting absent" >&2
+            echo "planning_doc_probe.sh: docs/decisions exists but is not listable (permission denied) — reporting absent" >&2
         elif [ -L "$dir" ] && ! _inside_repo "$repo_path" "$dir"; then
-            echo "planning_doc_probe.sh: $dir is a symlink resolving outside $repo_path — reporting absent (the probe never reads outside the repo)" >&2
+            echo "planning_doc_probe.sh: docs/decisions is a symlink resolving outside the repo — reporting absent (the probe never reads outside the repo)" >&2
         else
             while IFS= read -r -d '' entry; do
                 [ -e "$entry" ] || continue  # broken symlink: exists as an entry, but reads as absent (see note above)
                 if [ -L "$entry" ] && ! _inside_repo "$repo_path" "$entry"; then
-                    echo "planning_doc_probe.sh: $entry is a symlink resolving outside $repo_path — not counted (the probe never reads outside the repo)" >&2
+                    echo "planning_doc_probe.sh: docs/decisions/$(basename -- "$entry") is a symlink resolving outside the repo — not counted (the probe never reads outside the repo)" >&2
                     continue
                 fi
                 printf 'present\tdocs/decisions\n'
@@ -231,7 +235,7 @@ probe_health() {
     local repo_path="$1"
     local dir="$repo_path/docs"
     if [ -d "$dir" ] && [ ! -x "$dir" ]; then
-        echo "planning_doc_probe.sh: $dir exists but is not searchable (permission denied) — reporting docs/health.md absent" >&2
+        echo "planning_doc_probe.sh: docs/ exists but is not searchable (permission denied) — reporting docs/health.md absent" >&2
     elif [ -f "$dir/health.md" ]; then
         if ! _outside "$repo_path" "$dir/health.md" "docs/health.md"; then
             printf 'present\tdocs/health.md\n'
@@ -265,7 +269,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     repo_path="$1"
     if [ ! -d "$repo_path" ] || [ ! -r "$repo_path" ] || [ ! -x "$repo_path" ]; then
-        echo "planning_doc_probe.sh: not a readable/searchable directory: $repo_path" >&2
+        echo "planning_doc_probe.sh: repo_path is not a readable and searchable directory — cannot run (exit 3)" >&2
         exit 3
     fi
     probe_all "$repo_path"
