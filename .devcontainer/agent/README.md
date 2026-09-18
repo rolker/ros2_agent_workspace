@@ -33,9 +33,12 @@ make agent-run ISSUE=42
 #     the worktree's progress.md
 #   → You exit Claude (Ctrl+C or /exit) → container exits
 
-# 4. The host orchestrator (dispatch_subagent.sh / /run-issue) reads
-#    progress.md and performs the git push, PR creation, and any issue
-#    filing using its own credentials — the container has no push transport.
+# 4. Nothing runs automatically after the container exits — the launcher
+#    only prints the exit code and points at progress.md. YOU then either
+#    run the host orchestrator (`/run-issue <N>` in a host session, which
+#    reads progress.md and performs the git push, PR creation and any issue
+#    filing with the host's credentials) or publish by hand from the
+#    worktree. The container has no push transport of its own.
 ```
 
 ## Building the Image
