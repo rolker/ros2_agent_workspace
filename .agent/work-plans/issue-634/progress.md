@@ -142,3 +142,31 @@ Plan is well-aligned with the merged design draft's expected-location table (ver
 - [x] (suggestion) `docs/decisions/` containing only a broken symlink reads as absent (the `[ -e ]` no-match guard also filters broken symlinks) — undocumented side effect — `.agent/scripts/planning_doc_probe.sh:93-97`
 - [x] (suggestion) `janitor-sweep`'s embedded Planning Documents table relies solely on an inline HTML comment to stay non-scoring — no explicit tie-back from the roll-up-rule prose — `.claude/skills/janitor-sweep/SKILL.md:500`
 - [x] (suggestion) Report table templates show the kind's fixed expected path in Location even for "Not found," but the probe emits an empty path for absent kinds — ambiguous rendering guidance, plus test-coverage gaps (symlink/subdir/permission-denied/prefix-false-positive cases untested) — `.claude/skills/audit-project/SKILL.md:318-325`, `.claude/skills/janitor-sweep/SKILL.md:500-508`, `.agent/scripts/tests/test_planning_doc_probe.sh`
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-18 10:45 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-634 at `64f672c`
+**Addressed**: Local Review (Pre-Push), 2026-09-18 10:37 -04:00, round 1, at `380bed3` — 1 must-fix, 8 suggestions
+**Commits**: 0342378, 6359766, bd2bf79, 64f672c
+
+### Actions
+- [x] `audit-project` step 7 gets the same `$ROOT`-empty guard step 5 uses (SKIPPED, not a raw error) — `.claude/skills/audit-project/SKILL.md`
+- [x] Step 7 also guards on `planning_doc_probe.sh` actually existing at `$ROOT/.agent/scripts/` before invoking it — `.claude/skills/audit-project/SKILL.md`
+- [x] `probe_vision`'s heading match gets a word-boundary check (`^## Vision([[:space:]]|$)`); `## Visionary Roadmap` no longer false-positives — `.agent/scripts/planning_doc_probe.sh`, new test case
+- [x] (deferred: markdown-context-aware matching costs more than it's worth — a stateful line scanner or markdown parser for a self-inflicted edge case, and the Planning Documents section is descriptive-only so the worst outcome is a harmless false "present"; documented in the script's header comment) `probe_vision` not markdown-context-aware — `.agent/scripts/planning_doc_probe.sh`
+- [x] Permission-denied paths (unreadable README, unlistable `docs/decisions/`) now emit a distinct stderr diagnostic instead of being indistinguishable from genuine absence; TSV contract unchanged — `.agent/scripts/planning_doc_probe.sh`, new chmod-based tests (skipped when running as root)
+- [x] `probe_decision`'s dotfile exclusion now uses `find ... ! -name '.*'` instead of relying on the caller's unset-by-default `dotglob` — `.agent/scripts/planning_doc_probe.sh`, new `.gitkeep`-plus-real-entry test
+- [x] Broken-symlink-reads-as-absent behavior documented explicitly in `probe_decision`'s header comment, with a dedicated test case — `.agent/scripts/planning_doc_probe.sh`
+- [x] `janitor-sweep`'s Check 2 rollup rule now names the Planning Documents table explicitly as non-scoring, tying back to `audit-project`'s own § 7 rule — `.claude/skills/janitor-sweep/SKILL.md`
+- [x] Both report-format templates (`audit-project` § Report Format, `janitor-sweep`'s embedded example) now show Location as empty (`—`) on "Not found" rows, matching what the probe actually emits — `.claude/skills/audit-project/SKILL.md`, `.claude/skills/janitor-sweep/SKILL.md`
+
+### Verification
+- `.agent/scripts/tests/run_script_tests.sh`: 27/27 shell tests pass (incl. `test_planning_doc_probe.sh`, now 36 assertions, up from 29), 220/220 pytest.
+- `shellcheck --severity=warning` on `planning_doc_probe.sh` and `test_planning_doc_probe.sh`: clean.
+- `plan.md`'s "Implementation notes (as built)" section updated with an "Address-findings pass" subsection summarizing this round.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
