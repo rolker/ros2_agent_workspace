@@ -215,3 +215,15 @@ mechanics, where they weren't obvious from the plan text:
   `feature/issue-626`. `.agent/scripts/tests/run_script_tests.sh` passes in
   full (28 shell test files including the two new/extended ones, 220 pytest
   cases), and `shellcheck` is clean on every changed `.sh` file.
+
+### Round-1 review fix (host-inline, 2026-09-18)
+
+The pre-push review found the last-`=` split only moved the ambiguity: a
+LABEL containing `=` (`/home/x=<workspace=main>`) left the path unmatched and
+leaking, silently. `redact_text` now parses the label by its shape first —
+a trailing `=~` or `=<...>`, the only forms any caller uses — and falls back
+to the last-`=` split only for a label of neither shape. Tests cover a label
+with `=`, `=` on both sides, and the `~` form. The two suggestions are
+documented rather than changed: `redact_url` rewrites only the url the string
+starts with (callers with multi-url text use `redact_text`), and the fd-2
+window around each lock `exec` is safe only because no non-exiting trap exists.
