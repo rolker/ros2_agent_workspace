@@ -60,3 +60,18 @@ issue: 493
 - [x] Commit 4 (`64ba75b`): Rewrote `.devcontainer/agent/README.md` — updated tagline, Quick Start, Security Model, deleted `## Push Gateway Workflow` section (replaced with `## Host-Orchestrator Workflow`), updated Read-Only GitHub Access note; folded in review suggestion 1: dropped `issue_request.sh` reference from Troubleshooting rosdep section
 - [x] Final grep: zero live references to `push_gateway`, `push_request`, `issue_request`, `push-gateway` in `*.sh`, `*.md`, `Makefile` outside work-plans/work-artifacts
 - [x] Plan deviations: none — implemented exactly as approved
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 13:13 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Verdict**: approved
+
+**Branch**: feature/issue-493 at `f06024c`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1183 lines changed origin/main...HEAD, above the 200+ line Deep threshold; Makefile is also a Standard-tier override-trigger file)
+**Must-fix**: 0 | **Suggestions**: 1
+**Round**: 1 | **Ship**: recommended — no must-fix findings; single low-severity suggestion is optional cleanup guidance
+
+### Findings
+- [ ] (suggestion) A pending `push-requests/`/`issue-requests/` JSON left on an operator machine from before this merge is now silently inert forever (no migration/cleanup callout) — `.agent/scripts/docker_run_agent.sh` (removed block)
