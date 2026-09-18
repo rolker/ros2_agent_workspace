@@ -89,7 +89,7 @@ the root is not a fix; finding it is.
 repo (at least one `package.xml`) before auditing it, and **observe** the mode
 rather than asserting it: the current directory is only a `layer` checkout if
 it actually sits under a layer tree. A project repo cloned somewhere else — or
-this skill re-entered on a resolver clone — is mode `clone`, and step 7's
+this skill re-entered on a resolver clone — is mode `clone`, and step 8's
 "correct layer" check must report SKIPPED there rather than answering from an
 assumption it never tested.
 
@@ -152,7 +152,7 @@ in the report header for exactly that reason.
 
 In `clone` mode
 the two genuinely layer-dependent checks (the optional `colcon test` run in
-step 5, and step 7's "correct layer") must report **SKIPPED (no layer
+step 5, and step 8's "correct layer") must report **SKIPPED (no layer
 checkout)**, never OK. A check that could not run is never rendered as a pass.
 Everything else — governance coverage, the agent guide, package metadata,
 test-file existence, documentation — reads the working tree and is unaffected
@@ -247,7 +247,29 @@ Report test existence and pass/fail, not test quality.
 - Are launch files documented?
 - Are custom message/service/action files documented?
 
-### 7. Cross-reference with workspace
+### 7. Check planning documents
+
+Probe the four planning-document kinds named in the expected-location table
+in [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md)
+(vision, roadmap, decision, health) with `.agent/scripts/planning_doc_probe.sh`,
+addressed through `$ROOT` for the same reason step 1 is — `.agent/scripts/`
+does not exist beside a project repo checked out under a layer worktree.
+
+```bash
+"$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
+```
+
+This prints four TSV lines (`<kind>\t<present|absent>\t<relative-path>`),
+which render as the **Planning Documents** report section below. **This is
+descriptive only — absence of any kind is never a finding and never drives a
+Recommended Actions entry.** The design draft is explicit that the
+expected-location table is a published expectation, not a requirement: a
+repo that keeps a planning document somewhere else, or doesn't keep one at
+all, is not in violation. Report `Present` / `Not found` — deliberately not
+"Missing", the word the Governance Coverage table above uses for items that
+do drive a recommendation.
+
+### 8. Cross-reference with workspace
 
 - Is this repo listed in a `.repos` config file?
 - Is it in the expected layer? (`layer` mode only — in `clone` mode there is no
@@ -292,6 +314,19 @@ creating one with the project_agents_guide.md template">
 |---|---|
 | Top-level README | Present / Missing |
 | ... | ... |
+
+### Planning Documents
+
+| Kind | Status | Location |
+|---|---|---|
+| vision | Present / Not found | `README.md` |
+| roadmap | Present / Not found | `ROADMAP.md` |
+| decision | Present / Not found | `docs/decisions` |
+| health | Present / Not found | `docs/health.md` |
+
+<!-- Descriptive only — a repo publishing a planning document somewhere else,
+     or not at all, is not in violation. This section never contributes a
+     Recommended Actions entry (docs/design/planning_document_vocabulary.md). -->
 
 ### Workspace Integration
 
