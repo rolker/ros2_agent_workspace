@@ -975,3 +975,90 @@ Regression checks, all pass: every relative link in the changed files resolves (
 - [x] (must-fix) ROADMAP.md Status cell was a sentence, column convention is a one-word token — `ROADMAP.md:97`
 - [x] (suggestion) "provisional by default" read as binding rather than proposed — reworded
 - [ ] (suggestion) World-store case study is more project narrative than a worked example; trim toward summary + link at promotion — `docs/design/planning_document_vocabulary.md` § What the world-store case showed
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-09-18 14:20 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**PR**: #641 at `7fbd643`
+**Sources**: 5 (Copilot R1 @ `3f1b46d`, R2 @ `1d2a2d4`, R3 @ `7fbd643`; prior Local Review (Pre-Push) @ `690872a` — resolved, different head; CI rollup)
+**Cross-source confirmations**: 0 — all live findings are Copilot re-raising the same items across R1/R2/R3, which is one source repeated, not two sources; the Local Review (Pre-Push) entry's own findings were already fixed in `690872a`, before this PR's head.
+**CI**: all-pass (9 checks: Lint (pre-commit), Validate Documentation, Script tests, Validate commit identity (Mechanism C), copilot-pull-request-reviewer — no failures, none pending)
+
+Round 1 on PR #641 (opened after #638 merged). Copilot ran three reviews as the
+draft was revised in place (R1 against the pre-rewrite text, R2 against the
+deployment-mode-vs-season rewrite, R3 against the current head, which
+re-raises two R1/R2 items as "suppressed" duplicates rather than new). Every
+comment was checked by reading the current file, not the review text, and one
+was verified against the external `unh_marine_autonomy#391` issue body.
+
+### Findings
+- [ ] (must-fix, Copilot R2+R3) `ROADMAP.md:97` links to
+  `#decisions-and-drafts-across-the-season-boundary`, which does not exist —
+  the section this PR added is titled "Decisions and drafts across the
+  **deployment** boundary" (`docs/design/planning_document_vocabulary.md:353`),
+  so the anchor is `#decisions-and-drafts-across-the-deployment-boundary`.
+  Confirmed broken at head `7fbd643` by grepping the actual heading. One-line
+  fix — `ROADMAP.md:97`
+- [ ] (must-fix, Copilot R1+R3) The world-store case study still lists six
+  ADRs (`0002, 0006, 0007, 0010, 0011, 0013`) and calls the count complete
+  ("Three are `Proposed`, three `Accepted`"), but `unh_marine_autonomy#391`
+  (fetched and checked: `gh issue view 391 --repo rolker/unh_marine_autonomy`)
+  names seven world-store ADRs including `0005`. The undercount repeats at
+  three sites: the enumeration and count (`docs/design/planning_document_vocabulary.md:392-396`),
+  "The six store ADRs above" (`:437`), and "six field-written store ADRs"
+  (`:590`). Add ADR-0005 (or state explicitly why it's excluded) and
+  recompute the Proposed/Accepted split at all three sites.
+- [ ] (valid, Copilot R1) `plan.md:412` (and the draft's own text) describe
+  the provisional-decision health row as already "in scope on #635". Checked
+  `gh issue view 635 --repo rolker/ros2_agent_workspace`: its Scope section's
+  finding-tier list ("work that can be lost → unowned safety bugs → rules
+  that have bitten with no enforcement → contradictions in the record →
+  drift") does not mention a provisional-decision row at all. The claim is
+  not currently true. Either add the row to #635's issue body, or reword the
+  plan/draft to describe it as a dependency #635 still needs to pick up
+  rather than settled scope.
+- [ ] (valid, Copilot R2) `docs/design/planning_document_vocabulary.md`
+  ("Every robotics project this workspace serves alternates between two
+  modes...") is an unqualified universal claim. It's still present verbatim
+  at head. ADR-0003 requires the workspace to stay project-agnostic and keep
+  project-specific lifecycle assumptions out of workspace-level text
+  (`docs/decisions/0003-workspace-infrastructure-is-project-agnostic.md`);
+  deployment mode itself is framed around "live field deployments of an
+  autonomous robot boat" (AGENTS.md § Deployment mode), so not every project
+  this workspace serves necessarily alternates deployment/design mode. Scope
+  the sentence to projects that use deployment mode — `docs/design/planning_document_vocabulary.md:358`
+- [ ] (suggestion, Copilot R1+R2) The health row's "aged from the date they
+  were made" / "no review scheduled" classification (`docs/design/planning_document_vocabulary.md:469-471`)
+  has no data source: the proposed `/wrap-up-deployment` "Decisions made this
+  deployment" entry (`:456-462`) names only the decision, where it was
+  recorded, and the review owed — no decision-date or review-schedule field.
+  Either add those fields to the wrap-up entry shape, or move this specific
+  gap into the existing "Open questions" section alongside the review-pass
+  process gap it already names, the same way the draft handled the R1
+  "conversion outcome" concern below.
+
+### Addressed
+- (Copilot R1 @ `3f1b46d`, `docs/design/planning_document_vocabulary.md:433` old numbering) "An off-season review is an activity, not a conversion result... merely holding a review provides no proof threshold." The `1d2a2d4` rewrite (after this comment was raised) names review-pass outcomes — "converts or supersedes the provisional decisions on the list" (§ A review pass whose cadence the roadmap names) — and the "Open questions" section explicitly states the review process itself "is deliberately not specified here... still no specified process," consistent with the draft's own convention of naming what's unproven rather than silently deciding it (§ A draft names what proves it). The specific proof-threshold gap Copilot wants is the same gap the draft now names as open, not a silent one.
+
+### False positives
+None — every live comment traced to a real, currently-present gap or an already-acknowledged one.
+
+### Assessment
+Two must-fix items are one-line factual/link corrections (the broken anchor
+and the ADR-0005 undercount, the latter verified against the external
+issue it cites). One valid item is a governance-accuracy problem: the plan
+claims dependency scope on #635 that #635's issue body does not actually
+carry. One valid item is a scoping claim that reads as workspace-wide policy
+where ADR-0003 requires project-agnostic framing. One suggestion narrows an
+already-partially-addressed gap. Nothing here disputes the design itself or
+reopens an operator decision recorded on #628. CI is green on every check.
+
+### Fix plan
+1. `ROADMAP.md:97` — fix the anchor to `#decisions-and-drafts-across-the-deployment-boundary`.
+2. `docs/design/planning_document_vocabulary.md:392-396,437,590` — add ADR-0005 to the world-store enumeration, recompute the Proposed/Accepted count.
+3. `.agent/work-plans/issue-628/plan.md:412` and the draft's matching sentence — stop claiming the health row is already in #635's scope; either update #635's issue body to own it, or reword to "needs to be added to #635".
+4. `docs/design/planning_document_vocabulary.md:358` — scope "every robotics project this workspace serves alternates between two modes" to projects that use deployment mode.
+5. (optional) `docs/design/planning_document_vocabulary.md:469-471` — add a decision-date/review-schedule field to the wrap-up entry shape, or fold into Open questions.
+6. Re-run `/review-code` pre-push (or a fresh local pass) and let Copilot re-review before merge.
