@@ -345,3 +345,11 @@ Copilot's fifth pass asked for the inside-the-repo rule on README.md,
 ROADMAP.md and docs/health.md too, so it is now one helper applied to every
 probed path: a symlink resolving outside `repo_path` reads as absent with a
 diagnostic, one resolving inside is followed. Tested for all four kinds.
+
+### Report hygiene (host-inline, 2026-09-18)
+
+Copilot's sixth pass: the probe's stderr diagnostics interpolated the absolute
+repo path, which audit-project lets through into a report that must stay free
+of host paths — every diagnostic is now repo-relative (documented in the
+header, checked by the fix script); the audit-project status capture reads
+`$?` inside an `if`, so it is correct under `set -e`.
