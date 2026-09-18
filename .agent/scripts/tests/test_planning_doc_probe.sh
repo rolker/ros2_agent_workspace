@@ -90,6 +90,37 @@ assert_eq "README.md exists, no Vision heading -> absent" "absent	" "$(probe_vis
 
 REPO=$(new_repo)
 assert_eq "no README.md at all -> absent" "absent	" "$(probe_vision "$REPO")"
+
+REPO=$(new_repo)
+{
+    echo "# Some Project"
+    echo ""
+    echo "## Visionary Roadmap"
+} > "$REPO/README.md"
+assert_eq "'## Visionary Roadmap' (same-prefix word, not a boundary) -> absent" "absent	" "$(probe_vision "$REPO")"
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    {
+        echo "# Some Project"
+        echo ""
+        echo "## Vision"
+    } > "$REPO/README.md"
+    chmod 000 "$REPO/README.md"
+    STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+    ACTUAL=$(probe_vision "$REPO" 2>"$STDERR_FILE")
+    assert_eq "unreadable README.md -> absent (not a false present)" "absent	" "$ACTUAL"
+    if grep -q "permission denied" "$STDERR_FILE"; then
+        echo "✅ PASS: unreadable README.md emits a distinct permission-denied stderr diagnostic"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: unreadable README.md did not emit a permission-denied diagnostic: $(cat "$STDERR_FILE")"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+    chmod 644 "$REPO/README.md"
+else
+    echo "⚠️  SKIP: unreadable-README.md case (running as root — permission bits are not enforced)"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -122,6 +153,37 @@ assert_eq "docs/decisions with only .gitkeep -> absent" "absent	" "$(probe_decis
 
 REPO=$(new_repo)
 assert_eq "no docs/decisions at all -> absent" "absent	" "$(probe_decision "$REPO")"
+
+REPO=$(new_repo)
+mkdir -p "$REPO/docs/decisions"
+ln -s "./nonexistent-target-$$" "$REPO/docs/decisions/broken-link"
+assert_eq "docs/decisions with only a broken symlink -> absent" "absent	" "$(probe_decision "$REPO")"
+
+REPO=$(new_repo)
+mkdir -p "$REPO/docs/decisions"
+touch "$REPO/docs/decisions/.gitkeep"
+echo "# ADR 1" > "$REPO/docs/decisions/0001-example.md"
+assert_eq "docs/decisions with .gitkeep AND a real entry -> present" "present	docs/decisions" "$(probe_decision "$REPO")"
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    mkdir -p "$REPO/docs/decisions"
+    echo "# ADR 1" > "$REPO/docs/decisions/0001-example.md"
+    chmod 000 "$REPO/docs/decisions"
+    STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+    ACTUAL=$(probe_decision "$REPO" 2>"$STDERR_FILE")
+    assert_eq "unlistable docs/decisions -> absent (not a false present)" "absent	" "$ACTUAL"
+    if grep -q "permission denied" "$STDERR_FILE"; then
+        echo "✅ PASS: unlistable docs/decisions emits a distinct permission-denied stderr diagnostic"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: unlistable docs/decisions did not emit a permission-denied diagnostic: $(cat "$STDERR_FILE")"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+    chmod 755 "$REPO/docs/decisions"
+else
+    echo "⚠️  SKIP: unlistable-docs/decisions case (running as root — permission bits are not enforced)"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
