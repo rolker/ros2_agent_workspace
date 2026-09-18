@@ -215,6 +215,10 @@ manifest_config_dir() {
         # redirections left to right, so the open (and its error) happens
         # before a later redirection on the same line takes effect.
         exec 6>&2
+        # Signal window: between the line above and the restore below, fd 2 is
+        # /dev/null. Only `trap cleanup EXIT` is installed, and an exiting shell
+        # needs no restore; a future NON-exiting trap would lose its output here
+        # and must restore fd 2 itself.
         exec 2>/dev/null
         if exec 8>"$cache/.$repo.lock"; then
             lock_open=1

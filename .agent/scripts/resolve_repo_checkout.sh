@@ -472,6 +472,10 @@ if command -v flock >/dev/null 2>&1; then
     # stderr on fd 7 and point fd 2 at /dev/null for the open attempt instead,
     # then restore it before deciding how to report.
     exec 7>&2
+    # Signal window: between the line above and the restore below, fd 2 is
+    # /dev/null. Only `trap cleanup EXIT` is installed, and an exiting shell
+    # needs no restore; a future NON-exiting trap would lose its output here
+    # and must restore fd 2 itself.
     exec 2>/dev/null
     if exec 9>"$CACHE_DIR/.$REPO_NAME.lock"; then
         lock_open=1
