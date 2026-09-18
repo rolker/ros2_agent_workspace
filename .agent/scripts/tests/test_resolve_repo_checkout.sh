@@ -507,6 +507,44 @@ else
     fail "redact load failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
 fi
 
+# --- 6h4c. resolve_repo_checkout.sh's OWN pre-redact.sh refusals -------------
+# The no_redact/bad_redact fixtures just above copy-and-SOURCE
+# manifest_fallback.sh, which only exercises THAT script's own guard
+# (manifest_fallback.sh:107-108). resolve_repo_checkout.sh is EXECUTED, not
+# sourced, and has two bare-echo refusals of its own (missing redact.sh;
+# a redact.sh present but that fails to load) that neither this fixture nor
+# any other in this file reaches — copy-and-execute a standalone copy of the
+# resolver itself instead.
+mkdir -p "$TMPDIR_ROOT/resolver_no_redact"
+cp "$REAL_SCRIPTS_DIR/resolve_repo_checkout.sh" "$TMPDIR_ROOT/resolver_no_redact/"
+out=$(bash "$TMPDIR_ROOT/resolver_no_redact/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "cannot load redact.sh beside it" \
+   && ! stderr_text | grep -qF "$TMPDIR_ROOT"; then
+    pass "resolve_repo_checkout.sh without redact.sh beside it → 5, no absolute path on stderr"
+else
+    fail "resolver missing-redact: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
+# A redact.sh that fails to load must NOT itself leak the path via bash's own
+# parse-time error (a syntactically broken file like an unterminated function
+# would print "<absolute path>: line N: syntax error..." straight to stderr
+# before this script's own guard ever runs) — so this fixture is syntactically
+# valid bash that simply returns non-zero and defines nothing, the same
+# "half-defined shell" failure mode the guard exists to catch.
+mkdir -p "$TMPDIR_ROOT/resolver_bad_redact"
+cp "$REAL_SCRIPTS_DIR/resolve_repo_checkout.sh" "$TMPDIR_ROOT/resolver_bad_redact/"
+printf '#!/bin/bash\n# deliberately broken: fails to load, defines nothing\nreturn 1\n' \
+    > "$TMPDIR_ROOT/resolver_bad_redact/redact.sh"
+out=$(bash "$TMPDIR_ROOT/resolver_bad_redact/resolve_repo_checkout.sh" demo_repo 2>"$TMPDIR_ROOT/stderr"); rc=$?
+if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+   && stderr_text | grep -q "cannot load redact.sh beside it" \
+   && ! stderr_text | grep -qF "$TMPDIR_ROOT"; then
+    pass "resolve_repo_checkout.sh with a redact.sh that will not load → 5, no absolute path on stderr"
+else
+    fail "resolver bad-redact: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+fi
+
 # --- 6h4b. a cached manifest that cannot be REFRESHED is a failure ----------
 # The cached clone is still readable, which is exactly why a refresh failure
 # needs its own answer: returning 0 with a stderr warning let the caller
@@ -736,6 +774,31 @@ if command -v flock >/dev/null 2>&1; then
     fi
 else
     echo "⏭️  SKIP: flock cases (flock not available on this host)"
+fi
+
+# --- 6k2. the lock file itself cannot be OPENED (e.g. an unwritable cache
+#          dir) — must be reported through say(), never as bash's own raw
+#          "Permission denied" naming the absolute lock path -----------------
+if command -v flock >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then
+    root=$(make_root lock_open_fails)
+    origin=$(make_origin lock_open_fails)
+    write_manifest "$root" "demo_repo" "file://$origin"
+    cache_dir="$root/.agent/scratchpad/janitor-repos"
+    mkdir -p "$cache_dir"
+    chmod 555 "$cache_dir"
+    out=$(run_resolver "$root" demo_repo); rc=$?
+    chmod 755 "$cache_dir"
+    if [ "$rc" -eq 5 ] && [ -z "$out" ] \
+       && stderr_text | grep -q "could not open the lock file" \
+       && ! stderr_text | grep -qi "permission denied"; then
+        pass "an unopenable lock file → exit 5 via say(), never bash's own raw permission-denied line"
+    else
+        fail "lock open failure: rc=$rc out='$out' (expected 5 / empty), stderr='$(stderr_text)'"
+    fi
+elif [ "$(id -u)" -eq 0 ]; then
+    echo "⏭️  SKIP: lock-open-failure case (running as root; chmod cannot deny)"
+else
+    echo "⏭️  SKIP: lock-open-failure case (flock not available on this host)"
 fi
 
 # --- 7. the same name in two manifests with different urls is ambiguous -----

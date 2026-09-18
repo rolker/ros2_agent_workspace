@@ -128,7 +128,7 @@ TREE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # rather than duplicated, and its absence is a failure: a run that carried on
 # without it would print the very thing the helper exists to remove.
 if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
-    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    echo "resolve_repo_checkout.sh: cannot load redact.sh beside it — refusing to run, since its failure messages would print urls and captured git output unredacted (exit 5)" >&2
     exit 5
 fi
 # The `source` status is checked for the same reason its absence is: a
@@ -138,7 +138,7 @@ fi
 if ! source "$SCRIPT_DIR/redact.sh" \
    || ! declare -F redact_url >/dev/null 2>&1 \
    || ! declare -F redact_text >/dev/null 2>&1; then
-    echo "resolve_repo_checkout.sh: $SCRIPT_DIR/redact.sh would not load — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    echo "resolve_repo_checkout.sh: cannot load redact.sh beside it — refusing to run, since its failure messages would print urls and captured git output unredacted (exit 5)" >&2
     exit 5
 fi
 
@@ -463,9 +463,31 @@ if command -v flock >/dev/null 2>&1; then
     # RESOLVE_LOCK_TIMEOUT overrides the wait, in seconds — the tests use it to
     # exercise the timeout path without waiting five minutes for it.
     lock_wait="${RESOLVE_LOCK_TIMEOUT:-300}"
-    if exec 9>"$CACHE_DIR/.$REPO_NAME.lock" && flock -w "$lock_wait" 9; then
-        :
+    # A failed `exec 9>...` (e.g. an unwritable cache directory) prints bash's
+    # own error text straight to the real stderr, naming the absolute lock
+    # path — bypassing the `say()` redaction funnel entirely. A trailing
+    # `2>/dev/null` on the `exec` line itself is too late: bash applies
+    # redirections left to right, so the open is attempted (and its error
+    # emitted) before that later redirection takes effect. Save the real
+    # stderr on fd 7 and point fd 2 at /dev/null for the open attempt instead,
+    # then restore it before deciding how to report.
+    exec 7>&2
+    # Signal window: between the line above and the restore below, fd 2 is
+    # /dev/null. Only `trap cleanup EXIT` is installed, and an exiting shell
+    # needs no restore; a future NON-exiting trap would lose its output here
+    # and must restore fd 2 itself.
+    exec 2>/dev/null
+    if exec 9>"$CACHE_DIR/.$REPO_NAME.lock"; then
+        lock_open=1
     else
+        lock_open=0
+    fi
+    exec 2>&7 7>&-
+    if [[ "$lock_open" -ne 1 ]]; then
+        say "could not open the lock file for $REPO_NAME (permissions?) — refusing to proceed unlocked"
+        exit 5
+    fi
+    if ! flock -w "$lock_wait" 9; then
         say "could not lock the clone cache for $REPO_NAME within ${lock_wait}s — another run may be wedged on $CACHE_DIR/.$REPO_NAME.lock"
         exit 5
     fi
@@ -482,7 +504,7 @@ clone_fresh() {
     local out
     if [[ -n "$REPO_VERSION" ]]; then
         # Branch or tag: one shot.
-        if out=$("${GIT_NET[@]}" git clone --depth 1 --branch "$REPO_VERSION" -- "$REPO_URL" "$TARGET" 2>&1); then
+        if out=$("${GIT_NET[@]}" git clone --depth 1 --branch "$REPO_VERSION" -- "$REPO_URL" "$TARGET" 2>&1 9>&-); then
             return 0
         fi
         # A `version:` may also be a commit SHA, which --branch cannot take.
@@ -490,9 +512,9 @@ clone_fresh() {
         # the SHA is re-checked against HEAD afterwards: a pin that did not
         # take must never reach the caller as a successful resolve.
         rm -rf "$TARGET"
-        if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1) \
-           && out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$REPO_VERSION" 2>&1) \
-           && out=$(git -C "$TARGET" checkout --detach FETCH_HEAD 2>&1) \
+        if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1 9>&-) \
+           && out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$REPO_VERSION" 2>&1 9>&-) \
+           && out=$(git -C "$TARGET" checkout --detach FETCH_HEAD 2>&1 9>&-) \
            && out=$(verify_pin); then
             return 0
         fi
@@ -500,7 +522,7 @@ clone_fresh() {
         rm -rf "$TARGET"
         return 1
     fi
-    if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1); then
+    if out=$("${GIT_NET[@]}" git clone --depth 1 -- "$REPO_URL" "$TARGET" 2>&1 9>&-); then
         return 0
     fi
     say "clone of $(redact_url "$REPO_URL") failed: $out"
@@ -514,7 +536,7 @@ clone_fresh() {
 verify_pin() {
     [[ "$REPO_VERSION" =~ ^[0-9a-fA-F]{40}$ ]] || return 0
     local head
-    head=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null)
+    head=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null 9>&-)
     if [[ "${head,,}" != "${REPO_VERSION,,}" ]]; then
         echo "checked out '${head:-<none>}', not the pinned '$REPO_VERSION'"
         return 1
@@ -527,12 +549,12 @@ if [[ -d "$TARGET/.git" ]]; then
     # once its origin is confirmed to be the URL this manifest declares —
     # otherwise a renamed or re-homed repo would be audited from the old
     # remote's code under the new remote's name.
-    cached_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null)
+    cached_url=$(git -C "$TARGET" remote get-url origin 2>/dev/null 9>&-)
     if [[ "$cached_url" != "$REPO_URL" ]]; then
         say "cached clone of $REPO_NAME points at '$(redact_url "${cached_url:-<none>}")', manifest says '$(redact_url "$REPO_URL")' — re-cloning"
         clone_fresh || exit 5
-    elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$FETCH_REF" 2>&1) \
-         || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1) \
+    elif ! refresh_out=$("${GIT_NET[@]}" git -C "$TARGET" fetch --depth 1 origin -- "$FETCH_REF" 2>&1 9>&-) \
+         || ! refresh_out=$(git -C "$TARGET" reset --hard FETCH_HEAD 2>&1 9>&-) \
          || ! refresh_out=$(verify_pin); then
         # A shallow fetch of a pinned SHA is not served by every host; a
         # re-clone is the honest recovery, and only its failure is exit 5.

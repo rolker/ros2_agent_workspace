@@ -122,6 +122,7 @@ manifest_config_dir() {
     local root="${1:-$PWD}"
     local pointer_file="$root/configs/project_bootstrap.url"
     local bootstrap_url owner repo branch config_path git_url cache clone_dir
+    local lock_open
 
     # The normal case: the workspace has its manifest on disk. Print nothing.
     #
@@ -202,7 +203,34 @@ manifest_config_dir() {
     # advisory lock with a bounded wait, held for the clone/refresh. Absent
     # flock the run proceeds unlocked and says so.
     if command -v flock >/dev/null 2>&1; then
-        if ! { exec 8>"$cache/.$repo.lock" && flock -w 120 8; }; then
+        # A failed `exec 8>...` (e.g. an unwritable cache directory) prints
+        # bash's own error text straight to the real stderr, naming the
+        # absolute lock path — bypassing the `_manifest_fallback_say`
+        # redaction funnel entirely. Same fix as resolve_repo_checkout.sh's
+        # lock open: save the real stderr first (fd 6 here — distinct from
+        # resolve_repo_checkout.sh's fd 7, in case the two are ever nested in
+        # one process) and point fd 2 at /dev/null for the open attempt, then
+        # restore before deciding how to report. A trailing `2>/dev/null` on
+        # the `exec` line itself would be too late — bash applies
+        # redirections left to right, so the open (and its error) happens
+        # before a later redirection on the same line takes effect.
+        exec 6>&2
+        # Signal window: between the line above and the restore below, fd 2 is
+        # /dev/null. Only `trap cleanup EXIT` is installed, and an exiting shell
+        # needs no restore; a future NON-exiting trap would lose its output here
+        # and must restore fd 2 itself.
+        exec 2>/dev/null
+        if exec 8>"$cache/.$repo.lock"; then
+            lock_open=1
+        else
+            lock_open=0
+        fi
+        exec 2>&6 6>&-
+        if [[ "$lock_open" -ne 1 ]]; then
+            _manifest_fallback_say "could not open the lock file for $repo (permissions?) — refusing to proceed unlocked"
+            return 5
+        fi
+        if ! flock -w 120 8; then
             _manifest_fallback_say "could not lock the manifest cache for $repo within 120s"
             return 5
         fi
@@ -224,7 +252,7 @@ manifest_config_dir() {
         # resets to the CURRENT pointer's `$branch` on every run, so a cached
         # clone made at a different branch of the same repo is corrected
         # rather than reused as-is.
-        cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null)
+        cached_url=$(git -C "$clone_dir" remote get-url origin 2>/dev/null 8>&-)
         if [[ "$cached_url" != "$git_url" ]]; then
             _manifest_fallback_say "cached manifest clone at $clone_dir points at '$(redact_url "${cached_url:-<none>}")', the bootstrap pointer derives '$(redact_url "$git_url")' — re-cloning"
             rm -rf "$clone_dir"
@@ -241,14 +269,14 @@ manifest_config_dir() {
         # could not verify: exactly the report-level false green the callers'
         # status contract exists to prevent. Callers map 6 to
         # FAILED(manifest refresh: <reason>).
-        if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1) \
-           || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1); then
+        if ! out=$(_manifest_fallback_git git -C "$clone_dir" fetch --depth 1 origin -- "$branch" 2>&1 8>&-) \
+           || ! out=$(git -C "$clone_dir" reset --hard FETCH_HEAD 2>&1 8>&-); then
             _manifest_fallback_say "could not refresh the cached manifest repo at $clone_dir ($out) — the cached copy may be stale, so this is a failure, not a fallback"
             return 6
         fi
     else
         rm -rf "$clone_dir"
-        if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1); then
+        if ! out=$(_manifest_fallback_git git clone --depth 1 --branch "$branch" -- "$git_url" "$clone_dir" 2>&1 8>&-); then
             _manifest_fallback_say "could not clone the manifest repo $(redact_url "$git_url") at '$branch': $out"
             rm -rf "$clone_dir"
             return 5

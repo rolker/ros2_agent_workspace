@@ -1,0 +1,229 @@
+# Plan: janitor-sweep redaction-class fixes (gate for #635)
+
+## Issue
+
+https://github.com/rolker/ros2_agent_workspace/issues/626
+
+## Context
+
+Issue #626 collects 23 deferred review suggestions from PR #625 rounds 5-6.
+The operator's 2026-09-18 comment (and the `## Issue Review` entry already on
+this issue's `progress.md`) fixes scope for **this PR** to the **redaction
+class only**: five confirmed bugs where an absolute host path or a credential
+tail reaches stderr and is transcribed verbatim into the janitor-sweep report
+that `#635` will publish as `docs/health.md` into graded repos. Everything
+else on the issue (false-RED case sensitivity, path-traversal via symlinked
+`config_path`, doc-accuracy nits, two named test-fixture gaps) stays deferred
+on #626.
+
+All five items were re-verified against current `HEAD` source during the
+Issue Review pass; two (the `@`-in-password leak and the `REDACT_PATH_PREFIXES`
+`=`-split corruption) were reproduced live in a sourced shell. None were
+already fixed.
+
+## Approach
+
+1. **Stop the two pre-`redact.sh` refusals in `resolve_repo_checkout.sh` from
+   naming an absolute path.** Match the wording `manifest_fallback.sh:107`
+   already uses ("cannot load redact.sh beside it") instead of interpolating
+   `$SCRIPT_DIR/redact.sh`.
+2. **Stop a failed lock-file `exec` from leaking bash's own error text**
+   (which bypasses the `say`/`_manifest_fallback_say` redaction funnel
+   entirely) in both `resolve_repo_checkout.sh` and `manifest_fallback.sh`.
+   Save/restore stderr around the `exec` so bash's built-in error message
+   never reaches the real stderr, and report failure through the existing
+   redacted `say()` call instead.
+3. **Fix the `@`-in-password leak** in both `redact_url` and `redact_text` by
+   widening the userinfo character class so the match is greedy up to the
+   *last* `@` before the host, not the first.
+4. **Fix the `REDACT_PATH_PREFIXES` first-`=`-split corruption** by splitting
+   each `<prefix>=<replacement>` spec on the *last* `=` instead of the first,
+   so a workspace path containing `=` is preserved intact as the prefix.
+5. **Stop the janitor-sweep report-directory `mkdir` failure from printing an
+   absolute path, and make it terminal.** Move `redact.sh` sourcing and
+   `REDACT_PATH_PREFIXES` setup earlier in `janitor-sweep/SKILL.md` step 1
+   (right after `$ROOT` is resolved), route the `mkdir` failure message
+   through `redact_text`, and `exit 1` instead of falling through. The new
+   direct `source ".../redact.sh"` this adds must carry the same guard items
+   1-2 establish elsewhere in this same PR: check the `source`'s own exit
+   status **and** `declare -F redact_url`/`declare -F redact_text`, and fail
+   terminally (`exit 1`) with a message that names no absolute path — a bare
+   `source` here would reintroduce, in new code, the exact leak class (a
+   failed/missing helper printing bash's own unredacted, path-bearing error)
+   that items 1-2 are fixing in `resolve_repo_checkout.sh` (Plan Review
+   Finding 2).
+
+Ride-alongs (required, per operator scope):
+
+6. **Close the lock fd for child `git` processes** so an inherited fd 9/8
+   cannot hold the advisory lock open past the parent's own exit (a stalled
+   or orphaned `git` child currently keeps the lock alive). Append `9>&-`
+   (`8>&-`) to every `git` invocation that runs after the lock fd is opened,
+   in both scripts.
+7. **New `.agent/scripts/tests/test_redact.sh`**, in the shape of the
+   existing `tests/test_*.sh` files (sourced-function tests, `pass`/`fail`
+   counters, non-zero exit on any failure), covering: the `@`-in-password
+   case for both `redact_url`/`redact_text`, two distinct urls with
+   credentials on one line (confirming the widened match does not merge
+   them), a `REDACT_PATH_PREFIXES` spec whose value contains `=`, and the
+   pre-existing simple-case behavior (so the file also serves as the
+   dedicated, discoverable redact.sh test surface the issue named as
+   missing).
+
+   **New (not "extended") test cases for `resolve_repo_checkout.sh`'s own two
+   pre-`redact.sh` refusals** (Plan Review Finding 1): the existing
+   `no_redact`/`bad_redact` fixture at `test_resolve_repo_checkout.sh:489-503`
+   copies and **sources** `manifest_fallback.sh`, so it tests *that* script's
+   guard (`manifest_fallback.sh:107`) — it does not execute
+   `resolve_repo_checkout.sh` at all, so the two bare-echo refusals at its own
+   lines 130-131 and 141 (before this PR's wording fix) have zero coverage.
+   Add new cases that copy `resolve_repo_checkout.sh` itself into a temp
+   directory and **execute** it (matching how the script is actually invoked)
+   in two shapes: (a) `redact.sh` absent from beside the copy, and (b)
+   `redact.sh` present but edited to fail on `source` (or to not define
+   `redact_url`/`redact_text`). Assert exit 5 and that stderr contains
+   neither `$SCRIPT_DIR` nor any other absolute path, only the fixed
+   "cannot load redact.sh beside it" wording.
+
+   **New lock-open-failure test**, alongside the existing lock section (near
+   the "6k" timeout case): make the clone-cache directory (or the specific
+   `.<repo>.lock` file within it) unwritable/unopenable before invoking the
+   script, assert exit 5, and assert stderr carries the `say()`-emitted,
+   redacted "could not open the lock file" message but never a raw bash
+   `exec`/permission-denied line naming the absolute lock path.
+8. **Fix the stale `AGENTS.md` `redact.sh` Script Reference row** — Ask-First
+   already confirmed by the operator via #626's own framing (this row
+   directly documents the refusal contract touched by item 1/2 above).
+
+## Files to Change
+
+| File | Change |
+|------|--------|
+| `.agent/scripts/resolve_repo_checkout.sh:130-131,141` | Drop `$SCRIPT_DIR/redact.sh` from both bare-`echo` refusal messages; match `manifest_fallback.sh`'s "cannot load redact.sh beside it" wording. |
+| `.agent/scripts/resolve_repo_checkout.sh:465-471` | Save/restore stderr around `exec 9>"$CACHE_DIR/.$REPO_NAME.lock"`; on failure, route a redacted message through `say()` and `exit 5` instead of letting bash's own error print the raw path. |
+| `.agent/scripts/resolve_repo_checkout.sh:485,493,494,495,503,517,530,534,535` | Append `9>&-` to each `git`/`"${GIT_NET[@]}" git` invocation after the lock fd is opened, so children don't inherit fd 9. |
+| `.agent/scripts/manifest_fallback.sh:205-208` | Same save/restore pattern around `exec 8>"$cache/.$repo.lock"` (use fd 6 for the saved copy — distinct from `resolve_repo_checkout.sh`'s fd 7, in case the two are ever nested). |
+| `.agent/scripts/manifest_fallback.sh:227,244,245,251` (Plan Review Finding 4, re-verified against `HEAD`: the `remote get-url origin`, `fetch`, `reset --hard`, and `clone` calls after `exec 8>` at line 205 — not the "~190-230"/"223" range/line first cited) | Append `8>&-` to each, mirroring item 6. |
+| `.agent/scripts/redact.sh:41` | `redact_url`: change `[^/@]*@` → `[^/]*@` so the greedy match reaches the *last* `@` before any `/`. |
+| `.agent/scripts/redact.sh:57` | `redact_text`: change `[^/[:space:]@]+@` → `[^/[:space:]]+@` in the `sed -E` pattern, same fix. |
+| `.agent/scripts/redact.sh:61-62` | `REDACT_PATH_PREFIXES` parsing: `prefix=${spec%%=*}` → `prefix=${spec%=*}`; `replacement=${spec#*=}` → `replacement=${spec##*=}` (split on the *last* `=`). |
+| `.claude/skills/janitor-sweep/SKILL.md` (step 1, ~lines 92-112 — inside step 1, not step 2; Plan Review Finding 3) | Move `REDACT_PATH_PREFIXES=("$ROOT=<workspace>")` (+ `$HOME` line) and a **guarded** direct `source "$ROOT/.agent/scripts/redact.sh"` to immediately after `$ROOT` is resolved, before the `mkdir -p "$REPORT_DIR"` line — the guard checks the `source`'s own exit status and `declare -F redact_url`/`declare -F redact_text`, and `exit 1` with a path-free message on failure (Plan Review Finding 2; see item 5 above). Change the `mkdir` line to `if ! mkdir -p "$REPORT_DIR"; then echo "FAILED(report directory: cannot create $(redact_text "$REPORT_DIR"))"; exit 1; fi`. Remove the now-redundant `REDACT_PATH_PREFIXES` assignment further down, still inside step 1 (~line 136 — the label "step 2" in an earlier draft of this plan was wrong; step 2 does not begin until line 240), since it is already set (idempotent duplicate, drop it to avoid drift). |
+| `AGENTS.md` (Script Reference, `redact.sh` row) | "Both callers **refuse to run** when it is missing rather than printing around it" → "...when it is missing **or will not load** (exit 5) rather than printing around it". |
+| `.agent/scripts/tests/test_redact.sh` (new) | New hermetic test file per item 7 above. |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | **New** cases (not an extension of the existing `no_redact`/`bad_redact` fixture at ~lines 489-503, which sources `manifest_fallback.sh` and tests *its* guard, not `resolve_repo_checkout.sh`'s own — Plan Review Finding 1) that copy `resolve_repo_checkout.sh` itself into a temp dir and execute it with `redact.sh` absent, and with `redact.sh` present but broken, asserting exit 5 and no absolute path on stderr for either. Add a new case near the existing lock section (~line 700, "6k") exercising an unwritable/unopenable lock-file path: assert exit 5, and assert stderr contains the `say()`-emitted, redacted message but never a raw bash `exec`/permission-denied line naming the absolute lock path. |
+
+## Principles Self-Check
+
+| Principle | Consideration |
+|---|---|
+| Human control and transparency | The sweep report is read directly by operators and (via #635) published into other repos' `docs/health.md`; every fix in this plan removes a channel by which a host's real filesystem layout or a credential fragment could reach that surface unintentionally. |
+| A change includes its consequences | Item 5's `mkdir` fix reorders `REDACT_PATH_PREFIXES` setup in `janitor-sweep/SKILL.md`; the plan explicitly removes the now-duplicate later assignment rather than leaving two copies to drift. Item 8 updates the one doc row that describes the exact refusal contract items 1-2 touch. |
+| Test what breaks | Every one of the 5 redaction-class bugs plus the fd-inheritance ride-along gets a new or extended test (see Files to Change); none of the five items had prior test coverage per the Issue Review. |
+| Only what's needed | The 17 deferred items (false-RED case sensitivity, path-traversal, lock-lifecycle-via-`manifest_config_dir`-return doc gap, doc nits, two named test-fixture gaps) are explicitly left off this PR per operator scope; this plan does not touch them. |
+| Improve incrementally | This is scoped as its own gate PR ahead of #635, not folded into a larger rewrite. |
+
+## ADR Compliance
+
+| ADR | Triggered | How addressed |
+|---|---|---|
+| ADR-0013 (progress.md entry-type vocabulary) | Yes | This plan's own `## Plan Authored` entry and all subsequent phase entries follow the vocabulary; no new entry types needed. |
+| Others (0001-0012, 0014-0019) | No | This work is a bug-fix pass on existing shell scripts and skill docs; it does not touch worktrees, deployment mode, dispatch contracts, or layer chaining. |
+
+## Consequences
+
+| If we change... | Also update... | Included in plan? |
+|---|---|---|
+| `redact.sh`'s `redact_url`/`redact_text` regexes | `test_resolve_repo_checkout.sh`'s inline simple-case assertions (~lines 887-907) must still pass unchanged | Yes — the fix only widens the greedy match; the existing single-`@`, no-`@`, and scp-form cases are unaffected (verified by re-deriving the regex behavior by hand; will re-run `test_resolve_repo_checkout.sh` after the edit). |
+| `REDACT_PATH_PREFIXES` split direction | Every caller that composes a spec (`resolve_repo_checkout.sh` ~lines 220-223, `janitor-sweep/SKILL.md` ~line 136, `issue-triage/SKILL.md` if present) | Checked: all existing callers use replacement tokens (`<workspace>`, `<worktree>`, `~`) that never contain `=`, so splitting on the last `=` instead of the first is a pure bugfix with no behavior change for any existing caller. |
+| `janitor-sweep/SKILL.md` step 1/2 ordering | `issue-triage/SKILL.md` and `audit-project/SKILL.md`, which the doc says share "the same snippet" for the workspace-root walk | Checked: neither has the `mkdir -p "$REPORT_DIR"` line (grep confirmed no hits in either file) — the bug is unique to `janitor-sweep/SKILL.md`. No follow-up needed; noted here so a future reader doesn't have to re-check. |
+| Appending `9>&-`/`8>&-` to git calls | Any *other* fd the git calls might need to inherit | Checked: neither script opens any other high-numbered fd before these git calls; `9>&-`/`8>&-` only closes the lock fd, nothing else. |
+
+## Documentation & Instruction Impact
+
+- **Stale docs** (must land in this PR): `AGENTS.md`'s `redact.sh` Script
+  Reference row (item 8) — it currently says callers refuse to run "when it
+  is missing," which is stale now that `resolve_repo_checkout.sh:141` and
+  `manifest_fallback.sh`'s guard also refuse on a `redact.sh` that fails to
+  *load* (source error / functions not defined). Fixing the row's wording
+  and adding the exit code lands in this PR since the code it describes is
+  being touched.
+- **Agent-instruction candidates** (proposals only): None — this is a
+  targeted bugfix pass; it does not surface a new pattern that belongs in
+  `.agent/knowledge/` beyond what item 8 already covers.
+
+## Open Questions
+
+- Should the `9>&-`/`8>&-` fd-closing ride-along also cover the `rm -rf`,
+  `mkdir -p`, and other non-`git` subprocess calls inside the locked regions
+  (e.g., `find`, if any are added later)? This plan only closes the fd for
+  `git` invocations, since those are the only long-running/network-facing
+  children today and the ones the deferred note names explicitly.
+- The deferred item "Manifest-cache lock releases when `manifest_config_dir`
+  returns... read unlocked" (a `$(...)`-subshell scoping issue, not a
+  redaction bug) is adjacent to item 6's `exec`/`flock` code but explicitly
+  out of scope per the operator's framing — confirming it stays deferred and
+  is not accidentally "fixed" as a side effect of the fd-inheritance change
+  (the fd-inheritance fix does not touch where the lock is acquired, only
+  what inherits it, so no overlap is expected).
+
+## Estimated Scope
+
+Single PR. Five small, independently testable script/doc edits plus one new
+test file; no cross-repo or cross-layer impact.
+
+## Implementation notes (as built)
+
+Built exactly to plan, item by item, as separate atomic commits. Notes on the
+mechanics, where they weren't obvious from the plan text:
+
+- **Item 2/6 (lock-open save/restore)**: a plain trailing `2>/dev/null` on the
+  `exec 9>"$lockfile"` line does **not** suppress bash's own error — bash
+  applies redirections left to right, so the open is attempted (and its
+  error emitted to the then-current stderr) before a later redirection on
+  the same line takes effect. Verified this empirically before writing the
+  fix. The working pattern is: `exec 7>&2` (save), `exec 2>/dev/null`
+  (redirect away), attempt `exec 9>"$lockfile"` and capture its own exit
+  status into a `lock_open` variable (since the exec's status is not
+  otherwise recoverable once fd 2 is restored), then `exec 2>&7 7>&-`
+  (restore + close the saved copy) before deciding how to report. Same
+  pattern in `manifest_fallback.sh`, using fd 6/8 instead of 7/9 as the plan
+  specifies, plus a new `local lock_open` in `manifest_config_dir`'s
+  declarations.
+- **Item 7 test fixtures**: the "redact.sh present but fails to load" case
+  (both the new resolver fixture and, implicitly, the pre-existing
+  manifest_fallback.sh `bad_redact` fixture) must NOT use a syntactically
+  broken file (e.g. an unterminated function) — bash's own parse-time error
+  for a `source` on invalid syntax prints the sourced file's *absolute path*
+  directly to stderr, before this PR's own guard code ever runs, which would
+  make the "no absolute path on stderr" assertion fail for the wrong reason.
+  Used a syntactically valid file that simply `return 1`s and defines
+  nothing instead — reproduces the same "half-defined shell" failure mode
+  without the parser leak. (The pre-existing `bad_redact` fixture at
+  `test_resolve_repo_checkout.sh:500-508`, which predates this PR and tests
+  `manifest_fallback.sh`'s guard, still uses the unterminated-function form;
+  it happens to pass because it never asserts path-absence, only message
+  content — left as-is since re-auditing it is outside this PR's scope, but
+  noted here for a future reader.)
+- **Commit granularity**: split slightly finer than the plan's five
+  numbered items where a single Files-to-Change row bundled two
+  independently-revertable changes (e.g. the two redact.sh regex/split
+  fixes; the lock-open fix vs. the fd-close ride-along in each script) —
+  each landed as its own atomic commit rather than being combined, per the
+  workspace's "one logical change per commit" rule.
+- All five redaction-class fixes, the two ride-alongs, the new/extended
+  tests, the `AGENTS.md` doc fix, and this plan amendment are on
+  `feature/issue-626`. `.agent/scripts/tests/run_script_tests.sh` passes in
+  full (28 shell test files including the two new/extended ones, 220 pytest
+  cases), and `shellcheck` is clean on every changed `.sh` file.
+
+### Round-1 review fix (host-inline, 2026-09-18)
+
+The pre-push review found the last-`=` split only moved the ambiguity: a
+LABEL containing `=` (`/home/x=<workspace=main>`) left the path unmatched and
+leaking, silently. `redact_text` now parses the label by its shape first —
+a trailing `=~` or `=<...>`, the only forms any caller uses — and falls back
+to the last-`=` split only for a label of neither shape. Tests cover a label
+with `=`, `=` on both sides, and the `~` form. The two suggestions are
+documented rather than changed: `redact_url` rewrites only the url the string
+starts with (callers with multi-url text use `redact_text`), and the fd-2
+window around each lock `exec` is safe only because no non-exiting trap exists.
