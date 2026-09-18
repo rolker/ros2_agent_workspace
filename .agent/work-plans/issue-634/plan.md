@@ -266,3 +266,41 @@ Single PR.
   is a lot of complexity for a self-inflicted edge case, and since the
   Planning Documents section is descriptive-only, the worst outcome is a
   harmless false "present".
+
+### Address-findings pass (Integrated Review, post-PR)
+
+- **Must-fix**: the CLI entry guard now also checks `[ -x ]` (search
+  permission) on `repo_path`, not just `-d`/`-r`. Without it, a
+  readable-but-unsearchable `repo_path` let every probe silently report
+  `absent` for all four kinds instead of hitting the documented exit-3
+  "could not run" contract, since nothing inside an unsearchable directory
+  can be stat'd. Covered by a new CLI test (`chmod 600`, skipped when
+  running as root).
+- **Must-fix**: `audit-project` step 7's guard now checks `[ -x ]` on
+  `planning_doc_probe.sh` (subsuming the prior existence-only `[ -f ]`
+  check, since `-x` is also false on a nonexistent path) — a
+  present-but-non-executable script previously reached the direct
+  invocation and failed with a raw "Permission denied" instead of the
+  intended `SKIPPED`.
+- **Suggestion**: the PR description's "unreadable paths get a stderr
+  diagnostic, distinct from absence" claim previously only held for
+  `probe_vision`/`probe_decision`. Rather than narrow the description,
+  extended `probe_roadmap` and `probe_health` to detect the permission
+  problem they're actually capable of detecting — an unlistable parent
+  directory (`repo_path` for `ROADMAP.md`, `docs/` for `docs/health.md`) —
+  and emit the same distinct stderr diagnostic there, covered by new
+  chmod-based tests. Both probes still correctly report "present" for a
+  target file that exists but is itself unreadable, since neither reads
+  file contents. `probe_decision`'s `find` now uses `-L` so listing
+  descends through `docs/decisions` when it is itself a symlink to a
+  populated directory (previously misreported `absent`, since plain `find`
+  does not descend into a symlinked start path) — this also closes one of
+  the three test-only symlink gaps Local Review round 2 left open.
+- While already in the test file for the suggestion above, also added the
+  other two round-2 symlink test gaps: a broken-symlink `ROADMAP.md` and a
+  broken-symlink `docs/health.md` (both already correctly read `absent` via
+  `[ -f ]`; test-completeness gaps only, no behavior change).
+- Full test suite (`run_script_tests.sh`, 27/27 shell incl. 44/44
+  `test_planning_doc_probe.sh` assertions, 220/220 pytest) and
+  `shellcheck --severity=warning` (via the pre-commit hook) both pass on
+  the modified scripts.
