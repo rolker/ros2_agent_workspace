@@ -108,8 +108,33 @@ if [ -z "$ROOT" ]; then
     echo "FAILED(workspace root: none above ${WORKSPACE_ROOT:-$(pwd)} — run from the workspace, or set WORKSPACE_ROOT to one)"
     exit 1
 fi
+
+# redact.sh and $REDACT_PATH_PREFIXES are set up here, before the report
+# directory is even created, because EVERY failure from this point on —
+# starting with the `mkdir` two lines down — is a reason string that can name
+# an absolute path, and this skill's own contract forbids host identity in the
+# report. Loading it late (as a prior version of this step did, just before
+# sourcing manifest_fallback.sh) left the `mkdir` failure printing $REPORT_DIR
+# verbatim. `declare -F` guards the load the same way resolve_repo_checkout.sh
+# and manifest_fallback.sh guard their own: a `source` can succeed as a
+# no-op on a truncated file, leaving the functions undefined.
+REDACT_PATH_PREFIXES=("$ROOT=<workspace>")
+if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && [ "$HOME" != "$ROOT" ]; then
+    REDACT_PATH_PREFIXES+=("$HOME=~")
+fi
+# shellcheck source=/dev/null
+if ! source "$ROOT/.agent/scripts/redact.sh" \
+   || ! declare -F redact_url >/dev/null 2>&1 \
+   || ! declare -F redact_text >/dev/null 2>&1; then
+    echo "FAILED(redact.sh unusable — missing or will not load; cannot safely print any further failure reason)"
+    exit 1
+fi
+
 REPORT_DIR="$ROOT/.agent/scratchpad/janitor"
-mkdir -p "$REPORT_DIR" || echo "FAILED(report directory: cannot create $REPORT_DIR)"
+if ! mkdir -p "$REPORT_DIR"; then
+    echo "FAILED(report directory: cannot create $(redact_text "$REPORT_DIR"))"
+    exit 1
+fi
 ```
 
 This is the same snippet `audit-project` step 1 uses. It resolves the workspace
@@ -130,14 +155,12 @@ it needs" covers:
 ```bash
 # `manifest_fallback.sh` routes every diagnostic through `redact.sh`, which
 # rewrites absolute paths only when the CALLER says which prefixes to strip.
-# Unset, its reasons keep this host's real paths — and they are transcribed
-# verbatim into a report the "keep the report free of host identity and
-# absolute local paths" rule below forbids them in. Most specific first.
-REDACT_PATH_PREFIXES=("$ROOT=<workspace>")
-if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && [ "$HOME" != "$ROOT" ]; then
-    REDACT_PATH_PREFIXES+=("$HOME=~")
-fi
-# The `source` itself can fail — exit 5, "the redact.sh I route diagnostics
+# `$REDACT_PATH_PREFIXES` and `redact.sh` itself were already set up in step 1
+# (before the report directory was even created), so nothing further is needed
+# here — `manifest_fallback.sh` sources `redact.sh` itself only when the
+# functions are not already declared, so this does not re-source it.
+#
+# The `source` itself can fail — exit 5, "the redact.sh it routes diagnostics
 # through is missing or will not load". Unchecked, that surfaces later as
 # `manifest_config_dir: command not found`, which is not a code any arm below
 # claims. Check it here, where the reason is still on stderr.
