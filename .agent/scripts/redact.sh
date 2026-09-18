@@ -38,7 +38,11 @@ fi
 # `git@github.com:org/repo` url has no password field and is left alone.
 redact_url() {
     local url="$1"
-    if [[ "$url" =~ ^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@(.*)$ ]]; then
+    # Greedy up to the LAST `@` before the host, not the first: a password
+    # containing a literal `@` (`user:p@ss@host`) previously matched only the
+    # shortest run (`[^/@]*` stops at the first `@`), leaving the password's
+    # own `@`-suffix — `ss@host` — unredacted in the output.
+    if [[ "$url" =~ ^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@(.*)$ ]]; then
         printf '%s<redacted>@%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
     else
         printf '%s' "$url"
@@ -53,8 +57,15 @@ redact_url() {
 # $REDACT_PATH_PREFIXES.
 redact_text() {
     local text="$1"
+    # Same last-`@` widening as redact_url, and for the same reason: a
+    # password containing a literal `@` left its own tail unredacted when the
+    # class excluded `@` and stopped at the first one. Every `scheme://`
+    # prefix contains a literal `/`, which the widened class still excludes,
+    # so this cannot merge two distinct urls' credentials on one line — the
+    # greedy run for one url's userinfo still halts at the next url's `://`
+    # (or at any `/` in the first url's own path).
     text=$(printf '%s' "$text" \
-           | sed -E 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/[:space:]@]+@#\1<redacted>@#g')
+           | sed -E 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/[:space:]]+@#\1<redacted>@#g')
     local spec prefix replacement
     for spec in ${REDACT_PATH_PREFIXES[@]+"${REDACT_PATH_PREFIXES[@]}"}; do
         [[ -z "$spec" || "$spec" != *=* ]] && continue
