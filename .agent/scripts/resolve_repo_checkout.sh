@@ -128,7 +128,7 @@ TREE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # rather than duplicated, and its absence is a failure: a run that carried on
 # without it would print the very thing the helper exists to remove.
 if [[ ! -f "$SCRIPT_DIR/redact.sh" ]]; then
-    echo "resolve_repo_checkout.sh: cannot find $SCRIPT_DIR/redact.sh — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    echo "resolve_repo_checkout.sh: cannot load redact.sh beside it — refusing to run, since its failure messages would print urls and captured git output unredacted (exit 5)" >&2
     exit 5
 fi
 # The `source` status is checked for the same reason its absence is: a
@@ -138,7 +138,7 @@ fi
 if ! source "$SCRIPT_DIR/redact.sh" \
    || ! declare -F redact_url >/dev/null 2>&1 \
    || ! declare -F redact_text >/dev/null 2>&1; then
-    echo "resolve_repo_checkout.sh: $SCRIPT_DIR/redact.sh would not load — refusing to run, since its failure messages would print urls and captured git output unredacted" >&2
+    echo "resolve_repo_checkout.sh: cannot load redact.sh beside it — refusing to run, since its failure messages would print urls and captured git output unredacted (exit 5)" >&2
     exit 5
 fi
 
