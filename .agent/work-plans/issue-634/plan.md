@@ -182,17 +182,48 @@ Script Reference row.
 ## Open Questions
 
 - [ ] Confirm the `AGENTS.md` Script Reference row wording before merge
-  (Ask-First: instruction file edit).
-- [ ] Confirm `run_script_tests.sh` auto-discovers `test_*.sh` under
-  `.agent/scripts/tests/`, or needs the new test file added to an explicit
-  list — resolve during implementation, not a design decision.
-- [ ] Confirm `## Vision` heading matching should be exact-level (`^## Vision`)
-  and not also match trailing text on the same line (e.g. `## Vision and
-  Goals`) — this plan assumes a prefix match on the heading text is fine
-  (the workspace's own `README.md` uses a bare `## Vision`), but a project
-  repo could plausibly use a longer heading. Flagging rather than guessing;
-  low-stakes since it only affects a descriptive Present/Not-found row.
+  (Ask-First: instruction file edit). The operator approved this instruction-file
+  edit at the plan-review checkpoint, 2026-09-18; the added row is at
+  `AGENTS.md` § Script Reference, immediately after the `field_mode.sh` row.
+- [x] Resolved (plan-review Finding 1, confirmed during implementation):
+  `run_script_tests.sh` already auto-discovers `test_*.sh` via `nullglob`
+  over both `"$SCRIPTS_DIR"/test_*.sh` and `"$TESTS_DIR"/test_*.sh` — no
+  explicit registration list exists. `test_planning_doc_probe.sh` needed no
+  extra wiring beyond being placed in `.agent/scripts/tests/`; confirmed by
+  running `run_script_tests.sh`, which picked it up and ran it without any
+  change to the runner.
+- [x] Resolved during implementation: `## Vision` heading matching is a
+  **prefix match at the `##` level** — `^## Vision` — which matches a bare
+  `## Vision` (this workspace's own `README.md`) and also a longer heading
+  that starts with the word "Vision", such as `## Vision and Goals` (a
+  plausible project-repo phrasing the draft names no exact wording for). It
+  does **not** match `### Vision` (wrong heading level) or `## Our Vision`
+  (does not start with "Vision"). The choice and its rationale are documented
+  in `planning_doc_probe.sh`'s header comment, and all four cases (bare
+  heading, trailing-text heading, wrong level, non-matching prefix) are
+  covered in `test_planning_doc_probe.sh`'s "Vision heading variants" block.
 
 ## Estimated Scope
 
 Single PR.
+
+## Implementation notes (as built)
+
+- `probe_decision` excludes dotfiles when counting `docs/decisions/` entries
+  (plan-review Finding 2): a directory holding only a `.gitkeep` reads as
+  `absent`, matching the stated intent that an empty placeholder directory is
+  not "a decision was recorded here." Covered by a dedicated
+  `.gitkeep`-only test case in `test_planning_doc_probe.sh`, alongside the
+  already-planned present/empty/absent cases.
+- `audit-project`'s new step became step 7 (renumbering the former step 7
+  "Cross-reference with workspace" to step 8); the two internal
+  cross-references to "step 7's ... correct layer check" were updated to
+  "step 8's" to match.
+- `janitor-sweep`'s report-format example was extended in place (the
+  `#### Project governance — <repo>` block already embeds `audit-project`'s
+  report verbatim) to show the Planning Documents table appearing inside
+  that embed — no new call site, no new check, no change to the four-check
+  status contract, exactly as the plan specifies.
+- Full test suite (`run_script_tests.sh`) and `shellcheck --severity=warning`
+  (via the pre-commit hook) both pass on the two new scripts; see the PR /
+  progress.md for the run output.
