@@ -220,6 +220,15 @@ else
     TEST_FAIL=$((TEST_FAIL + 1))
 fi
 
+REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+echo "# ADR" > "$OUTSIDE/0001-x.md"
+mkdir -p "$REPO/docs/decisions"
+ln -s "$OUTSIDE/0001-x.md" "$REPO/docs/decisions/external.md"
+assert_eq "docs/decisions holding only an entry symlinked OUTSIDE the repo -> absent (entry not counted)" "absent	" "$(probe_decision "$REPO" 2>/dev/null)"
+echo "# ADR 2" > "$REPO/docs/decisions/0002-local.md"
+assert_eq "docs/decisions with an outside-symlinked entry AND a local entry -> present" "present	docs/decisions" "$(probe_decision "$REPO" 2>/dev/null)"
+
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
     mkdir -p "$REPO/docs/decisions"

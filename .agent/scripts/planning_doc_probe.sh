@@ -158,7 +158,9 @@ probe_roadmap() {
 # -L, does not descend into a symlinked start path). A symlinked
 # `docs/decisions` is followed only if it resolves INSIDE repo_path; one
 # pointing outside the repo reads as absent with a diagnostic, because the
-# probe never reads outside the repo it was given. This still correctly
+# probe never reads outside the repo it was given; the same rule applies to
+# each ENTRY: a symlinked entry whose target resolves outside repo_path is
+# not counted. This still correctly
 # reads a broken-symlink ENTRY inside the directory as absent, per the
 # paragraph above, since `find -L` still lists a broken symlink (it just
 # cannot resolve it) and the `[ -e ]` guard still drops it.
@@ -182,6 +184,10 @@ probe_decision() {
         else
             while IFS= read -r -d '' entry; do
                 [ -e "$entry" ] || continue  # broken symlink: exists as an entry, but reads as absent (see note above)
+                if [ -L "$entry" ] && ! _inside_repo "$repo_path" "$entry"; then
+                    echo "planning_doc_probe.sh: $entry is a symlink resolving outside $repo_path — not counted (the probe never reads outside the repo)" >&2
+                    continue
+                fi
                 printf 'present\tdocs/decisions\n'
                 return
             done < <(find -L "$dir" -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null)

@@ -266,10 +266,12 @@ denied" instead of the intended `SKIPPED`.
 ```bash
 if [ -z "$ROOT" ]; then
     echo "SKIPPED (no workspace root — planning_doc_probe.sh unreachable)"
-elif [ ! -x "$ROOT/.agent/scripts/planning_doc_probe.sh" ]; then
-    echo "SKIPPED (planning_doc_probe.sh not found or not executable under $ROOT/.agent/scripts/)"
+elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ]; then
+    echo "SKIPPED (planning_doc_probe.sh not found under $ROOT/.agent/scripts/)"
 else
-    "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
+    # -f + bash rather than -x, as step 1 does: exec bits are lost on a noexec
+    # mount, an unpacked archive or a CIFS share, and the script runs fine there.
+    bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
 fi
 ```
 

@@ -65,10 +65,11 @@ Script Reference row.
      the machine-readable contract `audit-project` and (transitively)
      `janitor-sweep` read.
    - CLI form (`planning_doc_probe.sh <repo_path>`) calls `probe_all` and
-     exits 0 whenever `repo_path` is a readable directory — **presence or
+     exits 0 whenever `repo_path` is a readable, searchable directory — **presence or
      absence of any or all four kinds is never a non-zero exit**, per the
      issue's "Out of scope" line. Exit 2 = usage (missing/extra args); exit 3
-     = `repo_path` does not exist or is not a directory (a real error, not an
+     = `repo_path` does not exist, is not a directory, or is not readable and
+     searchable (a real error, not an
      absence finding — the probe couldn't run at all).
    - The script reads the filesystem only; it writes nothing, caches
      nothing, and creates no marker file anywhere — satisfying the ADR-0017
@@ -320,3 +321,11 @@ Copilot's post-push review and the round-3 Lens B pass both flagged that a
 symlinked `docs/decisions` could resolve outside the repo. The probe now
 follows such a symlink only when its target resolves inside `repo_path`
 (`realpath` prefix check); otherwise absent with a diagnostic. Tested.
+
+### Copilot round on the symlink-bound head (host-inline, 2026-09-18)
+
+Four points, all applied: the inside-repo rule now applies per entry of
+`docs/decisions` as well as to the directory symlink itself; the audit-project
+guard uses `[ -f ]` + `bash` like step 1 (exec bits are lost on noexec mounts,
+archives and CIFS shares); the plan's CLI contract and the AGENTS.md row now
+say "readable and searchable", matching the script.
