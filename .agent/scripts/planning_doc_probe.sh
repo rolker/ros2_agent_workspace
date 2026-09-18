@@ -93,11 +93,32 @@
 # one, but with a distinct stderr diagnostic so the two are not confused by
 # anyone reading the probe's own diagnostics (the TSV output contract is
 # unaffected — see the permission-denied note above).
+# True iff the resolved path of $2 lies inside the resolved path of $1.
+_inside_repo() {
+    local root target
+    root=$(realpath -e -- "$1" 2>/dev/null) || return 1
+    target=$(realpath -e -- "$2" 2>/dev/null) || return 1
+    [ "$target" = "$root" ] || [ "${target#"$root"/}" != "$target" ]
+}
+
+# _outside <repo_path> <path> <label>: true iff <path> is a symlink resolving
+# outside <repo_path>; prints the diagnostic. The probe never reads outside
+# the repo it was given, so such a file reads as absent.
+_outside() {
+    if [ -L "$2" ] && ! _inside_repo "$1" "$2"; then
+        echo "planning_doc_probe.sh: $2 is a symlink resolving outside $1 — reporting $3 absent (the probe never reads outside the repo)" >&2
+        return 0
+    fi
+    return 1
+}
+
 probe_vision() {
     local repo_path="$1"
     local readme="$repo_path/README.md"
     if [ -f "$readme" ]; then
-        if [ ! -r "$readme" ]; then
+        if _outside "$repo_path" "$readme" "README.md"; then
+            :
+        elif [ ! -r "$readme" ]; then
             echo "planning_doc_probe.sh: $readme exists but is not readable (permission denied) — reporting absent" >&2
         elif grep -qE '^## Vision([[:space:]]|$)' "$readme"; then
             printf 'present\tREADME.md\n'
@@ -124,8 +145,10 @@ probe_roadmap() {
     if [ -d "$repo_path" ] && [ ! -x "$repo_path" ]; then
         echo "planning_doc_probe.sh: $repo_path exists but is not searchable (permission denied) — reporting ROADMAP.md absent" >&2
     elif [ -f "$repo_path/ROADMAP.md" ]; then
-        printf 'present\tROADMAP.md\n'
-        return
+        if ! _outside "$repo_path" "$repo_path/ROADMAP.md" "ROADMAP.md"; then
+            printf 'present\tROADMAP.md\n'
+            return
+        fi
     fi
     printf 'absent\t\n'
 }
@@ -153,6 +176,10 @@ probe_roadmap() {
 # documented side effect: an entry can exist (`find` lists it) while still
 # reading as absent.
 #
+# The same inside-the-repo rule applies to README.md, ROADMAP.md and
+# docs/health.md: a symlink at any of those paths resolving outside repo_path
+# reads as absent with a diagnostic.
+#
 # `docs/decisions` itself may be a symlink to a populated directory — `find
 # -L` is used so listing descends through that symlink (plain `find`, without
 # -L, does not descend into a symlinked start path). A symlinked
@@ -164,14 +191,6 @@ probe_roadmap() {
 # reads a broken-symlink ENTRY inside the directory as absent, per the
 # paragraph above, since `find -L` still lists a broken symlink (it just
 # cannot resolve it) and the `[ -e ]` guard still drops it.
-# True iff the resolved path of $2 lies inside the resolved path of $1.
-_inside_repo() {
-    local root target
-    root=$(realpath -e -- "$1" 2>/dev/null) || return 1
-    target=$(realpath -e -- "$2" 2>/dev/null) || return 1
-    [ "$target" = "$root" ] || [ "${target#"$root"/}" != "$target" ]
-}
-
 probe_decision() {
     local repo_path="$1"
     local dir="$repo_path/docs/decisions"
@@ -214,8 +233,10 @@ probe_health() {
     if [ -d "$dir" ] && [ ! -x "$dir" ]; then
         echo "planning_doc_probe.sh: $dir exists but is not searchable (permission denied) — reporting docs/health.md absent" >&2
     elif [ -f "$dir/health.md" ]; then
-        printf 'present\tdocs/health.md\n'
-        return
+        if ! _outside "$repo_path" "$dir/health.md" "docs/health.md"; then
+            printf 'present\tdocs/health.md\n'
+            return
+        fi
     fi
     printf 'absent\t\n'
 }

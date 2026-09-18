@@ -81,6 +81,12 @@ REPO=$(new_repo)
 assert_eq "'## Our Vision' (does not start with Vision) -> absent" "absent	" "$(probe_vision "$REPO")"
 
 REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+printf '# X\n\n## Vision\n' > "$OUTSIDE/README.md"
+ln -s "$OUTSIDE/README.md" "$REPO/README.md"
+assert_eq "README.md symlink resolving OUTSIDE the repo -> absent (even with a Vision heading)" "absent	" "$(probe_vision "$REPO" 2>/dev/null)"
+
+REPO=$(new_repo)
 {
     echo "# Some Project"
     echo ""
@@ -136,6 +142,16 @@ assert_eq "no ROADMAP.md -> absent" "absent	" "$(probe_roadmap "$REPO")"
 REPO=$(new_repo)
 ln -s "./nonexistent-target-$$" "$REPO/ROADMAP.md"
 assert_eq "ROADMAP.md is a broken symlink -> absent" "absent	" "$(probe_roadmap "$REPO")"
+
+REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+echo "# Roadmap" > "$OUTSIDE/ROADMAP.md"
+ln -s "$OUTSIDE/ROADMAP.md" "$REPO/ROADMAP.md"
+assert_eq "ROADMAP.md symlink resolving OUTSIDE the repo -> absent" "absent	" "$(probe_roadmap "$REPO" 2>/dev/null)"
+REPO=$(new_repo)
+mkdir -p "$REPO/planning"; echo "# Roadmap" > "$REPO/planning/ROADMAP.md"
+ln -s "planning/ROADMAP.md" "$REPO/ROADMAP.md"
+assert_eq "ROADMAP.md symlink resolving INSIDE the repo -> present" "present	ROADMAP.md" "$(probe_roadmap "$REPO")"
 
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
@@ -283,6 +299,13 @@ REPO=$(new_repo)
 mkdir -p "$REPO/docs"
 ln -s "./nonexistent-target-$$" "$REPO/docs/health.md"
 assert_eq "docs/health.md is a broken symlink -> absent" "absent	" "$(probe_health "$REPO")"
+
+REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+echo "# Health" > "$OUTSIDE/health.md"
+mkdir -p "$REPO/docs"
+ln -s "$OUTSIDE/health.md" "$REPO/docs/health.md"
+assert_eq "docs/health.md symlink resolving OUTSIDE the repo -> absent" "absent	" "$(probe_health "$REPO" 2>/dev/null)"
 
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)

@@ -338,3 +338,10 @@ audit-project block captures the probe's exit status and renders `SKIPPED`
 on a non-zero exit instead of silently proceeding with no TSV. A `-r || -x`
 guard Copilot flagged at the same time is `probe_decision`'s own, which
 enumerates a directory and does need read; roadmap/health are `-x` only.
+
+### Uniform symlink rule (host-inline, 2026-09-18)
+
+Copilot's fifth pass asked for the inside-the-repo rule on README.md,
+ROADMAP.md and docs/health.md too, so it is now one helper applied to every
+probed path: a symlink resolving outside `repo_path` reads as absent with a
+diagnostic, one resolving inside is followed. Tested for all four kinds.
