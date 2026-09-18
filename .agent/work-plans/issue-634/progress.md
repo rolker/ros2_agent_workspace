@@ -78,3 +78,40 @@ reverse.
 - [ ] Confirm the AGENTS.md Script Reference row wording before merge (Ask-First: instruction file edit).
 - [ ] Confirm `run_script_tests.sh` auto-discovers `test_*.sh` or needs the new test file added explicitly — resolve during implementation.
 - [ ] Confirm `## Vision` heading matching should be a prefix match (`^## Vision`) vs. requiring the exact bare heading — low-stakes, descriptive row only.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-09-18 10:15 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Plan**: `.agent/work-plans/issue-634/plan.md` at `3baac19`
+**PR**: PR-less
+**Verdict**: approve-with-suggestions
+
+### Evaluation
+
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | Good | Single PR, matches sub-issue 1's precedent; external fallbacks correctly excluded per #643 split. |
+| Issue alignment | Good | Both 2026-09-18 operator decisions on #634 (kind marker dropped; external fallbacks split to #643) are reflected exactly, verbatim-checked against the issue body and comments. The issue-review checkpoint's carried concern (probe must be a real script; no per-repo cache/marker) is explicitly addressed in step 1. |
+| File targeting | Good | The four probed paths match `docs/design/planning_document_vocabulary.md`'s expected-location table exactly (vision/roadmap/decision/health), verified by reading the table directly (lines 112-117). Wiring through `audit-project` step 1's `$ROOT` pattern and `janitor-sweep`'s existing per-repo embed (SKILL.md line ~380/497) is verified accurate — no second call site is created. |
+| Consequences | Good | Consequences table is complete; correctly defers the ADR-promotion gate update to #637 (already settled at issue-review) and correctly scopes the `AGENTS.md` row consequence to itself. |
+| Documentation & instruction impact | Good | Non-silent; lists both skill-doc edits landing in this PR and flags the `AGENTS.md` row as an Ask-First candidate rather than auto-applying it, per `AGENTS.md § Boundaries`. |
+| Principle alignment | Good | "Only what's needed" and "Enforcement over documentation" are both satisfied — no fifth janitor-sweep check invented, probe factored as real code with a dedicated test file. |
+| ADR compliance | Good | ADR-0003 (verified: Decision section confirms workspace infra must stay project-agnostic) — the probe checks generic paths only, graceful-absence test instantiates it. ADR-0017 correctly invoked for the no-marker/no-cache constraint (matches the design draft's own rejection of a declaration file). ADR-0013 carve-out for periodic non-issue-scoped skills is consistent with review-issue's own assessment. |
+| ROS conventions | N/A | Workspace-repo skill/script change only, no project-repo code touched. |
+
+### Findings
+
+1. **[Open Question 2, resolvable now]** `run_script_tests.sh` (verified by reading it) already auto-discovers `test_*.sh` via `nullglob` over both `"$SCRIPTS_DIR"/test_*.sh` and `"$TESTS_DIR"/test_*.sh` — no explicit registration list exists to add to. The plan's Open Question "Confirm `run_script_tests.sh` auto-discovers `test_*.sh`..." can be answered now rather than left for implementation: yes, it auto-discovers; `test_planning_doc_probe.sh` needs no extra wiring beyond being placed in `.agent/scripts/tests/`.
+2. **[File targeting, minor]** `probe_decision`'s "present iff `docs/decisions/` contains at least one entry" doesn't say whether a placeholder file (e.g. a tracked `.gitkeep` some repos use to keep an empty dir in git) counts as an "entry." If it does, a repo that created the directory but hasn't written a decision yet would read as "present," contradicting the plan's own stated intent ("an empty placeholder directory reads as absent, not present"). Suggest the implementation exclude dotfiles when counting entries, and the test file add a `.gitkeep`-only case alongside the already-planned present/empty/absent cases.
+3. **[Open Question 3, no action needed pre-implementation]** The `## Vision` heading prefix-match question (exact heading vs. `## Vision and Goals`-style trailing text) is already correctly flagged by the plan itself as low-stakes and resolvable during implementation — noting it here only to confirm review agrees it's not a blocker.
+
+### Summary
+
+Plan is well-aligned with the merged design draft's expected-location table (verified directly against `docs/design/planning_document_vocabulary.md`), ADR-0003, and both operator decisions recorded on the issue (verified against the issue body and comments via `gh`). The proposed script shape matches the workspace's existing `field_mode.sh`/`test_field_mode.sh` pattern, and the `janitor-sweep`/`audit-project` wiring claim (no second call site) is verified accurate against the current SKILL.md. No must-fix findings. Ready for implementation; the two minor suggestions above are cheap to fold in during implementation rather than requiring a plan revision.
+
+### Recommended Actions
+
+- [ ] During implementation, exclude dotfiles (e.g. `.gitkeep`) when counting `docs/decisions/` entries in `probe_decision`, and add that case to the test file.
+- [ ] Resolve Open Question 2 as answered above (no registration needed) when updating the plan inline per `plan-task`'s "During implementation" rules.
