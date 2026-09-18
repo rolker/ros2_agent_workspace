@@ -170,3 +170,48 @@ Ride-alongs (required, per operator scope):
 
 Single PR. Five small, independently testable script/doc edits plus one new
 test file; no cross-repo or cross-layer impact.
+
+## Implementation notes (as built)
+
+Built exactly to plan, item by item, as separate atomic commits. Notes on the
+mechanics, where they weren't obvious from the plan text:
+
+- **Item 2/6 (lock-open save/restore)**: a plain trailing `2>/dev/null` on the
+  `exec 9>"$lockfile"` line does **not** suppress bash's own error — bash
+  applies redirections left to right, so the open is attempted (and its
+  error emitted to the then-current stderr) before a later redirection on
+  the same line takes effect. Verified this empirically before writing the
+  fix. The working pattern is: `exec 7>&2` (save), `exec 2>/dev/null`
+  (redirect away), attempt `exec 9>"$lockfile"` and capture its own exit
+  status into a `lock_open` variable (since the exec's status is not
+  otherwise recoverable once fd 2 is restored), then `exec 2>&7 7>&-`
+  (restore + close the saved copy) before deciding how to report. Same
+  pattern in `manifest_fallback.sh`, using fd 6/8 instead of 7/9 as the plan
+  specifies, plus a new `local lock_open` in `manifest_config_dir`'s
+  declarations.
+- **Item 7 test fixtures**: the "redact.sh present but fails to load" case
+  (both the new resolver fixture and, implicitly, the pre-existing
+  manifest_fallback.sh `bad_redact` fixture) must NOT use a syntactically
+  broken file (e.g. an unterminated function) — bash's own parse-time error
+  for a `source` on invalid syntax prints the sourced file's *absolute path*
+  directly to stderr, before this PR's own guard code ever runs, which would
+  make the "no absolute path on stderr" assertion fail for the wrong reason.
+  Used a syntactically valid file that simply `return 1`s and defines
+  nothing instead — reproduces the same "half-defined shell" failure mode
+  without the parser leak. (The pre-existing `bad_redact` fixture at
+  `test_resolve_repo_checkout.sh:500-508`, which predates this PR and tests
+  `manifest_fallback.sh`'s guard, still uses the unterminated-function form;
+  it happens to pass because it never asserts path-absence, only message
+  content — left as-is since re-auditing it is outside this PR's scope, but
+  noted here for a future reader.)
+- **Commit granularity**: split slightly finer than the plan's five
+  numbered items where a single Files-to-Change row bundled two
+  independently-revertable changes (e.g. the two redact.sh regex/split
+  fixes; the lock-open fix vs. the fd-close ride-along in each script) —
+  each landed as its own atomic commit rather than being combined, per the
+  workspace's "one logical change per commit" rule.
+- All five redaction-class fixes, the two ride-alongs, the new/extended
+  tests, the `AGENTS.md` doc fix, and this plan amendment are on
+  `feature/issue-626`. `.agent/scripts/tests/run_script_tests.sh` passes in
+  full (28 shell test files including the two new/extended ones, 220 pytest
+  cases), and `shellcheck` is clean on every changed `.sh` file.
