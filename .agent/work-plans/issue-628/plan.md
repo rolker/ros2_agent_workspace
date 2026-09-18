@@ -392,7 +392,7 @@ inline per the plan-first workflow rather than left for review to discover.
   staging step and the progress timeline's dated entries. Step 9's PR body and
   the #628 comment likewise belonged to the publish step.
 
-## Revision after merge (2026-09-18): decisions and drafts across the season boundary
+## Revision after merge (2026-09-18): decisions and drafts across the deployment boundary
 
 Sub-issue (1) merged as PR #638 on 2026-09-17. The next day the operator raised
 a gap in the vocabulary — verbatim in the draft's new section — that the
@@ -410,8 +410,13 @@ new issue, not an ADR):
   section — owed, not yet filed.
 - Off-season half: a health row for unreviewed provisional decisions, in scope
   on #635.
-- A seasonal review pass, distinct from the weekly sweep, named as the proposed
-  home for the consistency-review discussion item (still unspecified).
+- A review pass distinct from the sweep, its cadence named by each roadmap,
+  as the proposed home for the consistency-review discussion item (still
+  unspecified). Reframed the same day from "seasonal" to mode-based after the
+  operator asked whether the season framing was project-agnostic: the boundary
+  is deployment mode vs design mode (ADR-0014); the season is this project's
+  instance. Queue growth under frequent deployments recorded as an open
+  question, not decided.
 
 Files: `docs/design/planning_document_vocabulary.md` (kinds table decision row,
 new section, Consequences, Open questions, References) and one row in
