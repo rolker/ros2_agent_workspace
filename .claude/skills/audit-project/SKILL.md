@@ -253,10 +253,21 @@ Probe the four planning-document kinds named in the expected-location table
 in [`docs/design/planning_document_vocabulary.md`](../../../docs/design/planning_document_vocabulary.md)
 (vision, roadmap, decision, health) with `.agent/scripts/planning_doc_probe.sh`,
 addressed through `$ROOT` for the same reason step 1 is — `.agent/scripts/`
-does not exist beside a project repo checked out under a layer worktree.
+does not exist beside a project repo checked out under a layer worktree. As
+in step 5, check `$ROOT` is non-empty first: no workspace root above you
+means the probe script itself is unreachable — that is `SKIPPED`, not a
+failure to paper over. Also check the script actually exists at that path
+before invoking it — a layer worktree whose main checkout predates this
+script landing on `main` would otherwise hit a raw "No such file" error.
 
 ```bash
-"$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
+if [ -z "$ROOT" ]; then
+    echo "SKIPPED (no workspace root — planning_doc_probe.sh unreachable)"
+elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ]; then
+    echo "SKIPPED (planning_doc_probe.sh not found under $ROOT/.agent/scripts/)"
+else
+    "$ROOT/.agent/scripts/planning_doc_probe.sh" "$REPO_PATH"
+fi
 ```
 
 This prints four TSV lines (`<kind>\t<present|absent>\t<relative-path>`),
@@ -267,7 +278,10 @@ expected-location table is a published expectation, not a requirement: a
 repo that keeps a planning document somewhere else, or doesn't keep one at
 all, is not in violation. Report `Present` / `Not found` — deliberately not
 "Missing", the word the Governance Coverage table above uses for items that
-do drive a recommendation.
+do drive a recommendation. A `SKIPPED` probe (either guard above) renders as
+a single note in the Planning Documents section instead of the four-row
+table — there is no per-kind data to show, and four blank "Not found" rows
+would misreport a probe that never ran as one that ran and found nothing.
 
 ### 8. Cross-reference with workspace
 
@@ -319,14 +333,22 @@ creating one with the project_agents_guide.md template">
 
 | Kind | Status | Location |
 |---|---|---|
-| vision | Present / Not found | `README.md` |
-| roadmap | Present / Not found | `ROADMAP.md` |
-| decision | Present / Not found | `docs/decisions` |
-| health | Present / Not found | `docs/health.md` |
+| vision | Present / Not found | `README.md` (Present) / — (Not found) |
+| roadmap | Present / Not found | `ROADMAP.md` (Present) / — (Not found) |
+| decision | Present / Not found | `docs/decisions` (Present) / — (Not found) |
+| health | Present / Not found | `docs/health.md` (Present) / — (Not found) |
+
+<!-- Location matches what planning_doc_probe.sh actually emits: the kind's
+     path on Present, and an EMPTY field on Not found — never the expected
+     path repeated as if it were found. Render the empty TSV field as "—",
+     not as the expected path. -->
 
 <!-- Descriptive only — a repo publishing a planning document somewhere else,
      or not at all, is not in violation. This section never contributes a
      Recommended Actions entry (docs/design/planning_document_vocabulary.md). -->
+
+<!-- If step 7 reported SKIPPED, render that single note here instead of the
+     table above — there is no per-kind data from a probe that did not run. -->
 
 ### Workspace Integration
 
