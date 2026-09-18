@@ -146,7 +146,7 @@ Plan is well-aligned with the merged design draft's expected-location table (ver
 ## Implementation
 **Status**: complete
 **When**: 2026-09-18 10:45 -04:00
-**By**: Claude Code Agent (Claude Opus)
+**By**: Claude Code Agent (Claude Sonnet)
 
 **Branch**: feature/issue-634 at `64f672c`
 **Addressed**: Local Review (Pre-Push), 2026-09-18 10:37 -04:00, round 1, at `380bed3` — 1 must-fix, 8 suggestions
