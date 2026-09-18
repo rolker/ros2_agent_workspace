@@ -407,7 +407,7 @@ new issue, not an ADR):
   promotion (#637). #620 stays open, pointing at the draft.
 - The design-draft kind names what would prove it.
 - Field half: `/wrap-up-deployment` gains a *Decisions made this deployment*
-  section — owed, not yet filed.
+  section — filed as #642 (2026-09-18); the review pass is held until #635.
 - Off-season half: a health row for unreviewed provisional decisions, in scope
   on #635.
 - A review pass distinct from the sweep, its cadence named by each roadmap,

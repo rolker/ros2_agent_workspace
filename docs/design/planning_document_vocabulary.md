@@ -462,8 +462,8 @@ owed. That list is what design mode reviews from. It costs the operator
 nothing during the run, because it is written at wrap-up from the log, not
 in the field.
 
-This is a change to the wrap-up skill and its dev-log template, not yet filed
-(see Consequences).
+This is a change to the wrap-up skill and its dev-log template, filed as
+[#642](https://github.com/rolker/ros2_agent_workspace/issues/642).
 
 ### The design-mode half: health lists what is owed
 
@@ -538,12 +538,14 @@ specified.
   promotion ([#637](https://github.com/rolker/ros2_agent_workspace/issues/637));
   the ADR-0001 status addendum it proposed is part of that promotion. #620
   stays open until then, pointing here.
-- **Two mechanisms are owed and not yet filed** (2026-09-18): the wrap-up
-  skill's *Decisions made this deployment* section, and the roadmap-timed
-  review pass. The health row for unreviewed provisional decisions is already in
-  scope on #635. Until the wrap-up change lands, the deployment-mode half of the
-  deployment-boundary section is a stated intention, and a deployment wrapped up
-  before it lands leaves no decision list behind.
+- **Two mechanisms are owed** (2026-09-18): the wrap-up skill's *Decisions
+  made this deployment* section, filed as
+  [#642](https://github.com/rolker/ros2_agent_workspace/issues/642), and the
+  roadmap-timed review pass, deliberately not filed until the health row it
+  reads from exists (#635). The health row itself is in scope on #635. Until
+  #642 lands, the deployment-mode half of the deployment-boundary section is a
+  stated intention, and a deployment wrapped up before it lands leaves no
+  decision list behind.
 - **A new directory.** This page creates `docs/design/`. *Design draft* is a
   supporting kind, so the expected-location table prescribes no path for it:
   `docs/design/` is a local choice this repo makes, not a claim the table makes.
