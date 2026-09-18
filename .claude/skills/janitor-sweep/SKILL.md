@@ -404,8 +404,12 @@ run" is not a status.
   covers the rotation as well as the audits: `FAILED` if **any candidate failed
   its rule-3 probe**, if any repo in the chunk failed to resolve (any non-zero
   exit from `resolve_repo_checkout.sh`), or if any repo failed to audit;
-  otherwise `FINDINGS` if any repo produced findings; otherwise `OK`.
-  Per-repo statuses are listed individually regardless.
+  otherwise `FINDINGS` if any repo produced findings; otherwise `OK`. The
+  embedded Planning Documents table (see below) is descriptive only and never
+  counts toward "produced findings" here — the same non-scoring rule
+  `audit-project` itself states in its own § 7, tied back explicitly because
+  this rollup is where a stray finding would actually change a repo's
+  reported status. Per-repo statuses are listed individually regardless.
 
   **An empty chunk is never `OK`.** Audit-count zero has three causes and the
   check must say which: every candidate *excluded* → `SKIPPED(no eligible
@@ -498,14 +502,20 @@ Report format:
 - ...
 
 Planning Documents (embedded from `audit-project`'s own report section — no
-separate call site here; see `audit-project` § 7):
+separate call site here; see `audit-project` § 7). If `audit-project`
+reported the probe `SKIPPED`, embed that single note instead of the table
+below — there is no per-kind data from a probe that did not run:
 
 | Kind | Status | Location |
 |---|---|---|
-| vision | Present / Not found | `README.md` |
-| roadmap | Present / Not found | `ROADMAP.md` |
-| decision | Present / Not found | `docs/decisions` |
-| health | Present / Not found | `docs/health.md` |
+| vision | Present / Not found | `README.md` (Present) / — (Not found) |
+| roadmap | Present / Not found | `ROADMAP.md` (Present) / — (Not found) |
+| decision | Present / Not found | `docs/decisions` (Present) / — (Not found) |
+| health | Present / Not found | `docs/health.md` (Present) / — (Not found) |
+
+<!-- Location matches what planning_doc_probe.sh actually emits: the kind's
+     path on Present, an EMPTY field on Not found. Render the empty field as
+     "—", not as the expected path repeated. -->
 
 <!-- Descriptive only, same as in audit-project's own report: absence of any
      kind is never a finding and never drives a Recommended Actions entry. -->
