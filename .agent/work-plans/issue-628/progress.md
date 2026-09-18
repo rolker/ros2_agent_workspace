@@ -957,3 +957,21 @@ Regression checks, all pass: every relative link in the changed files resolves (
 
 ### Findings
 - [x] (suggestion) A second copy of the as-built edit count survives the round-2 fix: "Rev 4's ten rows are nine here, and rev 4's eight small edits are six" still reads as a present-tense claim that this slice edits six files, where the Estimated Scope two sections later now correctly says seven. Round 2 named only line 328, so this one was not in scope of the fix; the sentence is historical (what rev 4 dropped), so it misleads no one reading the as-built record itself. One clause — that a seventh arrived in round-1 review — closes it, and it can ride any later commit — `.agent/work-plans/issue-628/plan.md:240`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 08:57 -04:00
+**By**: Claude Code Agent (Claude Fable 5.1)
+**Verdict**: approved
+
+**Branch**: feature/issue-628 at `690872a` (season-boundary revision of the vocabulary draft, after PR #638 merged)
+**Mode**: pre-push
+**Depth**: Standard (reason: design draft + roadmap, 170 lines; docs only, no linter profile)
+**Must-fix**: 2 (both fixed in 690872a) | **Suggestions**: 2
+**Round**: 1 | **Ship**: recommended — both must-fixes were mechanical and are applied; remaining suggestions are wording/proportionality
+
+### Findings
+- [x] (must-fix) Provisional status never reaches the ADR template's status vocabulary — named as a promotion consequence — `docs/design/planning_document_vocabulary.md` § What this does not change
+- [x] (must-fix) ROADMAP.md Status cell was a sentence, column convention is a one-word token — `ROADMAP.md:97`
+- [x] (suggestion) "provisional by default" read as binding rather than proposed — reworded
+- [ ] (suggestion) World-store case study is more project narrative than a worked example; trim toward summary + link at promotion — `docs/design/planning_document_vocabulary.md` § What the world-store case showed
