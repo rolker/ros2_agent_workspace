@@ -408,8 +408,8 @@ new issue, not an ADR):
 - The design-draft kind names what would prove it.
 - Field half: `/wrap-up-deployment` gains a *Decisions made this deployment*
   section — filed as #642 (2026-09-18); the review pass is held until #635.
-- Off-season half: a health row for unreviewed provisional decisions, in scope
-  on #635.
+- Off-season half: a health row for unreviewed provisional decisions, added to
+  #635's scope on 2026-09-18 (it was not there when the draft first claimed it).
 - A review pass distinct from the sweep, its cadence named by each roadmap,
   as the proposed home for the consistency-review discussion item (still
   unspecified). Reframed the same day from "seasonal" to mode-based after the

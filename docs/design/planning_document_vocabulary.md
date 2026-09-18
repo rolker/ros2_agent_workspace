@@ -358,8 +358,10 @@ hurts.
 
 ### The two tempos: deployment mode and design mode
 
-Every robotics project this workspace serves alternates between two modes,
-and the boundary between them is what this section is about. In
+A project that uses deployment mode alternates between two modes, and the
+boundary between them is what this section is about. (A project that never
+activates deployment mode has no such boundary and nothing in this section
+applies to it.) In
 **deployment mode** ([ADR-0014](../decisions/0014-deployment-mode.md)) the
 forcing function is a date the hardware has to work by: decisions are made
 fast, under the urgency contract, to get the robot out. In **design mode**
@@ -389,11 +391,13 @@ a stopping rule so the review finishes.
 
 ### What the world-store case showed
 
-The framework repo's store-related decisions —
+The framework repo's store-related decisions — the seven
+[unh_marine_autonomy#391](https://github.com/rolker/unh_marine_autonomy/issues/391)
+names as the world-store ADRs:
 [uma-ADR-0002](https://github.com/rolker/unh_marine_autonomy/blob/jazzy/docs/decisions/0002-bathymetric-data-store.md),
-0006, 0007, 0010, 0011 and 0013 — were all added between 2026-06-10 and
+0005, 0006, 0007, 0010, 0011 and 0013 — were all added between 2026-06-10 and
 2026-08-21, inside that project's field season (verified from their git history,
-2026-09-18). Three are `Proposed`, three `Accepted`. By the operator's account
+2026-09-18). Four are `Proposed`, three `Accepted`. By the operator's account
 above they recorded what the deployments built under pressure, and
 the ADR form then did one of two things to each: an `Accepted`
 one froze it ([ADR-0001](../decisions/0001-adopt-architecture-decision-records.md):
@@ -434,7 +438,7 @@ state for a field decision, and it is exactly the state ADR-0014's own "defer
 is not skip" clause asks for: deferred design is *tracked*, not dropped, and
 wrap-up is where completeness is restored.
 
-The six store ADRs above are the first candidates for being marked
+The seven store ADRs above are the first candidates for being marked
 `Provisional` retroactively, with #391's vertical slice as their conversion
 condition. That is the framework repo's call, tracked there, not here.
 
@@ -456,9 +460,9 @@ more round.
 `/wrap-up-deployment` already consolidates the dev log and files RCA issues
 from an `## RCA / Follow-up Backlog` section. It does **not** list the
 decisions the deployment made. It should: a `## Decisions made this
-deployment` section in the dev log, each entry naming the decision, where it
-was recorded (an ADR, a config change, a field commit), and the review it is
-owed. That list is what design mode reviews from. It costs the operator
+deployment` section in the dev log, each entry naming the decision, the date it was
+made, where it was recorded (an ADR, a config change, a field commit), and the
+review it is owed. That list is what design mode reviews from. It costs the operator
 nothing during the run, because it is written at wrap-up from the log, not
 in the field.
 
@@ -587,7 +591,7 @@ specified.
   entries escalate, or an overfull queue is itself a finding that the
   roadmap's loop is too slow, is not decided (raised 2026-09-18, no operator
   ruling yet).
-- **Retroactive `Provisional` marking of the six field-written store ADRs** in
+- **Retroactive `Provisional` marking of the seven field-written store ADRs** in
   `unh_marine_autonomy` — the framework repo's decision, to be raised on
   [unh_marine_autonomy#391](https://github.com/rolker/unh_marine_autonomy/issues/391).
 

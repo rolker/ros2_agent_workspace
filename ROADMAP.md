@@ -94,7 +94,7 @@ first. This thread is what stops a green result from meaning nothing.
 | Item | Issue | Status | Notes |
 |---|---|---|---|
 | Backfill the ADR Applicability table in `.agent/knowledge/principles_review_guide.md` | — | planned | The table runs 0001–0010 then 0013: **0011, 0012 and 0014–0019 have no row at all** (verified 2026-09-17). Exactly the quiet drift the roadmap + health loop exists to surface |
-| A `Provisional` ADR status for decisions made in deployment mode and owed a design-mode review | [#620](https://github.com/rolker/ros2_agent_workspace/issues/620) | planned | Specified in the [vocabulary draft](docs/design/planning_document_vocabulary.md#decisions-and-drafts-across-the-season-boundary) on 2026-09-18; lands in ADR-0001 and the ADR template when the draft is promoted (#637). Wrap-up decision list filed as [#642](https://github.com/rolker/ros2_agent_workspace/issues/642); the review pass is filed once #635's health row exists |
+| A `Provisional` ADR status for decisions made in deployment mode and owed a design-mode review | [#620](https://github.com/rolker/ros2_agent_workspace/issues/620) | planned | Specified in the [vocabulary draft](docs/design/planning_document_vocabulary.md#decisions-and-drafts-across-the-deployment-boundary) on 2026-09-18; lands in ADR-0001 and the ADR template when the draft is promoted (#637). Wrap-up decision list filed as [#642](https://github.com/rolker/ros2_agent_workspace/issues/642); the review pass is filed once #635's health row exists |
 | Resolve the three ADRs still `Proposed` while cited as binding | — | planned | 0005 (layered enforcement), 0008 (ROS 2 conventions), 0009 (Python packaging), verified 2026-09-17 |
 
 ## Recently completed
