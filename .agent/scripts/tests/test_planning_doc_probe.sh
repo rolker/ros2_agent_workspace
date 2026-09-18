@@ -307,6 +307,18 @@ mkdir -p "$REPO/docs"
 ln -s "$OUTSIDE/health.md" "$REPO/docs/health.md"
 assert_eq "docs/health.md symlink resolving OUTSIDE the repo -> absent" "absent	" "$(probe_health "$REPO" 2>/dev/null)"
 
+REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+echo "# Health" > "$OUTSIDE/health.md"
+mkdir -p "$OUTSIDE/decisions"; echo "# ADR" > "$OUTSIDE/decisions/0001-x.md"
+ln -s "$OUTSIDE" "$REPO/docs"
+assert_eq "docs/ itself a symlink OUTSIDE the repo -> health.md absent (ancestor resolved)" "absent	" "$(probe_health "$REPO" 2>/dev/null)"
+assert_eq "docs/ itself a symlink OUTSIDE the repo -> docs/decisions absent (ancestor resolved)" "absent	" "$(probe_decision "$REPO" 2>/dev/null)"
+REPO=$(new_repo)
+mkdir -p "$REPO/real-docs"; echo "# Health" > "$REPO/real-docs/health.md"
+ln -s "real-docs" "$REPO/docs"
+assert_eq "docs/ a symlink INSIDE the repo -> health.md present" "present	docs/health.md" "$(probe_health "$REPO")"
+
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
     mkdir -p "$REPO/docs"

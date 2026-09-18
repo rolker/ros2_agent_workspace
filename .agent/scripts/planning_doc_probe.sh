@@ -109,8 +109,11 @@ _inside_repo() {
 # outside <repo_path>; prints the diagnostic. The probe never reads outside
 # the repo it was given, so such a file reads as absent.
 _outside() {
-    if [ -L "$2" ] && ! _inside_repo "$1" "$2"; then
-        echo "planning_doc_probe.sh: $3 is a symlink resolving outside the repo — reporting absent (the probe never reads outside the repo)" >&2
+    # Resolve the WHOLE path, not just its last component: a symlinked
+    # ancestor (docs/ -> /elsewhere) makes a plain file inside it resolve
+    # outside the repo just as surely as a symlinked file does.
+    if ! _inside_repo "$1" "$2"; then
+        echo "planning_doc_probe.sh: $3 resolves outside the repo — reporting absent (the probe never reads outside the repo)" >&2
         return 0
     fi
     return 1
@@ -181,8 +184,10 @@ probe_roadmap() {
 # reading as absent.
 #
 # The same inside-the-repo rule applies to README.md, ROADMAP.md and
-# docs/health.md: a symlink at any of those paths resolving outside repo_path
-# reads as absent with a diagnostic.
+# docs/health.md, and it is applied to the RESOLVED path of each probed file,
+# so a symlinked ancestor (docs/ -> somewhere outside) is caught just as a
+# symlinked file is: anything resolving outside repo_path reads as absent with
+# a diagnostic.
 #
 # `docs/decisions` itself may be a symlink to a populated directory — `find
 # -L` is used so listing descends through that symlink (plain `find`, without
@@ -206,13 +211,13 @@ probe_decision() {
     elif [ -d "$dir" ]; then
         if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
             echo "planning_doc_probe.sh: docs/decisions exists but is not listable (permission denied) — reporting absent" >&2
-        elif [ -L "$dir" ] && ! _inside_repo "$repo_path" "$dir"; then
-            echo "planning_doc_probe.sh: docs/decisions is a symlink resolving outside the repo — reporting absent (the probe never reads outside the repo)" >&2
+        elif ! _inside_repo "$repo_path" "$dir"; then
+            echo "planning_doc_probe.sh: docs/decisions resolves outside the repo — reporting absent (the probe never reads outside the repo)" >&2
         else
             while IFS= read -r -d '' entry; do
                 [ -e "$entry" ] || continue  # broken symlink: exists as an entry, but reads as absent (see note above)
-                if [ -L "$entry" ] && ! _inside_repo "$repo_path" "$entry"; then
-                    echo "planning_doc_probe.sh: docs/decisions/$(basename -- "$entry") is a symlink resolving outside the repo — not counted (the probe never reads outside the repo)" >&2
+                if ! _inside_repo "$repo_path" "$entry"; then
+                    echo "planning_doc_probe.sh: docs/decisions/$(basename -- "$entry") resolves outside the repo — not counted (the probe never reads outside the repo)" >&2
                     continue
                 fi
                 printf 'present\tdocs/decisions\n'

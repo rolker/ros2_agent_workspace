@@ -353,3 +353,12 @@ repo path, which audit-project lets through into a report that must stay free
 of host paths — every diagnostic is now repo-relative (documented in the
 header, checked by the fix script); the audit-project status capture reads
 `$?` inside an `if`, so it is correct under `set -e`.
+
+### Resolved-path rule (host-inline, 2026-09-18)
+
+Copilot's read of the final head: `docs/` itself symlinked outside the repo
+let health.md and docs/decisions through, because only the last path
+component was tested for being a symlink. The inside-the-repo rule is now
+applied to the resolved path of every probed file and entry, closing the
+class rather than the instance. Tested for a symlinked `docs/` both outside
+and inside the repo.
