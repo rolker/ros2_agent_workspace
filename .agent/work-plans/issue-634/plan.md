@@ -313,3 +313,10 @@ so a search-only parent misreported a present file as absent. Guards now check
 `x` alone, with `chmod 100` tests for both probes. The `find -L` symlink
 following in `probe_decision` is documented as unbounded to `repo_path` (one
 level, present/absent only).
+
+### Symlink bound (host-inline, 2026-09-18)
+
+Copilot's post-push review and the round-3 Lens B pass both flagged that a
+symlinked `docs/decisions` could resolve outside the repo. The probe now
+follows such a symlink only when its target resolves inside `repo_path`
+(`realpath` prefix check); otherwise absent with a diagnostic. Tested.

@@ -204,6 +204,22 @@ mkdir -p "$REPO/docs"
 ln -s "../real-decisions" "$REPO/docs/decisions"
 assert_eq "docs/decisions itself a symlink to a populated dir -> present" "present	docs/decisions" "$(probe_decision "$REPO")"
 
+REPO=$(new_repo)
+OUTSIDE=$(mktemp -d "$TMPDIR_ROOT/outside.XXXXXX")
+echo "# ADR" > "$OUTSIDE/0001-x.md"
+mkdir -p "$REPO/docs"
+ln -s "$OUTSIDE" "$REPO/docs/decisions"
+STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+ACTUAL=$(probe_decision "$REPO" 2>"$STDERR_FILE")
+assert_eq "docs/decisions symlink resolving OUTSIDE the repo -> absent (never reads outside the repo)" "absent	" "$ACTUAL"
+if grep -q "outside" "$STDERR_FILE"; then
+    echo "✅ PASS: outside-repo docs/decisions symlink emits a diagnostic"
+    TEST_PASS=$((TEST_PASS + 1))
+else
+    echo "❌ FAIL: outside-repo docs/decisions symlink emitted no diagnostic"
+    TEST_FAIL=$((TEST_FAIL + 1))
+fi
+
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
     mkdir -p "$REPO/docs/decisions"

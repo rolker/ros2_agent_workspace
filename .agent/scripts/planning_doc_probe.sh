@@ -155,13 +155,21 @@ probe_roadmap() {
 #
 # `docs/decisions` itself may be a symlink to a populated directory — `find
 # -L` is used so listing descends through that symlink (plain `find`, without
-# -L, does not descend into a symlinked start path — and note the symlink
-# target is not constrained to lie inside repo_path: the probe follows it
-# wherever it points, bounded to one level and yielding only present/absent,
-# never content); this still correctly
+# -L, does not descend into a symlinked start path). A symlinked
+# `docs/decisions` is followed only if it resolves INSIDE repo_path; one
+# pointing outside the repo reads as absent with a diagnostic, because the
+# probe never reads outside the repo it was given. This still correctly
 # reads a broken-symlink ENTRY inside the directory as absent, per the
 # paragraph above, since `find -L` still lists a broken symlink (it just
 # cannot resolve it) and the `[ -e ]` guard still drops it.
+# True iff the resolved path of $2 lies inside the resolved path of $1.
+_inside_repo() {
+    local root target
+    root=$(realpath -e -- "$1" 2>/dev/null) || return 1
+    target=$(realpath -e -- "$2" 2>/dev/null) || return 1
+    [ "$target" = "$root" ] || [ "${target#"$root"/}" != "$target" ]
+}
+
 probe_decision() {
     local repo_path="$1"
     local dir="$repo_path/docs/decisions"
@@ -169,6 +177,8 @@ probe_decision() {
     if [ -d "$dir" ]; then
         if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
             echo "planning_doc_probe.sh: $dir exists but is not listable (permission denied) — reporting absent" >&2
+        elif [ -L "$dir" ] && ! _inside_repo "$repo_path" "$dir"; then
+            echo "planning_doc_probe.sh: $dir is a symlink resolving outside $repo_path — reporting absent (the probe never reads outside the repo)" >&2
         else
             while IFS= read -r -d '' entry; do
                 [ -e "$entry" ] || continue  # broken symlink: exists as an entry, but reads as absent (see note above)
