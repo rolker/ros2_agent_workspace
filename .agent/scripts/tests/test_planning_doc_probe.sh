@@ -132,6 +132,29 @@ assert_eq "ROADMAP.md present -> present" "present	ROADMAP.md" "$(probe_roadmap 
 
 REPO=$(new_repo)
 assert_eq "no ROADMAP.md -> absent" "absent	" "$(probe_roadmap "$REPO")"
+
+REPO=$(new_repo)
+ln -s "./nonexistent-target-$$" "$REPO/ROADMAP.md"
+assert_eq "ROADMAP.md is a broken symlink -> absent" "absent	" "$(probe_roadmap "$REPO")"
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    echo "# Roadmap" > "$REPO/ROADMAP.md"
+    chmod 000 "$REPO"
+    STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+    ACTUAL=$(probe_roadmap "$REPO" 2>"$STDERR_FILE")
+    chmod 755 "$REPO"
+    assert_eq "unlistable repo_path -> ROADMAP.md absent (not a false present)" "absent	" "$ACTUAL"
+    if grep -q "permission denied" "$STDERR_FILE"; then
+        echo "✅ PASS: unlistable repo_path emits a distinct permission-denied stderr diagnostic (probe_roadmap)"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: unlistable repo_path did not emit a permission-denied diagnostic (probe_roadmap): $(cat "$STDERR_FILE")"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+else
+    echo "⚠️  SKIP: unlistable-repo_path case for probe_roadmap (running as root — permission bits are not enforced)"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -165,6 +188,13 @@ touch "$REPO/docs/decisions/.gitkeep"
 echo "# ADR 1" > "$REPO/docs/decisions/0001-example.md"
 assert_eq "docs/decisions with .gitkeep AND a real entry -> present" "present	docs/decisions" "$(probe_decision "$REPO")"
 
+REPO=$(new_repo)
+mkdir -p "$REPO/real-decisions"
+echo "# ADR 1" > "$REPO/real-decisions/0001-example.md"
+mkdir -p "$REPO/docs"
+ln -s "../real-decisions" "$REPO/docs/decisions"
+assert_eq "docs/decisions itself a symlink to a populated dir -> present" "present	docs/decisions" "$(probe_decision "$REPO")"
+
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
     mkdir -p "$REPO/docs/decisions"
@@ -196,6 +226,31 @@ assert_eq "docs/health.md present -> present" "present	docs/health.md" "$(probe_
 
 REPO=$(new_repo)
 assert_eq "no docs/health.md -> absent" "absent	" "$(probe_health "$REPO")"
+
+REPO=$(new_repo)
+mkdir -p "$REPO/docs"
+ln -s "./nonexistent-target-$$" "$REPO/docs/health.md"
+assert_eq "docs/health.md is a broken symlink -> absent" "absent	" "$(probe_health "$REPO")"
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    mkdir -p "$REPO/docs"
+    echo "# Health" > "$REPO/docs/health.md"
+    chmod 000 "$REPO/docs"
+    STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
+    ACTUAL=$(probe_health "$REPO" 2>"$STDERR_FILE")
+    chmod 755 "$REPO/docs"
+    assert_eq "unlistable docs/ -> docs/health.md absent (not a false present)" "absent	" "$ACTUAL"
+    if grep -q "permission denied" "$STDERR_FILE"; then
+        echo "✅ PASS: unlistable docs/ emits a distinct permission-denied stderr diagnostic (probe_health)"
+        TEST_PASS=$((TEST_PASS + 1))
+    else
+        echo "❌ FAIL: unlistable docs/ did not emit a permission-denied diagnostic (probe_health): $(cat "$STDERR_FILE")"
+        TEST_FAIL=$((TEST_FAIL + 1))
+    fi
+else
+    echo "⚠️  SKIP: unlistable-docs/ case for probe_health (running as root — permission bits are not enforced)"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------

@@ -47,14 +47,19 @@
 # "present" for a document with no real Vision section, which is a harmless,
 # non-blocking cosmetic error, not something worth the parser.
 #
-# Permission-denied paths: probe_vision and probe_decision both read file/
-# directory CONTENTS (grep'ing README.md, listing docs/decisions/), so an
-# unreadable path emits a distinct stderr diagnostic rather than silently
-# reporting absent-and-nothing-else. probe_roadmap and probe_health are
-# plain `[ -f ]` existence checks with no content read — a permission-denied
-# parent directory (missing +x on docs/) fails `[ -f ]` silently with no way
-# to distinguish it from real absence from a shell test alone, so those two
-# probes do not attempt a diagnostic for that case.
+# Permission-denied paths: all four probes emit a distinct stderr diagnostic
+# rather than silently reporting absent-and-nothing-else, whenever the
+# permission problem is one the probe can actually detect. probe_vision and
+# probe_decision detect it on the file/directory they read CONTENTS from
+# (grep'ing README.md, listing docs/decisions/); probe_roadmap and
+# probe_health detect it on the immediate parent directory of the file they
+# check for (repo_path itself for ROADMAP.md, docs/ for docs/health.md) —
+# they never read the target file's own contents, so an unreadable-but-
+# listable target file is still correctly reported present (existence alone
+# is all that kind needs). In every case, a permission problem the probe
+# cannot detect at all (e.g. repo_path itself unsearchable) still degrades
+# to a silent absent — the CLI's own top-level `[ -x ]` guard on repo_path
+# (see the exit-3 case above) is what catches that one before any probe runs.
 #
 # Usage:
 #   # CLI — probes all four kinds, prints TSV to stdout, one line per kind:
@@ -105,13 +110,22 @@ probe_vision() {
 # probe_roadmap <repo_path>
 # Present iff ROADMAP.md exists at the repo root (plain file existence — the
 # draft names no required heading for this kind).
+#
+# A repo_path that exists but is not listable (permission denied) is
+# reported absent, same as a genuinely missing ROADMAP.md, but with a
+# distinct stderr diagnostic — same rationale as probe_vision above. (The
+# file's own read permission does not matter here — this probe only checks
+# existence, never content — so an unreadable-but-present ROADMAP.md is
+# still correctly reported present.)
 probe_roadmap() {
     local repo_path="$1"
-    if [ -f "$repo_path/ROADMAP.md" ]; then
+    if [ -d "$repo_path" ] && { [ ! -r "$repo_path" ] || [ ! -x "$repo_path" ]; }; then
+        echo "planning_doc_probe.sh: $repo_path exists but is not listable (permission denied) — reporting ROADMAP.md absent" >&2
+    elif [ -f "$repo_path/ROADMAP.md" ]; then
         printf 'present\tROADMAP.md\n'
-    else
-        printf 'absent\t\n'
+        return
     fi
+    printf 'absent\t\n'
 }
 
 # probe_decision <repo_path>
@@ -136,6 +150,13 @@ probe_roadmap() {
 # directory entry, valid or not, was placed here" — but it is a real,
 # documented side effect: an entry can exist (`find` lists it) while still
 # reading as absent.
+#
+# `docs/decisions` itself may be a symlink to a populated directory — `find
+# -L` is used so listing descends through that symlink (plain `find`, without
+# -L, does not descend into a symlinked start path); this still correctly
+# reads a broken-symlink ENTRY inside the directory as absent, per the
+# paragraph above, since `find -L` still lists a broken symlink (it just
+# cannot resolve it) and the `[ -e ]` guard still drops it.
 probe_decision() {
     local repo_path="$1"
     local dir="$repo_path/docs/decisions"
@@ -148,7 +169,7 @@ probe_decision() {
                 [ -e "$entry" ] || continue  # broken symlink: exists as an entry, but reads as absent (see note above)
                 printf 'present\tdocs/decisions\n'
                 return
-            done < <(find "$dir" -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null)
+            done < <(find -L "$dir" -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null)
         fi
     fi
     printf 'absent\t\n'
@@ -156,13 +177,22 @@ probe_decision() {
 
 # probe_health <repo_path>
 # Present iff docs/health.md exists.
+#
+# A docs/ directory that exists but is not listable (permission denied) is
+# reported absent, same as a genuinely missing docs/health.md, but with a
+# distinct stderr diagnostic — same rationale as probe_vision above. (As in
+# probe_roadmap, the file's own read permission does not matter — this probe
+# only checks existence, never content.)
 probe_health() {
     local repo_path="$1"
-    if [ -f "$repo_path/docs/health.md" ]; then
+    local dir="$repo_path/docs"
+    if [ -d "$dir" ] && { [ ! -r "$dir" ] || [ ! -x "$dir" ]; }; then
+        echo "planning_doc_probe.sh: $dir exists but is not listable (permission denied) — reporting docs/health.md absent" >&2
+    elif [ -f "$dir/health.md" ]; then
         printf 'present\tdocs/health.md\n'
-    else
-        printf 'absent\t\n'
+        return
     fi
+    printf 'absent\t\n'
 }
 
 # probe_all <repo_path>
