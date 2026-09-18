@@ -241,3 +241,33 @@ Lifecycle: **Local Review (Pre-Push)** → push / open PR → **triage-reviews**
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 11:11 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-634 at `6909a97`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1249 lines changed across 7 files since main, ≥200-line Deep-promotion threshold; carries override-trigger files — two `.claude/skills/*/SKILL.md` edits and an `AGENTS.md` Script Reference row). Both adversarial passes scoped to the commits since round 2 (`d970d27..HEAD`: the `-x` guards, symmetric permission diagnostics, `find -L` change, and new tests), per this round's focus instruction.
+**Static analysis**: `shellcheck` binary unavailable on this review host, as in rounds 1-2; full `.agent/scripts/tests/run_script_tests.sh` suite re-run clean (27/27 shell tests incl. `test_planning_doc_probe.sh`, 220/220 pytest)
+**Claude Adversarial**: 2 fresh sub-agent passes (Lens A + Lens B), scoped to `d970d27..HEAD`
+**Copilot Adversarial**: off (default)
+**Local Adversarial**: off (default)
+**Must-fix**: 1 | **Suggestions**: 2
+**Round**: 3 | **Ship**: recommended — single must-fix is a precise, verified, mechanical one-line-per-function fix (drop an erroneous `-r` requirement, keep `-x` only); count rose from round 2's 0 but stays within the "low, mechanical" convergence band rather than signaling a design problem — addressing it does not warrant another full round
+
+### Findings
+- [ ] (must-fix, Lens A — verified empirically) `probe_roadmap`'s and `probe_health`'s new permission guard requires **both** `[ ! -r ]` and `[ ! -x ]` on the parent directory, but a plain `[ -f "$dir/<file>" ]` stat-by-known-name only needs search (`x`) permission on the parent, not read (`r`) — listing (`r`) is only needed to *enumerate* a directory's contents, not to `stat()` a specific known filename inside it. Reproduced directly: `chmod 100 dir` (x-only, no r) with `ROADMAP.md` present inside — `[ -f dir/ROADMAP.md ]` still succeeds, but the current guard's `[ ! -r "$dir" ]` half trips first and the probe reports `absent` plus a spurious permission-denied diagnostic for a file that is genuinely present and discoverable. This is a real regression versus round 2's plain `[ -f ]` check, which handled this case correctly. Fix: drop the `-r` half of the guard in both functions, keeping only `[ ! -x "$dir" ]` — `.agent/scripts/planning_doc_probe.sh:122` (`probe_roadmap`), `.agent/scripts/planning_doc_probe.sh:189` (`probe_health`)
+- [ ] (suggestion, Lens A) The new chmod-based tests for `probe_roadmap`/`probe_health` use `chmod 000`, which strips `r` and `x` together, so they cannot distinguish "needs x only" from "needs r+x" — they pass whether or not the must-fix bug above exists. A `chmod 100` (search-only) case asserting `present` would catch it — `.agent/scripts/tests/test_planning_doc_probe.sh` (~line 141, ~line 230)
+- [ ] (suggestion, Lens B) `probe_decision`'s `find -L "$dir" ...` follows `docs/decisions` if it is itself a symlink, with no restriction on the target — a repo containing `docs/decisions -> /etc` (or any path outside the repo) makes the probe read outside `repo_path` and report presence based on foreign-filesystem contents. Bounded by `-mindepth 1 -maxdepth 1` (no traversal/hang risk, self-referential loops tested clean) and no content is ever surfaced (present/absent boolean only), so this is a low-value information oracle, not a disclosure — but it is a genuine, undocumented expansion of the tool's trust boundary versus the script's own "reads the filesystem only" design note. Worth a header-comment callout, or constraining the symlink target to resolve under `repo_path` — `.agent/scripts/planning_doc_probe.sh:172`
+
+### Verification notes (this round)
+- Must-fix #1 independently reproduced by the lead reviewer (not just trusted from the sub-agent report): `chmod 100` on a directory containing a target file still passes `[ -f dir/file ]` while `ls dir` fails — confirms the guard's `-r` requirement is stricter than the code path it's protecting actually needs.
+- Lens B's other 6 observations (TSV-contract preservation via `$(...)` capturing only stdout, no parallel-invocation hazard, `[ -x ]` guard consistency between the CLI and `audit-project/SKILL.md`, no `-L` hang/DoS given `-maxdepth 1`, diagnostic symmetry across all four probes matching the updated header comment) were reviewed and are not disputed — no separate action needed.
+- Lens A's other observations (no `-L` infinite-recursion risk on a self-loop, `[ -x ]` guard consistency, root-skip guards correctly applied to all new chmod-based tests, header comment internally consistent with — though wrong about — the buggy permission requirement) reviewed and not disputed.
+- Full test suite re-run clean before and after this review pass: 27/27 shell tests (incl. `test_planning_doc_probe.sh`), 220/220 pytest — the must-fix bug above is not covered by any existing test (per the paired suggestion), so the clean run does not contradict the finding.
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** → address findings (1 mechanical must-fix) → re-review or ship at operator's discretion, per the Round 3 convergence assessment. Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
