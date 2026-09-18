@@ -111,16 +111,18 @@ probe_vision() {
 # Present iff ROADMAP.md exists at the repo root (plain file existence — the
 # draft names no required heading for this kind).
 #
-# A repo_path that exists but is not listable (permission denied) is
+# A repo_path that exists but is not searchable (permission denied) is
 # reported absent, same as a genuinely missing ROADMAP.md, but with a
 # distinct stderr diagnostic — same rationale as probe_vision above. (The
 # file's own read permission does not matter here — this probe only checks
 # existence, never content — so an unreadable-but-present ROADMAP.md is
-# still correctly reported present.)
+# still correctly reported present.) Only SEARCH permission (x) on the parent
+# is required for a stat by known name; read permission (r) is not, so a
+# search-only parent with the file present still reports present.
 probe_roadmap() {
     local repo_path="$1"
-    if [ -d "$repo_path" ] && { [ ! -r "$repo_path" ] || [ ! -x "$repo_path" ]; }; then
-        echo "planning_doc_probe.sh: $repo_path exists but is not listable (permission denied) — reporting ROADMAP.md absent" >&2
+    if [ -d "$repo_path" ] && [ ! -x "$repo_path" ]; then
+        echo "planning_doc_probe.sh: $repo_path exists but is not searchable (permission denied) — reporting ROADMAP.md absent" >&2
     elif [ -f "$repo_path/ROADMAP.md" ]; then
         printf 'present\tROADMAP.md\n'
         return
@@ -153,7 +155,10 @@ probe_roadmap() {
 #
 # `docs/decisions` itself may be a symlink to a populated directory — `find
 # -L` is used so listing descends through that symlink (plain `find`, without
-# -L, does not descend into a symlinked start path); this still correctly
+# -L, does not descend into a symlinked start path — and note the symlink
+# target is not constrained to lie inside repo_path: the probe follows it
+# wherever it points, bounded to one level and yielding only present/absent,
+# never content); this still correctly
 # reads a broken-symlink ENTRY inside the directory as absent, per the
 # paragraph above, since `find -L` still lists a broken symlink (it just
 # cannot resolve it) and the `[ -e ]` guard still drops it.
@@ -178,7 +183,7 @@ probe_decision() {
 # probe_health <repo_path>
 # Present iff docs/health.md exists.
 #
-# A docs/ directory that exists but is not listable (permission denied) is
+# A docs/ directory that exists but is not searchable (permission denied) is
 # reported absent, same as a genuinely missing docs/health.md, but with a
 # distinct stderr diagnostic — same rationale as probe_vision above. (As in
 # probe_roadmap, the file's own read permission does not matter — this probe
@@ -186,8 +191,8 @@ probe_decision() {
 probe_health() {
     local repo_path="$1"
     local dir="$repo_path/docs"
-    if [ -d "$dir" ] && { [ ! -r "$dir" ] || [ ! -x "$dir" ]; }; then
-        echo "planning_doc_probe.sh: $dir exists but is not listable (permission denied) — reporting docs/health.md absent" >&2
+    if [ -d "$dir" ] && [ ! -x "$dir" ]; then
+        echo "planning_doc_probe.sh: $dir exists but is not searchable (permission denied) — reporting docs/health.md absent" >&2
     elif [ -f "$dir/health.md" ]; then
         printf 'present\tdocs/health.md\n'
         return

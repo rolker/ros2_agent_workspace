@@ -304,3 +304,12 @@ Single PR.
   `test_planning_doc_probe.sh` assertions, 220/220 pytest) and
   `shellcheck --severity=warning` (via the pre-commit hook) both pass on
   the modified scripts.
+
+### Round-3 fix (host-inline, 2026-09-18)
+
+The address-findings pass had made `probe_roadmap` / `probe_health` require
+both `r` and `x` on the parent directory; a stat by known name needs only `x`,
+so a search-only parent misreported a present file as absent. Guards now check
+`x` alone, with `chmod 100` tests for both probes. The `find -L` symlink
+following in `probe_decision` is documented as unbounded to `repo_path` (one
+level, present/absent only).

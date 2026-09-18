@@ -140,6 +140,15 @@ assert_eq "ROADMAP.md is a broken symlink -> absent" "absent	" "$(probe_roadmap 
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
     echo "# Roadmap" > "$REPO/ROADMAP.md"
+    chmod 100 "$REPO"   # search-only: a stat by known name needs x, not r
+    ACTUAL=$(probe_roadmap "$REPO" 2>/dev/null)
+    chmod 755 "$REPO"
+    assert_eq "search-only (chmod 100) repo_path with ROADMAP.md -> present (r on the parent is not required)" "present	ROADMAP.md" "$ACTUAL"
+fi
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    echo "# Roadmap" > "$REPO/ROADMAP.md"
     chmod 000 "$REPO"
     STDERR_FILE=$(mktemp "$TMPDIR_ROOT/stderr.XXXXXX")
     ACTUAL=$(probe_roadmap "$REPO" 2>"$STDERR_FILE")
@@ -231,6 +240,16 @@ REPO=$(new_repo)
 mkdir -p "$REPO/docs"
 ln -s "./nonexistent-target-$$" "$REPO/docs/health.md"
 assert_eq "docs/health.md is a broken symlink -> absent" "absent	" "$(probe_health "$REPO")"
+
+if [ "$(id -u)" -ne 0 ]; then
+    REPO=$(new_repo)
+    mkdir -p "$REPO/docs"
+    echo "# Health" > "$REPO/docs/health.md"
+    chmod 100 "$REPO/docs"   # search-only: a stat by known name needs x, not r
+    ACTUAL=$(probe_health "$REPO" 2>/dev/null)
+    chmod 755 "$REPO/docs"
+    assert_eq "search-only (chmod 100) docs/ with health.md -> present (r on the parent is not required)" "present	docs/health.md" "$ACTUAL"
+fi
 
 if [ "$(id -u)" -ne 0 ]; then
     REPO=$(new_repo)
