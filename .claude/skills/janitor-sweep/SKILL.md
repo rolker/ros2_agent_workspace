@@ -497,6 +497,19 @@ Report format:
 #### Project governance — <repo> (mode: layer/clone)
 - ...
 
+Planning Documents (embedded from `audit-project`'s own report section — no
+separate call site here; see `audit-project` § 7):
+
+| Kind | Status | Location |
+|---|---|---|
+| vision | Present / Not found | `README.md` |
+| roadmap | Present / Not found | `ROADMAP.md` |
+| decision | Present / Not found | `docs/decisions` |
+| health | Present / Not found | `docs/health.md` |
+
+<!-- Descriptive only, same as in audit-project's own report: absence of any
+     kind is never a finding and never drives a Recommended Actions entry. -->
+
 <!-- The mode is not decoration: `clone` means the manifests chose the tree
      (their url, their pinned version), `layer` means the operator's working
      tree was audited as is, with its origin and checked-out ref deliberately
