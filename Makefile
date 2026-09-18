@@ -43,7 +43,7 @@ endif
 LAYER_STAMPS := $(patsubst %,$(STAMP)/layer-%.done,$(LAYERS))
 
 # --- Phony targets ---
-.PHONY: help build _build-layers test test-scripts lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell push-gateway add-remote push-remote pull-remote merge-pr
+.PHONY: help build _build-layers test test-scripts lint clean setup-all _setup-all-layers dashboard dashboard-ui test-dashboard validate sync lock unlock revert-feature pr-triage generate-skills skip-bootstrap skip-git-bug agent-build agent-run agent-shell add-remote push-remote pull-remote merge-pr
 
 # =============================================================================
 # Tier 2 — Developer workflow
@@ -89,7 +89,6 @@ help:
 	@echo "  agent-build   - Build the sandboxed agent Docker image"
 	@echo "  agent-run ISSUE=<number> - Launch agent container for a worktree"
 	@echo "  agent-shell ISSUE=<number> - Launch agent container with bash (debug)"
-	@echo "  push-gateway  - Process pending push requests from containers"
 	@echo ""
 
 # Ensure manifest is bootstrapped first, then re-invoke make so LAYERS is
@@ -314,6 +313,3 @@ agent-shell:
 		exit 1; \
 	fi
 	@./.agent/scripts/docker_run_agent.sh --issue $(ISSUE) --shell
-
-push-gateway:
-	@./.agent/scripts/push_gateway.sh
