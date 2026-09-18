@@ -170,3 +170,33 @@ Plan is well-aligned with the merged design draft's expected-location table (ver
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 10:50 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Verdict**: approved
+
+**Branch**: feature/issue-634 at `f87c963`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1035 lines changed across 7 files, ≥200-line Deep-promotion threshold; also carries override-trigger files — two `.claude/skills/*/SKILL.md` edits and an `AGENTS.md` Script Reference row)
+**Static analysis**: `shellcheck` binary unavailable on this review host; relies on pre-commit's `shellcheck-py` v0.9.0.6 (`--severity=warning`) at each commit as in round 1 — full `.agent/scripts/tests/run_script_tests.sh` suite re-run clean (27/27 shell tests incl. `test_planning_doc_probe.sh` at 36/36 internal assertions, 220/220 pytest)
+**Claude Adversarial**: 2 passes (Lens A + Lens B), Deep prompt, broadened file horizon (fresh-context, no history carried in)
+**Copilot Adversarial**: off (default)
+**Local Adversarial**: off (default)
+**Must-fix**: 0 | **Suggestions**: 3
+**Round**: 2 | **Ship**: recommended — no must-fix findings this round; round-1's single must-fix and 8 suggestions verified fixed against the diff (not just trusted from the Implementation entry), one deliberate documented skip (markdown-context-aware Vision matching) carried forward unchanged
+
+### Findings
+- [ ] (suggestion, Lens A) `## Vision` regex `^## Vision([[:space:]]|$)` requires exactly one space/char boundary; a heading written `##  Vision` (double space) still matches via `[[:space:]]` so this is fine as coded — verified no bug, downgraded from Lens A's raw note: regex is correct, no action needed — `.agent/scripts/planning_doc_probe.sh:93`
+- [ ] (suggestion, Lens A) `test_planning_doc_probe.sh` has no broken-symlink case for `ROADMAP.md` / `docs/health.md` at the root, analogous to the existing broken-symlink case for `docs/decisions` entries (behavior is already correct via `[ -f ]`; test-completeness gap only) — `.agent/scripts/tests/test_planning_doc_probe.sh`
+- [ ] (suggestion, Lens A) No test for `docs/decisions` (or `docs`) itself being a symlink to a directory (behavior is already correct via `[ -d ]` following symlinks; test-completeness gap only) — `.agent/scripts/tests/test_planning_doc_probe.sh`
+
+### Verification notes (this round)
+- All 9 round-1 items re-checked against the current diff, not trusted from the Implementation entry: `$ROOT`-empty guard (`.claude/skills/audit-project/SKILL.md:259-268`), probe-script existence guard (same block), word-boundary Vision regex (`.agent/scripts/planning_doc_probe.sh:93`), permission-denied diagnostics for README/decisions (lines 88-101), `find ... ! -name '.*'` dotfile exclusion (lines 118-126), documented broken-symlink-as-absent (header comment + line 124), janitor-sweep non-scoring tie-back (`.claude/skills/janitor-sweep/SKILL.md:404-410`), Location-column empty-on-absent in both report templates (`audit-project` SKILL.md:334-350, `janitor-sweep` SKILL.md:504-521) — all confirmed present and correct.
+- Cross-checked step renumbering consistency (old audit-project §7 → §8, new "Check planning documents" inserted as §7): every remaining "step 7"/"step 8" reference in both SKILL.md files points at the correct section (Lens B, via grep across `.claude`/`AGENTS.md`).
+- Security/lifecycle (Lens B): probe functions never return file contents, only present/absent + fixed relative path; no shell injection (repo_path always a quoted positional param); script is fully stateless, safe for parallel invocation across a janitor-sweep chunk; TSV contract (4 lines, 3 fields each) cannot be corrupted by a permission-denied path (degrades to "absent" + separate stderr diagnostic).
+- Two prior-round deliberate deferrals stand unchanged and are correctly out of scope for this round: markdown-context-aware Vision matching (documented in script header, harmless-false-positive worst case) and externally-hosted-document discovery fallbacks (split to #643).
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** → push / open PR → **triage-reviews**. Ship recommended — no must-fix findings; the three suggestions above are test-completeness/cosmetic and can ride the PR or a fast follow-up at the operator's discretion.
