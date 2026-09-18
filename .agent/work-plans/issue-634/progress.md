@@ -115,3 +115,30 @@ Plan is well-aligned with the merged design draft's expected-location table (ver
 
 - [ ] During implementation, exclude dotfiles (e.g. `.gitkeep`) when counting `docs/decisions/` entries in `probe_decision`, and add that case to the test file.
 - [ ] Resolve Open Question 2 as answered above (no registration needed) when updating the plan inline per `plan-task`'s "During implementation" rules.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 10:37 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-634 at `380bed3`
+**Mode**: pre-push
+**Depth**: Deep (reason: 798 lines changed across 7 files, ≥200-line Deep-promotion threshold; also carries Standard-tier governance-trigger files — two `.claude/skills/*/SKILL.md` edits and an `AGENTS.md` Script Reference row)
+**Static analysis**: relies on pre-commit's `shellcheck-py` v0.9.0.6 (`--severity=warning`) at each commit — `shellcheck` binary unavailable on this review host to independently re-run; full `.agent/scripts/tests/run_script_tests.sh` suite re-run clean (27/27 shell tests incl. the new `test_planning_doc_probe.sh`, 220/220 pytest)
+**Claude Adversarial**: 2 passes (Lens A + Lens B), Deep prompt, broadened file horizon
+**Copilot Adversarial**: off (default)
+**Local Adversarial**: off (default)
+**Must-fix**: 1 | **Suggestions**: 8
+**Round**: 1 | **Ship**: continue — one must-fix (missing `$ROOT` empty-guard) is a precise, mechanical, single-line fix, but Round 1 with an open must-fix does not meet the "no must-fix" or "round ≥2 + low/not-rising" recommended-ship criteria
+
+### Findings
+- [ ] (must-fix) `audit-project` step 7's probe invocation has no `$ROOT`-empty guard, unlike step 5's identical-precondition guard a few lines above — `.claude/skills/audit-project/SKILL.md:259`
+- [ ] (suggestion) Step 7 also has no existence/executable check for `planning_doc_probe.sh` itself (a layer worktree with an unmerged main checkout would hit a raw "No such file" error) — `.claude/skills/audit-project/SKILL.md:259`
+- [ ] (suggestion) `probe_vision`'s `^## Vision` prefix match has no word-boundary check — `## Visionary Roadmap` would false-positive as present — `.agent/scripts/planning_doc_probe.sh:64`
+- [ ] (suggestion) `probe_vision` is not markdown-context-aware — a `## Vision` line inside a fenced code block or blockquote would still match — `.agent/scripts/planning_doc_probe.sh:64`
+- [ ] (suggestion) Permission-denied paths (unreadable README, unlistable `docs/decisions/`) are indistinguishable from genuine absence — no distinct error signal — `.agent/scripts/planning_doc_probe.sh:64,92-101,107`
+- [ ] (suggestion) `probe_decision`'s dotfile-exclusion relies on bash's default (unset) `dotglob` with no explicit guard or filter — `.agent/scripts/planning_doc_probe.sh:88-101`
+- [ ] (suggestion) `docs/decisions/` containing only a broken symlink reads as absent (the `[ -e ]` no-match guard also filters broken symlinks) — undocumented side effect — `.agent/scripts/planning_doc_probe.sh:93-97`
+- [ ] (suggestion) `janitor-sweep`'s embedded Planning Documents table relies solely on an inline HTML comment to stay non-scoring — no explicit tie-back from the roll-up-rule prose — `.claude/skills/janitor-sweep/SKILL.md:500`
+- [ ] (suggestion) Report table templates show the kind's fixed expected path in Location even for "Not found," but the probe emits an empty path for absent kinds — ambiguous rendering guidance, plus test-coverage gaps (symlink/subdir/permission-denied/prefix-false-positive cases untested) — `.claude/skills/audit-project/SKILL.md:318-325`, `.claude/skills/janitor-sweep/SKILL.md:500-508`, `.agent/scripts/tests/test_planning_doc_probe.sh`
