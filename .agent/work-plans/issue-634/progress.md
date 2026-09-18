@@ -200,3 +200,21 @@ Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatch
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** → push / open PR → **triage-reviews**. Ship recommended — no must-fix findings; the three suggestions above are test-completeness/cosmetic and can ride the PR or a fast follow-up at the operator's discretion.
+
+## Integrated Review
+**Status**: complete
+**When**: 2026-09-18 15:10 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**PR**: #644 at `f9385e0`
+**Sources**: 2 (Copilot R1 @ `f9385e0`, prior Local Review (Pre-Push) round 2 @ `f87c963` — different SHA, no overlapping concerns)
+**Cross-source confirmations**: 0
+**CI**: pending (Validate Documentation not yet concluded; all other checks pass)
+
+### Findings
+- [ ] (must-fix, Copilot) CLI entry guard checks `[ -d ]`/`[ -r ]` on `repo_path` but not `[ -x ]` (search permission); a readable-but-not-searchable directory silently makes all four probes report `absent` instead of hitting the documented exit-3 "could not run" contract — `.agent/scripts/planning_doc_probe.sh:189-192`
+- [ ] (must-fix, Copilot) `audit-project` step 7's guard only checks `[ -f ... planning_doc_probe.sh ]`, not executability; a present-but-non-executable script reaches the direct invocation and fails with a raw "Permission denied" instead of the intended `SKIPPED` — `.claude/skills/audit-project/SKILL.md:267-269`
+- [ ] (suggestion, Copilot) PR description states "Unreadable paths get a stderr diagnostic, distinct from absence" without qualification, but `probe_roadmap`/`probe_health` are plain `[ -f ]` checks that do **not** emit a diagnostic for a permission-denied parent (only `probe_vision`/`probe_decision` do) — the script's own header comment already documents this narrower, asymmetric guarantee accurately; the PR description overclaims. Fix by either narrowing the PR description text, or extending diagnostics to `probe_roadmap`/`probe_health` for symmetry — `.agent/scripts/planning_doc_probe.sh:160`, PR #644 description
+
+### False positives
+- (Copilot) Claimed the new `audit-project` "Check planning documents" step (7→8 sections) risks breaking `janitor-sweep`'s "all seven checklist sections" completeness rule at SKILL.md:398-400 — verified that rule belongs to **Check 1 (`audit-workspace`)**, a wholly separate skill with its own independent 7-section checklist (`.claude/skills/audit-workspace/SKILL.md` §§1-7: Principles enforcement, ADR accuracy, Script reference table, Template validity, Consequences map currency, Instruction file consistency, Stale worktrees). `audit-project`'s step renumbering (7→8, adding "Check planning documents") is unrelated code and does not feed that rule; Check 2's own rollup rule (janitor-sweep SKILL.md ~404-410) already explicitly excludes the Planning Documents table from "produced findings." The two "seven"s are different skills' checklists that happen to share a number.
