@@ -130,3 +130,20 @@ The plan's diagnosis and five core redaction fixes are accurate against current 
 - [ ] Add an exit-status/`declare -F` guard around the new direct `source ".../redact.sh"` in `janitor-sweep/SKILL.md` step 1, matching the guard pattern in `resolve_repo_checkout.sh`/`manifest_fallback.sh`.
 - [ ] Fix the plan's "step 2 (~line 136)" label to "step 1 (~line 136)" for the redundant `REDACT_PATH_PREFIXES` assignment being removed.
 - [ ] When doing the `manifest_fallback.sh` fd-close ride-along, grep for every git call after `exec 8>` (lines 223, 244, 245, 251) rather than relying on the cited "~190-230" range.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-18 14:28 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-626 at `2c00d33`
+**Mode**: pre-push
+**Depth**: Deep (reason: security-relevant credential/path-redaction gate for the janitor-sweep report, per operator request)
+**Must-fix**: 1 | **Suggestions**: 2
+**Round**: 1 | **Ship**: continue — one precise, low-risk must-fix remains in `redact.sh`'s `REDACT_PATH_PREFIXES` split
+
+### Findings
+- [ ] (must-fix) `REDACT_PATH_PREFIXES` split-on-last-`=` only covers a PREFIX containing `=` (the case this PR's own tests cover); a spec whose REPLACEMENT contains `=` (e.g. `"/home/x=<workspace=main>"`) is corrupted by the same split and silently leaves the absolute host path completely unredacted, no error — `.agent/scripts/redact.sh:75-76`
+- [ ] (suggestion) `redact_url` is a single non-global match (unlike `redact_text`'s global `sed .../g`); a url with a second full `scheme://user:pass@host` embedded in its query string leaks the inner credential. No current caller passes such input, but the asymmetry with `redact_text` is undocumented — `.agent/scripts/redact.sh:39-50`
+- [ ] (suggestion) narrow signal-window gap in the stderr save/restore around the lock-file `exec`: a signal landing between `exec 2>/dev/null` and the restore line loses any handler output and could leave stderr pointed at `/dev/null` if the enclosing shell doesn't exit. Not reachable today — neither script installs a non-exiting trap in that window (only `trap cleanup EXIT` in `resolve_repo_checkout.sh`; `manifest_fallback.sh` is only ever sourced by it) — `.agent/scripts/resolve_repo_checkout.sh:474-481`, `.agent/scripts/manifest_fallback.sh:217-224`
