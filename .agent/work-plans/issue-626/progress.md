@@ -68,3 +68,16 @@ issue's line numbers. No item was already fixed.
 - [ ] Add `test_redact.sh` (none exists) covering at minimum: `@` in password, a path-prefix spec whose value contains `=`, and the existing simple-case behavior — closing the "tests exercise only the simple form" gap named in the issue.
 - [ ] Keep the remaining ~17 items open on #626 for later passes (false-RED url-key case-sensitivity, path-traversal via symlinked `config_path`, lock-lifecycle/fd-inheritance, doc-accuracy nits, and the two named test gaps for the round-5 `*)`/will-not-load arms).
 - [ ] Optional, low-cost bundle candidate for the gate PR (not required): fix the stale `redact.sh` row in `AGENTS.md` ("when it is missing" → "missing or will not load", plus the exit code) since it describes the exact code the gate PR touches.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-18 13:47 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Plan**: `.agent/work-plans/issue-626/plan.md` at `858744a`
+**Branch**: feature/issue-626 at `858744a`
+**Phases**: single
+
+### Open questions
+- [ ] Should the fd-close ride-along (`9>&-`/`8>&-`) also cover non-`git` subprocess calls in the locked regions, or only `git` (as scoped)?
+- [ ] Confirm the fd-inheritance fix does not overlap with the separately-deferred "manifest_config_dir lock releases on subshell return" item — plan states no overlap expected.
