@@ -271,3 +271,18 @@ Lifecycle: **Implementation** → **review-code** (re-review). Not auto-dispatch
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** → address findings (1 mechanical must-fix) → re-review or ship at operator's discretion, per the Round 3 convergence assessment. Not auto-dispatched here per this skill's "no auto-chaining" rule — the host orchestrator drives the next phase.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-18 11:38 -04:00
+**By**: Claude Code Agent (Claude Fable 5.1)
+
+**Branch**: feature/issue-634 at `03e983c`
+**Addresses**: Local Review (Pre-Push) round 3 must-fix + 2 suggestions; Copilot reviews of 2026-09-18 15:14, 15:24 and 15:32 UTC (host-inline passes)
+
+### Actions
+- [x] (must-fix, round 3) roadmap/health parent-directory guards need search permission only — `4fec2de`, chmod 100 tests
+- [x] (suggestion, round 3 + Copilot 15:14) symlinked `docs/decisions` followed only when it resolves inside the repo — `2cc4f38`
+- [x] (Copilot 15:24) per-entry inside-repo rule for symlinked entries; audit-project guard is `-f` + `bash` per step 1; plan and AGENTS.md say readable AND searchable — `74fbc7f`
+- [x] (Copilot 15:32) audit-project guard also checks readability; prose no longer says executable — this commit
+- (Copilot 15:32, false positive) the `-r || -x` guard at planning_doc_probe.sh:180 is `probe_decision`, which enumerates a directory and does need read; roadmap/health guards are already `-x` only
