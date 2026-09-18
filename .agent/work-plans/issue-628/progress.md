@@ -978,7 +978,7 @@ Regression checks, all pass: every relative link in the changed files resolves (
 
 ## Integrated Review
 **Status**: complete
-**When**: 2026-09-18 14:20 -04:00
+**When**: 2026-09-18 09:20 -04:00
 **By**: Claude Code Agent (Claude Sonnet 5)
 
 **PR**: #641 at `7fbd643`

@@ -398,7 +398,7 @@ Sub-issue (1) merged as PR #638 on 2026-09-17. The next day the operator raised
 a gap in the vocabulary — verbatim in the draft's new section — that the
 design-and-state record must "mesh well with both field season tempos and off
 season", prompted by the world-store design pass
-(unh_marine_autonomy#391) relitigating six ADRs written during the 2026 field
+(unh_marine_autonomy#391) relitigating seven ADRs written during the 2026 field
 season. Agreed shape, applied on this branch as a revision of the draft (not a
 new issue, not an ADR):
 

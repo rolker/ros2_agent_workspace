@@ -472,7 +472,12 @@ This is a change to the wrap-up skill and its dev-log template, filed as
 ### The design-mode half: health lists what is owed
 
 The health document gains a row: **provisional decisions with no review
-scheduled**, aged from the date they were made. That lands in the sweep-split
+scheduled**, aged from the date they were made. *Scheduled* means the entry's
+owed review names a forcing function or a date — "at the next design-mode
+pass", "before the 2027 season", "when #391's vertical slice lands"; an entry
+whose owed review says only that a review is owed is unscheduled, and that is
+the row's predicate. The wrap-up entry shape carries the date and the owed
+review, so the sweep needs nothing beyond what wrap-up writes. That lands in the sweep-split
 work ([#635](https://github.com/rolker/ros2_agent_workspace/issues/635)) as a
 finding tier beside the existing ones, and it is what makes the read-both rule
 bite in design mode: the roadmap says where to go, health says which
