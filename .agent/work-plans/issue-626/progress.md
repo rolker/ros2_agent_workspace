@@ -147,3 +147,16 @@ The plan's diagnosis and five core redaction fixes are accurate against current 
 - [ ] (must-fix) `REDACT_PATH_PREFIXES` split-on-last-`=` only covers a PREFIX containing `=` (the case this PR's own tests cover); a spec whose REPLACEMENT contains `=` (e.g. `"/home/x=<workspace=main>"`) is corrupted by the same split and silently leaves the absolute host path completely unredacted, no error — `.agent/scripts/redact.sh:75-76`
 - [ ] (suggestion) `redact_url` is a single non-global match (unlike `redact_text`'s global `sed .../g`); a url with a second full `scheme://user:pass@host` embedded in its query string leaks the inner credential. No current caller passes such input, but the asymmetry with `redact_text` is undocumented — `.agent/scripts/redact.sh:39-50`
 - [ ] (suggestion) narrow signal-window gap in the stderr save/restore around the lock-file `exec`: a signal landing between `exec 2>/dev/null` and the restore line loses any handler output and could leave stderr pointed at `/dev/null` if the enclosing shell doesn't exit. Not reachable today — neither script installs a non-exiting trap in that window (only `trap cleanup EXIT` in `resolve_repo_checkout.sh`; `manifest_fallback.sh` is only ever sourced by it) — `.agent/scripts/resolve_repo_checkout.sh:474-481`, `.agent/scripts/manifest_fallback.sh:217-224`
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-18 14:30 -04:00
+**By**: Claude Code Agent (Claude Opus 5 (1M context))
+
+**Branch**: feature/issue-626 at `9285ea3`
+**Addresses**: Local Review (Pre-Push) round 1 (host-inline)
+
+### Actions
+- [x] (must-fix) a path-prefix label containing '=' leaked the whole path — label now parsed by shape (trailing `=~` or `=<...>`), last-'=' split only as fallback; 3 new tests
+- [x] (suggestion) redact_url rewrites only the leading url — documented in its header; multi-url text goes through redact_text
+- [x] (suggestion) fd-2 window around each lock exec — documented at both sites
