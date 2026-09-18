@@ -257,17 +257,19 @@ does not exist beside a project repo checked out under a layer worktree. As
 in step 5, check `$ROOT` is non-empty first: no workspace root above you
 means the probe script itself is unreachable — that is `SKIPPED`, not a
 failure to paper over. Also check the script actually exists **and is
-executable** at that path before invoking it — a layer worktree whose main
+readable** at that path before invoking it — a layer worktree whose main
 checkout predates this script landing on `main` would otherwise hit a raw
-"No such file" error, and a present-but-non-executable script (e.g. an
-`x`-bit lost in a checkout/transfer) would otherwise hit a raw "Permission
-denied" instead of the intended `SKIPPED`.
+"No such file" error, and a present-but-unreadable script would otherwise hit
+a raw "Permission denied" instead of the intended `SKIPPED`. Executability is
+deliberately **not** required: the block invokes the script through `bash`,
+as step 1 does, because exec bits are lost on a noexec mount, an unpacked
+archive or a CIFS share, and the script runs fine there.
 
 ```bash
 if [ -z "$ROOT" ]; then
     echo "SKIPPED (no workspace root — planning_doc_probe.sh unreachable)"
-elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ]; then
-    echo "SKIPPED (planning_doc_probe.sh not found under $ROOT/.agent/scripts/)"
+elif [ ! -f "$ROOT/.agent/scripts/planning_doc_probe.sh" ] || [ ! -r "$ROOT/.agent/scripts/planning_doc_probe.sh" ]; then
+    echo "SKIPPED (planning_doc_probe.sh not found or not readable under $ROOT/.agent/scripts/)"
 else
     # -f + bash rather than -x, as step 1 does: exec bits are lost on a noexec
     # mount, an unpacked archive or a CIFS share, and the script runs fine there.
