@@ -36,6 +36,11 @@ fi
 # redact_url <url> — a whole string that IS a url. Replaces the `user[:pass]@`
 # userinfo of a `scheme://` url with `<redacted>`. An scp-style
 # `git@github.com:org/repo` url has no password field and is left alone.
+# It rewrites ONE url, the one the string starts with: a second full
+# `scheme://user:pass@` url embedded inside the first (say, in its query
+# string) is not touched. Anything that may carry more than one url — a
+# captured error message, a command's output — goes through redact_text,
+# which rewrites every occurrence.
 redact_url() {
     local url="$1"
     # Greedy up to the LAST `@` before the host, not the first: a password
@@ -69,11 +74,21 @@ redact_text() {
     local spec prefix replacement
     for spec in ${REDACT_PATH_PREFIXES[@]+"${REDACT_PATH_PREFIXES[@]}"}; do
         [[ -z "$spec" || "$spec" != *=* ]] && continue
-        # Split on the LAST `=`, not the first: a workspace path containing
-        # `=` (rare but not forbidden) was previously split at its own first
-        # `=`, corrupting the prefix and leaving the path unmatched later.
-        prefix=${spec%=*}
-        replacement=${spec##*=}
+        # A `<path>=<label>` spec is ambiguous whenever EITHER side contains
+        # `=`, and splitting on a fixed `=` only moves the leak: the first `=`
+        # corrupts a path containing `=`, the last corrupts a label containing
+        # `=` — either way the path is left unmatched and leaks whole, silently.
+        # Every label callers use is `~` or `<...>`, so parse the label by that
+        # SHAPE first: the trailing `=~` or `=<...>` is the label, everything
+        # before it the path, whatever `=` either contains. Only a spec with a
+        # label of neither shape falls back to splitting on the last `=`.
+        if [[ "$spec" =~ ^(.+)=(~|<[^<>]*>)$ ]]; then
+            prefix=${BASH_REMATCH[1]}
+            replacement=${BASH_REMATCH[2]}
+        else
+            prefix=${spec%=*}
+            replacement=${spec##*=}
+        fi
         # A bare `/` prefix would rewrite every path separator in the string.
         [[ -z "$prefix" || "$prefix" == "/" ]] && continue
         text=${text//"$prefix"/"$replacement"}

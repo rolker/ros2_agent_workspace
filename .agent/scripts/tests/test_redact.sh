@@ -124,6 +124,34 @@ else
 fi
 unset REDACT_PATH_PREFIXES
 
+# A LABEL containing `=`: the old last-`=` split turned this spec into
+# prefix `/home/someone=<workspace` + label `main>`, the prefix never matched,
+# and the full path leaked with no error.
+# shellcheck disable=SC2034
+REDACT_PATH_PREFIXES=("/home/someone=<workspace=main>")
+if [ "$(redact_text 'failed at /home/someone/ws/src/x')" = 'failed at <workspace=main>/ws/src/x' ]; then
+    pass "redact_text: a label containing '=' still redacts the path"
+else
+    fail "redact_text: label containing '=' leaked: $(redact_text 'failed at /home/someone/ws/src/x')"
+fi
+# Both sides containing `=` at once: parsed by the label's shape, not a fixed `=`.
+# shellcheck disable=SC2034
+REDACT_PATH_PREFIXES=("/tmp/a=b=<x=y>")
+if [ "$(redact_text 'see /tmp/a=b/file')" = 'see <x=y>/file' ]; then
+    pass "redact_text: '=' in both the path and the label is parsed by the label's shape"
+else
+    fail "redact_text: '=' in path and label: $(redact_text 'see /tmp/a=b/file')"
+fi
+# The `~` label form, as the skills use for $HOME.
+# shellcheck disable=SC2034
+REDACT_PATH_PREFIXES=("/home/some=one=~")
+if [ "$(redact_text 'in /home/some=one/x')" = 'in ~/x' ]; then
+    pass "redact_text: '~' label with '=' in the path"
+else
+    fail "redact_text: '~' label with '=' in the path: $(redact_text 'in /home/some=one/x')"
+fi
+unset REDACT_PATH_PREFIXES
+
 # --- redact.sh executed rather than sourced -----------------------------------
 out=$(bash "$REAL_SCRIPTS_DIR/redact.sh" 2>&1); rc=$?
 if [ "$rc" -eq 2 ] && [ -n "$out" ]; then
