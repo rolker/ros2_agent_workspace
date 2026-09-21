@@ -665,7 +665,7 @@ durable output — and, being the durable output, the one place the sweep must
 not assume success:
 
 ```bash
-if ! printf '%s' "$REPORT_BODY" > "$REPORT"; then
+if ! printf '%s\n' "$REPORT_BODY" > "$REPORT"; then
     echo "FAILED(report write: could not write $(redact_text "$REPORT"))"
 fi
 ```
@@ -937,7 +937,7 @@ with the document's top-level numbered steps.
    nothing has been added to it since:
 
    ```bash
-   if ! { mkdir -p docs && printf '%s' "$HEALTH_BODY" > docs/health.md; }; then
+   if ! { mkdir -p docs && printf '%s\n' "$HEALTH_BODY" > docs/health.md; }; then
        PUBLISH_LINE="FAILED(workspace publish: health write: could not write docs/health.md)"
        # -> skip to 7h
    fi
@@ -945,6 +945,10 @@ with the document's top-level numbered steps.
 
    A write failure here is named as its own cause (`health write`), not
    left to surface one sub-step later as a commit with nothing staged.
+   The trailing `\n` is load-bearing: the first live run wrote the file
+   without one, `end-of-file-fixer` rewrote it during the commit hook, and
+   7c reported `FAILED(workspace publish: commit: …)` for a file that was
+   correct in every other way (#649).
 
 7c. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
    Identity): for this PR's hand-run testing, the **implementing agent's own
