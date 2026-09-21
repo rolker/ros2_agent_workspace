@@ -73,31 +73,53 @@ result, never `FAILED`.
    Render findings grouped by tier within each scope section, replacing the
    current per-check `#### <check name>` findings list.
 
-3. **Run-over-run diff.** For the workspace scope, the previous run's state
-   is the last committed `docs/health.md` (read via
-   `git show HEAD:docs/health.md` before writing the new one, from the
-   janitor-sweep worktree, before the new commit). Diff findings by a stable
-   key (tier + check + one-line description) and render three subsections
-   under each tier: `New`, `Resolved`, `Unchanged`. For the project scope
-   (still report-only, no committed history), do a best-effort diff against
-   the most recent prior local report for the same repo under
-   `.agent/scratchpad/janitor/` when one exists, and say plainly when it
-   does not (no prior report / prior report for a different chunk) rather
-   than rendering an empty diff as "no changes."
+3. **Run-over-run diff, every tier of every scope.** For the workspace
+   scope, the previous run's state is the last committed `docs/health.md`
+   (read via `git show HEAD:docs/health.md` before writing the new one).
+   The janitor-sweep skill worktree doesn't exist yet at this point in the
+   run — it's created later, in the publish step below — so this read
+   actually runs from the main checkout; the same command is restated once
+   the worktree exists, reading the same committed answer either way. Diff
+   findings by a stable key (tier + check + one-line description) and
+   render three subsections under each tier: `New`, `Resolved`,
+   `Unchanged`. For the project scope (still report-only, no committed
+   history), do a best-effort diff against the most recent prior local
+   report for the same repo under `.agent/scratchpad/janitor/` when one
+   exists, and say plainly when it does not (no prior report / prior report
+   for a different chunk) rather than rendering an empty diff as "no
+   changes." Every tier in both scopes' report sections carries this
+   diff-state — the workspace scope renders it as `New`/`Resolved`/
+   `Unchanged` subsections per tier (one committed history to diff
+   against), the project scope renders the same three states as an inline
+   `[New/Resolved/Unchanged]` tag per finding (many repos, independent
+   best-effort local histories — per-tier subsections wouldn't stay
+   legible). The one exception is the Projects "provisional decisions"
+   sub-list, which isn't diffed because its own row text already states
+   whether a decision has a review scheduled.
 
 4. **Publish-by-commit — workspace scope only.** After the workspace-scope
    checks and tiering/diff are done:
    - Use the skill-worktree convention (`worktree_create.sh --skill
      janitor-sweep --type workspace`, branch `skill/janitor-sweep-<ts>`) —
      requires step 6 below.
-   - Write the rendered workspace section to `docs/health.md` at the repo
-     root (the path the design draft's expected-location table fixes).
+   - **Redact before writing**: pass the rendered workspace section through
+     `redact_text` (from `.agent/scripts/redact.sh`, with
+     `REDACT_PATH_PREFIXES` set for the workspace root and `$HOME`,
+     already wired up earlier in the run) before it touches disk. This is a
+     mandatory code-level gate, not an authoring reminder — `docs/health.md`
+     is committed to a public repo, the findings text is synthesized from
+     `audit-workspace`/`audit-project` output that was never itself routed
+     through `redact.sh`, and this skill is meant to run unattended once
+     #636 wires the trigger.
+   - Write the rendered (redacted) workspace section to `docs/health.md` at
+     the repo root (the path the design draft's expected-location table
+     fixes).
    - Commit with per-invocation `-c user.name=/-c user.email=` identity
      (AGENTS.md § Agent Commit Identity); for this PR's hand-run testing,
      the implementing agent's own identity, not `Janitor Sweep Agent`
      (that's #636's job per the host notes).
-   - Push and open a **non-draft** PR (Copilot does not review draft PRs —
-     `reference_copilot_skips_draft_prs.md`), title e.g. `Janitor sweep:
+   - Push and open a **non-draft** PR (Copilot code review does not review
+     draft PRs — open it non-draft so the review fires), title e.g. `Janitor sweep:
      workspace health <date>`, replacing any existing open PR from a prior
      `skill/janitor-*` branch rather than stacking a new one per run — **the
      new PR must be pushed and opened first; only then is the old PR
