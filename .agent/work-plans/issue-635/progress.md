@@ -21,3 +21,22 @@ issue: 635
 ### Recommendations
 - Once #635 merges, the design draft explicitly gates filing the "roadmap-timed review pass" issue on this issue landing ("deliberately not filed until the health row it reads from exists (#635)") — worth filing that follow-up issue as part of closing out #635, since the draft names it as the next piece.
 - The automated-PR commit identity (`Janitor Sweep Agent`) is #636's job (wiring the weekly cloud Routine under that identity), not #635's — #635 only builds the commit/PR *mechanism*. The plan should use the implementing agent's normal per-invocation git identity for any hand-run testing in #635's own PR, rather than attempting to stand up the `Janitor Sweep Agent` identity early.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-21 12:19 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-635/plan.md` at `74f712c`
+**Branch**: feature/issue-635 at `74f712c`
+**Phases**: single
+
+Both prior review Actions are carried into the plan: the report-side split
+covers both scopes, but the commit/PR publish path (`docs/health.md`) is
+gated to the workspace check only; the provisional-decisions scan is
+specified as a tolerant, always-non-`FAILED`-on-absence parser pending #642.
+
+### Open questions
+- [ ] The provisional-decisions parser is built against #642's *proposed* shape with no real instance to verify against yet — needs a follow-up once #642 ships.
+- [ ] Whether an aged, unscheduled provisional decision should ever escalate is explicitly open in the design draft itself — not decided by this plan.
+- [ ] The project-repo health-rollup shape (per-repo PR / one doc per project / health-follows-roadmap) is the operator's open decision — project scope stays report-only pending it.
