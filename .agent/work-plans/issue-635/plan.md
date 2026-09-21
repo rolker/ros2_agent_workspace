@@ -78,8 +78,8 @@ result, never `FAILED`.
    (read via `git show HEAD:docs/health.md` before writing the new one).
    The janitor-sweep skill worktree doesn't exist yet at this point in the
    run — it's created later, in the publish step below — so this read
-   actually runs from the main checkout; the same command is restated once
-   the worktree exists, reading the same committed answer either way. Diff
+   runs once, from the main checkout (`git -C "$ROOT" show
+   HEAD:docs/health.md`); nothing later re-reads it. Diff
    findings by a stable key (tier + check + one-line description) and
    render three subsections under each tier: `New`, `Resolved`,
    `Unchanged`. For the project scope (still report-only, no committed
@@ -97,35 +97,43 @@ result, never `FAILED`.
    sub-list, which isn't diffed because its own row text already states
    whether a decision has a review scheduled.
 
-4. **Publish-by-commit — workspace scope only.** After the workspace-scope
-   checks and tiering/diff are done:
-   - Use the skill-worktree convention (`worktree_create.sh --skill
-     janitor-sweep --type workspace`, branch `skill/janitor-sweep-<ts>`) —
-     requires step 6 below.
-   - **Redact before writing**: pass the rendered workspace section through
-     `redact_text` (from `.agent/scripts/redact.sh`, with
-     `REDACT_PATH_PREFIXES` set for the workspace root and `$HOME`,
-     already wired up earlier in the run) before it touches disk. This is a
-     mandatory code-level gate, not an authoring reminder — `docs/health.md`
-     is committed to a public repo, the findings text is synthesized from
-     `audit-workspace`/`audit-project` output that was never itself routed
-     through `redact.sh`, and this skill is meant to run unattended once
-     #636 wires the trigger.
-   - Write the rendered (redacted) workspace section to `docs/health.md` at
-     the repo root (the path the design draft's expected-location table
-     fixes).
-   - Commit with per-invocation `-c user.name=/-c user.email=` identity
-     (AGENTS.md § Agent Commit Identity); for this PR's hand-run testing,
-     the implementing agent's own identity, not `Janitor Sweep Agent`
-     (that's #636's job per the host notes).
-   - Push and open a **non-draft** PR (Copilot code review does not review
-     draft PRs — open it non-draft so the review fires), title e.g. `Janitor sweep:
-     workspace health <date>`, replacing any existing open PR from a prior
-     `skill/janitor-*` branch rather than stacking a new one per run — **the
-     new PR must be pushed and opened first; only then is the old PR
-     commented-on, closed, and its branch deleted** (never the reverse: a
-     failed new-push/PR-create must leave the previously-published PR
-     intact, per Local Review round 1's must-fix).
+4. **Publish-by-commit — workspace scope only.** Redesigned after Local
+   Review round 3 (three rounds each found a new defect in this step, so
+   the data flow was named rather than patched again):
+   - **One render pass, two named artifacts (step 6 of `SKILL.md`)**: the
+     `## Workspace` section is rendered once; `$HEALTH_BODY` (title +
+     provenance line + that section — the exact bytes committed) and
+     `$REPORT_BODY` (the local report) are composed from it. Both pass
+     through `redact_text` (from `.agent/scripts/redact.sh`, with
+     `REDACT_PATH_PREFIXES` set for the workspace root and `$HOME`, wired
+     up in step 1) **once, before either is written** — a code-level gate,
+     not an authoring reminder: `docs/health.md` is public, the findings
+     text comes from `audit-workspace`/`audit-project` output never routed
+     through `redact.sh`, and the skill will run unattended once #636 wires
+     the trigger. Nothing is appended to `$HEALTH_BODY` after that.
+   - **`docs/health.md` carries no PR URL or publish outcome** — unknowable
+     when rendered; the commit and PR are its provenance. The outcome (PR
+     URL, or `FAILED(workspace publish: <reason>)`) is appended to the local
+     report as a `## Publish outcome` section by sub-step 7h, on every exit
+     path.
+   - Sub-steps 7a–7h: 7a removes any leftover `skill-*-janitor-sweep-*`
+     worktree **by exact path** (a completed run removes its own in 7g, so
+     anything present at start is an orphan), then creates this run's via
+     `worktree_create.sh --skill janitor-sweep --type workspace` and
+     captures `$WT_PATH`/`$NEW_BRANCH`; 7b writes `$HEALTH_BODY` verbatim
+     to `docs/health.md` (replaced wholesale); 7c commits with
+     per-invocation `-c user.name=/-c user.email=` identity (the
+     implementing agent's own for hand-run testing — `Janitor Sweep Agent`
+     is #636's job); 7d pushes and opens a **non-draft** PR (Copilot does
+     not review drafts), capturing `$NEW_PR_URL` from `gh pr create`; 7e
+     replaces prior `skill/janitor-sweep-*` PRs (comment, close, delete
+     branch only after close succeeded) and deletes stray remote branches
+     with no open PR; 7f a human merges; 7g removes this run's worktree by
+     `$WT_PATH`; 7h appends the outcome. **New PR first, old PR second,
+     never the reverse.**
+   - `worktree_remove.sh --skill` is deliberately not used for cleanup: its
+     newest-match lookup would delete the live run's worktree when an
+     orphan exists.
    - **Never commit `docs/health.md` into a project repo in this slice** —
      project-scope findings stay in the local
      `.agent/scratchpad/janitor/<ts>-sweep.md` report exactly as today.
@@ -187,9 +195,9 @@ Folded in per the Plan Review's must-fix and two suggestions
   moment workspace scope commits `docs/health.md`. Caught by the grep for
   other stale references the implementation prompt asked for.
 - **PR-replacement mechanism (step 4 of Approach, suggestion)** — implemented
-  concretely in `SKILL.md` § Publish the workspace scope, sub-step 7f (after
-  the round-1 Local Review fix reordered publish so the new PR opens first
-  in 7e and the old one is replaced second in 7f, never the reverse):
+  concretely in `SKILL.md` § Publish the workspace scope, sub-step 7e (the
+  new PR opens first in 7d and the old one is replaced second in 7e, never
+  the reverse — relabeled from 7e/7f in the round-3 redesign):
   `gh pr list --state open --json number,headRefName` filtered by the
   `skill/janitor-sweep-` prefix (excluding this run's own new branch), then
   `gh pr comment` (naming the new PR's real URL, captured from `gh pr
