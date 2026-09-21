@@ -62,3 +62,38 @@ The plan correctly reconciles the issue's Scope text against the operator's 2026
 - [ ] Add `AGENTS.md` to the Files to Change table before implementation starts (trivial one-line fix, already scoped by the plan's own Consequences row).
 - [ ] During implementation, specify the "replace existing open PR" mechanism concretely in `SKILL.md` rather than leaving it as prose intent.
 - [ ] During implementation, state the first-run (`git show` failure) behavior explicitly in `SKILL.md` step 3's diff logic.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-21 12:45 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-635 at `9c838a0`
+**Mode**: pre-push
+**Depth**: Deep (reason: 650 insertions across 7 files, including two governance-trigger files — `.claude/skills/janitor-sweep/SKILL.md` and `AGENTS.md` — well over the 200-line/10-file Deep threshold)
+**Must-fix**: 2 | **Suggestions**: 6
+**Round**: 1 | **Ship**: continue — 2 must-fix findings on round 1 (convergence rule only recommends shipping past must-fixes at round ≥2)
+
+### Findings
+- [ ] (must-fix) `SKILL.md` step 6 ("minus the run-over-run-diff subsections, which have no meaning outside this report") directly contradicts step 7 sub-step 3 ("with the `## Workspace` section's content from step 6 (tiers, `New`/`Resolved`/`Unchanged`...)") on whether New/Resolved/Unchanged subsections are committed into `docs/health.md` — `.claude/skills/janitor-sweep/SKILL.md:748-750` vs `:780-783`
+- [ ] (must-fix) Step 7 sub-step 5's PR-replacement text explicitly permits closing/deleting the prior `skill/janitor-sweep-*` PR and branch *before* the new push/`gh pr create` is confirmed to succeed ("either order is fine") — if push or PR-create then fails, the previously-open published record is destroyed with no PR left open and no recovery path stated; must mandate push-and-create-new-PR-first, close-old-PR-second — `.claude/skills/janitor-sweep/SKILL.md:811-814`
+- [ ] (suggestion) The literal `gh pr comment` code block posts a placeholder URL (`<new PR URL, filled in after step 6 opens it>`) with no enforced substitution step before the call — an agent running the block verbatim posts a broken comment to a public PR; make the two-pass nature (comment now with placeholder → edit after new PR opens, or defer the whole comment) an explicit numbered sub-step rather than prose-only — `.claude/skills/janitor-sweep/SKILL.md:806, 811-814`
+- [ ] (suggestion) `git push origin --delete "$OLD_BRANCH" || true` swallows any failure (including a real auth/permission error) under "may already be gone" — worth surfacing the actual failure reason in the report rather than fully discarding it — `.claude/skills/janitor-sweep/SKILL.md:808`
+- [ ] (suggestion) No stated concurrency invariant for overlapping sweep runs once #636 wires the weekly trigger — a scheduled run and a hand-run could race on step 7 sub-step 5's list/close/delete against each other's GitHub state — worth a one-line stated assumption ("only one sweep publishes at a time") — `.claude/skills/janitor-sweep/SKILL.md` § 7 (whole section)
+- [ ] (suggestion) No cleanup guidance for an orphaned skill worktree/branch left behind by a failed workspace publish (`FAILED(workspace publish: ...)`) — could accumulate stale `skill/janitor-sweep-*` worktrees over repeated runs — `.claude/skills/janitor-sweep/SKILL.md:833-839`
+- [ ] (suggestion) `$BODY_FILE` used in `gh pr create --body-file "$BODY_FILE"` with no local `mktemp`/heredoc construction shown, unlike every other command in this doc shown verbatim — `.claude/skills/janitor-sweep/SKILL.md:823`
+- [ ] (suggestion) Step 7's own local sub-step numbering ("step 6" inside its 1-7 list, meaning its own sub-step 6) visually collides with the document's top-level step 6 ("Write the report") — disambiguated only by "below" in prose; worth a distinct label to survive future reordering — `.claude/skills/janitor-sweep/SKILL.md:812` (and step 7's sub-list generally)
+
+### Specialist summary
+- **Static Analysis**: no linter profile for changed `.md` files (content review only, per table); `shellcheck` unavailable on this host for the one-line `worktree_create.sh` array-addition edit — not independently re-verified beyond manual read (trivial, correct array syntax).
+- **Governance**: no must-fix. All 4 Consequences-Map rows this diff touches (Skill Worktree Exception allowlist, `skill_workflows.md` table row, `principles_review_guide.md` Consequences sentence, `worktree_create.sh` `ALLOWED_SKILLS`) confirmed Done. Bot-identity/trigger out-of-scope discipline and the #609 four-state contract (kept separate from the new sixth publish state) both confirmed intact. 2 suggestions (folded above).
+- **Plan Drift**: none. All 7 Approach steps implemented; the plan's own "Implementation notes" claims (AGENTS.md landed alongside `worktree_create.sh` in commit `bc5cbf0`; PR-replacement mechanism; first-run diff behavior) verified true against the actual diff and commit log. `skill_workflows.md` addition beyond the original Files-to-Change table is disclosed and justified in the plan.
+- **Claude Adversarial / Lens A** (logic & correctness, Deep horizon): found the step-6/step-7 `docs/health.md` content contradiction (must-fix above) plus 3 suggestions (folded above). All other cross-references, the 8-step renumbering, and edge-case handling (first run, empty manifest, no deployment.yaml, zero prior PRs) verified consistent.
+- **Claude Adversarial / Lens B** (security/concurrency/lifecycle, Deep horizon): found the unsafe PR-replacement ordering (must-fix above) plus 3 suggestions (folded above, cross-model-confirmed on the placeholder-URL point with Governance's independent finding). Redaction-scrubbing claim for `docs/health.md` verified real (not just asserted) — `redact.sh`/`REDACT_PATH_PREFIXES` wired at step 1, content lifted verbatim from the already-redacted local report.
+- **Copilot Adversarial**: not run (`--copilot` not requested for this review).
+- **Local Model Adversarial**: not run (`--local` not requested for this review).
+
+### Notes
+- Plan Review's round-1 must-fix (AGENTS.md missing from Files to Change) and both suggestions (concrete PR-replacement mechanism; explicit first-run diff behavior) were verified folded into the implementation — confirmed independently by Plan Drift and Governance specialists, not just by the plan's own "Implementation notes" self-report.
+- Both must-fix findings here are self-contained prose/ordering fixes in `SKILL.md` — no code, no other file affected. Low likelihood of a second full round of adversarial passes surfacing new findings once these two are fixed; a lighter round-2 pass (or --skip-static self-check) would likely suffice.
