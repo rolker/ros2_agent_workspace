@@ -868,7 +868,11 @@ one is in flight.
 **Inputs this step consumes, and nothing else**: `$HEALTH_BODY` (step 6,
 already redacted), `$REPORT` (step 6, the local report path), `$ROOT`
 (step 1). **Values this step captures and every later sub-step reuses**:
-`$WT_PATH` and `$NEW_BRANCH` (7a), `$NEW_PR_URL` (7d). Cleanup and
+`$WT_PATH` and `$NEW_BRANCH` (7a), `$NEW_PR_URL` (7d), and
+`$PUBLISH_LINE` — the one-line outcome, assigned by whichever sub-step
+**ends the publish attempt**: each failure exit in 7a–7d assigns it and
+skips to 7h, and 7d assigns it on success, so by 7h it is set on every
+path. Only 7h and step 8 read it. Cleanup and
 replacement key on these captured values — never on a glob or a
 "most recent match" lookup, which is how an earlier revision's cleanup
 command could delete the live run's worktree instead of the orphan.
@@ -889,7 +893,9 @@ with the document's top-level numbered steps.
        br=$(git -C "$wt" branch --show-current)
        echo "note: removing orphaned sweep worktree ${wt#"$ROOT"/}${br:+ (branch $br)}"
        if git worktree remove --force "$wt"; then
-           [ -n "$br" ] && git branch -D "$br"
+           if [ -n "$br" ] && ! git branch -D "$br"; then
+               echo "note: could not delete local branch $br — left in place"
+           fi
        else
            echo "note: could not remove ${wt#"$ROOT"/} — left in place"
        fi
@@ -907,8 +913,10 @@ with the document's top-level numbered steps.
    `.agent/scripts/worktree_create.sh`'s `ALLOWED_SKILLS`):
 
    ```bash
-   .agent/scripts/worktree_create.sh --skill janitor-sweep --type workspace \
-       || { echo "FAILED(workspace publish: worktree create failed)"; }
+   if ! CREATE_ERR=$(.agent/scripts/worktree_create.sh --skill janitor-sweep --type workspace 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: worktree create: $CREATE_ERR)"
+       # -> skip to 7h
+   fi
    source .agent/scripts/worktree_enter.sh --skill janitor-sweep
    WT_PATH="$WORKTREE_ROOT"                   # exported by worktree_enter.sh
    NEW_BRANCH=$(git branch --show-current)    # skill/janitor-sweep-<ts>-<nano>
@@ -919,7 +927,7 @@ with the document's top-level numbered steps.
    here **only because the loop above just removed every other match** —
    that ordering is the reason the orphan removal comes first. Both captured
    values are what 7g uses; do not re-discover them later. If creation
-   fails, the outcome is `FAILED(workspace publish: worktree create:
+   fails, `$PUBLISH_LINE` is `FAILED(workspace publish: worktree create:
    <reason>)`; skip to 7h.
 
 7b. **Write `docs/health.md`** — `$HEALTH_BODY` verbatim, at the repo root
@@ -929,8 +937,14 @@ with the document's top-level numbered steps.
    nothing has been added to it since:
 
    ```bash
-   mkdir -p docs && printf '%s' "$HEALTH_BODY" > docs/health.md
+   if ! { mkdir -p docs && printf '%s' "$HEALTH_BODY" > docs/health.md; }; then
+       PUBLISH_LINE="FAILED(workspace publish: health write: could not write docs/health.md)"
+       # -> skip to 7h
+   fi
    ```
+
+   A write failure here is named as its own cause (`health write`), not
+   left to surface one sub-step later as a commit with nothing staged.
 
 7c. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
    Identity): for this PR's hand-run testing, the **implementing agent's own
@@ -940,12 +954,15 @@ with the document's top-level numbered steps.
 
    ```bash
    git add docs/health.md
-   git -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
-       commit -m "Janitor sweep: workspace health $(date '+%Y-%m-%d')"
+   if ! COMMIT_ERR=$(git -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
+           commit -m "Janitor sweep: workspace health $(date '+%Y-%m-%d')" 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: commit: $COMMIT_ERR)"
+       # -> skip to 7h
+   fi
    ```
 
-   A commit failure (typically a pre-commit hook rejection) is
-   `FAILED(workspace publish: commit: <reason>)`; skip to 7h. The worktree
+   A commit failure (typically a pre-commit hook rejection) sets
+   `$PUBLISH_LINE` to `FAILED(workspace publish: commit: <reason>)`; skip to 7h. The worktree
    stays for inspection until the next run's 7a.
 
 7d. **Push and open a non-draft PR — before touching any prior PR.**
@@ -961,9 +978,16 @@ with the document's top-level numbered steps.
    Full record (workspace and project findings): .agent/scratchpad/janitor/<report-file>
    EOF
 
-   git push -u origin HEAD \
-       && NEW_PR_URL=$(gh pr create --title "Janitor sweep: workspace health $(date '+%Y-%m-%d')" \
-                          --body-file "$BODY_FILE")
+   if ! PUSH_ERR=$(git push -u origin HEAD 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: push: $PUSH_ERR)"
+       # -> skip to 7h
+   elif ! NEW_PR_URL=$(gh pr create --title "Janitor sweep: workspace health $(date '+%Y-%m-%d')" \
+                           --body-file "$BODY_FILE" 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: pr create: $NEW_PR_URL)"; NEW_PR_URL=""
+       # -> skip to 7h
+   else
+       PUBLISH_LINE="committed to docs/health.md — PR $NEW_PR_URL"
+   fi
    rm -f "$BODY_FILE"
    ```
 
@@ -976,7 +1000,9 @@ with the document's top-level numbered steps.
    half).
 
    **If this sub-step fails** (push rejected, or `gh pr create` errors):
-   the outcome is `FAILED(workspace publish: <reason>)`; skip to 7h. Do
+   `$PUBLISH_LINE` is `FAILED(workspace publish: <reason>)`; skip to 7h.
+   On success `$PUBLISH_LINE` is assigned here, immediately — 7e and 7g can
+   only add notes, never change the outcome. Do
    **not** run 7e: any prior `skill/janitor-sweep-*` PR is left untouched
    and stays open, the local report from step 6 already carries this run's
    findings, and the worktree stays for inspection until the next run's 7a.
@@ -1063,8 +1089,9 @@ with the document's top-level numbered steps.
    known until now:
 
    ```bash
-   # PUBLISH_LINE is one of:
-   #   committed to docs/health.md — PR $NEW_PR_URL
+   # $PUBLISH_LINE was assigned by the sub-step that ended the attempt
+   # (7a/7b/7c/7d on failure, 7d on success) and is one of:
+   #   committed to docs/health.md — PR <url>
    #   FAILED(workspace publish: <reason>)
    printf '\n## Publish outcome\n\n%s\n' "$(redact_text "$PUBLISH_LINE")" >> "$REPORT"
    ```
