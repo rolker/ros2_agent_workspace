@@ -191,3 +191,44 @@ Lifecycle: **Local Review (Pre-Push)** round 2, changes-requested → **address-
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review the fixes, round 3). Not dispatched by this pass — the host orchestrator drives the next phase.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-21 13:07 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-635 at `5bd1e50`
+**Mode**: pre-push
+**Depth**: Deep (reason: 960 insertions across 7 files, including two governance-trigger files — `.claude/skills/janitor-sweep/SKILL.md` and `AGENTS.md` — well over the Deep threshold; unchanged from rounds 1-2)
+**Must-fix**: 3 | **Suggestions**: 0
+**Round**: 3 | **Ship**: continue — 3 new must-fix findings, all genuine design/correctness gaps (an undefined variable, a chicken-and-egg PR-URL field, a wrong-worktree-deletion risk in the documented cleanup command); none are one-line mechanical fixes, so round 3 does not meet the low-and-mechanical bar for shipping past them
+
+### Round-2 verification (all 6 independently confirmed fixed)
+- [x] private-memory-filename citation (`reference_copilot_skips_draft_prs.md`) — resolved, replaced with inlined fact at `SKILL.md:876-877` and `plan.md:122`; confirmed zero remaining occurrences of the filename anywhere in the repo
+- [x] step 7f unchecked `gh pr close` before branch delete — resolved, delete is gated on `gh pr close`'s own exit status (`SKILL.md:920-935`); a close failure leaves the old PR/branch untouched
+- [x] `redact_text` asserted but never invoked before the `docs/health.md` write — resolved, `WORKSPACE_SECTION=$(redact_text "$WORKSPACE_SECTION")` runs in 7c immediately before the write (`SKILL.md:850-855`); signature verified against `redact.sh`'s real `redact_text <text>` contract
+- [x] Projects tiers 2-5 missing diff-state tags — resolved, all five tiers under `## Projects` now carry the `[New/Resolved/Unchanged, or "no prior report..."]` inline tag, with an explanatory paragraph on why the rendering shape legitimately differs from Workspace's subsection form (`SKILL.md:682-731`)
+- [x] step 5 wrongly said the pre-publish read runs "from the janitor-sweep worktree" — resolved, reworded to say it runs from the main checkout at that point in the run (`SKILL.md:556-561`)
+- [x] 7e `$BODY_FILE` heredoc used unquoted `cat << EOF` — resolved, quoted (`cat << 'EOF'`, `SKILL.md:885`)
+
+### Findings
+- [ ] (must-fix) **`$WORKSPACE_SECTION`, used in 7c's `redact_text` call, is never assigned anywhere.** Step 6 only ever produces `$REPORT_BODY` (`SKILL.md:610`) — no sub-step extracts a `## Workspace`-only section into a separate variable. 7c's own comment claims it "was rendered (step 6)" but that rendering step does not exist. An agent following 7c literally hits an undefined/empty variable — `.claude/skills/janitor-sweep/SKILL.md:850-855` vs `:588-610`
+- [ ] (must-fix) **The step-6 report template's `**Publish**: committed to `docs/health.md`, PR <url> / not published: <reason>` line (`SKILL.md:653`) cannot be filled at the time step 6 runs.** Step 6 (report authoring) completes before step 7 exists at all, and the PR URL is only known after 7e's `gh pr create` — yet step 6's closing paragraph says the whole `## Workspace` section, "including its `New`/`Resolved`/`Unchanged`... subsections," "gets lifted verbatim into `docs/health.md`" in 7c, which itself runs *before* 7e. The doc gives no second-pass/backfill instruction (rewrite the line after 7e succeeds, defer it to an amend, or drop it from the verbatim-lifted content) — an agent following the steps as written must either stall on an unfillable field or invent a differing resolution each run — `.claude/skills/janitor-sweep/SKILL.md:653` vs `:783-789` vs `:833-916` (7c precedes 7e)
+- [ ] (must-fix) **The orphan-cleanup command can silently delete the wrong, live worktree.** `worktree_remove.sh --skill janitor-sweep` resolves via `find_worktree_by_skill()` (`.agent/scripts/_worktree_helpers.sh:141-183`), which globs `skill-*-janitor-sweep-*` and, on more than one match, silently picks the **most recent by timestamp** (only a stderr `Warning:`, not surfaced to the caller). SKILL.md's own text says a failed run's worktree is "left in place for inspection or retry" and that "repeated failed runs would accumulate these" — so in the exact scenario the doc describes (orphan T1 left in place, agent retries, creating T2 with a later timestamp), running the one documented cleanup command deletes the **live retry T2**, not the intended orphan T1, with no warning in the doc and no branch-targeted removal path offered despite `$NEW_BRANCH` having been captured in 7a — `.claude/skills/janitor-sweep/SKILL.md:972-990`
+
+### Specialist summary
+- **Round-2-item re-verification**: done directly by the lead reviewer (not a specialist dispatch) — grep + source-read against each of the 6 fixed files/lines, including reading `redact.sh`'s actual function signature and `AGENTS.md`/`worktree_create.sh`/`skill_workflows.md`/`principles_review_guide.md` for consistency. All confirmed.
+- **Claude Adversarial / Lens A** (logic & correctness, Deep horizon, fresh subagent): found the undefined `$WORKSPACE_SECTION` and the Publish-line-ordering chicken-and-egg (both must-fix above); independently re-verified all 6 round-2 fixes hold; verified `worktree_remove.sh --skill` claims and all named script/flag/path references against actual source. No suggestions.
+- **Claude Adversarial / Lens B** (security/concurrency/lifecycle, Deep horizon, fresh subagent): found the wrong-worktree-deletion risk in the orphan-cleanup path (must-fix above, independently confirmed by the lead reviewer against `_worktree_helpers.sh:141-183`); traced redaction coverage of every text path reaching `docs/health.md`/PR title/body/comment and found no gap; confirmed 7e→7f ordering and close-gated delete are sound; confirmed the concurrency section is honest about being unenforced, not falsely safe. No suggestions.
+- **Governance / Plan Drift**: not separately dispatched this round (unchanged consequences-map rows already confirmed Done in round 2; spot-checked again directly — `AGENTS.md`, `worktree_create.sh`, `skill_workflows.md`, `principles_review_guide.md` all still consistent with each other and with `janitor-sweep` being allowlisted).
+- **Copilot Adversarial**: not run (`--copilot` not requested).
+- **Local Model Adversarial**: not run (`--local` not requested).
+
+### Notes
+- All 3 new findings are in the newly-added `docs/health.md` publish machinery (step 6/§7), the same area rounds 1-2 already fixed twice — this is the fourth distinct class of bug found there across three rounds (contradiction → ordering → this round's undefined-variable/unfillable-field/wrong-deletion trio), which is a real signal that the publish section's design needs a slower pass rather than another quick patch-and-rereview cycle.
+- Findings 1 and 2 are closely related (both stem from step 6 rendering `## Workspace` content, including a field it cannot yet know, before step 7 exists) but are reported separately since fixing one does not fix the other: extracting `$WORKSPACE_SECTION` correctly still leaves the Publish-line value unfillable at render time.
+- Per the convergence rule, round 3 does not qualify for "recommended" — 3 must-fix, none mechanical, none a design question already settled by prior rounds.
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** round 3, changes-requested → **address-findings** (work the 3 must-fix above; likely requires restructuring so the Publish line and the redacted-section extraction happen after 7e, or deferring the Publish line's population to a follow-up amend/commit) → **review-code** round 4. Not dispatched by this pass — the host orchestrator drives the next phase.
