@@ -168,3 +168,26 @@ Also verified independently: `worktree_create.sh`'s `ALLOWED_SKILLS` and `AGENTS
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** round 2, changes-requested → **address-findings** (work the 4 must-fix + 2 suggestions above) → **review-code** round 3. Not dispatched by this pass — the host orchestrator drives the next phase. Per this skill's convergence rule, the diff should not be pushed / no PR opened until a pre-push review comes back approved (or ships past a low, non-rising, mechanical must-fix count at round ≥2 — not met here).
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-21 13:02 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Branch**: feature/issue-635 at `62f18a3`
+**Addressed**: Local Review (Pre-Push) round 2, changes-requested, When 2026-09-21 13:20 -04:00, SHA `ecfea9d`
+**Commits**: 997c62c, 00628f5, e08fba9, 38cc612, acc51b6, a4efd30
+
+### Actions
+- [x] (must-fix) Private memory filename (`reference_copilot_skips_draft_prs.md`) cited from `SKILL.md:820` and `plan.md:100` — replaced both citations with the inlined fact ("Copilot code review does not review draft PRs; open it non-draft so the review fires"); verified no other occurrence of the filename remains anywhere in the repo — `997c62c`
+- [x] (must-fix) Step 7f deleted the old branch unconditionally after `gh pr comment`/`gh pr close`, without checking their exit status — now `gh pr close`'s own exit status gates the delete: on failure the reason is printed and the loop `continue`s, leaving the old PR and branch untouched rather than risking an open PR pointing at a deleted head — `00628f5`
+- [x] (must-fix) `redact_text` was asserted ("keep the report free of host identity") but never actually invoked on the findings text before it reached `docs/health.md` — added a mandatory sub-step inside 7c that runs `redact_text` (using the `$REDACT_PATH_PREFIXES`/`redact.sh` already sourced in step 1) over the rendered `## Workspace` section immediately before the write, with the real invocation verified against `redact.sh`'s actual signature — `e08fba9`
+- [x] (must-fix) Step 6's `## Projects` template gave tiers 2-5 no diff-state indication, contradicting step 5's "for each scope" mandate (only tier 1 carried a `[New/Resolved/Unchanged]` tag) — gave tiers 2-5 the same inline diff-state tag as tier 1, added an explanatory paragraph in step 6 on why the Projects scope's rendering *shape* (inline tag) legitimately differs from the Workspace scope's (subsections) while still diffing every tier, and restated the same rationale in step 5 so both steps agree; the one deliberately-undiffed exception (the "provisional decisions" sub-list) is now stated explicitly in both places — `38cc612`
+- [x] (suggestion) Step 5 said the prior `docs/health.md` state was read "from the janitor-sweep worktree" although the worktree isn't created until 7a (after steps 5/6) — reworded to say the read runs from the main checkout at this point in the run, restated correctly at 7b — `acc51b6`
+- [x] (suggestion) The 7e `$BODY_FILE` heredoc used an unquoted `cat << EOF` delimiter, diverging from AGENTS.md's own `cat << 'EOF'` convention — quoted the delimiter — `acc51b6`
+
+### Plan sync
+`plan.md` updated in its own commit (`a4efd30`): dropped the private-memory-filename citation, added the mandatory `redact_text` sub-step to the publish-by-commit approach item, and restated the "every tier of every scope carries diff-state, rendering shape may differ by scope" rule (matching the `SKILL.md` fix) in the run-over-run-diff approach item.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes, round 3). Not dispatched by this pass — the host orchestrator drives the next phase.
