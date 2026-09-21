@@ -555,8 +555,12 @@ whether a decision has a review scheduled — a New/Resolved/Unchanged tag on
 top would be redundant, not because diffing was skipped.
 
 - **Workspace scope** — the previous run's state is the last **committed**
-  `docs/health.md`, read from the janitor-sweep worktree **before** the new
-  commit:
+  `docs/health.md`. The janitor-sweep skill worktree doesn't exist yet at
+  this point in the run (it isn't created until § Publish the workspace
+  scope's 7a, after this step and step 6), so this read runs from `$ROOT`
+  (the main checkout) — the same command is restated at 7b, where it runs
+  from the now-created worktree instead, reading the same committed answer
+  either way:
 
   ```bash
   PREV_HEALTH=$(git show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
@@ -878,7 +882,7 @@ confused with the document's top-level numbered steps (this is step 7; step
 
    ```bash
    BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
-   cat << EOF > "$BODY_FILE"
+   cat << 'EOF' > "$BODY_FILE"
    Coverage: X of 4 completed.
    Full record (workspace and project findings): .agent/scratchpad/janitor/<report-file>
    EOF
