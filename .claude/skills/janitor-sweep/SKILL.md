@@ -816,9 +816,10 @@ confused with the document's top-level numbered steps (this is step 7; step
        commit -m "Janitor sweep: workspace health $(date '+%Y-%m-%d')"
    ```
 
-7e. **Push and open a non-draft PR first** (Copilot does not review draft PRs
-   — `reference_copilot_skips_draft_prs.md`). This must happen **before**
-   touching any prior PR (7f) — see the ordering rule below. Build the PR
+7e. **Push and open a non-draft PR first.** Copilot code review does not
+   review draft PRs — open it non-draft (the default for `gh pr create`
+   without `--draft`) so the review actually fires. This must happen
+   **before** touching any prior PR (7f) — see the ordering rule below. Build the PR
    body with the usual `mktemp` + heredoc pattern (AGENTS.md § Use
    `--body-file`, Not `--body`):
 
