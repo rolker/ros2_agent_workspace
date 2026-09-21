@@ -259,3 +259,45 @@ Lifecycle: **Local Review (Pre-Push)** round 3, changes-requested → **address-
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (round 4, pre-push). Not dispatched by this pass.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-21 13:20 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-635 at `74e33b7`
+**Mode**: pre-push
+**Depth**: Deep (reason: governance-trigger files (`SKILL.md`, `AGENTS.md`) + a full redesign of the publish steps; unchanged from rounds 1-3)
+**Must-fix**: 1 | **Suggestions**: 4
+**Round**: 4 | **Ship**: recommended — must-fix count dropped from 3 (round 3) to 1, the one remaining defect is mechanical (add missing variable assignments at 4 named points), no design question
+
+### Round-3 verification (all 3 must-fix items confirmed fixed by the redesign)
+- [x] `$WORKSPACE_SECTION` undefined at point of use — resolved: step 6's variable table (`SKILL.md:598-603`) names it, renders it once, and composes both `$HEALTH_BODY`/`$REPORT_BODY` from it (`:605-616`); consistently referenced everywhere it's used
+- [x] Unfillable `Publish: ... PR <url>` field rendered into `docs/health.md` before the PR exists — resolved: the field is gone from the `## Workspace` section/template (`:690-836` has no such line); the committed file deliberately carries no PR URL (`:641-646`); the outcome is appended to the *local* report only, by 7h, after it's known
+- [x] `worktree_remove.sh --skill janitor-sweep` newest-match risk deleting the live retry worktree — resolved and independently re-verified against source: 7a's cleanup glob (`.workspace-worktrees/skill-*-janitor-sweep-*`) is byte-identical to `find_worktree_by_skill`'s glob (`_worktree_helpers.sh:152-154`), confirmed `janitor-sweep` is in `ALLOWED_SKILLS` (`worktree_create.sh:387`) and `--type workspace` always lands in `.workspace-worktrees/` (`worktree_create.sh:783`); after 7a's removal loop at most one match remains before `worktree_enter.sh --skill janitor-sweep` runs, so the newest-match tie-break is moot by construction; cleanup itself now keys on `$WT_PATH`/`$NEW_BRANCH` captured in 7a, never on a fresh lookup
+
+### Earlier-round fixes verified still intact
+New-PR-first/old-PR-second ordering (7d before 7e, with an explicit "never the reverse" rationale, `SKILL.md:1031-1038`); branch delete gated on `gh pr close`'s own exit status (7e, `:1003-1006`); 7e's heredoc quoted (`cat << 'EOF'`); no private memory filename anywhere in the repo; Projects tiers 2-5 carry the same `[New/Resolved/Unchanged]` diff-state shape as tier 1; the provisional-decisions sub-list states its no-diff exception explicitly in steps 5 and 6.
+
+### Findings
+- [ ] (must-fix) **`$PUBLISH_LINE`, read at 7h (`SKILL.md:1069`, `redact_text "$PUBLISH_LINE"`), is never assigned anywhere in the document.** Step 6's variable table (`:598-603`) — written specifically to close out "a variable read but never assigned," the round-3 defect class — covers `$WORKSPACE_SECTION`/`$PROJECTS_SECTION`/`$HEALTH_BODY`/`$REPORT_BODY` but omits `$PUBLISH_LINE`. Every failure exit in step 7 (7a `:911`, 7c `:948`, 7d `:979`) only echoes `FAILED(workspace publish: ...)` to the conversation — none sets `PUBLISH_LINE=`; there is also no assignment on the success path after 7g (`:1043-1057`). On literal execution, 7h's `## Publish outcome` section renders blank instead of the PR URL or the failure reason, contradicting step 8's own claim (`:1091`) that the operator report states "the same `$PUBLISH_LINE` 7h appended." Same defect class as round 3's `$WORKSPACE_SECTION` bug, relocated outside step 6's table. Fix: add explicit `PUBLISH_LINE="..."` assignments at each of 7a/7c/7d's FAILED points and after 7g's success, or fold `$PUBLISH_LINE` into step 6's table/data-flow contract the same way `$NEW_PR_URL` is captured via command substitution in 7d.
+- [ ] (suggestion) `SKILL.md:925-933` (7b, write `docs/health.md`) has no stated failure handling, unlike 7a/7c/7d, and the failure-state summary (`:1075-1082`) lists only 7a/7c/7d — a write failure here would most likely surface, mislabeled, as 7c's commit failure rather than its true cause.
+- [ ] (suggestion) `SKILL.md:909-915` (7a) — the `worktree_create.sh ... || { echo "FAILED(...)"; }` snippet doesn't `exit`/`return`, so on literal execution it falls through to `source worktree_enter.sh` after a reported creation failure; the prose right after says "skip to 7h" so this is low-risk (7a's own orphan removal already cleared prior stale worktrees), but a guard would be more robust.
+- [ ] (suggestion) `worktree_create.sh` does not itself reject `--type layer` for a workspace-only allowlisted skill (`janitor-sweep`); nothing in this diff exercises that path (the skill always passes `--type workspace`), but a future hand-edit or misuse could park a worktree under `layers/worktrees/`, which 7a's cleanup glob wouldn't reach.
+- [ ] (suggestion) `SKILL.md` 7a's `git branch -D "$br"` after a successful `worktree remove` has no failure check or log — cosmetic.
+
+### Specialist summary
+- **Round 1-3 fix re-verification**: done directly by the lead reviewer — grep + source-read against `_worktree_helpers.sh`, `worktree_create.sh`, `worktree_enter.sh`, `redact.sh`, and the full text of `SKILL.md` steps 1, 3-8. All confirmed.
+- **Claude Adversarial / Lens A** (logic & correctness, Deep horizon, fresh subagent): found the `$PUBLISH_LINE` must-fix independently; also flagged the two suggestions above (7b's missing failure handling, 7a's non-exiting fallthrough) under the guidance-doc calibration; confirmed `$WORKSPACE_SECTION`/`$PROJECTS_SECTION`/`$HEALTH_BODY`/`$REPORT_BODY`/`$TS`/`$WT_PATH`/`$NEW_BRANCH`/`$NEW_PR_URL`/`$PREV_HEALTH` all consistently assigned and consumed; confirmed `docs/health.md` never carries an unknowable-at-render-time field.
+- **Claude Adversarial / Lens B** (security/concurrency/lifecycle, Deep horizon, fresh subagent): found no must-fix; independently re-verified the 7a glob-match soundness against `_worktree_helpers.sh`/`worktree_create.sh` source, confirmed the concurrency disclosure is honest (not false-safe), traced full redaction coverage of `$HEALTH_BODY`/`$REPORT_BODY`/7e's PR comment/7h's publish line with no gap, confirmed lifecycle half-states are handled or noted rather than silent, and confirmed the 7d→7e ordering is adequately and explicitly documented. Flagged the `--type layer` allowlist gap and the unchecked `git branch -D` as non-blocking suggestions.
+- **Governance / Plan Drift**: spot-checked directly — `AGENTS.md`, `worktree_create.sh`, `skill_workflows.md`, `principles_review_guide.md` all remain consistent with each other and with the redesign; `plan.md`'s Approach steps 3-4 accurately describe the named-artifact data flow, the no-PR-URL-in-health-doc decision, and 7a-7h (spot-checked against `SKILL.md`, not separately dispatched — unchanged consequences-map rows already confirmed Done in round 2).
+- **Copilot Adversarial**: not run (`--copilot` not requested).
+- **Local Model Adversarial**: not run (`--local` not requested).
+
+### Notes
+- The round-3→round-4 pattern held: the redesign closed all 3 named defects cleanly with no regression, and turned up one new, narrower instance of the *same* defect class (a referenced-but-unassigned variable) that step 6's own anti-pattern table didn't cover because `$PUBLISH_LINE` lives in step 7, not step 6. This is a single mechanical omission, not evidence the publish section needs another structural pass — the fix is additive (name the assignment points), not a further redesign.
+- Must-fix count: round 1 unknown/fixed, round 2: 6, round 3: 3, round 4: 1 — monotonically decreasing and now at the "low and mechanical" bar the convergence rule names.
+
+### Next step
+Lifecycle: **Local Review (Pre-Push)** round 4, changes-requested (ship recommended after the one mechanical fix) → **address-findings** (add the 4 `PUBLISH_LINE` assignment points) → push / open PR → **triage-reviews**. Not dispatched by this pass — the host orchestrator drives the next phase.
