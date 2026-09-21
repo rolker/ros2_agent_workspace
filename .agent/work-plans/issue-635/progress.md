@@ -301,3 +301,23 @@ New-PR-first/old-PR-second ordering (7d before 7e, with an explicit "never the r
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** round 4, changes-requested (ship recommended after the one mechanical fix) → **address-findings** (add the 4 `PUBLISH_LINE` assignment points) → push / open PR → **triage-reviews**. Not dispatched by this pass — the host orchestrator drives the next phase.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-21 13:22 -04:00
+**By**: Claude Code Agent (Claude Fable 5.1)
+
+**Branch**: feature/issue-635 at `194e2e2`
+**Addressed**: Local Review (Pre-Push) round 4, changes-requested / Ship: recommended, SHA `b0328aa`
+**Commits**: cfe1826
+**Mode**: host-inline (one mechanical must-fix; per the convergence rule no round 5 — next is the publish checkpoint)
+
+### Actions
+- [x] (must-fix) `$PUBLISH_LINE` read at 7h but never assigned — assigned at every failure exit of 7a–7d with the captured reason (worktree create / health write / commit / push / pr create) and on 7d success as soon as the PR exists; added to step 7's captured-values contract — `cfe1826`
+- [x] (suggestion) 7b had no failure handling — names its own `health write` failure and skips to 7h — `cfe1826`
+- [x] (suggestion) 7a's create-failure branch fell through — now assigns the outcome and skips to 7h — `cfe1826`
+- [ ] (suggestion) `worktree_create.sh` does not reject `--type layer` for a workspace-only skill — **skipped**: no per-skill type constraint exists in `ALLOWED_SKILLS`; a new script feature, not a defect in this diff; the skill text passes `--type workspace`
+- [x] (suggestion) 7a's local `git branch -D` failure was ignored — reported as a note — `cfe1826`
+
+### Next step
+Lifecycle: **Implementation** → publish checkpoint (round-4 verdict Ship: recommended; remaining must-fix addressed).
