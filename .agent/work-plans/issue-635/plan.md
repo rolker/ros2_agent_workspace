@@ -146,6 +146,35 @@ result, never `FAILED`.
 | `.claude/skills/janitor-sweep/SKILL.md` | Restructure report into workspace/project scope sections; add finding-tier classification and rendering; add run-over-run diff (committed-history-based for workspace, best-effort local-report-based for projects); add publish-by-commit step (worktree, commit, push, PR) gated to workspace scope only; add provisional-decisions tolerant scan for project scope; update "Deferred: publishing and the trigger" section to record that publishing is no longer fully deferred (workspace half is live; project half stays deferred) |
 | `.agent/scripts/worktree_create.sh` | Add `"janitor-sweep"` to `ALLOWED_SKILLS` (line 387) |
 | `.agent/knowledge/principles_review_guide.md` | Rewrite the janitor-sweep durable-output sentence in the Consequences Map to state the workspace/project split |
+| `AGENTS.md` | Add `janitor-sweep` to the Skill Worktree Exception's "Allowed skills" line, alongside `worktree_create.sh`'s allowlist (must-fix from Plan Review — was missing from this table even though the plan's own Consequences row already committed to it) |
+
+### Implementation notes (added during implementation, not re-planned)
+
+Folded in per the Plan Review's must-fix and two suggestions
+(`.agent/work-plans/issue-635/progress.md` § Plan Review):
+
+- **`AGENTS.md` above** — added to this table, and edited alongside
+  `worktree_create.sh` in the same commit.
+- **`.agent/knowledge/skill_workflows.md`** was also updated (not originally
+  in the Files to Change table): its utility-skills table described
+  `janitor-sweep` as "report-only, publishes nothing", which goes stale the
+  moment workspace scope commits `docs/health.md`. Caught by the grep for
+  other stale references the implementation prompt asked for.
+- **PR-replacement mechanism (step 4 of Approach, suggestion)** — implemented
+  concretely in `SKILL.md` § Publish the workspace scope, step 5: `gh pr list
+  --state open --json number,headRefName` filtered by the
+  `skill/janitor-sweep-` prefix, then `gh pr comment` + `gh pr close` on each
+  match, then `git push origin --delete` the old branch.
+- **First-run diff behavior (step 3 of Approach, suggestion)** — stated
+  explicitly in `SKILL.md` § Run-over-run diff: a failed or empty `git show
+  HEAD:docs/health.md` (no prior commit, or the file absent on the base
+  branch) renders every workspace-scope finding under `New` with an explicit
+  "first committed run — no prior health document" note, never treated as an
+  error.
+- No deviations from the Approach section's numbered steps — all seven
+  landed as scoped. `docs/health.md` itself was not created in this PR, per
+  the implementation instructions; the sweep creates it on its first real
+  run.
 
 ## Principles Self-Check
 
