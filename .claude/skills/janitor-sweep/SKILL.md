@@ -857,20 +857,35 @@ confused with the document's top-level numbered steps (this is step 7; step
 7f. **Replace, don't stack, any existing open PR from a prior
    `skill/janitor-sweep-*` branch — only after 7e's new PR exists.** List
    open PRs whose head matches the prefix, excluding the branch just pushed,
-   and close each with a comment naming the real new PR:
+   and close each with a comment naming the real new PR. **The branch is
+   deleted only after `gh pr close` itself reports success** — a close
+   failure leaves the old PR (and its branch) untouched rather than risking
+   an open PR left pointing at a deleted head, which GitHub does not
+   auto-close and which then has to be cleaned up by hand:
 
    ```bash
    gh pr list --state open --json number,headRefName \
        --jq '.[] | select(.headRefName | startswith("skill/janitor-sweep-")) | "\(.number)\t\(.headRefName)"' \
    | while IFS=$'\t' read -r OLD_PR OLD_BRANCH; do
        [ "$OLD_BRANCH" = "$NEW_BRANCH" ] && continue   # that's this run's own PR
-       gh pr comment "$OLD_PR" --body "Superseded by this run's sweep PR: $NEW_PR_URL."
-       gh pr close "$OLD_PR"
+       if ! gh pr comment "$OLD_PR" --body "Superseded by this run's sweep PR: $NEW_PR_URL."; then
+           echo "note: could not comment on old PR #$OLD_PR — closing anyway"
+       fi
+       if ! CLOSE_ERR=$(gh pr close "$OLD_PR" 2>&1); then
+           # Do NOT delete the branch on a close failure: an open PR whose
+           # head branch is gone is stuck (GitHub won't auto-close it, and
+           # closing/merging by hand gets awkward). Leave the old PR and its
+           # branch alone and surface the reason.
+           echo "note: could not close old PR #$OLD_PR: $CLOSE_ERR — branch $OLD_BRANCH left in place"
+           continue
+       fi
        if ! DELETE_ERR=$(git push origin --delete "$OLD_BRANCH" 2>&1); then
            # Record the reason rather than swallowing it — could be
            # "already gone" (auto-delete-on-merge/close, benign) or a real
            # auth/permission error worth surfacing; either way, keep going
-           # rather than aborting the publish over branch cleanup.
+           # rather than aborting the publish over branch cleanup. The PR is
+           # already closed at this point, so a leftover branch strands
+           # nothing (matches merge_pr.sh's own delete-is-best-effort rule).
            echo "note: could not delete branch $OLD_BRANCH: $DELETE_ERR"
        fi
    done
@@ -881,7 +896,10 @@ confused with the document's top-level numbered steps (this is step 7; step
    never "either order."** If 7e fails after an old PR was
    already closed, the previously-published record would be gone with
    nothing left open and no recovery path; running 7e first means a failure
-   there always leaves the old PR intact.
+   there always leaves the old PR intact. The same reasoning applies inside
+   7f itself: deleting a branch is only safe once its PR is confirmed closed,
+   so the delete is gated on `gh pr close`'s own exit status, not attempted
+   unconditionally after it.
 
 7g. **A human still merges** (AGENTS.md § Merging, "green CI is not review").
    This step opens the PR; it never merges it.
