@@ -232,3 +232,30 @@ Lifecycle: **Implementation** → **review-code** (re-review the fixes, round 3)
 
 ### Next step
 Lifecycle: **Local Review (Pre-Push)** round 3, changes-requested → **address-findings** (work the 3 must-fix above; likely requires restructuring so the Publish line and the redacted-section extraction happen after 7e, or deferring the Publish line's population to a follow-up amend/commit) → **review-code** round 4. Not dispatched by this pass — the host orchestrator drives the next phase.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-21 13:15 -04:00
+**By**: Claude Code Agent (Claude Fable 5.1)
+
+**Branch**: feature/issue-635 at `cf766f3`
+**Addressed**: Local Review (Pre-Push) round 3, changes-requested, SHA `f72b5b7`
+**Commits**: fb2d29b, 67525f3, cf766f3
+**Mode**: host-inline (operator chose "redesign steps 6–7" at the round-3 checkpoint over another patch pass, on the round-3 reviewer's recommendation)
+
+### Actions
+- [x] (must-fix) `$WORKSPACE_SECTION` used in 7c but never assigned — step 6 is now "Render, redact, and write the report": it renders `$WORKSPACE_SECTION` and `$PROJECTS_SECTION` once and composes two named artifacts from them, `$HEALTH_BODY` (the exact bytes committed to `docs/health.md`) and `$REPORT_BODY` (the local report), with a table stating what each later sub-step consumes — `fb2d29b`
+- [x] (must-fix) the template's `**Publish**: … PR <url>` line could not be filled when written — removed from the `## Workspace` section; `docs/health.md` deliberately carries no PR URL or outcome (the commit and PR are its provenance); the outcome is appended to the local report as `## Publish outcome` by new sub-step 7h on every exit path, and step 8 reports that same line — `fb2d29b`
+- [x] (must-fix) `worktree_remove.sh --skill janitor-sweep` could delete the live worktree — cleanup keys on `$WT_PATH` (from `worktree_enter.sh`'s exported `WORKTREE_ROOT`) and `$NEW_BRANCH`, captured in 7a; 7g removes the run's own worktree after the PR is open; 7a removes any leftover `skill-*-janitor-sweep-*` worktree by exact path before creating the new one (sound because a completed run always removes its own); the newest-match tool is named as the wrong one — `fb2d29b`
+
+### Also in the redesign
+- Redaction moved from 7c to step 6 and applied once to both artifacts before either is written; nothing is appended to `$HEALTH_BODY` afterwards. Reason strings that reach the local report later (7e notes, 7h outcome) pass through `redact_text` themselves.
+- The redundant 7b re-read of the previous `docs/health.md` is gone; step 5 reads it once from `$ROOT` via `git -C`.
+- 7e gained a second loop deleting stray remote `skill/janitor-sweep-*` branches with no open PR (a 7d push that succeeded before `gh pr create` failed), so that failure strands nothing on origin.
+- Sub-steps relabeled 7a–7h; step 7 opens with an explicit inputs/captured-values contract.
+
+### Plan sync
+`plan.md` Approach steps 3 and 4 and the implementation notes updated in `67525f3` to describe the named-artifact data flow, the no-PR-URL-in-health-doc decision, 7a–7h, and the exact-path cleanup.
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (round 4, pre-push). Not dispatched by this pass.
