@@ -99,7 +99,11 @@ result, never `FAILED`.
    - Push and open a **non-draft** PR (Copilot does not review draft PRs —
      `reference_copilot_skips_draft_prs.md`), title e.g. `Janitor sweep:
      workspace health <date>`, replacing any existing open PR from a prior
-     `skill/janitor-*` branch rather than stacking a new one per run.
+     `skill/janitor-*` branch rather than stacking a new one per run — **the
+     new PR must be pushed and opened first; only then is the old PR
+     commented-on, closed, and its branch deleted** (never the reverse: a
+     failed new-push/PR-create must leave the previously-published PR
+     intact, per Local Review round 1's must-fix).
    - **Never commit `docs/health.md` into a project repo in this slice** —
      project-scope findings stay in the local
      `.agent/scratchpad/janitor/<ts>-sweep.md` report exactly as today.
@@ -161,10 +165,14 @@ Folded in per the Plan Review's must-fix and two suggestions
   moment workspace scope commits `docs/health.md`. Caught by the grep for
   other stale references the implementation prompt asked for.
 - **PR-replacement mechanism (step 4 of Approach, suggestion)** — implemented
-  concretely in `SKILL.md` § Publish the workspace scope, step 5: `gh pr list
-  --state open --json number,headRefName` filtered by the
-  `skill/janitor-sweep-` prefix, then `gh pr comment` + `gh pr close` on each
-  match, then `git push origin --delete` the old branch.
+  concretely in `SKILL.md` § Publish the workspace scope, sub-step 7f (after
+  the round-1 Local Review fix reordered publish so the new PR opens first
+  in 7e and the old one is replaced second in 7f, never the reverse):
+  `gh pr list --state open --json number,headRefName` filtered by the
+  `skill/janitor-sweep-` prefix (excluding this run's own new branch), then
+  `gh pr comment` (naming the new PR's real URL, captured from `gh pr
+  create`'s own output) + `gh pr close` on each match, then `git push origin
+  --delete` the old branch (failure recorded, not silently swallowed).
 - **First-run diff behavior (step 3 of Approach, suggestion)** — stated
   explicitly in `SKILL.md` § Run-over-run diff: a failed or empty `git show
   HEAD:docs/health.md` (no prior commit, or the file absent on the base
