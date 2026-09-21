@@ -539,8 +539,20 @@ scope's section, not rendered empty.
 ### 5. Run-over-run diff
 
 For **each scope**, diff this run's findings against the previous run's, by a
-stable key: `tier + check + one-line description`. Render three subsections
-under each tier that has any diff activity: `New`, `Resolved`, `Unchanged`.
+stable key: `tier + check + one-line description`. Every tier in every scope
+carries this diff state — there is no tier that goes undiffed by default.
+The **rendering shape** differs by scope (both described fully in § Write
+the report, so the two steps must be read together, not just this one): the
+Workspace scope renders three subsections per tier — `New`, `Resolved`,
+`Unchanged` — because it diffs against one committed `docs/health.md`.
+Project scope renders the same three states as a `[New/Resolved/Unchanged]`
+tag inline on each per-repo finding, because it diffs many repos against
+independent, best-effort local-report history, where per-tier subsections
+spanning dozens of repos would be unreadable. The one stated exception is
+the Projects section's "Provisional decisions" sub-list (§ Write the
+report): it is not diffed, because the row's own wording already states
+whether a decision has a review scheduled — a New/Resolved/Unchanged tag on
+top would be redundant, not because diffing was skipped.
 
 - **Workspace scope** — the previous run's state is the last **committed**
   `docs/health.md`, read from the janitor-sweep worktree **before** the new
@@ -673,28 +685,47 @@ heading:
 **Publish**: report-only, not committed (project health-rollup shape not yet
 decided — § Deferred: the project-scope rollup and the trigger)
 
+Every tier below carries the same diff-state tag per finding —
+`[New/Resolved/Unchanged, or "no prior report for this repo" / "prior report
+covered a different chunk"]` — per § Run-over-run diff's "for **each scope**"
+mandate. Project scope renders it inline per finding (`- **<repo>** [tag]:
+...`) rather than as `New`/`Resolved`/`Unchanged` subsections, because unlike
+the workspace scope's single committed `docs/health.md`, project-scope
+findings span many repos with independent, best-effort local-report history —
+a per-finding tag is legible where a per-tier subsection split across dozens
+of repos would not be. This is a deliberate shape difference from the
+Workspace section above, not an omission: every tier still carries run-over-run
+information, just in this scope's own shape.
+
 ### 1. Work that can be lost
 - **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
   "prior report covered a different chunk"]: ...
 
 ### 2. Unowned safety bugs
-- **<repo>**: ...
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
 
 ### 3. Rules that have bitten with no enforcement
-- **<repo>**: ...
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
 
 ### 4. Contradictions in the record
-- **<repo>**: ...
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
 
 **Provisional decisions with no review scheduled** (distinct labeled
-sub-list, not merged into the tier's other findings):
+sub-list, not merged into the tier's other findings — not diffed: a
+provisional decision either still has no review scheduled or it doesn't,
+which is what the row itself says, so a New/Resolved/Unchanged tag on top
+would be redundant):
 - **<repo>**: <decision text>, made <date>, recorded in <where>, review owed:
   <text> — unscheduled, <n> days since decision
 - (or, if no repo in this run's chunk has any `## Decisions made this
   deployment` heading): "no provisional decisions found this run"
 
 ### 5. Drift
-- **<repo>**: ...
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
 
 #### Planning Documents — <repo> (mode: layer/clone)
 
