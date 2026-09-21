@@ -762,7 +762,21 @@ change. This step runs after the workspace-scope checks, tiering and diff are
 done, and only when check 1 and check 4 both reached a terminal status
 (`OK`/`FINDINGS`/`SKIPPED`/`FAILED` — a crash mid-check never reaches here).
 
-1. **Create the skill worktree** (now allowlisted —
+**Concurrency**: this whole step assumes **only one sweep publishes at a
+time** — two concurrent runs would race on 7f's list/close/delete against
+each other's GitHub state (e.g. both seeing the other's just-opened PR as
+"old" and closing it). Nothing in this step serialises that; the invariant
+must be enforced by whatever triggers a sweep. Wiring the weekly trigger is
+[#636](https://github.com/rolker/ros2_agent_workspace/issues/636)'s job — it
+must ensure a scheduled run and a hand-run (or two hand-runs) never publish
+concurrently, e.g. by locking or by refusing to start a second publish while
+one is in flight.
+
+The sub-steps below are labeled **7a–7g** (not 1–7) so they cannot be
+confused with the document's top-level numbered steps (this is step 7; step
+6 is "Write the report", above).
+
+7a. **Create the skill worktree** (now allowlisted —
    `.agent/scripts/worktree_create.sh`'s `ALLOWED_SKILLS`):
 
    ```bash
@@ -772,22 +786,26 @@ done, and only when check 1 and check 4 both reached a terminal status
 
    This produces the timestamped branch `skill/janitor-sweep-<ts>-<nano>`
    (`worktree_create.sh`'s `SYNTHETIC_ID` convention, the same one `research`
-   uses).
+   uses). Capture it for later sub-steps:
 
-2. **Read the previous state** (§ Run-over-run diff, workspace half) from
+   ```bash
+   NEW_BRANCH=$(git branch --show-current)
+   ```
+
+7b. **Read the previous state** (§ Run-over-run diff, workspace half) from
    this worktree, **before** writing the new file:
 
    ```bash
    PREV_HEALTH=$(git show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
    ```
 
-3. **Write `docs/health.md`** at the repo root — the path the design draft's
+7c. **Write `docs/health.md`** at the repo root — the path the design draft's
    expected-location table fixes — with the `## Workspace` section's content
    from step 6 (tiers, `New`/`Resolved`/`Unchanged`, generated with `date`,
    never hand-typed). The file is **replaced wholesale each run** (the
    "health" kind's definition in the design draft), not appended to.
 
-4. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
+7d. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
    Identity): for this PR's hand-run testing, the **implementing agent's own
    identity**, not `Janitor Sweep Agent` — standing up that bot identity is
    [#636](https://github.com/rolker/ros2_agent_workspace/issues/636)'s job,
@@ -798,40 +816,73 @@ done, and only when check 1 and check 4 both reached a terminal status
        commit -m "Janitor sweep: workspace health $(date '+%Y-%m-%d')"
    ```
 
-5. **Replace, don't stack, any existing open PR from a prior
-   `skill/janitor-sweep-*` branch.** Before pushing the new branch, list open
-   PRs whose head matches the prefix and close them with a comment pointing
-   at the new one, then delete their branches:
+7e. **Push and open a non-draft PR first** (Copilot does not review draft PRs
+   — `reference_copilot_skips_draft_prs.md`). This must happen **before**
+   touching any prior PR (7f) — see the ordering rule below. Build the PR
+   body with the usual `mktemp` + heredoc pattern (AGENTS.md § Use
+   `--body-file`, Not `--body`):
+
+   ```bash
+   BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+   cat << EOF > "$BODY_FILE"
+   Coverage: X of 4 completed.
+   Full record (workspace and project findings): .agent/scratchpad/janitor/<report-file>
+   EOF
+
+   git push -u origin HEAD
+   NEW_PR_URL=$(gh pr create --title "Janitor sweep: workspace health $(date '+%Y-%m-%d')" \
+       --body-file "$BODY_FILE")
+   rm -f "$BODY_FILE"
+   ```
+
+   `gh pr create` prints the new PR's URL to stdout on success — capture it
+   in `$NEW_PR_URL` rather than filling in a placeholder later; there is no
+   two-pass substitution to get right because the comment in 7f is written
+   *after* this succeeds and already has the real URL. Title format:
+   `Janitor sweep: workspace health <YYYY-MM-DD>`. The body states the
+   coverage line (`X of 4 completed`) and links the local report for the
+   full record (workspace **and** project findings — `docs/health.md`
+   carries only the workspace half).
+
+   **If this sub-step fails** (push rejected, or `gh pr create` errors) —
+   stop here and report `FAILED(workspace publish: <reason>)`. Do **not**
+   proceed to 7f: any prior `skill/janitor-sweep-*` PR is left untouched and
+   stays open, the local report from step 6 already landed and still carries
+   this run's findings, and the skill worktree from 7a is left in place for
+   inspection or retry (see the cleanup note below for removing it if the
+   run is abandoned instead). Nothing is lost; the run is just not yet
+   published.
+
+7f. **Replace, don't stack, any existing open PR from a prior
+   `skill/janitor-sweep-*` branch — only after 7e's new PR exists.** List
+   open PRs whose head matches the prefix, excluding the branch just pushed,
+   and close each with a comment naming the real new PR:
 
    ```bash
    gh pr list --state open --json number,headRefName \
        --jq '.[] | select(.headRefName | startswith("skill/janitor-sweep-")) | "\(.number)\t\(.headRefName)"' \
    | while IFS=$'\t' read -r OLD_PR OLD_BRANCH; do
-       gh pr comment "$OLD_PR" --body "Superseded by this run's sweep PR: <new PR URL, filled in after step 6 opens it>."
+       [ "$OLD_BRANCH" = "$NEW_BRANCH" ] && continue   # that's this run's own PR
+       gh pr comment "$OLD_PR" --body "Superseded by this run's sweep PR: $NEW_PR_URL."
        gh pr close "$OLD_PR"
-       git push origin --delete "$OLD_BRANCH" || true   # may already be gone (auto-delete-on-merge/close)
+       if ! DELETE_ERR=$(git push origin --delete "$OLD_BRANCH" 2>&1); then
+           # Record the reason rather than swallowing it — could be
+           # "already gone" (auto-delete-on-merge/close, benign) or a real
+           # auth/permission error worth surfacing; either way, keep going
+           # rather than aborting the publish over branch cleanup.
+           echo "note: could not delete branch $OLD_BRANCH: $DELETE_ERR"
+       fi
    done
    ```
 
-   The comment references the new PR's URL, so run this **after** step 6
-   below has opened it, filling in the placeholder — or open the new PR first
-   and close-and-comment on the old ones second; either order is fine as long
-   as the comment on the old PR names the real new URL, never a placeholder
-   left unfilled.
-6. **Push and open a non-draft PR** (Copilot does not review draft PRs —
-   `reference_copilot_skips_draft_prs.md`):
+   This is the load-bearing ordering rule: **push-and-open the new PR first
+   (7e), close-and-delete the old one second (7f) — never the reverse, and
+   never "either order."** If 7e fails after an old PR was
+   already closed, the previously-published record would be gone with
+   nothing left open and no recovery path; running 7e first means a failure
+   there always leaves the old PR intact.
 
-   ```bash
-   git push -u origin HEAD
-   gh pr create --title "Janitor sweep: workspace health $(date '+%Y-%m-%d')" \
-       --body-file "$BODY_FILE"
-   ```
-
-   Title format: `Janitor sweep: workspace health <YYYY-MM-DD>`. The body
-   states the coverage line (`X of 4 completed`) and links the local report
-   for the full record (workspace **and** project findings — `docs/health.md`
-   carries only the workspace half).
-7. **A human still merges** (AGENTS.md § Merging, "green CI is not review").
+7g. **A human still merges** (AGENTS.md § Merging, "green CI is not review").
    This step opens the PR; it never merges it.
 
 **Failure is a named, separate state** (the sixth state, § The status
@@ -841,6 +892,26 @@ be opened is reported as `FAILED(workspace publish: <reason>)`, next to — not
 instead of — the local report's own status. The local report has already
 landed by the time this step runs (step 6 precedes it), so a publish failure
 never loses the run's findings; it only means they are not yet committed.
+
+**Orphaned skill worktree/branch after a failed publish**: a run that fails
+partway through 7a–7g (most likely 7d's commit or 7e's push/PR-create) can
+leave a `skill/janitor-sweep-<ts>-<nano>` worktree and branch behind with no
+open PR pointing at it. Repeated failed runs would accumulate these. Clean
+one up with:
+
+```bash
+.agent/scripts/worktree_remove.sh --skill janitor-sweep
+```
+
+(verified against `.agent/scripts/worktree_remove.sh`: it accepts `--skill
+<name>` as an alternative to `--issue <N>` and locates the worktree by
+matching the `skill-*-janitor-sweep-*` pattern under
+`layers/worktrees/`/`.workspace-worktrees/` — no separate flag needed). If
+that script cannot find or remove it (e.g. the worktree was created but the
+script's own bookkeeping is inconsistent), fall back to the manual path:
+`git worktree remove <path>` (or `--force` if dirty) from the main checkout,
+then `git branch -D skill/janitor-sweep-<ts>-<nano>` and, if it was ever
+pushed, `git push origin --delete skill/janitor-sweep-<ts>-<nano>`.
 
 ### 8. Report to the operator
 
