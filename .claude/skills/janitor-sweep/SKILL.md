@@ -745,9 +745,13 @@ under it.
 
 Fill the **Checks** line from the status table, not from impression. If any
 check is `SKIPPED` or `FAILED`, the report may not describe the workspace as
-clean. The `## Workspace` section's tiered findings (minus the
-run-over-run-diff subsections, which have no meaning outside this report) are
-what gets lifted verbatim into `docs/health.md` in the next step.
+clean. The `## Workspace` section, **including its `New`/`Resolved`/`Unchanged`
+run-over-run-diff subsections**, is what gets lifted verbatim into
+`docs/health.md` in the next step: those subsections are exactly the
+run-over-run record the issue asked for, and `docs/health.md`'s own git
+history — one committed version per sweep — is where an operator reads it.
+Committing the diff sections (not stripping them) is the deliberate choice
+here.
 
 ### 7. Publish the workspace scope
 
