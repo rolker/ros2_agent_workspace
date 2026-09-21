@@ -1,6 +1,6 @@
 ---
 name: janitor-sweep
-description: Run the workspace's staleness and drift detectors in one pass and write the result to a single local report file. Report-only — opens no PRs, files no issues, and publishes nothing.
+description: Run the workspace's staleness and drift detectors in one pass, split into a workspace scope and a project scope. Workspace scope publishes a committed docs/health.md via PR; project scope stays report-only to a local file. Neither scope files per-finding issues.
 ---
 
 # Janitor Sweep
@@ -27,13 +27,22 @@ the workspace's own staleness detectors. Not tied to the per-issue lifecycle.
 Four staleness/drift detectors already exist, and all four report only into the
 conversation that ran them: `audit-workspace`, `audit-project`, `issue-triage`,
 and the freshness header of `.agent/knowledge/research_digest.md`. This skill
-chains them into **one sweep** and writes that sweep to **one local report
-file**.
+chains them into **one sweep** and splits the result into two scopes:
 
-It is **report-only**, and in this slice it is also **publish-nothing**: no
-PRs, no per-finding issues, no rolling GitHub issue, no comments. The report is
-a local file and the conversation that ran the sweep. The operator triages it
-into work. See **Deferred: publishing and the trigger**.
+- **Workspace scope** — check 1 (`audit-workspace`) + check 4 (research-digest
+  freshness). Both grade the workspace repo itself.
+- **Project scope** — check 2 (`audit-project`, per repo in the rotation
+  chunk) + check 3 (`issue-triage`, which already scans only overlay/project
+  repos, never the workspace repo).
+
+**Workspace scope publishes: it commits a `docs/health.md` at the repo root
+and opens a PR** (§ Publish the workspace scope). **Project scope stays
+report-only** — its findings land only in the local sweep report under
+`.agent/scratchpad/janitor/`, pending the operator's decision on the
+project-repo health-rollup shape (per-repo PR / one document per project /
+health-follows-roadmap — not yet made). Neither scope files per-finding
+issues or opens issues on its own initiative; the operator triages findings
+into work. See **Deferred: the project-scope rollup and the trigger**.
 
 It also **must not assume `layers/` exists** — `layers/` is gitignored and
 absent in every worktree, fresh clone and container. Repo lookups go through
@@ -67,6 +76,15 @@ file. The consequences map requires a durable-output skill to name the state
 in which that write failed
 ([`principles_review_guide.md`](../../../.agent/knowledge/principles_review_guide.md)),
 and this is that state. It is never "the sweep ran clean".
+
+**The workspace-scope commit-and-PR (§ Publish the workspace scope) is a
+sixth, separate state**, on top of the five above: the local report can land
+even when the `docs/health.md` publish fails (a worktree that could not be
+created, a push that was rejected, a PR that could not be opened), and the
+reverse also holds (a report-write failure per the fifth state above is
+already terminal for the run and the publish step is never reached). The two
+never stand in for each other — a failed publish is stated by name, next to
+the local report's own status, never folded into it.
 
 ## Steps
 
@@ -457,9 +475,177 @@ thresholds the file declares in its own header comment: the file-level
 flagged for review"). A missing or unparseable header is
 `FAILED(digest header unreadable)`, not OK.
 
-### 4. Write the report
+- **Provisional decisions with no review scheduled** (project scope,
+  report-only — riding check 2's per-repo rotation, not a fifth check of its
+  own). For each repo in the chunk, read `<log_dir>/**/*.md` from that repo's
+  `.agents/deployment.yaml` (`log_dir:` key,
+  [`.agent/knowledge/deployment_mode.md`](../../../.agent/knowledge/deployment_mode.md)
+  § Project-config schema) for a `## Decisions made this deployment` heading
+  (the section `/wrap-up-deployment` is meant to write, per
+  [#642](https://github.com/rolker/ros2_agent_workspace/issues/642) — **not
+  shipped yet**, so no such heading exists anywhere in the repo today). This
+  scan is tolerant by construction, since #642's actual output shape has never
+  been observed:
 
-Write the full report to a **timestamped** file:
+  - No `.agents/deployment.yaml` in the repo → skip the repo silently, counted
+    as "no deployment config" — never a failure, and never rendered as a
+    finding.
+  - `.agents/deployment.yaml` present but no `## Decisions made this
+    deployment` heading found in any file under `<log_dir>` → nothing to
+    report for that repo. This is a normal empty result, `OK`, never
+    `FAILED` — absence is never a finding, the same rule the design draft
+    states for every planning-document probe.
+  - A heading found → parse entries loosely (decision text, date made, where
+    recorded, review owed). An entry is **unscheduled** when its "review
+    owed" text names no date and no forcing-function phrase (e.g. "at the
+    next design-mode pass", "before the 2027 season", "when #391's vertical
+    slice lands") — age it from its recorded date.
+
+  Across **every** scanned repo, if no heading was ever found, the row renders
+  "no provisional decisions found this run" — empty, `OK`. Where headings
+  exist, unscheduled entries feed the **contradictions-in-the-record** tier
+  (§ Classify findings into tiers) as a distinct labeled sub-list
+  (`Provisional decisions with no review scheduled`), not merged into that
+  tier's other findings — a later #642-driven refinement can retarget the
+  tier without re-deriving the scan. This row is project scope: it is not
+  part of the committed `docs/health.md` (the workspace repo has no project
+  dev logs of its own).
+
+### 4. Classify findings into tiers
+
+Every finding from checks 1-4 (and the provisional-decisions scan above) is
+classified into exactly **one** of five tiers, in this severity order:
+
+| Tier | Covers |
+|---|---|
+| 1. Work that can be lost | Uncommitted/unpushed work flagged by `audit-workspace`/`audit-project`; stale worktrees |
+| 2. Unowned safety bugs | `audit-project`'s Quality Standard gaps that name a safety-relevant failure mode (error handling, silent failure, missing validation) with **no tracking issue** |
+| 3. Rules that have bitten with no enforcement | A documented rule with no CI/hook backing it — ADR-0005's own test; `audit-workspace`'s enforcement-gap section |
+| 4. Contradictions in the record | `audit-workspace`/`audit-project` findings that two tracked documents disagree; the provisional-decisions-with-no-review-scheduled sub-list above |
+| 5. Drift (catch-all/default) | Everything else — stale docs, digest freshness, stale issues. Any finding not matched by a more specific rule above defaults here, so the mapping never fails closed |
+
+The mapping is **mechanical, not judgment-per-finding**: apply the table
+above to each finding's *kind*, not to its content. This keeps tiering
+reproducible run over run — the same finding kind always lands in the same
+tier, which is what makes the run-over-run diff below meaningful (a finding
+that moved tiers between runs would otherwise look like two different
+findings).
+
+Render findings grouped by tier within each scope section (§ Write the
+report), replacing the flat per-check findings list a prior revision of this
+skill used. A tier with no findings in a given run is omitted from that
+scope's section, not rendered empty.
+
+### 5. Run-over-run diff
+
+For **each scope**, diff this run's findings against the previous run's, by a
+stable key: `tier + check + one-line description`. Every tier in every scope
+carries this diff state — there is no tier that goes undiffed by default.
+The **rendering shape** differs by scope (both described fully in § Write
+the report, so the two steps must be read together, not just this one): the
+Workspace scope renders three subsections per tier — `New`, `Resolved`,
+`Unchanged` — because it diffs against one committed `docs/health.md`.
+Project scope renders the same three states as a `[New/Resolved/Unchanged]`
+tag inline on each per-repo finding, because it diffs many repos against
+independent, best-effort local-report history, where per-tier subsections
+spanning dozens of repos would be unreadable. The one stated exception is
+the Projects section's "Provisional decisions" sub-list (§ Write the
+report): it is not diffed, because the row's own wording already states
+whether a decision has a review scheduled — a New/Resolved/Unchanged tag on
+top would be redundant, not because diffing was skipped.
+
+- **Workspace scope** — the previous run's state is the last **committed**
+  `docs/health.md`. Read it from the main checkout, `$ROOT` — the skill
+  worktree does not exist yet (it is created in § Publish the workspace
+  scope, 7a, after this step and the next) and is not needed for the read,
+  since it branches from the same commit:
+
+  ```bash
+  PREV_HEALTH=$(git -C "$ROOT" show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
+  ```
+
+  This is the only read of the previous state in the run; nothing later
+  re-reads it.
+
+  **First run — no prior `docs/health.md` in history** (the normal case for
+  this skill's very first publish, and for any repo where the file was never
+  committed, or was removed from the base branch): `git show` fails, `PREV_HEALTH`
+  is empty, and this is **not an error**. Every finding renders under `New`
+  in every tier, with an explicit note in the report — "first committed
+  run — no prior health document" — rather than an empty `Resolved`/
+  `Unchanged` subsection that would read as "nothing changed" on a repo that
+  has never had a health document before.
+- **Project scope** — no committed history exists (project scope is still
+  report-only, § Overview), so the diff is **best-effort** against the most
+  recent prior **local** report under `.agent/scratchpad/janitor/` for the
+  same repo, when one exists (the retention-pruned set from step 1, so a
+  report older than the last 20 runs is no longer available for this — say so
+  rather than silently diffing against nothing). When no prior local report
+  covers this repo — first sweep ever, or the repo was not in a prior run's
+  chunk — say so plainly (`no prior report for this repo` / `prior report
+  covered a different chunk`) rather than rendering an empty diff as "no
+  changes."
+
+### 6. Render, redact, and write the report
+
+This step is **one render pass that produces two artifacts**, and every later
+step consumes them by the names below — nothing downstream re-renders,
+re-extracts, or edits report content. Two earlier revisions of this skill
+had the publish step read a variable that was never assigned, and had the
+report template carry a field (the PR URL) that cannot be known when the
+template is rendered; naming the data flow here is what rules both out.
+
+| Variable | Rendered here as | Consumed by |
+|---|---|---|
+| `$WORKSPACE_SECTION` | the `## Workspace` section: check-status table, then findings by tier with `New`/`Resolved`/`Unchanged` subsections | composed into both artifacts below |
+| `$PROJECTS_SECTION` | the `## Projects` section, per the template | `$REPORT_BODY` only — project scope is never published (§ Overview) |
+| `$HEALTH_BODY` | `# Workspace health — <ts>` title + a fixed provenance line + `$WORKSPACE_SECTION` — **exactly the bytes committed to `docs/health.md`** | 7b, written verbatim |
+| `$REPORT_BODY` | the local report: `## Janitor Sweep — <ts>` header, `$WORKSPACE_SECTION`, `$PROJECTS_SECTION`, the retention footer | written to `$REPORT` in this step; 7h appends the publish outcome |
+
+Render `$WORKSPACE_SECTION` once and compose both artifacts around it, so the
+committed section and the local report's workspace section are the same
+bytes by construction, not by a copy step that can drift.
+
+```bash
+TS=$(date '+%Y-%m-%d %H:%M %:z')          # one timestamp, used by both artifacts
+HEALTH_BODY=$(printf '# Workspace health — %s\n\n%s\n\n%s\n' "$TS" \
+    'Generated by the `janitor-sweep` skill and replaced wholesale each run. The run'"'"'s full record, including project-scope findings, is the local report under `.agent/scratchpad/janitor/` on the host that ran it.' \
+    "$WORKSPACE_SECTION")
+REPORT_BODY=$(printf '## Janitor Sweep — %s\n\n%s\n\n%s\n\n%s\n' "$TS" \
+    "$HEADER_LINES" "$WORKSPACE_SECTION" "$PROJECTS_SECTION")
+```
+
+(`$HEADER_LINES` is the two-line **Checks** / **Repo rotation** block from
+the template below; the retention footer follows `$PROJECTS_SECTION` in the
+template and is part of it.)
+
+**Redact both artifacts, once, before either is written.** The findings text
+is synthesized from `audit-workspace` / `audit-project` output (a stale-worktree
+finding embeds a path; a clone failure embeds a remote URL) that was never
+routed through `redact.sh`. `docs/health.md` is committed to a **public** repo,
+and the local report is written to disk and handed around. So this is a
+code-level gate on the rendered content, not an authoring reminder:
+
+```bash
+HEALTH_BODY=$(redact_text "$HEALTH_BODY")
+REPORT_BODY=$(redact_text "$REPORT_BODY")
+```
+
+`redact_text` and `$REDACT_PATH_PREFIXES` were set up in step 1 from the
+run's `$ROOT` and `$HOME`, and that is the right prefix set here: everything
+was rendered relative to the main checkout, before the skill worktree (7a)
+exists at a different path. **Nothing is appended to `$HEALTH_BODY` after
+this line.** The only later addition to the local report is 7h's publish
+outcome, which passes through `redact_text` itself.
+
+**What the committed file deliberately does not contain**: its own PR URL or
+publish outcome. Neither is knowable when the content is rendered, and a
+file that had to be rewritten after its own commit would need a second
+commit or an amend on every run. The commit and the PR *are* the provenance
+of `docs/health.md`; the outcome, PR URL included, is recorded in the local
+report by 7h.
+
+Now write the local report to a **timestamped** file:
 
 ```bash
 REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-sweep.md"
@@ -470,17 +656,17 @@ Generate the timestamp with `date`; never hand-type one (AGENTS.md
 overwrite the first run's report — the runs are the record, so they must
 accumulate. Seconds are not enough on their own for the same reason: two runs
 finishing within one second would collide, so the pid disambiguates them. The
-name stays sortable, and `*-sweep.md` still matches it (the retention sweep at
-step 3 globs on that suffix).
+name stays sortable, and `*-sweep.md` still matches it (the retention sweep in
+step 1 globs on that suffix).
 
-This write depends on neither network nor auth, so a sweep that reached step 4
+This write depends on neither network nor auth, so a sweep that reached step 6
 produces its record wherever the filesystem is writable. It is the sweep's
 durable output — and, being the durable output, the one place the sweep must
 not assume success:
 
 ```bash
 if ! printf '%s' "$REPORT_BODY" > "$REPORT"; then
-    echo "FAILED(report write: could not write $REPORT)"
+    echo "FAILED(report write: could not write $(redact_text "$REPORT"))"
 fi
 ```
 
@@ -490,16 +676,26 @@ A failed write (read-only filesystem, no space, an unwritable or absent
 conversation, print the findings inline so the run is not lost with the file,
 and never describe the sweep as clean**. Checks that completed are still
 reported with their own statuses — the failure is the record, not the checks.
+A report-write failure is terminal for the run: step 7 is not reached
+(§ The status contract, fifth state).
 
-**Keep the report free of host identity and absolute local paths.** Name files
-relative to the workspace root (`.agent/knowledge/research_digest.md`, not
-`/home/…/.agent/knowledge/research_digest.md`), and do not record the hostname.
-Nothing publishes this report today, but the deferred publish decision lands on
-a repo that may be public, and a report written this way needs no scrubbing
-when it gets there. Excluded repo *names* are fine — they are already in the
-tracked manifests.
+**Keep the prose free of host identity and absolute local paths** as you
+write it — name files relative to the workspace root
+(`.agent/knowledge/research_digest.md`, not
+`/home/…/.agent/knowledge/research_digest.md`), and do not record the
+hostname. The `redact_text` pass above is the backstop for content the
+checks produced; it is not a licence to author paths into the prose.
+Excluded repo *names* are fine — they are already in the tracked manifests.
 
-Report format:
+Report format — **two top-level sections, `## Workspace` and `## Projects`**,
+replacing the single flat `### Check Status` table a prior revision of this
+skill used. Each carries its own check-status line and its findings grouped
+by tier (§ Classify findings into tiers), each tier further split into `New`
+/ `Resolved` / `Unchanged` (§ Run-over-run diff). A tier with no findings this
+run is omitted from that scope's section entirely — not rendered as an empty
+heading. The `## Workspace` section carries no publish line: the outcome is
+appended to the end of this file by 7h as its own `## Publish outcome`
+section, once it is known.
 
 ```markdown
 ## Janitor Sweep — <YYYY-MM-DD HH:MM ±HH:MM>
@@ -507,27 +703,99 @@ Report format:
 **Checks**: X of 4 completed, Y skipped, Z failed
 **Repo rotation**: chunk <i> of <n>, ISO week <YYYY-Www>
 
-### Check Status
+## Workspace
 
 | Check | Status | Detail |
 |---|---|---|
 | Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | ... |
-| Project governance (`audit-project`) | ... | <n> repos audited |
-| Issue staleness (`issue-triage`) | ... | <n> repos scanned |
 | Research-digest freshness | ... | last updated <date>, <n> days |
 
-### Findings
+<!-- First committed run for this repo (git show HEAD:docs/health.md fails,
+     or docs/health.md has never been committed): say so explicitly here —
+     "first committed run — no prior health document" — rather than
+     rendering empty Resolved/Unchanged subsections that would read as
+     "nothing changed". -->
 
-#### Workspace governance
+### 1. Work that can be lost
+#### New
+- ...
+#### Resolved
+- ...
+#### Unchanged
 - ...
 
-#### Project governance — <repo> (mode: layer/clone)
-- ...
+### 2. Unowned safety bugs
+(same New/Resolved/Unchanged shape)
 
-Planning Documents (embedded from `audit-project`'s own report section — no
-separate call site here; see `audit-project` § 7). If `audit-project`
-reported the probe `SKIPPED`, embed that single note instead of the table
-below — there is no per-kind data from a probe that did not run:
+### 3. Rules that have bitten with no enforcement
+(same shape)
+
+### 4. Contradictions in the record
+(same shape)
+
+### 5. Drift
+(same shape)
+
+## Projects
+
+| Check | Status | Detail |
+|---|---|---|
+| Project governance (`audit-project`) | ... | <n> repos audited |
+| Issue staleness (`issue-triage`) | ... | <n> repos scanned |
+
+**Publish**: report-only, not committed (project health-rollup shape not yet
+decided — § Deferred: the project-scope rollup and the trigger)
+
+Every tier below carries the same diff-state tag per finding —
+`[New/Resolved/Unchanged, or "no prior report for this repo" / "prior report
+covered a different chunk"]` — per § Run-over-run diff's "for **each scope**"
+mandate. Project scope renders it inline per finding (`- **<repo>** [tag]:
+...`) rather than as `New`/`Resolved`/`Unchanged` subsections, because unlike
+the workspace scope's single committed `docs/health.md`, project-scope
+findings span many repos with independent, best-effort local-report history —
+a per-finding tag is legible where a per-tier subsection split across dozens
+of repos would not be. This is a deliberate shape difference from the
+Workspace section above, not an omission: every tier still carries run-over-run
+information, just in this scope's own shape.
+
+### 1. Work that can be lost
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
+
+### 2. Unowned safety bugs
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
+
+### 3. Rules that have bitten with no enforcement
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
+
+### 4. Contradictions in the record
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
+
+**Provisional decisions with no review scheduled** (distinct labeled
+sub-list, not merged into the tier's other findings — not diffed: a
+provisional decision either still has no review scheduled or it doesn't,
+which is what the row itself says, so a New/Resolved/Unchanged tag on top
+would be redundant):
+- **<repo>**: <decision text>, made <date>, recorded in <where>, review owed:
+  <text> — unscheduled, <n> days since decision
+- (or, if no repo in this run's chunk has any `## Decisions made this
+  deployment` heading): "no provisional decisions found this run"
+
+### 5. Drift
+- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
+  "prior report covered a different chunk"]: ...
+
+#### Planning Documents — <repo> (mode: layer/clone)
+
+(embedded from `audit-project`'s own report section — no separate call site
+here; see `audit-project` § 7. Descriptive only, never counted as a finding
+or diffed — same non-scoring rule `audit-project` itself states. If
+`audit-project` reported the probe `SKIPPED`, embed that single note instead
+of the table below — there is no per-kind data from a probe that did not
+run):
 
 | Kind | Status | Location |
 |---|---|---|
@@ -540,20 +808,11 @@ below — there is no per-kind data from a probe that did not run:
      path on Present, an EMPTY field on Not found. Render the empty field as
      "—", not as the expected path repeated. -->
 
-<!-- Descriptive only, same as in audit-project's own report: absence of any
-     kind is never a finding and never drives a Recommended Actions entry. -->
-
 <!-- The mode is not decoration: `clone` means the manifests chose the tree
      (their url, their pinned version), `layer` means the operator's working
      tree was audited as is, with its origin and checked-out ref deliberately
      unverified against the manifests. A reader deciding whether a finding
      applies to the pinned code or to this host's code needs that. -->
-
-#### Issue staleness
-- ...
-
-#### Research-digest freshness
-- ...
 
 ### Repos not audited this run
 
@@ -578,29 +837,306 @@ under it.
 
 Fill the **Checks** line from the status table, not from impression. If any
 check is `SKIPPED` or `FAILED`, the report may not describe the workspace as
-clean.
+clean. The `## Workspace` section, **including its `New`/`Resolved`/`Unchanged`
+run-over-run-diff subsections**, is what `$HEALTH_BODY` carries into
+`docs/health.md` in the next step: those subsections are exactly the
+run-over-run record the issue asked for, and `docs/health.md`'s own git
+history — one committed version per sweep — is where an operator reads it.
+Committing the diff sections (not stripping them) is the deliberate choice
+here.
 
-### 5. Report to the operator
+### 7. Publish the workspace scope
+
+**Workspace scope only** — never commit `docs/health.md` into a project repo
+in this slice; project-scope findings stay in the local
+`.agent/scratchpad/janitor/<ts>-sweep.md` report exactly as before this
+change. This step runs after step 6 wrote the local report, and only when
+check 1 and check 4 both reached a terminal status
+(`OK`/`FINDINGS`/`SKIPPED`/`FAILED` — a crash mid-check never reaches here).
+
+**Concurrency**: this whole step assumes **only one sweep publishes at a
+time** — two concurrent runs would race on 7e's list/close/delete against
+each other's GitHub state (each seeing the other's just-opened PR as "old"
+and closing it), and on 7a's orphan removal against each other's worktree.
+Nothing in this step serialises that; the invariant must be enforced by
+whatever triggers a sweep. Wiring the weekly trigger is
+[#636](https://github.com/rolker/ros2_agent_workspace/issues/636)'s job — it
+must ensure a scheduled run and a hand-run (or two hand-runs) never publish
+concurrently, e.g. by locking or by refusing to start a second publish while
+one is in flight.
+
+**Inputs this step consumes, and nothing else**: `$HEALTH_BODY` (step 6,
+already redacted), `$REPORT` (step 6, the local report path), `$ROOT`
+(step 1). **Values this step captures and every later sub-step reuses**:
+`$WT_PATH` and `$NEW_BRANCH` (7a), `$NEW_PR_URL` (7d), and
+`$PUBLISH_LINE` — the one-line outcome, assigned by whichever sub-step
+**ends the publish attempt**: each failure exit in 7a–7d assigns it and
+skips to 7h, and 7d assigns it on success, so by 7h it is set on every
+path. Only 7h and step 8 read it. Cleanup and
+replacement key on these captured values — never on a glob or a
+"most recent match" lookup, which is how an earlier revision's cleanup
+command could delete the live run's worktree instead of the orphan.
+
+The sub-steps are labeled **7a–7h** (not 1–8) so they cannot be confused
+with the document's top-level numbered steps.
+
+7a. **Remove orphans, then create this run's worktree.** A run that
+   completes removes its own worktree in 7g, so any `skill-*-janitor-sweep-*`
+   worktree present now is left over from a run that failed partway (and,
+   by the concurrency invariant, no other run is in flight). Remove each by
+   its **exact path**, from the main checkout:
+
+   ```bash
+   cd "$ROOT"
+   for wt in "$ROOT"/.workspace-worktrees/skill-*-janitor-sweep-*; do
+       [ -d "$wt" ] || continue
+       br=$(git -C "$wt" branch --show-current)
+       echo "note: removing orphaned sweep worktree ${wt#"$ROOT"/}${br:+ (branch $br)}"
+       if git worktree remove --force "$wt"; then
+           if [ -n "$br" ] && ! git branch -D "$br"; then
+               echo "note: could not delete local branch $br — left in place"
+           fi
+       else
+           echo "note: could not remove ${wt#"$ROOT"/} — left in place"
+       fi
+   done
+   ```
+
+   An orphan's *remote* branch, if it was ever pushed, is handled in 7e.
+   A failed run's worktree is therefore inspectable only until the next
+   run starts; inspect it then, or remove it by hand with the same two
+   commands. `worktree_remove.sh --skill janitor-sweep` is **not** the
+   tool for this: `find_worktree_by_skill` (`_worktree_helpers.sh`) picks
+   the newest match when several exist, with only a stderr warning.
+
+   Then create this run's worktree (`janitor-sweep` is in
+   `.agent/scripts/worktree_create.sh`'s `ALLOWED_SKILLS`):
+
+   ```bash
+   if ! CREATE_ERR=$(.agent/scripts/worktree_create.sh --skill janitor-sweep --type workspace 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: worktree create: $CREATE_ERR)"
+       # -> skip to 7h
+   fi
+   source .agent/scripts/worktree_enter.sh --skill janitor-sweep
+   WT_PATH="$WORKTREE_ROOT"                   # exported by worktree_enter.sh
+   NEW_BRANCH=$(git branch --show-current)    # skill/janitor-sweep-<ts>-<nano>
+   ```
+
+   `worktree_enter.sh` `cd`s into the worktree and exports `WORKTREE_ROOT`;
+   it locates the worktree by the same newest-match lookup, which is safe
+   here **only because the loop above just removed every other match** —
+   that ordering is the reason the orphan removal comes first. Both captured
+   values are what 7g uses; do not re-discover them later. If creation
+   fails, `$PUBLISH_LINE` is `FAILED(workspace publish: worktree create:
+   <reason>)`; skip to 7h.
+
+7b. **Write `docs/health.md`** — `$HEALTH_BODY` verbatim, at the repo root
+   of the worktree (the path the design draft's expected-location table
+   fixes), **replaced wholesale each run** (the "health" kind's definition
+   in the design draft), never appended to. It was redacted in step 6 and
+   nothing has been added to it since:
+
+   ```bash
+   if ! { mkdir -p docs && printf '%s' "$HEALTH_BODY" > docs/health.md; }; then
+       PUBLISH_LINE="FAILED(workspace publish: health write: could not write docs/health.md)"
+       # -> skip to 7h
+   fi
+   ```
+
+   A write failure here is named as its own cause (`health write`), not
+   left to surface one sub-step later as a commit with nothing staged.
+
+7c. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
+   Identity): for this PR's hand-run testing, the **implementing agent's own
+   identity**, not `Janitor Sweep Agent` — standing up that bot identity is
+   [#636](https://github.com/rolker/ros2_agent_workspace/issues/636)'s job,
+   not this one's.
+
+   ```bash
+   git add docs/health.md
+   if ! COMMIT_ERR=$(git -c user.name="$AGENT_NAME" -c user.email="$AGENT_EMAIL" \
+           commit -m "Janitor sweep: workspace health $(date '+%Y-%m-%d')" 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: commit: $COMMIT_ERR)"
+       # -> skip to 7h
+   fi
+   ```
+
+   A commit failure (typically a pre-commit hook rejection) sets
+   `$PUBLISH_LINE` to `FAILED(workspace publish: commit: <reason>)`; skip to 7h. The worktree
+   stays for inspection until the next run's 7a.
+
+7d. **Push and open a non-draft PR — before touching any prior PR.**
+   Copilot code review does not review draft PRs, so open it non-draft (the
+   default for `gh pr create` without `--draft`) so the review actually
+   fires. Build the PR body with the usual `mktemp` + heredoc pattern
+   (AGENTS.md § Use `--body-file`, Not `--body`):
+
+   ```bash
+   BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
+   cat << 'EOF' > "$BODY_FILE"
+   Coverage: X of 4 completed.
+   Full record (workspace and project findings): .agent/scratchpad/janitor/<report-file>
+   EOF
+
+   if ! PUSH_ERR=$(git push -u origin HEAD 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: push: $PUSH_ERR)"
+       # -> skip to 7h
+   elif ! NEW_PR_URL=$(gh pr create --title "Janitor sweep: workspace health $(date '+%Y-%m-%d')" \
+                           --body-file "$BODY_FILE" 2>&1); then
+       PUBLISH_LINE="FAILED(workspace publish: pr create: $NEW_PR_URL)"; NEW_PR_URL=""
+       # -> skip to 7h
+   else
+       PUBLISH_LINE="committed to docs/health.md — PR $NEW_PR_URL"
+   fi
+   rm -f "$BODY_FILE"
+   ```
+
+   `gh pr create` prints the new PR's URL to stdout on success; `$NEW_PR_URL`
+   is captured from that, so there is no placeholder anywhere to fill in
+   later. Title format: `Janitor sweep: workspace health <YYYY-MM-DD>`. The
+   body states the coverage line (`X of 4 completed`) and names the local
+   report, by workspace-relative path, for the full record (workspace
+   **and** project findings — `docs/health.md` carries only the workspace
+   half).
+
+   **If this sub-step fails** (push rejected, or `gh pr create` errors):
+   `$PUBLISH_LINE` is `FAILED(workspace publish: <reason>)`; skip to 7h.
+   On success `$PUBLISH_LINE` is assigned here, immediately — 7e and 7g can
+   only add notes, never change the outcome. Do
+   **not** run 7e: any prior `skill/janitor-sweep-*` PR is left untouched
+   and stays open, the local report from step 6 already carries this run's
+   findings, and the worktree stays for inspection until the next run's 7a.
+   If the push succeeded but `gh pr create` did not, the pushed branch with
+   no PR is cleaned up by the **next** run's 7e (its stray-branch loop),
+   so a failure here strands nothing on origin either.
+
+7e. **Replace, don't stack, prior sweep PRs and branches — only after 7d's
+   new PR exists.** List open PRs whose head matches the prefix, excluding
+   this run's branch, and close each with a comment naming the new PR.
+   **The branch is deleted only after `gh pr close` itself reports success**
+   — a close failure leaves the old PR and its branch untouched, rather than
+   risking an open PR pointing at a deleted head, which GitHub does not
+   auto-close and which then has to be cleaned up by hand:
+
+   ```bash
+   gh pr list --state open --json number,headRefName \
+       --jq '.[] | select(.headRefName | startswith("skill/janitor-sweep-")) | "\(.number)\t\(.headRefName)"' \
+   | while IFS=$'\t' read -r OLD_PR OLD_BRANCH; do
+       [ "$OLD_BRANCH" = "$NEW_BRANCH" ] && continue   # this run's own PR
+       if ! gh pr comment "$OLD_PR" --body "Superseded by this run's sweep PR: $NEW_PR_URL."; then
+           echo "note: could not comment on old PR #$OLD_PR — closing anyway"
+       fi
+       if ! CLOSE_ERR=$(gh pr close "$OLD_PR" 2>&1); then
+           echo "note: could not close old PR #$OLD_PR: $(redact_text "$CLOSE_ERR") — branch $OLD_BRANCH left in place"
+           continue
+       fi
+       if ! DELETE_ERR=$(git push origin --delete "$OLD_BRANCH" 2>&1); then
+           # Surface, don't swallow: "already gone" is benign, an auth error
+           # is not; either way the PR is closed, so a leftover branch
+           # strands nothing (merge_pr.sh's own delete-is-best-effort rule).
+           echo "note: could not delete branch $OLD_BRANCH: $(redact_text "$DELETE_ERR")"
+       fi
+   done
+   ```
+
+   Then the stray branches — pushed by a run whose `gh pr create` failed
+   (7d), so no PR points at them and the loop above never saw them:
+
+   ```bash
+   OPEN_HEADS=$(gh pr list --state open --json headRefName --jq '.[].headRefName')
+   git ls-remote --heads origin 'skill/janitor-sweep-*' | awk '{print $2}' | sed 's#^refs/heads/##' \
+   | while read -r BR; do
+       [ "$BR" = "$NEW_BRANCH" ] && continue
+       grep -qxF "$BR" <<< "$OPEN_HEADS" && continue     # has an open PR: handled above, or left in place
+       if ! DELETE_ERR=$(git push origin --delete "$BR" 2>&1); then
+           echo "note: could not delete stray branch $BR: $(redact_text "$DELETE_ERR")"
+       fi
+   done
+   ```
+
+   This is the load-bearing ordering rule: **push-and-open the new PR first
+   (7d), close-and-delete the old one second (7e) — never the reverse, and
+   never "either order."** If 7d failed after an old PR had already been
+   closed, the previously-published record would be gone with nothing left
+   open and no recovery path; running 7d first means a failure there always
+   leaves the old PR intact. The same reasoning applies inside 7e: a branch
+   is deleted only once its PR is confirmed closed, so the delete is gated on
+   `gh pr close`'s own exit status.
+
+7f. **A human still merges** (AGENTS.md § Merging, "green CI is not review").
+   This step opens the PR; it never merges it.
+
+7g. **Remove this run's worktree.** The branch is on origin and the PR is
+   open, so the worktree has nothing left to do — and removing it here is
+   what makes 7a's rule ("anything present at start is an orphan") sound.
+   Key on the values captured in 7a, never on a lookup:
+
+   ```bash
+   cd "$ROOT"
+   if git worktree remove "$WT_PATH"; then
+       git branch -D "$NEW_BRANCH"        # local copy only; origin's is the PR head
+   else
+       echo "note: could not remove ${WT_PATH#"$ROOT"/} — the next run's 7a will"
+   fi
+   ```
+
+   A failure here is a note, not a publish failure: the PR is already open.
+
+7h. **Append the publish outcome to the local report** — on **every** exit
+   path from 7a–7g, success or failure. This is where the PR URL lives; it
+   is the one place the outcome is recorded, and it is appended after the
+   file's step-6 content rather than rendered into it, because it is not
+   known until now:
+
+   ```bash
+   # $PUBLISH_LINE was assigned by the sub-step that ended the attempt
+   # (7a/7b/7c/7d on failure, 7d on success) and is one of:
+   #   committed to docs/health.md — PR <url>
+   #   FAILED(workspace publish: <reason>)
+   printf '\n## Publish outcome\n\n%s\n' "$(redact_text "$PUBLISH_LINE")" >> "$REPORT"
+   ```
+
+   The reason string of a failure can carry a path or a remote URL, hence
+   `redact_text`. The same line is what step 8 states to the operator.
+
+**Failure is a named, separate state** (the sixth state, § The status
+contract): a worktree that could not be created (7a), a commit that failed
+(7c), a push that was rejected or a PR that could not be opened (7d) is
+reported as `FAILED(workspace publish: <reason>)`, next to — not instead of —
+the local report's own status, and recorded in the local report by 7h. The
+local report has already landed by the time this step runs (step 6 precedes
+it), so a publish failure never loses the run's findings; it only means they
+are not yet committed.
+
+### 8. Report to the operator
 
 Summarise in the conversation and name the report file by its path **relative
 to the workspace root** (`.agent/scratchpad/janitor/<file>`). Lead with the
 coverage line — `X of 4 completed` — so a partial sweep cannot read as a clean
-one. If the report write failed, lead with that instead and print the findings
-inline. Nothing is published; say so plainly rather than leaving it ambiguous.
+one. If the local report write failed, lead with that instead and print the
+findings inline. State the workspace-scope publish outcome explicitly — the
+same `$PUBLISH_LINE` 7h appended: the PR URL on success, or
+`FAILED(workspace publish: <reason>)` — and state plainly that project-scope
+findings are **not** published anywhere beyond the local report.
 
 ## Known limitations
 
-Both are deliberate, and both are for the deferred decision below to close —
-they are listed here so that decision meets them rather than rediscovering
-them.
+Deliberate, and each is for the deferred decision below to close — they are
+listed here so that decision meets them rather than rediscovering them. The
+first is now **workspace-scope only** — the workspace half of this limitation
+closed when step 7 shipped a committed `docs/health.md`; the project half is
+unchanged.
 
-- **The report is host-local and ephemeral.** `$REPORT_DIR` lives under
-  `.agent/scratchpad/`, which is gitignored. Anchoring it at the main workspace
-  root (step 1) means every *worktree on a host* shares one report directory,
-  but a sweep run on another host, or in an ephemeral container, leaves a
-  record nobody else can read — and a container's copy dies with the container.
-  Until publishing is decided, a sweep is only as durable as the host it ran
-  on.
+- **The local report is host-local and ephemeral; the workspace half no
+  longer is.** `$REPORT_DIR` lives under `.agent/scratchpad/`, which is
+  gitignored. Anchoring it at the main workspace root (step 1) means every
+  *worktree on a host* shares one report directory, but a sweep run on
+  another host, or in an ephemeral container, leaves a local record nobody
+  else can read — and a container's copy dies with the container. The
+  workspace-scope portion of that same record is now also committed to
+  `docs/health.md` (step 7), which is durable and shared regardless of which
+  host ran the sweep. **Project scope is still only as durable as the host it
+  ran on** — pending the health-rollup shape decision, § Deferred below.
 - **The rotation has no coverage guarantee while the trigger is deferred.**
   `ISO-week mod chunk-count` cycles every repo in `ceil(N/3)` weeks *only under
   a real weekly trigger*. Two hand-runs in the same week re-audit the same
@@ -609,17 +1145,31 @@ them.
   worktree, a container, or a fresh clone. The report names the chunk index and
   ISO week so a reader can see which slice was covered.
 
-## Deferred: publishing and the trigger
+## Deferred: the project-scope rollup and the trigger
 
-This slice writes a local report and nothing else. **Publishing and the trigger
-are one decision, deferred together** (operator decision at the round-1
-code-review checkpoint, recorded on issue #569 as the
-["Scope update (2026-09-11)" comment](https://github.com/rolker/ros2_agent_workspace/issues/569#issuecomment-5638517972),
-which supersedes the earlier scope-decision comment's "one rolling report"): where a sweep's findings live durably depends on what runs the sweep,
-and deciding either half alone would fix the other by accident.
+**Workspace-scope publish is live** as of this change (step 7): a committed,
+PR-reviewed `docs/health.md` at the workspace repo root, per the design
+draft's *Publishing what the sweep finds*. What remains deferred:
 
-Whatever is chosen, a future GitHub publish step is a GitHub **write**, which
-is the crux:
+- **The project-repo health-rollup shape.** The operator's narrowing comment
+  on this issue draws the line explicitly: publish-by-commit ships for the
+  workspace check only in this slice; project-repo checks stay report-only
+  until the rollup shape is decided — three candidates are on the table
+  (per-repo PR, one document per project, health-follows-roadmap), and the
+  choice is explicitly **not made** by this change. Project-scope findings
+  stay in the local `.agent/scratchpad/janitor/<ts>-sweep.md` report exactly
+  as before.
+- **The (weekly, unattended) trigger** — decided in principle (operator,
+  2026-09-14: a weekly Claude Code cloud Routine, on stated grounds of
+  smallest credential surface and exact cadence — see the design draft's
+  *The trigger* for the alternatives weighed), but wiring it under a
+  dedicated `Janitor Sweep Agent` identity is
+  [#636](https://github.com/rolker/ros2_agent_workspace/issues/636), not this
+  change. Hand-run testing in this PR uses the implementing agent's own
+  identity for the workspace-scope commit (step 7).
+
+A future project-scope publish step is still a GitHub **write**, which is the
+same crux the workspace-scope one already crossed:
 
 - [ADR-0015](../../../docs/decisions/0015-dispatch-handoff-context-contract.md)
   — a dispatched container has no GitHub write auth; the container produces and
@@ -628,25 +1178,31 @@ is the crux:
   — what containment does and does not buy, before assuming a sandboxed runner
   is equivalent.
 
-Cite these rather than re-deriving them. The decision also inherits both
-**Known limitations** above, and must settle what a report may say on a public
-repo before anything is posted there — which is why step 4 already keeps the
-host and absolute paths out of it.
+Cite these rather than re-deriving them. Whatever rollup shape is chosen also
+inherits **Known limitations** above, and must settle what a report may say
+on a public repo before anything is posted there — which is why step 6
+already keeps the host and absolute paths out of it, workspace and project
+scope alike.
 
 ## Why no `progress.md` entry
 
 `progress.md` is keyed by issue (ADR-0013), and this skill is not issue-scoped
 — like its three periodic siblings (`audit-workspace`, `audit-project`,
 `issue-triage`), none of which write one. Its durable record is the local
-report file written in step 4.
+report file written in step 6, and — for the workspace scope only — the
+committed `docs/health.md` from step 7.
 
 ## Guidelines
 
 - **Report, don't fix** — this skill identifies staleness. Fixing it is
-  separate work with its own issues, decided by the operator. Do not open PRs
-  and do not file per-finding issues; the operator has asked explicitly for one
-  report over issue spam.
-- **Publish nothing** — not this slice. No issue, no comment, no PR.
+  separate work with its own issues, decided by the operator. Do not file
+  per-finding issues or comments; the operator has asked explicitly for one
+  report over issue spam. The workspace-scope commit-and-PR (step 7) is the
+  one deliberate exception to "no PRs" — it publishes the sweep's own
+  measurement, never a fix.
+- **Publish nothing beyond the workspace-scope `docs/health.md` PR.** No
+  issue, no comment on a project repo, no PR against a project repo. Project
+  scope stays report-only pending the rollup-shape decision above.
 - **Never report a check you did not run** — `SKIPPED` and `FAILED` carry a
   reason, and both are visible in the status table and the headline count.
 - **Be specific** — "`research_digest.md` last updated 2026-05-02, 132 days, 6

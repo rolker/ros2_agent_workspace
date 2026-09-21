@@ -72,7 +72,7 @@ accepts a PR number / URL for post-PR review of someone else's work.
 | `inspiration-tracker` | Periodically | Track external projects for portable enhancements and interesting patterns |
 | `document-package` | After audit-project flags doc gaps | Generate or update ROS 2 package README and API docs from source |
 | `issue-triage` | Periodically | Cross-repo issue scanning, categorization, and stale issue detection |
-| `janitor-sweep` | Periodically | Chain the four staleness detectors into one local sweep report; report-only, and publishes nothing (publishing and the trigger are deferred together) |
+| `janitor-sweep` | Periodically | Chain the four staleness detectors into a workspace-scope and a project-scope report; workspace scope publishes a committed `docs/health.md` via PR, project scope stays report-only pending the health-rollup shape decision |
 | `test-engineering` | After audit-project flags test gaps | Test scaffolding, debugging, and coverage analysis for ROS 2 packages |
 
 ### Makefile skills

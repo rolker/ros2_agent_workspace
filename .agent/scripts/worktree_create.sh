@@ -384,7 +384,7 @@ PLAN_FILE=""        # Path to approved plan file (implies draft PR creation)
 PARENT_ISSUE_NUM="" # Parent issue number for sub-issue worktrees
 
 # Skills allowed to create worktrees without a GitHub issue
-ALLOWED_SKILLS=("research" "inspiration-tracker")
+ALLOWED_SKILLS=("research" "inspiration-tracker" "janitor-sweep")
 
 # Available layers — read from manifest; exit if not found.
 # ROOT_DIR is derived from BASH_SOURCE and may resolve into a worktree
