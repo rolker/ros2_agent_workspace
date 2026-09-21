@@ -799,11 +799,33 @@ confused with the document's top-level numbered steps (this is step 7; step
    PREV_HEALTH=$(git show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
    ```
 
-7c. **Write `docs/health.md`** at the repo root — the path the design draft's
-   expected-location table fixes — with the `## Workspace` section's content
+7c. **Redact, then write, `docs/health.md`.** Step 6's "keep the report free
+   of host identity" instruction is an authoring convention for the prose an
+   agent writes by hand — it is **not** enforcement for the findings text
+   itself, which is synthesized from `audit-workspace`/`audit-project`
+   output (e.g. paths embedded in a stale-worktree finding) that was never
+   routed through `redact.sh`. `docs/health.md` is committed to a **public**
+   repo, and this skill is meant to run **unattended** under a bot identity
+   once [#636](https://github.com/rolker/ros2_agent_workspace/issues/636)
+   wires the trigger — so this is a mandatory, code-level gate, run
+   immediately before the write and after every other content decision for
+   the section is final, not an instruction to "remember to scrub":
+
+   ```bash
+   # redact_text and $REDACT_PATH_PREFIXES were set up in step 1 (workspace
+   # root -> <workspace>, $HOME -> ~) from the run's ORIGINAL $ROOT — still
+   # correct here even though 7a's skill worktree lives at a different path,
+   # because $WORKSPACE_SECTION was rendered (step 6) before 7a ran, so any
+   # absolute path in it is relative to that original $ROOT, not the worktree.
+   WORKSPACE_SECTION=$(redact_text "$WORKSPACE_SECTION")
+   ```
+
+   Only after that does the (now-redacted) `## Workspace` section's content
    from step 6 (tiers, `New`/`Resolved`/`Unchanged`, generated with `date`,
-   never hand-typed). The file is **replaced wholesale each run** (the
-   "health" kind's definition in the design draft), not appended to.
+   never hand-typed) get written to `docs/health.md` at the repo root — the
+   path the design draft's expected-location table fixes. The file is
+   **replaced wholesale each run** (the "health" kind's definition in the
+   design draft), not appended to.
 
 7d. **Commit** with per-invocation identity (AGENTS.md § Agent Commit
    Identity): for this PR's hand-run testing, the **implementing agent's own
