@@ -227,12 +227,113 @@ plan.
 **Specialists**: Static Analysis, Governance, Plan Drift, Claude Adversarial Lens A + Lens B (Copilot and Local Adversarial off by default). Static analysis clean at shellcheck `--severity=warning` on all 11 changed shell files; `test_rosdep_local_sources.sh` 39/39, `test_make_validate.sh` 7/7, `test_ci_local.sh` 88/88 all pass.
 
 ### Findings
-- [ ] (must-fix) `make build` now hard-fails when the system rosdep sources are uninitialized: the stamp recipe calls `rosdep_local_sources.sh` (exit 3) with no `||` guard, unlike bootstrap.sh's recoverable call of the same script; no test covers the path — `Makefile:223-227`
-- [ ] (must-fix) The launch-time `rosdep update` runs as root (setpriv drop is later, at :187), so the bind-mounted workspace's `file://` sources land in `/root`'s cache; the agent runs as `ros`, inherits the same `ROSDEP_SOURCE_PATH`, and its baked cache is keyed to `/opt/rosdep-local/...` URLs — in-session `rosdep resolve`/`install` of a workspace-local key still fails. The new Dockerfile comment asserts the opposite — `.devcontainer/agent/agent-entrypoint.sh:103-108`, `.devcontainer/agent/Dockerfile:146-149`
-- [ ] (must-fix) Nothing validates a project repo's `rosdep.yaml` shape before it drives `rosdep install -y` as root (image bake, ci_local container, container launch). rosdep's format also accepts `pip`, `npm`, `gem` and `source` (download-and-run an rdmanifest) rules, so a repo-merged file can install outside the documented `{distro: [pkg]}` form — and a `pip:` rule routes around ADR-0009. Enforce the list form (the staleness check already `yaml.safe_load`s) and state the constraint as a rule — `.agent/scripts/rosdep_local_sources.sh:61-83`, `.agent/scripts/stage_rosdep_manifests.sh:99-113`, `.agent/knowledge/dependency_policy.md:22-30`
-- [ ] (must-fix) Plan still contradicts the code: "no new note fields needed" vs. the `+rosdep-local` steps token the implementation deliberately adds — `.agent/work-plans/issue-654/plan.md:284`
-- [ ] (suggestion) Staged local yamls are keyed by repo basename, so two same-named repos under different `*_ws/src/` trees silently overwrite each other while `local_count` counts both — `.agent/scripts/stage_rosdep_manifests.sh:105-110`
-- [ ] (suggestion) ADR-0018 gets no "format extension" paragraph for the `+rosdep-local` steps token, unlike #577's `upstream-repo:`/`rosdep-skip-keys:` precedent — `docs/decisions/0018-local-first-ci-verification.md`
-- [ ] (suggestion) The hosted-CI recipe lives only in prose, so it does not cascade: neither the project-repo CI template nor the onboarding step that handles non-rosdep deps mentions it — `.agent/templates/ci_workflow.yml:35-42`, `.claude/skills/onboard-project/SKILL.md:180`
-- [ ] (suggestion) `dependency_policy.md` never states the trust implication — a `rosdep.yaml` merged in any project repo now has root-level install influence on the dev host, CI containers and the agent image — `.agent/knowledge/dependency_policy.md`
-- [ ] (suggestion) `make validate`'s one-line description was updated in `make help` but not here — `README.md:220`
+- [x] (must-fix) `make build` now hard-fails when the system rosdep sources are uninitialized: the stamp recipe calls `rosdep_local_sources.sh` (exit 3) with no `||` guard, unlike bootstrap.sh's recoverable call of the same script; no test covers the path — `Makefile:223-227`
+- [x] (must-fix) The launch-time `rosdep update` runs as root (setpriv drop is later, at :187), so the bind-mounted workspace's `file://` sources land in `/root`'s cache; the agent runs as `ros`, inherits the same `ROSDEP_SOURCE_PATH`, and its baked cache is keyed to `/opt/rosdep-local/...` URLs — in-session `rosdep resolve`/`install` of a workspace-local key still fails. The new Dockerfile comment asserts the opposite — `.devcontainer/agent/agent-entrypoint.sh:103-108`, `.devcontainer/agent/Dockerfile:146-149`
+- [x] (must-fix) Nothing validates a project repo's `rosdep.yaml` shape before it drives `rosdep install -y` as root (image bake, ci_local container, container launch). rosdep's format also accepts `pip`, `npm`, `gem` and `source` (download-and-run an rdmanifest) rules, so a repo-merged file can install outside the documented `{distro: [pkg]}` form — and a `pip:` rule routes around ADR-0009. Enforce the list form (the staleness check already `yaml.safe_load`s) and state the constraint as a rule — `.agent/scripts/rosdep_local_sources.sh:61-83`, `.agent/scripts/stage_rosdep_manifests.sh:99-113`, `.agent/knowledge/dependency_policy.md:22-30`
+- [x] (must-fix) Plan still contradicts the code: "no new note fields needed" vs. the `+rosdep-local` steps token the implementation deliberately adds — `.agent/work-plans/issue-654/plan.md:284`
+- [x] (suggestion) Staged local yamls are keyed by repo basename, so two same-named repos under different `*_ws/src/` trees silently overwrite each other while `local_count` counts both — `.agent/scripts/stage_rosdep_manifests.sh:105-110`
+- [x] (suggestion) ADR-0018 gets no "format extension" paragraph for the `+rosdep-local` steps token, unlike #577's `upstream-repo:`/`rosdep-skip-keys:` precedent — `docs/decisions/0018-local-first-ci-verification.md`
+- [x] (suggestion) The hosted-CI recipe lives only in prose, so it does not cascade: neither the project-repo CI template nor the onboarding step that handles non-rosdep deps mentions it — `.agent/templates/ci_workflow.yml:35-42`, `.claude/skills/onboard-project/SKILL.md:180`
+- [x] (suggestion) `dependency_policy.md` never states the trust implication — a `rosdep.yaml` merged in any project repo now has root-level install influence on the dev host, CI containers and the agent image — `.agent/knowledge/dependency_policy.md`
+- [x] (suggestion) `make validate`'s one-line description was updated in `make help` but not here — `README.md:220`
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 11:29 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-654 at `94871af`
+**Addressed**: ## Local Review (Pre-Push), 2026-09-22 11:13 -04:00, branch at `a5158d1` (round 1, changes-requested — 4 must-fix, 5 suggestions)
+**Commits**: 2949ad0 94871af 63dcacb 74a9314 53e93cd 6cabe0d 8e2afab 7b6c7e5 0f0b6c2 e1ac541 
+
+### Actions
+
+- [x] (must-fix) `make build` hard-failed on an uninitialized rosdep — `Makefile:223-227`
+      The stamp recipe now branches on the generator's status: exit 3 (no `*.list`
+      under the system sources dir — a clone that has not run `sudo rosdep init`)
+      is a note, and the stamp is deliberately **not** touched so the next build
+      retries once rosdep is initialized; any other non-zero status fails the
+      build. Tests drive the real recipe in a sandbox against a stub generator
+      (exit 0 / 3 / 4) and assert rc, stamp presence, and whether the cache
+      refresh ran. `2949ad0`
+- [x] (must-fix) The launch-time refresh landed in root's cache, not the agent's — `.devcontainer/agent/agent-entrypoint.sh:103-108`, `.devcontainer/agent/Dockerfile:146-149`
+      Both caches are refreshed now: root's (the entrypoint's own `rosdep check`/
+      `rosdep install` run as root) and `$TARGET_USER`'s, via `setpriv` with
+      `HOME=$TARGET_HOME` so the cache files land user-owned. `TARGET_HOME` moved
+      to the top of the script, where step 4 can use it under `set -u`. The
+      Dockerfile comment that asserted the baked non-root cache covers a mounted
+      workspace's sources is corrected. The test slices the real refresh block out
+      of the entrypoint and executes it against stub `rosdep`/`setpriv`, asserting
+      two refreshes, one of them dropped to the target user with its HOME and
+      ROSDEP_SOURCE_PATH, and none at all for a comment-only local list. `e1ac541`
+- [x] (must-fix) Nothing validated a project `rosdep.yaml` before it drove a root-level install — `.agent/scripts/rosdep_local_sources.sh`, `.agent/scripts/stage_rosdep_manifests.sh`, `.agent/knowledge/dependency_policy.md`
+      New `.agent/scripts/rosdep_yaml_validate.sh` accepts exactly
+      `<key>: {<os>: [<package>, ...]}` — list form only, plain package names —
+      and names what it rejected. Nested mappings (where `pip`/`npm`/`gem`/
+      `source` rules live, and the codename-keyed form) are rejected; the
+      installer keys are named explicitly in the message. Every path that can
+      carry a key to a root install runs it first and **fails closed** when it
+      cannot run at all (exit 3): `rosdep_local_sources.sh` and
+      `stage_rosdep_manifests.sh` exclude the file and exit 4, `ci_local.sh`
+      refuses the run (validating the **attested** content, not the working
+      tree), and `rosdep_local_staleness_check.sh` reports it as a finding so
+      `make validate` says so. `bootstrap.sh` distinguishes exit 4 (directory
+      written, one file dropped) from exit 3. The rule is stated in the policy
+      note with a table of what a rejection does on each path, and in the
+      AGENTS.md script reference. 15 new validator tests + cross-script tests +
+      a ci_local refusal test. `0f0b6c2`
+- [x] (must-fix) plan.md still said "no new note fields needed" — `.agent/work-plans/issue-654/plan.md:284`
+      The ADR-0018 row now records the `+rosdep-local` steps token and the
+      `rosdep-local:` line, why they exist, and that notes on repos without a
+      `rosdep.yaml` stay byte-identical. Files to Change and the approach gained
+      the shape gate and the three cascade targets. `7b6c7e5`, `94871af`
+- [x] (suggestion) Staged yamls keyed by repo basename collided — `.agent/scripts/stage_rosdep_manifests.sh:105-110`
+      Staged as `<layer_ws>__<repo>.yaml`; the Dockerfile globs the directory so
+      it is unaffected. A test stages two same-named repos from different layers
+      and asserts both survive with their own keys, plus one pinning that the
+      aggregation path (keyed by absolute path) never collided. `8e2afab`
+- [x] (suggestion) ADR-0018 had no format-extension paragraph — `docs/decisions/0018-local-first-ci-verification.md`
+      Added, in the shape of #577's: what the note now carries, why an environment
+      that resolved a key from a repo-carried source is a different verified
+      environment, that a file failing the shape gate is refused rather than
+      attested, and that notes on repos without a `rosdep.yaml` are unchanged.
+      `6cabe0d`
+- [x] (suggestion) The hosted-CI recipe did not cascade — `.agent/templates/ci_workflow.yml:35-42`, `.claude/skills/onboard-project/SKILL.md:180`
+      The template carries the step, before `rosdep update`, without `sudo` (the
+      job runs in a `ros:jazzy-*` container as root) and guarded by
+      `hashFiles('rosdep.yaml')` so it is a no-op in repos with no local keys.
+      `onboard-project` says to keep it and where the policy lives; the note says
+      which variant is which. `53e93cd`
+- [x] (suggestion) The policy note never stated the trust implication — `.agent/knowledge/dependency_policy.md`
+      New section: a `rosdep.yaml` merged in any project repo is fed to a
+      root-level `rosdep install -y` on the dev host, in the `ci_local` container
+      and in the agent image, so reviewing a one-line yaml is reviewing what
+      installs as root across three environments. `74a9314`
+- [x] (suggestion) README's `make validate` line — `README.md:220`
+      Updated, and the same stale line in AGENTS.md § Build & Test. `63dcacb`
+
+### Deferred
+
+None — every finding was actioned.
+
+### Tests run
+
+| What | Result |
+|---|---|
+| `make test-scripts` (worktree, no ROS env) | ✅ all shell tests + 220 pytest passed |
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` | ✅ 81 passed (was 39; +42 for the shape gate, the Makefile stamp, the entrypoint refresh and the staging collision) |
+| `.agent/scripts/tests/test_ci_local.sh` | ✅ 91 passed (was 88; +3 for the shape refusal) |
+| `.agent/scripts/tests/test_make_validate.sh` | ✅ 7 passed |
+| `.agent/scripts/tests/test_agent_image_build_paths.sh` | ✅ 7 passed |
+| `make validate` (worktree) | `validate_workspace.py` exits 3 (no `configs/manifest` in a workspace worktree — the pre-existing, expected state); layer-sourcing guard PASSED; `rosdep-local: no rosdep.yaml files found` |
+| Aggregation smoke-run against the real workspace root (out\_dir in scratch) | ✅ 2 system lists copied, 0 local yamls, exit 0 |
+| pre-commit | ✅ on every commit; never `--no-verify` |
+
+### Still owed (carried forward from the implementation entry)
+
+- The agent image must be rebuilt after merge (`make agent-build`) — this round
+  changed `agent-entrypoint.sh` again, and the startup scripts bake from the
+  MAIN checkout.
+- The Dockerfile bake itself was not executed (no Docker build in this
+  dispatch); the staging half is covered by tests.
+- `rosdep install` was never run (needs sudo).
