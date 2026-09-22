@@ -385,11 +385,13 @@ if ! PROJECT_IDENTITY=$(manifest_bootstrap_identity "$ROOT" 2>/dev/null); then
     PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
 else
     PROJECT_REPO_NAME=$(cut -f2 <<< "$PROJECT_IDENTITY")
-    for candidate in "$ROOT"/layers/main/*/src/"$PROJECT_REPO_NAME"; do
-        [ -d "$candidate" ] || continue
-        PROJECT_ROOT_PATH="$candidate"
-        break
-    done
+    if [ -n "$PROJECT_REPO_NAME" ]; then
+        for candidate in "$ROOT"/layers/main/*/src/"$PROJECT_REPO_NAME"; do
+            [ -d "$candidate" ] || continue
+            PROJECT_ROOT_PATH="$candidate"
+            break
+        done
+    fi
     if [ -z "$PROJECT_ROOT_PATH" ]; then
         # No layers/ at all, or the pointer's repo is not checked out in it.
         PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
@@ -405,6 +407,23 @@ else
     fi
 fi
 ```
+
+The `[ -n "$PROJECT_REPO_NAME" ]` guard is not belt-and-braces: an empty
+repo field would leave the glob as `layers/main/*/src/`, which matches every
+layer's `src` directory, and the first one would be adopted as "the project
+root" and probed. `manifest_bootstrap_identity` cannot emit an empty repo
+today (its safety regex requires at least one character), so this guard
+never fires — which is exactly why it is cheap, and why the failure it
+prevents would be silent and confident if the contract ever loosened.
+
+**First glob wins, and that is unrecorded.** If two layers happen to hold a
+checkout of the same repo name, this loop takes the first in glob order
+(alphabetical by layer) and says nothing about the other. That is
+deliberate — a duplicate repo name across layers is a workspace
+misconfiguration `validate_workspace.py` owns, not something the per-project
+report should adjudicate — but it does mean the report can name a checkout
+the operator was not thinking of. Nothing downstream depends on which one
+was picked beyond the roadmap probe.
 
 **No project name appears anywhere in this skill** (ADR-0003):
 `$PROJECT_REPO_NAME` comes from the tracked pointer, exactly as
