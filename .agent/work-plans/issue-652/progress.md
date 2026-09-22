@@ -236,3 +236,33 @@ Static analysis: `bash -n` clean on `manifest_fallback.sh` and the test file; pr
 - `bash .agent/scripts/tests/test_resolve_repo_checkout.sh` → **72 passed / 0 failed** (71 before, +1 malformed-pointer case)
 - `make test-scripts` → all script suites green + 220 pytest passed, exit 0
 - pre-commit (incl. shellcheck) ran on every commit; `bash -n` clean on `manifest_fallback.sh` and the test file
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 13:27 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+External cross-model review of PR #658 (Codex gpt-5.6-terra and Gemini via agy 1.2.8, headless, via agent_workspace's cross_model_review.sh) — 8 findings, 2 cross-confirmed.
+
+**Branch**: feature/issue-652 at `2116fb6`
+**Commits**: `a590898`, `7e88179`, `578733a`, `d313a10`, `7ce495b`, `d962148`, `2116fb6`
+
+### Actions
+- [x] (must-fix, Codex 1 + Gemini 1 — the same finding found independently by both) `$PROJECT_HEALTH_BODY` was described in prose and read on the write branch but assigned in no code block: fatal under `set -u` *after* the primary report had landed, a blank file without it. The render now sits on that same branch, immediately before the redact it feeds — an `awk` filter of `$PROJECTS_SECTION` down to this repo's `- **<repo>**` bullets and their continuation lines plus its `#### Planning Documents` sub-table, with tier headings held back until something for the repo lands under them so the source section's tier-omission rule carries over rather than being re-derived. It stays a re-scoping, not a recomputation. A repo audited with nothing to report gets a report that says so — never a blank file — `.claude/skills/janitor-sweep/SKILL.md` § 6 (`a590898`)
+- [x] (must-fix, Gemini 2) `ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f` exits 2 and prints to stderr on an empty match, which is the normal case on any checkout with no project configured and on every run before the first per-project report exists; under pipefail that ended the sweep at a step this skill says can never fail it. Both call sites — step 1's exposition and the step 6 call site it is repeated at — now use a `find … -printf '%T@ %p\n'` / `sort -rn` / `tail -n +21` / `cut` pipeline, wrapped in one `prune_shape` helper so the two shapes cannot drift (`7e88179`)
+- [x] (suggestion, Gemini 5) default `xargs` whitespace splitting would tear a `$REPORT_DIR` path containing a space into fragments handed to `rm`; folded into the same commit as `xargs -r -d '\n'`. Verified by hand against an empty directory, a 25-file directory, and a `$REPORT_DIR` whose path contains a space (`7e88179`)
+- [x] (suggestion, Gemini 4) `$REPORT` and `$PROJECT_REPORT` each called `date` for their own `<ts>`, so a run crossing a second boundary produced companion files with different prefixes — while the prose promises both carry the same `<ts>-<pid>-` prefix, the only thing identifying them as one run's output. One `$FILE_TS`, evaluated where `$REPORT` is defined and reused by both (`578733a`)
+- [x] (must-fix, Codex 2) both local reports were written with a plain `>` into the live `$REPORT_DIR` that § 5 also reads its diff source from, so a concurrent sweep's `ls -1t … | head -1` could pick a half-written file. Each now goes to a dot-prefixed `.tmp` name in the same directory — matched by neither the diff-source glob nor the retention prune — and is renamed into place; the rename is atomic, so a `*-sweep.md` the lookup can see is complete. Failure handling is unchanged. The "known limitation" paragraph is kept but narrowed to what stays true: two sweeps can still pick each other's **completed** report. No lock (`d313a10`)
+- [x] (must-fix, Codex 3) the `## Project health` (step 6) and `## Publish outcome` (7h, both branches) appends to the already-written report were unchecked, so the sweep could report a section its sole durable record does not contain. Each is now checked into `$APPEND_FAILURES` and reported by step 8, which is explicitly told not to describe an un-appended section as present. Added to the status contract next to the fifth state, and explicitly **non-terminal**: the findings already landed, only the named section is missing — `FAILED(report append: <section>: <reason>)` (`7ce495b`)
+- [x] (suggestion, Gemini 3) the default branch named its diff source whenever a `*-sweep.md` existed, without checking anything could be read from it — a zero-byte file or one from an older shape left `$PREV_HEALTH` empty while `$PREV_SOURCE` still claimed `local report <file>`, so every finding rendered `[New]` under a line asserting they had all appeared since that named run. The read now requires `[ -s "$PREV_REPORT" ]` **and** a non-empty `$PREV_HEALTH`; otherwise `none — newest local report <file> is empty or has no ## Workspace section` with an empty prior set. Added to the template's permitted `**Diffed against**` strings, and the prose that counted this branch's "nothing to diff against" states updated from one to two (`d962148`)
+- [x] (housekeeping) `.agent/work-plans/issue-652/plan.md` kept in sync: the `janitor-sweep/SKILL.md` row of Files to Change picks up this round's edits, and a new `## Implementation Notes` section records the review's provenance and a finding-by-finding table. The file *list* is unchanged — no fix needed a new file, as expected (`2116fb6`)
+
+### Verification
+- `bash .agent/scripts/tests/test_resolve_repo_checkout.sh` → **72 passed / 0 failed** (unchanged; no script was touched this round)
+- `make test-scripts` → all script suites green + 220 pytest passed, exit 0
+- `bash -n` clean on every edited shell block (the step 5 diff-source block, the step 6 write and per-project blocks, 7h's append); the `awk` filter and the prune pipeline were each run against fixtures rather than only read
+- pre-commit (incl. shellcheck) ran on every commit
+
+### Notes
+- All eight findings are in the skill document, which has no executable harness — its verification is the fixture runs above plus a hand-run of the sweep, per this skill's existing practice (§ Estimated Scope).
+- Not pushed: the host pushes.
