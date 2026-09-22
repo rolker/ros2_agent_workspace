@@ -285,8 +285,18 @@ itself describes.**
 
 This is a walkthrough against the new rules as written, not a live
 sub-agent run (no CI harness triggers `audit-workspace`/`janitor-sweep`
-automatically) — record the walkthrough's outcome in the PR description so
-a reviewer can check the worked example against the rule text.
+automatically).
+
+**Done** — the walkthrough is recorded in
+[`verification.md`](verification.md) beside this plan, and the PR
+description points at it. It was kept as a committed file rather than
+PR-description-only prose (review round 1: it is the only verification
+this change has, so it should live where a later agent reading the plan
+will find it). It covers case A (workspace scope, sampled section — the
+issue's own failure), case B (full coverage, plus the never-sampling
+`M of N` shortfall), case C (check 4, which has no section), and case D
+(project scope, clone mode — the round-1 must-fix), and names what the
+walkthrough does **not** establish.
 
 ## Open Questions
 
