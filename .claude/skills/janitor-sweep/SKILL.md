@@ -250,6 +250,11 @@ if EXTRA_CONFIG=$(manifest_config_dir "$ROOT"); then
     python3 "$ROOT/.agent/scripts/list_overlay_repos.py" --format json "${LIST_ARGS[@]}"
 else
     # Every arm is terminal: the sweep is FAILED and nothing is enumerated.
+    # Each arm therefore says so in code — `exit 1` after the status, as at the
+    # `source` check above and at step 6's report write. An arm that only
+    # echoed would fall out of the `if` into the rest of the sweep with no
+    # manifest, and the checks below would run over zero repos: the "4 of 4
+    # completed" false green this contract exists to prevent.
     # The status is captured before anything else runs — read inside an arm it
     # is no longer reliably the one `case` branched on.
     rc=$?
@@ -259,6 +264,7 @@ else
         6) echo "FAILED(manifest refresh — the reason is on stderr)" ;;
         *) echo "FAILED(manifest fallback: unexpected exit $rc)" ;;
     esac
+    exit 1
 fi
 ```
 
