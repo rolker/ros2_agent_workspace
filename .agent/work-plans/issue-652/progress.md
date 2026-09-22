@@ -103,3 +103,36 @@ issue: 652
 
 ### Summary
 Plan is well-researched and its four open Issue Review actions are addressed with specific, traceable mechanisms. The coverage-gate composition and the per-project report's scope definition both check out against the actual (post-#651) SKILL.md text and the two-root rule. Two must-fix gaps remain before implementation: the missing test-extension for the `manifest_fallback.sh` refactor, and the unverified/unsafe-for-other-projects dependency `resolve_repo_checkout.sh`'s manifest-lookup path has on the project root self-listing in its own `.repos` files — which silently fails exactly in the cloud-Routine scenario this skill is meant to run in. Both are fixable without changing the plan's overall shape.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 12:24 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-652 at `5c3af09`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1453 lines changed; skill/knowledge/governance override triggers)
+**Must-fix**: 3 | **Suggestions**: 12
+**Round**: 1 | **Ship**: continue — three must-fixes at round 1, but all are one-line mechanical fixes; one more round should close it
+
+Tests run by the reviewer: `bash .agent/scripts/tests/test_resolve_repo_checkout.sh` → 70 passed / 0 failed (incl. all 12 new `bootstrap identity` cases); `make test-scripts` → all script tests + 220 pytest passed, exit 0. `bash -n` clean on both shell files; shellcheck not installed in this worktree.
+
+Scrutiny asks: (a) the `manifest_bootstrap_identity()` extraction IS behaviour-preserving for `manifest_config_dir()`'s parse path (identical regex, `.git` strip, safety validation, exit 3 mapped through; no dangling `bootstrap_url`/`pointer_file` references); (c) the diff-source flip does NOT regress the #651 coverage gate — the gate keys on this run's `### Coverage` rows, not on the prior document, and the local report's `## Workspace` section is the same bytes as `docs/health.md` by construction; (d) the plan's Files-to-Change matches the diff exactly.
+
+### Findings
+- [ ] (must-fix) `$PROJECT_HEALTH_BODY` is redacted above the guard that decides whether it was ever rendered — unbound read under `set -u` on the common path — `.claude/skills/janitor-sweep/SKILL.md:1166`
+- [ ] (must-fix) the primary-report write-failure block does not stop, and the new per-project block then appends to `$REPORT` and can record `written:` for a run whose report never landed — `.claude/skills/janitor-sweep/SKILL.md:1099-1102` (with 1183)
+- [ ] (must-fix) new Deferred text claims a cloud run renders checks 2 and 3 as `SKIPPED(no project configured on this checkout)`, contradicting step 2's no-`layers/` row and reusing 1a's per-project status as a check status — `.claude/skills/janitor-sweep/SKILL.md:1823-1826`
+- [ ] (suggestion) `prior report predates retention` is unreachable on the default workspace diff branch — `.claude/skills/janitor-sweep/SKILL.md:781-797` (vs 1261-1264)
+- [ ] (suggestion) `$PREV_SOURCE` is `""` rather than one of the template's `none — …` strings, and the `--publish` branch names a source even when `git show` failed — `.claude/skills/janitor-sweep/SKILL.md:766-767,787`
+- [ ] (suggestion) `SKIPPED(project repo not in this run's chunk)` also fires when the repo was in the chunk but its probe/audit failed — `.claude/skills/janitor-sweep/SKILL.md:1173`
+- [ ] (suggestion) warn that `PROJECT_REPO_AUDITED_THIS_RUN=1` dies with the subshell if check 2's loop is a `| while read` pipeline — `.claude/skills/janitor-sweep/SKILL.md:639-640`
+- [ ] (suggestion) `FAILED(project root probe: <reason>)` is absent from the status contract and from step 8's bullet list, though 1a promises all four states are stated — `.claude/skills/janitor-sweep/SKILL.md:75-124,1753-1758`
+- [ ] (suggestion) "the next run's 7a/7e" is now the next *publishing* run — orphan worktrees and stray branches can survive many default runs — `.claude/skills/janitor-sweep/SKILL.md:1509-1514,1620-1621`
+- [ ] (suggestion) "no new lookup logic is needed" overclaims — §5's only concrete lookup globs `*-sweep.md` and the per-project file has a different shape — `.claude/skills/janitor-sweep/SKILL.md:1150-1159`
+- [ ] (suggestion) guard the project-root glob with `[ -n "$PROJECT_REPO_NAME" ]`, and note that two layers holding the same repo name resolve first-glob-wins unrecorded — `.claude/skills/janitor-sweep/SKILL.md:378`
+- [ ] (suggestion) prose says `<ts>-<repo>-health.md`, the code writes `<ts>-$$-<repo>-health.md` — `.claude/skills/janitor-sweep/SKILL.md:56,1117` vs 1175
+- [ ] (suggestion) the extracted exit-3 diagnostic dropped the "no `configs/manifest`" half, so the message that sends an operator to `make setup-all` now reads as a pointer problem only — `.agent/scripts/manifest_fallback.sh:384`
+- [ ] (suggestion) the Script Reference row does not name the new `manifest_bootstrap_identity` entry point — AGENTS.md is Ask-First and the plan deferred it deliberately, so this is an operator call — `AGENTS.md:587`
+- [ ] (suggestion) the ROADMAP `#635` row flip (`planned` → `done`) is a ride-along recorded nowhere in the plan — `.agent/work-plans/issue-652/plan.md`
