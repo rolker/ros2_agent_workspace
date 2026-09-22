@@ -305,6 +305,33 @@ check "no upstream-repo lines"        not_contains "$note" "upstream-repo:"
 check "no rosdep-skip-keys line"      not_contains "$note" "rosdep-skip-keys:"
 check "steps unchanged"               contains "$note" "steps: template"
 
+echo "== repo-local rosdep.yaml is detected and wired (#654) =="
+# A root rosdep.yaml must reach the inner script as a ROSDEP_SOURCE_PATH
+# overlay, and must be visible in both the dry-run report and the attestation
+# steps token — a verified environment that resolved a key from a repo-carried
+# source is not the same environment as one that did not.
+ROSREPO="$TMP/rosdep_repo"
+mkdir -p "$ROSREPO/demo_pkg"
+cp "$REPO/demo_pkg/package.xml" "$ROSREPO/demo_pkg/package.xml"
+cat > "$ROSREPO/rosdep.yaml" <<'EOF'
+snakemake:  # upstream PR owed: https://github.com/ros/rosdistro/pull/00000
+  ubuntu: [snakemake]
+EOF
+git -C "$ROSREPO" init -q
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t add -A
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t commit -qm rosdepfixture
+ROSREPO_SHA="$(git -C "$ROSREPO" rev-parse HEAD)"
+
+out=$(bash "$SUT" "$ROSREPO" --dry-run 2>&1); rc=$?
+check "dry run exits 0"               [ "$rc" -eq 0 ]
+check "steps gains rosdep-local"      contains "$out" "steps    : template+rosdep-local"
+check "dry run names the yaml"        contains "$out" "rosdep-local: src/rosdep_repo/rosdep.yaml"
+
+out=$(bash "$SUT" "$ROSREPO" 2>&1); rc=$?
+check "run exits 0"                   [ "$rc" -eq 0 ]
+rnote=$(git -C "$ROSREPO" notes --ref=ci-local show "$ROSREPO_SHA" 2>/dev/null)
+check "note steps gain rosdep-local"  contains "$rnote" "steps: template+rosdep-local"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
