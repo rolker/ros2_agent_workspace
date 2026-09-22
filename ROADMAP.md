@@ -16,11 +16,12 @@ first one expected to, with the BizzyBoat roadmap
 — still at its pre-existing `docs/roadmap.md` path until the rename to a root
 `ROADMAP.md` lands) beneath it.
 
-**Health document**: none yet. `docs/health.md` is the path the
-[planning-document vocabulary draft](docs/design/planning_document_vocabulary.md)
+**Health document**: [`docs/health.md`](docs/health.md), first committed
+2026-09-21 by the `janitor-sweep` skill, which replaces it wholesale on every
+workspace-scope run (see *How this roadmap stays useful*). That path is the one
+the [planning-document vocabulary draft](docs/design/planning_document_vocabulary.md)
 fixes for it — a workspace choice, with no external convention either way, and
-deliberately under `docs/` rather than beside this file at the root; the sweep
-that writes it is not wired up yet (see *How this roadmap stays useful*).
+deliberately under `docs/` rather than beside this file at the root.
 
 *Created 2026-09-17 under
 [#628](https://github.com/rolker/ros2_agent_workspace/issues/628), absorbing the

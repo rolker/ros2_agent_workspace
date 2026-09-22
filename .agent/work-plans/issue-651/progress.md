@@ -1,0 +1,240 @@
+---
+issue: 651
+---
+
+# Issue #651 — Sweep health doc: make audit coverage explicit and mandatory; never render Resolved for a section not re-examined
+
+## Issue Review
+**Status**: complete
+**When**: 2026-09-22 08:15 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Issue**: #651
+**Comment**: (best-effort post follows this entry; not recorded inline)
+**Scope verdict**: well-scoped
+
+### Actions
+- [ ] Name a verification approach for the coverage-as-data behavior in the plan — these are prose skill files with no automated test harness; propose replaying the 2026-09-14 vs 2026-09-21 sweep contrast from the issue body as a manual check that the shallower run would now render `Not re-examined` instead of silently omitting findings.
+- [ ] Clarify in the plan which `audit-project` sections genuinely need a new coverage line (item 4) vs. which already report coverage implicitly (its SKILL.md already frames itself as producing a "coverage report").
+- [ ] Distinguish the new per-check coverage line (item 2) from the sweep's existing top-line `Checks: X of 4 completed` metric in `janitor-sweep` SKILL.md, so the plan doesn't read as duplicating that existing line.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-22 08:19 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-651/plan.md` at `0e24bdb`
+**Branch**: feature/issue-651 at `0e24bdb`
+**Phases**: single
+
+### Open questions
+- [ ] Whether the audit-workspace Coverage line goes in per-section tables (new column) or a separate summary table — implementation detail, either satisfies the issue.
+
+## Plan Review
+**Status**: complete
+**When**: 2026-09-22 08:22 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-651/plan.md` at `0e24bdb`
+**PR**: PR-less
+**Verdict**: approve-with-suggestions
+
+### Findings
+- [ ] (suggestion) `audit-project`'s § 3 "Check agent guide quality" is silently dropped from the coverage-line convention — the Files to Change table (line 164) lists only "§ 2, 4, 5, 6, 8" and the Approach step-4 text (lines 133–157) never mentions § 3, with no stated rationale (unlike § 7, which explicitly says why it needs no change). § 3's checks (expected sections present, no empty sections, listed paths exist, package inventory matches) are a fixed checklist like §§ 2/6/8, so it's unclear whether the omission is deliberate (conditional on `.agents/README.md` existing) or an oversight — `plan.md:133-164`
+- [ ] (suggestion) The claim that an empty `Not re-examined` subsection is omitted "matching the existing rule for empty subsections" (`plan.md:126-131`) overstates current `janitor-sweep` behavior: the skill only omits an entire *tier* when it has zero findings across all subsections (§ 6, "A tier with no findings this run is omitted... not rendered as an empty heading"); there is no existing rule for omitting one of `New`/`Resolved`/`Unchanged` individually while its siblings still have entries — the closest precedent (lines ~573–577/716) is the special-cased "first run" narrative, not a general per-subsection rule. Restate this as new, deliberate behavior for the 4th state, and consider whether `New`/`Resolved`/`Unchanged` should get the same per-subsection omission for consistency, rather than citing a precedent that doesn't exist in the current text.
+
+### Verification notes
+Cross-checked the plan's section/step references against the current text of
+all three target files — `.claude/skills/audit-workspace/SKILL.md` (7
+checklist sections, matches plan's 1–2 sampling / 3–7 exhaustive split),
+`.claude/skills/janitor-sweep/SKILL.md` (§ 3/5/6 references and the
+`Checks: X of 4 completed` vs. per-check coverage distinction both check
+out), and `.claude/skills/audit-project/SKILL.md` (all sections are
+exhaustive-by-construction, supporting the plan's "workspace scope only"
+restriction on the new `Not re-examined` diff state). Also verified against
+the actually-committed `docs/health.md` (2026-09-21 run): its coverage
+narrative already carries counts (`2 of 10 principles, 1 of 19 ADRs`) but not
+item *names*, and its "Not re-examined this run" note is exactly the
+hand-written workaround the issue and plan describe — confirming the plan's
+factual premise and the value of the plan's "name which items were examined"
+requirement (sections 1–2), which is what makes the coverage-gated diff
+matchable at all.
+
+No must-fix findings. The core mechanism — coverage as named, structured
+data; a 4th diff state gated on whether the specific item a finding
+originated from was re-examined; workspace-scope-only restriction — composes
+correctly with the existing New/Resolved/Unchanged logic and the `Checks: X
+of 4` line. The two suggestions above are implementation-detail gaps, not
+scope or approach problems.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 08:45 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-651 at `65ba7de`
+**Mode**: pre-push
+**Depth**: Standard (reason: 236 lines across three `.claude/skills/**/SKILL.md` governance files — governance-path override; no security/ADR trigger for Deep)
+**Must-fix**: 3 | **Suggestions**: 10
+**Round**: 1 | **Ship**: continue — must-fix 1 is a design question (extend the coverage gate to project scope, or restate the limit honestly), not a mechanical edit
+
+### Findings
+- [x] (must-fix) Project-scope exemption rests on a false premise: `audit-project`'s coverage is NOT always `N of N` — its own new lines admit `0 of 1`, `0 of 4 — SKIPPED`, `2 of 3 — layer: SKIPPED`, `— run: M of N`. A repo audited in `layer` mode then re-audited in `clone` mode drops the layer check, and the prior finding reads `Resolved` — the exact failure #651 closes, left live in project scope while the text asserts it cannot occur. Cross-confirmed by both adversarial lenses and the lead read — `.claude/skills/janitor-sweep/SKILL.md:614-619`, `.claude/skills/audit-project/SKILL.md:200-206`, `.agent/work-plans/issue-651/plan.md:123-129`
+- [x] (must-fix) § 5's decision procedure is unfollowable for check-4 (research-digest) findings: they are workspace scope and tier 5 per § 4, but have no `audit-workspace` section, and check 4's Detail string ("the one digest file, read") matches none of the four bullets' patterns — no rule says whether an absent prior digest finding is `Resolved` or `Not re-examined` — `.claude/skills/janitor-sweep/SKILL.md:583-619`
+- [x] (must-fix) The fenced Report-Format template hard-codes `principles X of 10` / `ADRs X of 19`, directly contradicting `audit-workspace/SKILL.md:40-41`'s "count what is there, never assume these numbers"; every other placeholder in both files is generic `X of Y` — `.claude/skills/janitor-sweep/SKILL.md:777`
+- [x] (suggestion) The section→tier mapping parenthetical enumerates sections 1,2,3,4,5,7 and omits section 6 (instruction/adapter consistency, tier 4 by the § 4 table), silently downgrading it to the always-uncertain fallback — `.claude/skills/janitor-sweep/SKILL.md:589-592`
+- [x] (suggestion) `janitor-sweep` is the skill that now makes a *classification decision* on self-reported coverage, but never restates `audit-workspace`'s "reportable, not self-verifying" caveat; a reader of `janitor-sweep` alone is not told an inflated `10 of 10` silently converts a real gap to `Resolved` — `.claude/skills/janitor-sweep/SKILL.md:583-619`
+- [x] (suggestion) Never stated which subsections of the previous `docs/health.md` parse back as "the previous run's findings"; a `Not re-examined` entry carried forward verbatim must count as a prior finding next run or it flips to `New` — `.claude/skills/janitor-sweep/SKILL.md:570-582`
+- [x] (suggestion) "`audit-workspace` **ends with** a `### Coverage` table" — it sits between `### Summary` and `### Findings`, not at the end — `.claude/skills/janitor-sweep/SKILL.md:445-446`
+- [x] (suggestion) "makes the check `FINDINGS` at worst, never `OK`" (441) and "the check is `FINDINGS` at best" (453) are opposite idioms ten lines apart for the same class of condition — `.claude/skills/janitor-sweep/SKILL.md:441,453`
+- [x] (suggestion) `audit-workspace`'s `all N` sections have no partial form; `audit-project` defines `N-1 of N — <item>: <reason>` for an unreadable item but `audit-workspace` can only say `all N` or whole-section SKIPPED, and `all N` resolves prior findings — `.claude/skills/audit-workspace/SKILL.md:46-55`
+- [x] (suggestion) The `## Projects` check-status `Detail` cell still reads only `<n> repos audited` — none of `audit-project`'s new coverage signal surfaces at rollup level, unlike the Workspace row — `.claude/skills/janitor-sweep/SKILL.md:812-815`
+- [x] (suggestion) The `#### Not re-examined` worked example sits under tier 1 (stale worktrees, section 7 — never samples), where the state can essentially never arise; tier 3 (principles) is its natural home — `.claude/skills/janitor-sweep/SKILL.md:793`
+- [x] (suggestion) The Coverage table keys rows on section names ("Script references") while the per-section lines and the relayed Detail use kind names ("scripts"); the table's own comment says a consumer keys on the section name — `.claude/skills/audit-workspace/SKILL.md:170-186`
+- [x] (suggestion) The plan's Manual Verification (the hand walkthrough of the shallow-run and full-run replay) is not recorded anywhere yet — it is the only verification this change has, and the plan says it lands in the PR description — `.agent/work-plans/issue-651/plan.md` § Manual Verification
+
+### Governance
+Principles — Enforcement over documentation: **Watch** (honesty caveat present in `audit-workspace`, absent from the consumer that acts on the number). A change includes its consequences: **Concern** (the project-scope consequence is asserted away rather than handled — must-fix 1). Capture decisions: **Pass** (deliberate no-ADR while the mechanism is still in flux). Only what's needed / Improve incrementally / Workspace vs. project separation: **Pass**. Test what breaks: **Watch** (walkthrough not yet recorded). Workspace improvements cascade to projects: **Watch** (`audit-project` gained the convention but not the protection).
+ADRs — ADR-0013 not triggered (not a `progress.md` entry type); ADR-0017 N/A. Consequences map: framework-skill row satisfied (no skill added or removed, so adapter skill lists are unaffected); health-document row N/A (kind and expected location unchanged).
+Static analysis: no linter profile for Markdown (per review-code § 4); `git diff --check` clean; `pre-commit` not installed in this worktree.
+Plan adherence: in sync. Both `Plan Review` suggestions were addressed in the implementation (the `agent guide` coverage line was added; the empty-subsection rule is restated as new, deliberate behavior). The plan's own step-3 rationale carries the same false premise as must-fix 1 and must be corrected with it.
+Out of scope, noted only: `docs/design/planning_document_vocabulary.md:347` still says "no `docs/health.md` exists anywhere yet" — stale since the first health doc was committed on 2026-09-21.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 08:55 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-651 at `2ef161f`
+**Addressed**: `## Local Review (Pre-Push)` (2026-09-22 08:45 -04:00, branch at `65ba7de`), verdict changes-requested — 3 must-fix, 10 suggestions
+**Commits**: `8679427`, `08803a2`, `db18c95`, `026704d`, `de744b6`, `77da22f`, `2ef161f`
+
+**Design decision taken from the operator** (must-fix 1): extend the
+coverage-gated `Not re-examined` state to **project scope** rather than
+restate the limit honestly. The issue states the gate generally — "renders
+Resolved only for a finding whose section was fully covered this run" — so
+project scope gets the same rule, rendered as a fourth value on its existing
+inline per-finding tag (`[Not re-examined]`), keeping its per-finding tag
+shape rather than gaining subsections.
+
+### Actions
+- [x] (must-fix) Project-scope exemption rests on a false premise — gate now applies in both scopes: `janitor-sweep` § 5 gains a project-scope "a miss is `Resolved` only when this run looked" block keyed on `audit-project`'s `### Coverage` table (`0 of 1`, `N-1 of N`, `2 of 3 — layer: SKIPPED`, `0 of 4 — SKIPPED`, `— run: M of N`), § 6's tag placeholders and rendering prose carry the fourth value, `audit-project` § 2's "never applies" paragraph is replaced with "not sampling is not the same as always complete", and the plan's step 3 / step 4 / Files-to-Change / Consequences / Only-what's-needed rows are rewritten to match — `.claude/skills/janitor-sweep/SKILL.md` § 5, § 6; `.claude/skills/audit-project/SKILL.md:200`; `.agent/work-plans/issue-651/plan.md`
+- [x] (must-fix) § 5 unfollowable for check-4 findings — own bullet added: check 4 reads the one digest file whole every run, so its gate is the check's own status (`Resolved` when check 4 completed, `Not re-examined` when SKIPPED/FAILED), with an explicit instruction not to route these through the section bullets or the can't-determine bullet — `.claude/skills/janitor-sweep/SKILL.md` § 5
+- [x] (must-fix) Fenced template hard-codes `X of 10` / `X of 19` → generic `X of Y` — `.claude/skills/janitor-sweep/SKILL.md` report template
+- [x] (suggestion) Section→tier mapping omitted section 6 — all seven sections now named, with a note that nothing falls through to the can't-determine bullet by omission — `.claude/skills/janitor-sweep/SKILL.md` § 5
+- [x] (suggestion) `audit-workspace`'s "reportable, not self-verifying" caveat restated in the consumer that acts on the number, with an implausible coverage row made a `FINDINGS` condition rather than a licence to resolve — `.claude/skills/janitor-sweep/SKILL.md` § 5
+- [x] (suggestion) Which subsections of the previous `docs/health.md` are "the previous run's findings" — stated as New + Unchanged + Not re-examined, minus Resolved, with the reason carrying `Not re-examined` forward is load-bearing (otherwise it resets to `New`) — `.claude/skills/janitor-sweep/SKILL.md` § 5
+- [x] (suggestion) "`audit-workspace` **ends with** a `### Coverage` table" → "carries a `### Coverage` table, between its `### Summary` and `### Findings` sections"; same correction applied to the new `audit-project` relay text — `.claude/skills/janitor-sweep/SKILL.md` § 3
+- [x] (suggestion) "`FINDINGS` at worst" vs "at best" — unified on "at best" (an incomplete section can also leave the check FAILED, so FINDINGS is the ceiling) — `.claude/skills/janitor-sweep/SKILL.md` § 3
+- [x] (suggestion) `audit-workspace`'s never-sampling sections had no partial form — added `<kind>: M of N — <item>: <reason>`, the same form `audit-project` uses, because `all N` is what a consumer resolves prior findings against; § 5's bullets widened from "sampled" to "partially covered" to consume it — `.claude/skills/audit-workspace/SKILL.md` § Coverage
+- [x] (suggestion) `## Projects` `Detail` cell now carries per-repo coverage (checkout mode + each repo's folded `### Coverage` table), and check 2's § 3 bullet gains a "relay each repo's coverage too" paragraph — it is the data the project-scope gate keys on — `.claude/skills/janitor-sweep/SKILL.md` § 3, § 6
+- [x] (suggestion) `#### Not re-examined` worked example moved from tier 1 to tier 3; tier 1 keeps a short note saying why it is essentially always empty there — `.claude/skills/janitor-sweep/SKILL.md` report template
+- [x] (suggestion) Coverage table keyed on section names while the lines use kind names — table gains a `Kind` column carrying the `<kind>` token, and its comment now says a consumer may key on either — `.claude/skills/audit-workspace/SKILL.md` § Report Format
+- [x] (suggestion) Manual Verification walkthrough not recorded — written out as `.agent/work-plans/issue-651/verification.md` (case A workspace sampled, case B full coverage + `M of N` shortfall, case C check 4, case D project scope clone mode, plus what it does not establish); the plan's Manual Verification section now points at it — `.agent/work-plans/issue-651/verification.md`
+
+### Ride-along (out-of-scope defect, fixed in the PR where found)
+- [x] `docs/design/planning_document_vocabulary.md:347` said no `docs/health.md` exists anywhere yet — stale since the first health doc was committed 2026-09-21. Corrected to state when the first one landed and that the sweep's project scope is still report-only — `docs/design/planning_document_vocabulary.md`
+
+### Deferred actions
+- None. All 13 findings were actioned.
+
+### Checks run
+Pre-commit hooks ran clean on every commit (no `--no-verify`). No automated
+test harness exists for these prose skill files; the hand walkthrough in
+`verification.md` is the verification of record. Post-fix consistency greps
+confirm no surviving "workspace scope only" / "never occurs there" /
+three-state claims about the diff outside the deliberate one about
+publishing `docs/health.md`.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 09:03 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-651 at `23eb3d1`
+**Mode**: pre-push
+**Depth**: Standard (reason: three `.claude/skills/**/SKILL.md` governance files — governance-path override; no security/ADR trigger for Deep)
+**Must-fix**: 2 | **Suggestions**: 8
+**Round**: 2 | **Ship**: recommended — both must-fixes are precise, mechanical file:line edits; round 1's design question (extend the gate to project scope) is settled and all 13 round-1 findings verified resolved
+
+### Findings
+- [x] (must-fix) § 6's unchanged "a tier with no findings **this run** is omitted entirely" swallows a tier whose only content is carried-forward `Not re-examined` entries — the silent-vanishing #651 closes; the committed 2026-09-21 `docs/health.md` renders tier 3 with zero current findings precisely to carry that paragraph, so the case is live. § 5 mandates the carry-forward, § 6 deletes its tier — `.claude/skills/janitor-sweep/SKILL.md:844-846` vs `:638,725`
+- [x] (must-fix) § 5's project-scope gate does not recognise `audit-project` § 3's literal coverage tokens `checked` / `absent`; `checked` is the FULL-coverage case yet matches no full-coverage form, so a §3-sourced prior finding can never resolve. § 3 also lacks a partial form, unlike every other section. Fix either side — `.claude/skills/janitor-sweep/SKILL.md:718-726` vs `.claude/skills/audit-project/SKILL.md:229-233`
+- [x] (suggestion) No aging or provenance on carried-forward `Not re-examined` entries; sections 1–2 sample at agent discretion with no rotation, so an entry can park indefinitely and renders identically whether missed once or twenty times — `.claude/skills/janitor-sweep/SKILL.md:599-611,904-916`
+- [x] (suggestion) `ROADMAP.md`'s "Health document: none yet … the sweep that writes it is not wired up yet" is the same stale claim this PR's ride-along already corrected in `planning_document_vocabulary.md:347` — same class, same one-line fix, should ride along — `ROADMAP.md:19-23`
+- [x] (suggestion) Absence-as-finding encoded two opposite ways across the two audits this PR explicitly aligned: a missing adapter reduces coverage (`2 of 3 — <file> missing`), a missing agent guide does not (`absent`, "not a coverage gap") — `.claude/skills/audit-workspace/SKILL.md:146-147` vs `.claude/skills/audit-project/SKILL.md:229-232`
+- [x] (suggestion) "the same convention `audit-workspace` uses, so a reader of both audits sees the same shape" overstates: that table is 4 columns (`Section | Kind | Coverage | Items examined`), this one is 2 — `.claude/skills/audit-project/SKILL.md:196-198` vs `:374`
+- [x] (suggestion) Project scope has no tier→`audit-project`-section map, unlike workspace scope's explicit all-seven mapping; tier 2 has no `audit-project` section at all and always takes the conservative fallback — pre-existing, but the new gate inherits it silently — `.claude/skills/janitor-sweep/SKILL.md:702-731`
+- [x] (suggestion) "and the scope was briefly written as if it did" narrates this PR's own unshipped round-1 draft inside a durable instruction file; a future reader has no referent — `.claude/skills/janitor-sweep/SKILL.md:708`
+- [x] (suggestion) The fenced template's tier 3 says "(same shape)" and then adds an explicit `#### Not re-examined` block, reading as though tier 3 has only that subsection — `.claude/skills/janitor-sweep/SKILL.md:904-916`
+- [x] (suggestion) Plan drift: Estimated Scope still says the walkthrough is "recorded in the PR description" (it is a committed file) and names only three SKILL.md files, while the diff also touches `docs/design/planning_document_vocabulary.md` and adds `verification.md`; the Files to Change table lists neither — `.agent/work-plans/issue-651/plan.md:318-322`
+
+### Round-1 verification
+All 13 round-1 findings resolved. The design question was settled by extending
+the gate to project scope: `janitor-sweep` § 5 gains a project-scope block keyed
+on `audit-project`'s `### Coverage` table, § 6 carries the fourth tag value
+through every `## Projects` tier, and `audit-project` § 2's "never applies"
+paragraph is replaced with "not sampling is not the same as always complete".
+The check-4 bullet, generic `X of Y` template, section-6 mapping, `M of N`
+partial form, prior-finding-set definition, self-reporting caveat in the
+consumer, per-repo `Detail` coverage, tier-3 example move, `Kind` column, and
+committed `verification.md` are all present and correct. `verification.md`
+walks the rules as finally written — no skill-file commit lands after `77da22f`,
+the baseline it names.
+
+### Governance
+Principles — Enforcement over documentation: **Pass** (the "reportable, not
+self-verifying" caveat is restated in the consumer that turns the number into a
+classification, with an implausible row made a `FINDINGS` condition). A change
+includes its consequences: **Concern** (the tier-omission carve-out is the
+missing consequence of a state that renders without a current-run finding; the
+`ROADMAP.md` twin is a second). Test what breaks: **Pass** (`verification.md`
+committed, and it names what it does not establish). Workspace improvements
+cascade to projects: **Pass** (`audit-project` gained the protection, not just
+the convention). Only what's needed / Improve incrementally / Workspace vs.
+project separation / Capture decisions: **Pass**.
+ADRs — ADR-0013 not triggered; ADR-0017 N/A. Consequences map: framework-skill
+row satisfied (no skill added or removed); health-document row N/A.
+No live instruction file (`AGENTS.md`, `CLAUDE.md`,
+`.github/copilot-instructions.md`, `.agent/knowledge/`) still asserts the
+three-state vocabulary or the old `Coverage: X of 4` PR-body wording — only
+point-in-time `issue-635`/`issue-569` work-plan records, correctly left alone.
+Static analysis: no linter profile for Markdown (review-code § 4);
+`git diff --check` clean.
+Plan adherence: in sync on substance; only Estimated Scope and the Files to
+Change table lag (suggestion above).
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 09:10 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-651 at `c3706d6`
+**Addressed**: `## Local Review (Pre-Push)` (round 2, changes-requested), 2026-09-22 09:03 -04:00, branch at `23eb3d1`
+**Commits**: `0770098`, `31d9e20`, `974e2ac`, `3a56e77`, `9a14aab`, `df9da1b`, `8e2a734`, `8fb9618`, `c501dcf`, `9d503b9`, `c3706d6`
+
+### Actions
+- [x] (must-fix) Empty-tier omission swallowed carried-forward entries — § 6's rule now omits a tier only when it has **no entries in any subsection**, `Not re-examined` included; "no findings this run" is replaced with "nothing to show at all", with the 2026-09-21 `docs/health.md` named as the live case — `.claude/skills/janitor-sweep/SKILL.md` § 6 (`0770098`)
+- [x] (must-fix) § 3's `checked`/`absent` tokens unrecognised by the gate — tokens kept; `janitor-sweep` § 5 now states that `checked` is § 3's full-coverage form (and adds it to the full-coverage bullet), `0 of 1 — <reason>` its partial form, and `absent` neither: a prior content finding about a now-absent guide is `[Resolved]` only when this run reports § 2's "`.agents/README.md` missing", otherwise `[Not re-examined]`. `audit-project` § 3's coverage line restructured to name the three forms as full / partial / neither — `.claude/skills/janitor-sweep/SKILL.md` § 5, `.claude/skills/audit-project/SKILL.md` § 3 (`31d9e20`)
+- [x] (suggestion) No aging or provenance on carried-forward entries — every `Not re-examined` entry now carries `(since <YYYY-MM-DD>)`, the date of the health document that first parked it, copied verbatim on later runs and dropped when the finding leaves the subsection; project scope tags `[Not re-examined since <date>]`. Stated as a date, not a rotation mechanism — `.claude/skills/janitor-sweep/SKILL.md` § 5, § 6 template (`974e2ac`)
+- [x] (suggestion) `ROADMAP.md`'s stale "Health document: none yet … not wired up yet" — rewritten to point at `docs/health.md`, first committed 2026-09-21 and replaced wholesale by each workspace-scope sweep; same class as the vocabulary-doc ride-along already in this branch — `ROADMAP.md:19-23` (`3a56e77`)
+- [x] (suggestion) Absence-as-finding encoded two opposite ways — aligned on the `audit-project` form: a missing input that is itself a finding does **not** reduce coverage. `audit-workspace` § 6 now always reads `adapters: all 3`, with a missing adapter reported as a finding; the line drops below `all 3` only for an adapter that exists but could not be read. Report-format row updated; `janitor-sweep`'s rollup already read `adapters all 3` — `.claude/skills/audit-workspace/SKILL.md:145-158,189` (`9a14aab`)
+- [x] (suggestion) Overstated "same shape" — reworded to the same **convention**, with the difference stated: `audit-workspace`'s table has four columns, this one two, and the `Items examined` column has nothing to hold because nothing here samples — `.claude/skills/audit-project/SKILL.md` § 2 (`df9da1b`)
+- [x] (suggestion) No tier→section map in project scope — added: tier 1 none, tier 2 = § 4/§ 5, tier 3 none, tier 4 = § 3, tier 5 = § 2/§ 6/§ 8, § 7 never contributes; a tier with no section source takes the conservative fallback, stated explicitly — `.claude/skills/janitor-sweep/SKILL.md` § 5 (`8e2a734`)
+- [x] (suggestion) "and the scope was briefly written as if it did" — removed; it narrated an unshipped round-1 draft in a durable instruction file — `.claude/skills/janitor-sweep/SKILL.md:708` (`8fb9618`)
+- [x] (suggestion) Tier-3 "(same shape)" + explicit block ambiguity — tier 3 now spells out all four subsections, and tier 2 states once what the shorthand stands for (including the § 6 presence/omission rules) — `.claude/skills/janitor-sweep/SKILL.md` § 6 template (`c501dcf`)
+- [x] (suggestion) Plan drift — Estimated Scope rewritten (three SKILL.md files, the two ride-along doc fixes, and `verification.md` as a committed file); Files to Change gains rows for `docs/design/planning_document_vocabulary.md`, `ROADMAP.md` and `verification.md` — `.agent/work-plans/issue-651/plan.md` (`9d503b9`)
+
+### Also
+`verification.md` re-walked against the final rule text and its baseline moved
+to `9d503b9`: case A gains the `since` stamp and the tier-omission step (its
+tier 3 has only a carried-forward entry, so the new rule is what keeps it
+rendered); case B gains the `adapters: all 3` walk and the narrowed omission
+rule; case D gains the project tier→section map and the three § 3 forms
+(`checked` → `[Resolved]`, `0 of 1` → `[Not re-examined]`, `absent` → gated on
+§ 2's finding) (`c3706d6`).
+
+### Deferred
+None — all 10 findings actioned.
