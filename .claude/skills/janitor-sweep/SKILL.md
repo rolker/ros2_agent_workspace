@@ -1594,9 +1594,16 @@ with the document's top-level numbered steps.
    ```
 
    An orphan's *remote* branch, if it was ever pushed, is handled in 7e.
-   A failed run's worktree is therefore inspectable only until the next
-   run starts; inspect it then, or remove it by hand with the same two
-   commands. `worktree_remove.sh --skill janitor-sweep` is **not** the
+   A failed run's worktree is therefore inspectable until the next
+   **publishing** run starts — step 7 is the only caller of this cleanup,
+   and it runs only under `--publish`
+   ([#652](https://github.com/rolker/ros2_agent_workspace/issues/652)). Where
+   `--publish` is occasional, an orphaned worktree (and the stray branch 7e
+   would reap) can outlive many default runs, holding a checkout and a local
+   branch the whole time. That is the cost of making publish opt-in, and it
+   is stated rather than discovered: inspect an orphan while it lasts, or
+   remove it by hand with the same two commands — a default run will not do
+   it for you. `worktree_remove.sh --skill janitor-sweep` is **not** the
    tool for this: `find_worktree_by_skill` (`_worktree_helpers.sh`) picks
    the newest match when several exist, with only a stderr warning.
 
@@ -1704,8 +1711,11 @@ with the document's top-level numbered steps.
    and stays open, the local report from step 6 already carries this run's
    findings, and the worktree stays for inspection until the next run's 7a.
    If the push succeeded but `gh pr create` did not, the pushed branch with
-   no PR is cleaned up by the **next** run's 7e (its stray-branch loop),
-   so a failure here strands nothing on origin either.
+   no PR is cleaned up by the **next publishing** run's 7e (its stray-branch
+   loop) — nothing on origin is stranded permanently, but "next run" here
+   means the next `--publish` one, which may be many default runs away
+   (7a above). The branch is inert in the meantime; it is not a leak, just a
+   slower reap.
 
 7e. **Replace, don't stack, prior sweep PRs and branches — only after 7d's
    new PR exists.** List open PRs whose head matches the prefix, excluding
