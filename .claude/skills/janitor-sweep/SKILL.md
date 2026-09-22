@@ -1836,14 +1836,35 @@ re-implementation of publishing. What remains deferred:
   2026-09-21** in favour of the local-first report this change ships, and
   wiring it under a dedicated `Janitor Sweep Agent` identity is
   [#636](https://github.com/rolker/ros2_agent_workspace/issues/636), not this
-  change. Recorded there for when it is unparked: a cloud run is
-  **workspace scope only**. A cloud checkout of this repo is configured for
-  no project — the project is per-clone configuration, not a property of the
-  GitHub repo — so checks 2 and 3 render
-  `SKIPPED(no project configured on this checkout)` there, and the sweep
-  must not clone manifests to manufacture one. Hand-run `--publish` testing
-  uses the implementing agent's own identity for the workspace-scope commit
-  (step 7).
+  change.
+
+  **What #636 has to implement when it is unparked** — recorded here so the
+  design is not rediscovered then. A cloud run is to be **workspace scope
+  only**: a cloud checkout of this repo is configured for no project (the
+  project is per-clone configuration, not a property of the GitHub repo,
+  [#652](https://github.com/rolker/ros2_agent_workspace/issues/652)'s
+  decision 4), so #636 must add a **cloud-mode switch that skips checks 2 and
+  3 outright**, recording each as
+  `SKIPPED(cloud run: workspace scope only)` — a *check-level* status of its
+  own, deliberately not step 1a's per-project
+  `SKIPPED(no project configured on this checkout)`, which grades whether a
+  per-project health report can be written and says nothing about whether a
+  check ran. The two strings must stay distinct even though the underlying
+  reason is shared. That switch must **not** clone manifests to manufacture
+  a project to audit.
+
+  **None of that is true today**, and this change does not make it true: a
+  checkout with no `layers/` still follows step 2's manifest-clone row —
+  the manifest repo is shallow-cloned from `configs/project_bootstrap.url`,
+  the repos enumerate from that clone, and checks 2 and 3 run over them,
+  `audit-project` cloning each repo it audits. Step 1a is the only part of
+  the sweep that refuses to clone, and it governs the per-project report
+  alone. So a cloud run today would do the full project scope over shallow
+  clones; making it workspace-scope-only is work #636 owns, not a property
+  the sweep already has.
+
+  Hand-run `--publish` testing uses the implementing agent's own identity for
+  the workspace-scope commit (step 7).
 
 A future project-scope publish step is still a GitHub **write**, which is the
 same crux the workspace-scope one already crossed:
