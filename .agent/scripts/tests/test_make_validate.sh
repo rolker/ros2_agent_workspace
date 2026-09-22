@@ -1,9 +1,10 @@
 #!/bin/bash
 # Regression test for the `make validate` recipe (#609).
 #
-# `validate` is two commands: validate_workspace.py, then test_layer_sourcing.sh
-# — ADR-0016's named enforcement path for runtime layer chaining. Written as two
-# plain recipe lines, make aborts the recipe at the first non-zero status. That
+# `validate` is three commands: validate_workspace.py, test_layer_sourcing.sh
+# — ADR-0016's named enforcement path for runtime layer chaining — and
+# rosdep_local_staleness_check.sh (#654, point 3 below). Written as plain
+# recipe lines, make aborts the recipe at the first non-zero status. That
 # was harmless while validate_workspace.py only ever exited 0 or 1 on a
 # configured workspace; #609 gave it exit 3 for "no repos configured at all",
 # which is the *normal* state of every workspace worktree and every
