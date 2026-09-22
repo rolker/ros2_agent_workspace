@@ -79,11 +79,33 @@ generic, with no repo names baked into workspace scripts.
      (`.sources.list.d.slots/{a,b}`, alternating) and published by an
      **atomic symlink swap**, under a bounded `flock` (300s,
      `ROSDEP_SOURCES_LOCK_TIMEOUT`, following
-     `docker_run_agent.sh`'s precedent; unserialized with a notice where
-     `flock` is absent). `ROSDEP_SOURCE_PATH` therefore always resolves
-     to a **complete** directory — the old generation or the new one,
-     never a half-copied or missing one. A pre-existing real directory
-     at the published path migrates to the symlink form on the next run.
+     `docker_run_agent.sh`'s precedent). `ROSDEP_SOURCE_PATH` therefore
+     always resolves to a **complete** directory — the old generation or
+     the new one, never a half-copied or missing one.
+   - **Amended after the round-3 review**, three refinements to that
+     scheme:
+     - The **migration** of a pre-existing real directory at the
+       published path used to `rm -rf` it and only then rename the
+       symlink in, so the path was absent for the whole duration of a
+       tree removal — the one case where "never missing" did not hold
+       (reproduced at 40/2000 reader samples). The two are now swapped
+       atomically with `renameat2(RENAME_EXCHANGE)`, falling back to
+       rename-aside-then-publish **in one process** where that call is
+       unsupported; the old content is deleted only after the swap.
+     - The three lock outcomes are distinguished rather than collapsed:
+       `flock` **not installed** → proceed unserialized with a notice;
+       the lock file **unopenable** → proceed unserialized, but say so
+       (that tree is written by the host uid, by root in the entrypoint
+       and by the agent user, so it is a permissions problem, not a
+       missing tool); **timeout** → **exit 5**, because a timeout proves
+       another writer holds the lock and two unserialized writers share
+       one build slot and would publish a mid-mutation directory.
+     - The `FORCE` idiom behind `$(STAMP)/rosdep-local.list` is guarded:
+       a real file named `FORCE` would make the target up to date and
+       silently switch the add/rename/delete detection off, so the
+       Makefile now `$(error)`s at parse time naming the file. It stays
+       out of `.PHONY` because `.PHONY` targets here become `/make_*`
+       slash commands.
    - **Added after the round-2 review**: `<workspace_root>` is
      canonicalized before anything derives from it, in both
      `rosdep_local_sources.sh` and `stage_rosdep_manifests.sh`. The
@@ -250,11 +272,18 @@ generic, with no repo names baked into workspace scripts.
      shape grammar in the template — and two copies of a rule drift. The
      gate protects *persistent* machines; hosted CI is a throwaway
      runner container, so an out-of-shape rule there reaches nothing
-     else, and the same file is still gated by `ci_local.sh`, which on a
-     project repo is the ADR-0018 merge verification. The knowledge note
-     says this in its own subsection and the template step carries a
-     one-line comment pointing at it; if hosted CI ever gains a
-     persistent cache or a self-hosted runner, the reasoning expires.
+     else. **Corrected after the round-3 review**: the earlier wording
+     also claimed `ci_local.sh` catches such a file "before the branch
+     can merge". It does not, always — ADR-0018 §Decision 1 makes a
+     full-scope `ci_local` attestation *an accepted* merge verification,
+     not a required one, so a project-repo PR may equally merge on green
+     hosted Actions, the ungated route. What is guaranteed is narrower
+     and is what the note now says: every path that puts a key on a
+     **persistent** machine is gated, and PR review is the only
+     pre-merge check that always runs. The knowledge note says this in
+     its own subsection and the template step carries a one-line comment
+     pointing at it; if hosted CI ever gains a persistent cache or a
+     self-hosted runner, the reasoning expires.
 
 6. **Enforcement check** — new
    `.agent/scripts/rosdep_local_staleness_check.sh` (execute-only),
@@ -352,6 +381,11 @@ generic, with no repo names baked into workspace scripts.
 | `.agent/scripts/rosdep_local_staleness_check.sh` (round 3) | Partial-tolerant parse: a broken file is a finding, not a report-killer (round-2 review response) |
 | `Makefile` (round 3) | `$(STAMP)/rosdep-local.list` so a **deleted** `rosdep.yaml` invalidates the stamp (round-2 review response) |
 | `.agent/scripts/ci_local.sh` (round 3) | `rosdep-local:` line written into the attestation note via `NOTE_EXTRA` (round-2 review response) |
+| `.agent/scripts/rosdep_local_sources.sh` (round 4) | Atomic `renameat2(RENAME_EXCHANGE)` migration + the three-way lock outcome (exit 5 on timeout) (round-3 review response) |
+| `Makefile` (round 4) | Parse-time guard against a stray file named `FORCE` (round-3 review response) |
+| `.agent/knowledge/dependency_policy.md`, `.claude/skills/onboard-project/SKILL.md` (round 4) | Two corrections: the dev host's root install is the manual `rosdep install --from-paths …`, not a `make build` rosdep pass; and `ci_local.sh` gates the key only on the attestation merge route, not every merge (round-3 review response) |
+| `AGENTS.md` (round 4) | `rosdep_local_sources.sh` row: exit 5, the migration exchange, and the two distinct unserialized notices (round-3 review response) |
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` (round 4) | Migration race guard (12/12 bad rounds against the pre-fix code, 0 against the fix), lock-timeout/absent/unopenable cases, `FORCE`-file guard (round-3 review response) |
 
 ## Principles Self-Check
 
