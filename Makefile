@@ -96,7 +96,7 @@ help:
 build: $(STAMP)/manifest.done
 	@$(MAKE) --no-print-directory _build-layers
 
-_build-layers: $(LAYER_STAMPS)
+_build-layers: $(LAYER_STAMPS) $(STAMP)/rosdep-local.done
 	@./.agent/scripts/build.sh
 
 test: build
@@ -197,6 +197,22 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 		rm -f "$(STAMP)/manifest.done"; \
 	fi
 	@./.agent/scripts/setup_layers.sh $(if $(BOOTSTRAP_URL),--bootstrap-url "$(BOOTSTRAP_URL)") --manifest-only
+	@touch $@
+
+# Workspace-owned rosdep sources (#654): aggregate every project repo's root
+# rosdep.yaml into $(MAIN_ROOT)/.rosdep/sources.list.d/ and refresh the cache.
+# The wildcard is a PLAIN prerequisite list — no .SECONDEXPANSION needed, since
+# this target has no `%` (unlike $(STAMP)/layer-%.done, whose prerequisite
+# embeds $*). Makefiles are re-parsed every invocation, so the wildcard
+# re-evaluates and the stamp goes stale when a rosdep.yaml is edited, added, or
+# first appears with a newly checked-out repo.
+# `rosdep update` is best-effort: an offline host must not fail `make build`,
+# and the generated source list is still correct for the next online run.
+$(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+	@mkdir -p $(STAMP)
+	@./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT)
+	@ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
+		|| echo "  (rosdep update failed — offline? generated source list is still current)"
 	@touch $@
 
 # Enable secondary expansion for the layer stamp rule below.
