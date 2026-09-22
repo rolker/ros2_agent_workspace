@@ -752,6 +752,31 @@ top would be redundant, not because diffing was skipped.
     found, so the content finding is moot. Without that § 2 finding present
     this run, nothing was established either way and the prior finding is
     `[Not re-examined]`.
+  **Which `audit-project` section a tier's findings come from**, so no tier
+  reaches the gate without a named source the way the workspace scope's
+  all-seven mapping avoids
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)):
+  - **Tier 1 (work that can be lost)** — no `audit-project` section
+    produces these; the sweep's stale-worktree finding is workspace scope.
+  - **Tier 2 (unowned safety bugs)** — § 4 (package metadata) and § 5 (test
+    status): package-level quality gaps.
+  - **Tier 3 (rules that have bitten with no enforcement)** — none;
+    principles enforcement is audited only at workspace scope.
+  - **Tier 4 (contradictions in the record)** — § 3: an agent guide whose
+    package inventory or file paths disagree with the repo's actual
+    `package.xml` files.
+  - **Tier 5 (drift)** — § 2 (governance), § 6 (documentation) and § 8
+    (workspace integration).
+  - § 7 (planning documents) never contributes a finding: absence of a
+    planning document is explicitly not a finding
+    (`docs/design/planning_document_vocabulary.md`), so nothing from it
+    enters the tiers or the diff.
+
+  A tier with **no** section source (1 and 3) can still hold a prior finding
+  — from an earlier run, or from a finding whose origin cannot be read off
+  its text — and takes the conservative fallback below: `[Not re-examined]`
+  unless every one of that repo's sections was fully covered this run.
+
   - Section fully covered this run (`all N`, `checked`, `X of Y` with
     `X == Y`, or `N of N packages` with no `— run: M of N` shortfall bearing
     on the finding) and the prior finding is absent → **`[Resolved]`**.
