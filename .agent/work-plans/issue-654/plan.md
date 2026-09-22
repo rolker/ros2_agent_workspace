@@ -58,6 +58,17 @@ generic, with no repo names baked into workspace scripts.
    - Exits 0 even with zero `rosdep.yaml` files found (empty local list is
      a valid, common state) — same "degrade gracefully" posture as
      `stage_rosdep_manifests.sh`.
+   - **Added after the round-1 review**: every `rosdep.yaml` passes
+     `.agent/scripts/rosdep_yaml_validate.sh` before it is listed. These
+     files drive a root-level `rosdep install -y` (dev host, `ci_local`
+     container, image bake) and rosdep's format also accepts
+     `pip`/`npm`/`gem`/`source` rules, so the workspace enforces the one
+     documented shape — `<key>: {<os>: [<package>, ...]}`, list form only.
+     A rejected file is **excluded** from the generated list and the
+     script exits **4**; the same gate runs in
+     `stage_rosdep_manifests.sh` (not staged, exit 4), `ci_local.sh` (the
+     run is refused) and `rosdep_local_staleness_check.sh` (reported as a
+     finding). All fail closed when the validator cannot run at all.
    - `.rosdep/` added to the root `.gitignore` (generated, workspace-root
      only — mirrors `.devcontainer/agent/.rosdep-manifests/`'s existing
      gitignore entry for the sibling mechanism).
