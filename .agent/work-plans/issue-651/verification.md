@@ -4,8 +4,9 @@
 **Against**: `.claude/skills/janitor-sweep/SKILL.md` § 5 (Run-over-run diff)
 and § 6 (Render the report), `.claude/skills/audit-workspace/SKILL.md`
 § Coverage, `.claude/skills/audit-project/SKILL.md` § 2 / § Report Format,
-as written on branch `feature/issue-651` through `77da22f` (the
-last skill and plan commit before this file).
+as written on branch `feature/issue-651` through `9d503b9` (the last skill
+and plan commit before this revision of the file — re-walked after the
+round-2 review fixes).
 
 These three skills are prose/procedure files with no automated test
 harness (confirmed in review-issue), so the verification the plan proposes
@@ -65,7 +66,19 @@ Walking § 5's workspace-scope procedure:
      coverage does not block resolution of the thing actually re-examined.
    - If it does **not** → **`Not re-examined`**, carried forward verbatim
      under tier 3's `Not re-examined` subsection.
-5. With all five 2026-09-14 gaps and only 2 principles + 1 ADR examined, at
+5. The carried-forward entry is stamped with the date of the health document
+   that first parked it — here `(since 2026-09-21)`, this being the first
+   run to carry it. A later run that still cannot cover section 1 copies
+   that same date rather than restamping, so an entry missed five times is
+   visibly five runs old.
+6. Tier 3 has **no** `New` findings in this run ("none found in this run's
+   sample"). Its only content is the carried-forward entry — so § 6's
+   omission rule matters here: a tier is omitted only when *every* one of
+   its subsections is empty, `Not re-examined` included, so tier 3 renders.
+   Under the "no findings this run" wording this tier would have vanished
+   and taken the carried-forward gaps with it, reinstating the failure one
+   level up.
+7. With all five 2026-09-14 gaps and only 2 principles + 1 ADR examined, at
    most three could resolve and at least two must carry forward. The
    hand-written paragraph in the committed file becomes rendered output.
 
@@ -98,11 +111,21 @@ full pass: coverage rows `principles all 10` / `10 of 10`, `ADRs 19 of 19`,
   worktree removed) → `Resolved`. Both legitimate.
 - The script-table finding (tier 5, section 3, `all 58`): fully covered, so
   a miss is a real `Resolved`.
+- A prior finding from section 6 — *"the Gemini adapter is missing"* — is
+  gated on `adapters: all 3`, which is what that section reports **even when
+  an adapter is missing**: the absence is the finding, not a coverage
+  shortfall (the same rule `audit-project` § 3 applies to a missing agent
+  guide). So the section is fully covered, and the finding resolves exactly
+  when the adapter was actually added. Had a missing adapter been written as
+  `2 of 3`, its own finding could never have resolved.
 - **No tier renders a `Not re-examined` subsection**, because every section
   was fully covered and the subsection is rendered only when non-empty
   (§ 6). That is the deliberate asymmetry with `New`/`Resolved`/`Unchanged`,
   which are always present inside a rendered tier: an always-present empty
   `Not re-examined` would suggest partial coverage where there was none.
+  A tier that now holds nothing at all — no `New`, no `Resolved`, no
+  `Unchanged`, no carried-forward entry — is omitted outright, which is the
+  only case § 6's omission rule still covers.
 
 **Outcome**: full coverage produces the pre-#651 three-state report
 unchanged. The new state costs nothing on a complete run. ✅
@@ -169,6 +192,15 @@ row reads `2 of 3 — layer: SKIPPED (no layer checkout)`.
 **Outcome**: the gate now holds in project scope, and the rendering shape
 difference between the scopes is preserved. ✅
 
+Step 2 of that walk — "which section did this finding come from?" — is
+answerable because § 5's project-scope block now maps every tier to its
+`audit-project` section: the finding above is tier 5, and tier 5 is § 2 /
+§ 6 / § 8. Tiers 1 and 3 have no `audit-project` section at all, and a prior
+finding sitting in one of them takes the conservative fallback —
+`[Not re-examined]` unless every section of that repo was fully covered. § 7
+(planning documents) never contributes a finding, so it never appears as a
+tier's source.
+
 The same walk succeeds on the other partial forms `audit-project` emits —
 `0 of 1 — <reason>` (an agent guide that exists but could not be read),
 `N-1 of N — <item>: <reason>`, `0 of 4 — SKIPPED(<reason>)` (the
@@ -176,6 +208,22 @@ planning-document probe), `N of N packages — run: M of N` (a partial
 `colcon test` pass, for a finding that came from the test run). Each is a
 section that did not fully re-examine what a prior finding may have come
 from.
+
+§ 3's two word-forms are walked the same way, and are the case the round-2
+review caught. A prior finding *"the agent guide's package inventory omits
+`foo_msgs`"* (tier 4, § 3):
+
+- Run 2 reports `agent guide: checked` — § 3's **full-coverage** form. The
+  finding is absent → **`[Resolved]`**. Read only against the numeric forms,
+  `checked` would have matched neither the full nor the partial bullet and
+  this finding could never have resolved at all.
+- Run 2 reports `agent guide: 0 of 1 — unreadable` — the **partial** form
+  → **`[Not re-examined since <date>]`**.
+- Run 2 reports `agent guide: absent`. Nothing exists to carry the finding
+  about. If run 2 also reports § 2's "`.agents/README.md` missing" finding,
+  the audit looked and the guide's absence is what it found →
+  **`[Resolved]`** (the content finding is moot). Without that § 2 finding,
+  nothing was established → **`[Not re-examined since <date>]`**.
 
 ## What this walkthrough does not establish
 
