@@ -412,9 +412,119 @@ None — every finding was actioned.
 **Round-2 closure**: all 11 round-2 findings verified closed against the code. The four must-fixes carry real tests behind them (the `rosdep-local:` note line asserted present *and* absent; the deleted-`rosdep.yaml` stamp invalidation; the 8-way concurrent regeneration with a reader loop; the entrypoint's byte-identical skip in three cases). Plan Drift re-walked plan.md statement by statement and found **no** remaining drift — round 2's "whole plan re-walked" claim holds. Governance found every consequence row Done and no unverified claim in its 6-claim spot-check. Finding 1 below is the round-2 swap fix being **incomplete on one path**, not a reopened finding; findings 2 and 3 are claims in the new policy note that no earlier round checked against the build chain and ADR-0018.
 
 ### Findings
-- [ ] (must-fix) The atomic-swap guarantee does not hold on the migration path: a pre-existing REAL directory at `<out_dir>` is `rm -rf`'d and only then replaced by `mv -T`, so the published path is absent for a window — Lens A reproduced it at 40/2000 samples with a polling reader, and `setup.bash`'s `[ -d ]` gate and rosdep both read ENOENT as "no workspace sources". The header, the AGENTS.md row and `dependency_policy.md` all state "never missing". Rename the old directory aside, swap, then delete the aside copy — `.agent/scripts/rosdep_local_sources.sh:196-202` (cross-confirmed: lead + Lens A)
-- [ ] (must-fix) The trust section attributes the dev-host root install to "`make build`'s rosdep pass", but nothing in the build chain runs `rosdep install`: the `$(STAMP)/rosdep-local.done` recipe runs `rosdep update` only, and `build.sh` / `setup_layers.sh` never call rosdep. The real dev-host consumer is the manual `rosdep install --from-paths …` (README.md:180). The consumer is real; the named mechanism is not — `.agent/knowledge/dependency_policy.md:70-71`
-- [ ] (must-fix) The accepted-gap argument overclaims its own backstop: "a file that would be rejected is caught before the branch can merge" (and `onboard-project`'s "`ci_local.sh` does, before the repo can merge"). ADR-0018 §Decision 1 makes a full-scope `ci_local` attestation *an accepted* merge verification, not a required one — a project-repo PR may equally merge on green hosted Actions, which is the ungated path. Say what is actually guaranteed — `.agent/knowledge/dependency_policy.md:146-149`, `.claude/skills/onboard-project/SKILL.md:186`
-- [ ] (suggestion) A `flock` **timeout** falls through to the same "regenerating unserialized" path as `flock` being **absent**, but they differ: on timeout another writer demonstrably holds the lock, both writers then read the same published slot and can `rm -rf`/`cp` into one `BUILD_DIR` concurrently, and the swap publishes a mid-mutation directory. Fail (or retry) on timeout instead — `.agent/scripts/rosdep_local_sources.sh:123-129` (Lens B)
-- [ ] (suggestion) When `flock` is installed but `exec 9>"$LOCK_FILE"` fails (permission/ownership on `.rosdep/` — plausible, since the same tree is written by the host uid, by root in the entrypoint and by the agent user), the message says "flock unavailable", misdirecting the debugging — `.agent/scripts/rosdep_local_sources.sh:123-129` (Lens A)
-- [ ] (suggestion) The `FORCE` idiom is deliberately not `.PHONY` (`.PHONY` targets become `/make_*` slash commands), so a stray file literally named `FORCE` in the invocation directory silently disables the add/rename/delete detection the stamp exists for; nothing guards it — `Makefile:236-238` (Lens A)
+- [x] (must-fix) The atomic-swap guarantee does not hold on the migration path: a pre-existing REAL directory at `<out_dir>` is `rm -rf`'d and only then replaced by `mv -T`, so the published path is absent for a window — Lens A reproduced it at 40/2000 samples with a polling reader, and `setup.bash`'s `[ -d ]` gate and rosdep both read ENOENT as "no workspace sources". The header, the AGENTS.md row and `dependency_policy.md` all state "never missing". Rename the old directory aside, swap, then delete the aside copy — `.agent/scripts/rosdep_local_sources.sh:196-202` (cross-confirmed: lead + Lens A)
+- [x] (must-fix) The trust section attributes the dev-host root install to "`make build`'s rosdep pass", but nothing in the build chain runs `rosdep install`: the `$(STAMP)/rosdep-local.done` recipe runs `rosdep update` only, and `build.sh` / `setup_layers.sh` never call rosdep. The real dev-host consumer is the manual `rosdep install --from-paths …` (README.md:180). The consumer is real; the named mechanism is not — `.agent/knowledge/dependency_policy.md:70-71`
+- [x] (must-fix) The accepted-gap argument overclaims its own backstop: "a file that would be rejected is caught before the branch can merge" (and `onboard-project`'s "`ci_local.sh` does, before the repo can merge"). ADR-0018 §Decision 1 makes a full-scope `ci_local` attestation *an accepted* merge verification, not a required one — a project-repo PR may equally merge on green hosted Actions, which is the ungated path. Say what is actually guaranteed — `.agent/knowledge/dependency_policy.md:146-149`, `.claude/skills/onboard-project/SKILL.md:186`
+- [x] (suggestion) A `flock` **timeout** falls through to the same "regenerating unserialized" path as `flock` being **absent**, but they differ: on timeout another writer demonstrably holds the lock, both writers then read the same published slot and can `rm -rf`/`cp` into one `BUILD_DIR` concurrently, and the swap publishes a mid-mutation directory. Fail (or retry) on timeout instead — `.agent/scripts/rosdep_local_sources.sh:123-129` (Lens B)
+- [x] (suggestion) When `flock` is installed but `exec 9>"$LOCK_FILE"` fails (permission/ownership on `.rosdep/` — plausible, since the same tree is written by the host uid, by root in the entrypoint and by the agent user), the message says "flock unavailable", misdirecting the debugging — `.agent/scripts/rosdep_local_sources.sh:123-129` (Lens A)
+- [x] (suggestion) The `FORCE` idiom is deliberately not `.PHONY` (`.PHONY` targets become `/make_*` slash commands), so a stray file literally named `FORCE` in the invocation directory silently disables the add/rename/delete detection the stamp exists for; nothing guards it — `Makefile:236-238` (Lens A)
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 12:19 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-654 at `ba981e4`
+**Addressed**: `## Local Review (Pre-Push)` (round 3, 2026-09-22 12:04 -04:00, branch at `f8a1834`) — 3 must-fix + 3 suggestions, all actioned, none deferred
+**Commits**: 990dcb4 038d160 2f75ae8 4470f96 ee95be4 ba981e4
+
+### Actions
+- [x] (must-fix) The migration path unpublished the directory — the pre-existing
+      REAL directory is no longer `rm -rf`'d before the swap. The old directory
+      and the new symlink are exchanged **atomically** with
+      `renameat2(RENAME_EXCHANGE)` (one syscall, so the published path is never
+      absent); where that call is unsupported — pre-3.15 kernel, pre-2.28 glibc,
+      a filesystem that refuses it — the fallback renames the old directory
+      aside and publishes immediately after, **both renames in one process**, so
+      the residual gap is a single `rename(2)` rather than the fork+exec of a
+      second `mv`. Either way the old content is deleted only *after* the new
+      symlink is published. `ROSDEP_SOURCES_FORCE_FALLBACK=1` is a test hook for
+      the fallback branch — `.agent/scripts/rosdep_local_sources.sh:223-273`,
+      `AGENTS.md:577`. `990dcb4`
+
+      **Test sensitivity** (the review reproduced the defect at only 40/2000
+      samples): the new guard repeats the migration 12 times over a deliberately
+      fat stale directory (500 filler entries, so the old code's `rm -rf` is a
+      real tree walk) against a spin-polling reader, ~2000 samples per round. It
+      reports **12/12 bad rounds, ~180 torn samples each, against the pre-fix
+      publish block** and **0 against the fix** (4 consecutive runs). It also
+      still catches the rename-aside fallback in 12/12 rounds — that is the
+      evidence it is sensitive to a one-`rename(2)` gap, two orders of magnitude
+      finer than the defect it was asked to catch.
+- [x] (must-fix) `make build` does not run `rosdep install` — corrected. Nothing
+      in the build chain installs: the `$(STAMP)/rosdep-local.done` recipe runs
+      `rosdep update` (the *resolution* side) and `build.sh`/`setup_layers.sh`
+      never call rosdep at all (verified by grep across the Makefile and
+      `.agent/scripts/`). The trust section now names the real dev-host consumer
+      — the manual `rosdep install --from-paths layers/main/<layer>_ws/src
+      --ignore-src -r -y` the README documents — and says what `make build` does
+      instead — `.agent/knowledge/dependency_policy.md:65-72`. `2f75ae8`
+- [x] (must-fix) The accepted-gap argument overclaimed its backstop — ADR-0018
+      §Decision 1 makes a full-scope `ci_local` attestation *an accepted* merge
+      verification, not a required one, so a project-repo PR may merge on green
+      hosted Actions and never meet the shape gate. Both the policy note and
+      `onboard-project` now state the narrower truth: every path that puts a key
+      on a **persistent** machine (dev host, `ci_local` container, agent image)
+      is gated, so an out-of-shape rule cannot be *used* there even if it merges;
+      PR review is the only pre-merge check that always runs; `ci_local.sh`
+      catches it first only when the PR takes the attestation route. The
+      consumer table's hosted-CI row says the same in one line —
+      `.agent/knowledge/dependency_policy.md:146-158,~190`,
+      `.claude/skills/onboard-project/SKILL.md:186-193`. `4470f96`
+- [x] (suggestion) A `flock` timeout fell through to the unserialized path — it
+      is now its own failure: **exit 5**, a message naming the lock file, the
+      timeout and `ROSDEP_SOURCES_LOCK_TIMEOUT`, and nothing written (the
+      previously published directory is untouched). Rationale in the header: a
+      timeout *proves* another writer holds the lock, and two unserialized
+      writers pick the same published slot, `rm -rf`/`cp` into one `BUILD_DIR`
+      and then swap a mid-mutation directory into place — unserialized is only
+      safe when nobody else is writing, which is exactly what a timeout
+      disproves. Documented in the script header and the `AGENTS.md` row;
+      `bootstrap.sh` already routes any non-0/4 status to its "not generated —
+      using system defaults" note, which is accurate for 5 —
+      `.agent/scripts/rosdep_local_sources.sh:134-163`. `038d160`
+- [x] (suggestion) "flock unavailable" for an unopenable lock file — the three
+      outcomes are now distinct: `flock` **not installed** (proceed unserialized),
+      lock file **unopenable** (proceed unserialized, but name the file and point
+      at ownership/permissions on the parent — that tree is written by the host
+      uid, by root in the entrypoint and by the agent user), and **timeout**
+      (exit 5). Tested: the no-`flock` case via a `PATH` with no `flock` on it,
+      the unopenable case via a read-only `.rosdep/` (skipped when running as
+      root), and the timeout case against a real lock holder. `038d160`
+- [x] (suggestion) The `FORCE` idiom was unguarded — a real file named `FORCE`
+      makes the target up to date, which silently switches off the
+      add/rename/delete detection `$(STAMP)/rosdep-local.list` exists for. It
+      stays out of `.PHONY` (those become `/make_*` slash commands), so the
+      Makefile now `$(error)`s at **parse** time — the guard has to be parse-time,
+      since the shadowed rule's own recipe is exactly what stops running — naming
+      the file, the directory and what it shadows. Tested in the Makefile sandbox:
+      a stray `FORCE` stops `make`, the message names it, and `make` parses again
+      once it is removed — `Makefile:236-250`. `ee95be4`
+
+### Plan sync
+`plan.md` updated inline in `ba981e4`: the round-2 swap bullet gained the three
+round-3 refinements (atomic migration, the three-way lock outcome, the `FORCE`
+guard), the hosted-CI accepted-gap paragraph carries the ADR-0018 correction,
+and Files to Change gained five round-4 rows.
+
+### Verification
+| What | Result |
+|---|---|
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` | ✅ **123 passed, 0 failed** (was 103; +20 for the migration race, the fallback, the three lock outcomes and the `FORCE` guard) |
+| `make test-scripts` | ✅ all 20 shell suites + 220 pytest passed |
+| `make validate` | `validate_workspace.py` exits 3 (no `configs/manifest` in a workspace worktree — the documented, pre-existing state there); layer-sourcing guard PASSED (checks 1–4); `rosdep-local: no rosdep.yaml files found` |
+| Race guard against the **pre-fix** publish block | 12/12 rounds torn (~180 samples each) — the guard is a real regression detector, not a tautology |
+| Race guard against the fix | 0/12 torn, 4 consecutive runs — not flaky |
+| Smoke run against the real workspace root (`out_dir` in scratch, pre-seeded as a REAL directory) | ✅ migrated to the symlink form, 2 system lists + local list, no aside left behind, exit 0 |
+| pre-commit | ✅ on every commit (shellcheck included); never `--no-verify`. Nothing pushed. |
+
+### Still owed (carried forward)
+- The agent image must be rebuilt after merge (`make agent-build`) — earlier
+  rounds changed `agent-entrypoint.sh`, and the startup scripts bake from the
+  MAIN checkout. This round did not touch it.
+- The Dockerfile bake itself was never executed (no Docker build in this
+  dispatch); the staging half is covered by tests.
+- `rosdep install` was never run (needs sudo).
+- `renameat2(RENAME_EXCHANGE)` was exercised on this host (ext4, glibc 2.35);
+  the fallback branch is exercised by the test hook, not by a kernel that
+  actually lacks the call.
