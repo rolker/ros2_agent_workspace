@@ -337,3 +337,32 @@ None — every finding was actioned.
 - The Dockerfile bake itself was not executed (no Docker build in this
   dispatch); the staging half is covered by tests.
 - `rosdep install` was never run (needs sudo).
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 11:38 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-654 at `e2de837`
+**Mode**: pre-push
+**Depth**: Deep (reason: 2226 added / 24 files, governance files, CI + container + root-install paths)
+**Must-fix**: 4 | **Suggestions**: 7
+**Round**: 2 | **Ship**: continue — must-fix is flat at 4, and two are not mechanical: whether hosted CI gets the shape gate or an explicitly-accepted gap is a trust-boundary decision, and the unserialized rebuild of the host-shared `.rosdep/sources.list.d` is a design fix (lock + swap), not a one-line edit
+
+**Specialists**: Static Analysis, Governance, Plan Drift, Claude Adversarial Lens A + Lens B (Copilot and Local Adversarial off by default). Static analysis clean: shellcheck via pre-commit on all changed shell files, yamllint clean on the touched lines of `ci_workflow.yml`, pyflakes/flake8/py_compile clean on the embedded validator python, `make -n validate` parses. Tests: `test_rosdep_local_sources.sh` 81/81, `test_ci_local.sh` 91/91, `test_make_validate.sh` 7/7, `test_agent_image_build_paths.sh` 7/7; pre-commit clean on changed files. hadolint unavailable, so the Dockerfile was eye-reviewed only.
+
+**Round-1 closure**: all 9 round-1 findings verified closed against the code, with real tests behind the three load-bearing ones (Makefile exit-3 branch, the entrypoint's two-cache `setpriv` refresh, the `<layer_ws>__<repo>.yaml` staging rename). Two round-1 findings recur in new form rather than reopening: the shape gate's own rationale now applies to a path this round added (finding 1), and the plan sync fixed the ADR-0018 row but left three other statements stale (finding 4).
+
+### Findings
+- [ ] (must-fix) Hosted CI is the one consumer that feeds an unvalidated `rosdep.yaml` to a root-level `rosdep install` — no shape gate — while the policy note claims every such path runs the gate first and names only three machines, though its own consumer table lists hosted CI as a fourth; gate it inline or record it as an accepted residual gap and fix the overclaiming language — `.agent/templates/ci_workflow.yml:48-63`, `.agent/knowledge/dependency_policy.md:78,108-114,163-186`, `.claude/skills/onboard-project/SKILL.md:181` (cross-confirmed: Governance + Lens A + Lens B)
+- [ ] (must-fix) ADR-0018 and plan.md say the ci-local attestation note carries a `rosdep-local: src/<repo>/rosdep.yaml via ROSDEP_SOURCE_PATH` line; the code emits it only in the `--dry-run` report and `NOTE_EXTRA` appends only `upstream-repo:`/`rosdep-skip-keys:`. The ADR's own rationale argues for adding it to the note; no test asserts it either way — `.agent/scripts/ci_local.sh:322,514-518`, `docs/decisions/0018-local-first-ci-verification.md:124`, `.agent/work-plans/issue-654/plan.md:299`, `.agent/scripts/tests/test_ci_local.sh:333`
+- [ ] (must-fix) The generated sources dir is rebuilt with `rm -rf` + re-copy and nothing serializes it, yet it is host-shared: `setup.bash` exports it as `ROSDEP_SOURCE_PATH` for every shell and two worktrees' `make build` both regenerate it. A reader in that window gets no rosdep sources at all. Precedent for the fix: `docker_run_agent.sh:471-476`'s bounded `flock` (a temp-dir build plus swap closes the reader window too) — `.agent/scripts/rosdep_local_sources.sh:89-91`
+- [ ] (must-fix) Plan/code drift, in statements the round-1 fixes made stale: staging key still documented as `<stage_dir>/rosdep-local/<repo>.yaml` (code: `<layer_ws>__<repo>.yaml`); entrypoint still documented as "one best-effort `rosdep update`" (code: two, root + `ros`); "Stale docs: None" though this round corrected the stale `make validate` lines — `.agent/work-plans/issue-654/plan.md:145,170-172,312`
+- [ ] (suggestion) Deleting a `rosdep.yaml` — the documented end of a local key's lifecycle — never invalidates `$(STAMP)/rosdep-local.done` (the `$(wildcard)` prerequisite only shrinks), so the generated list keeps a `yaml file://…` line for a file that no longer exists and nothing regenerates it — `Makefile:234`, `.agent/knowledge/dependency_policy.md:200-203`
+- [ ] (suggestion) The launch-time refresh guard fires on the image's own baked `30-workspace-local.list` when the mounted workspace never generated one, so every launch pays two extra `rosdep update`s and announces workspace-local sources that are actually the image's — `.devcontainer/agent/agent-entrypoint.sh:113-115`
+- [ ] (suggestion) `workspace_root` is never canonicalized, so a relative argument yields a relative `file://` URI in the generated list; every current caller happens to pass an absolute path, and nothing states the requirement — `.agent/scripts/rosdep_local_sources.sh:68-69`, `.agent/scripts/stage_rosdep_manifests.sh`
+- [ ] (suggestion) One unparseable `rosdep.yaml` discards the key report for every other file, so legitimate stale/unmarked keys elsewhere go unreported until the broken file is fixed — `.agent/scripts/rosdep_local_staleness_check.sh:150`
+- [ ] (suggestion) `ci_local.sh`'s Script Reference row was not updated for the `+rosdep-local` token and the `rosdep.yaml` overlay, though the script gained both — `AGENTS.md:582`
+- [ ] (suggestion) Header comment still says "`validate` is two commands" in the same file whose new point 3 describes a third — `.agent/scripts/tests/test_make_validate.sh:4`
+- [ ] (suggestion) "See also" omits `rosdep_yaml_validate.sh`, the gate the note devotes a section to — `.agent/knowledge/dependency_policy.md:216-221`
