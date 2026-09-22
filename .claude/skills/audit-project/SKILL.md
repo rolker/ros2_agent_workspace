@@ -226,11 +226,20 @@ If `.agents/README.md` exists, check it against the template
 - Do listed file paths actually exist in the repo?
 - Does the package inventory match actual `package.xml` files?
 
-**Coverage line**: `agent guide: checked` when the file exists and all
-four questions were answered; `agent guide: absent` when there is no
-`.agents/README.md` (nothing to examine — the absence is the § 2 finding,
-not a coverage gap); `agent guide: 0 of 1 — <reason>` when it exists but
-could not be read.
+**Coverage line** — three word-forms rather than a count, because the set
+this section enumerates is a single file. They are coverage values like any
+other, and `janitor-sweep` § 5's gate reads them as such
+([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)):
+
+- `agent guide: checked` — the file exists and all four questions above were
+  answered. This is the section's **full-coverage** form, the counterpart of
+  the other sections' `all N`.
+- `agent guide: 0 of 1 — <reason>` — the file exists but could not be read.
+  This is the section's **partial** form, the counterpart of `N-1 of N —
+  <item>: <reason>`; it is what makes an incomplete pass here visible.
+- `agent guide: absent` — there is no `.agents/README.md`. Nothing exists to
+  examine, so this is neither full nor partial coverage: the absence is the
+  § 2 finding, not a coverage gap.
 
 ### 4. Check package metadata
 

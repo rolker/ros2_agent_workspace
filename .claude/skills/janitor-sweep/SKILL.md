@@ -707,7 +707,7 @@ top would be redundant, not because diffing was skipped.
   enumerates a set it discovered — but that does not make its coverage always
   `N of N`, and the scope was briefly written as if it did. Its own lines
   admit `0 of 1 — <reason>` (an agent guide that exists but could not be
-  read), `N-1 of N — <item>: <reason>` (an item that could not be read),
+  read — § 3's partial form), `N-1 of N — <item>: <reason>` (an item that could not be read),
   `2 of 3 — layer: SKIPPED (no layer checkout)` (clone mode), `0 of 4 —
   SKIPPED(<reason>)` (the planning-document probe), and `N of N packages —
   run: M of N` (a partial `colcon test` pass). A repo audited in `layer` mode
@@ -715,12 +715,34 @@ top would be redundant, not because diffing was skipped.
   resolving its prior finding would be precisely the "not looked at reads as
   fixed" failure this issue closes, in the scope where it is likeliest to
   happen, since checkout mode changes with the host and not with the code.
-  - Section fully covered this run (`all N`, `X of Y` with `X == Y`, or
-    `N of N packages` with no `— run: M of N` shortfall bearing on the
-    finding) and the prior finding is absent → **`[Resolved]`**.
+
+  **Section 3's two word-form tokens are coverage values like any other**
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+  `audit-project` § 3 reports `agent guide: checked` / `absent` /
+  `0 of 1 — <reason>` rather than a count, because the set it enumerates is a
+  single file:
+  - **`checked`** is § 3's **full-coverage** form — the guide exists and all
+    four of its questions were answered. It satisfies the full-coverage
+    bullet below exactly as `all N` does. Read only against the numeric
+    forms it matches none of them, and a § 3-sourced prior finding could
+    then never resolve.
+  - **`0 of 1 — <reason>`** is § 3's **partial** form — the guide exists but
+    could not be read. It is the partial bullet's case, and it is the form
+    that makes an incomplete § 3 pass visible.
+  - **`absent`** is neither: no item exists to carry a finding about. A prior
+    finding about the *content* of a guide that is now absent is
+    `[Resolved]` only when this run reports § 2's "`.agents/README.md`
+    missing" finding — the audit looked, and the guide's absence is what it
+    found, so the content finding is moot. Without that § 2 finding present
+    this run, nothing was established either way and the prior finding is
+    `[Not re-examined]`.
+  - Section fully covered this run (`all N`, `checked`, `X of Y` with
+    `X == Y`, or `N of N packages` with no `— run: M of N` shortfall bearing
+    on the finding) and the prior finding is absent → **`[Resolved]`**.
   - Section partially covered (`0 of 1`, `N-1 of N — <item>: <reason>`,
     `2 of 3 — layer: SKIPPED`, or `— run: M of N` where the finding came from
-    the test run), reported `0 of Y` / `SKIPPED`, or carrying no coverage row
+    the test run), reported `0 of Y` / `SKIPPED`, reported `absent` without
+    the § 2 finding that establishes it, or carrying no coverage row
     at all, and the prior finding is absent → **`[Not re-examined]`**. The
     prior finding is carried forward verbatim with that tag; nothing about it
     is known to have changed.
