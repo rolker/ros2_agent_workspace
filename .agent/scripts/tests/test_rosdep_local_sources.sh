@@ -96,6 +96,75 @@ echo "stale" > "$OUT_DIR/99-stale.list"
 check "a real dir migrates to a link"  test -L "$OUT_DIR"
 check "the stale list is gone"         bash -c "! [ -f '$OUT_DIR/99-stale.list' ]"
 
+echo "=== rosdep_local_sources.sh: the migration never unpublishes the path ==="
+# The migration used to `rm -rf` the pre-existing REAL directory and only THEN
+# rename the symlink in, so the published path was absent for as long as
+# removing a whole directory tree takes. setup.bash's `[ -d ]` gate and rosdep
+# itself both read that ENOENT as "no workspace sources at all".
+#
+# Sensitivity matters here: a pre-push review reproduced the gap at only
+# 40/2000 reader samples against a 4-file directory. This guard widens the
+# window the OLD code would open (the stale directory carries MIG_FILLERS extra
+# files, so its removal is a real tree walk) and repeats the migration
+# MIG_ROUNDS times, each against a spin-polling reader — tens of thousands of
+# samples per round. The fixed code swaps the old directory and the new symlink
+# atomically (renameat2 RENAME_EXCHANGE) and deletes the old content only
+# afterwards; the rename-aside fallback below is still detected by this same
+# guard in every round, which is the evidence that it is sensitive enough.
+MIG_FILLERS=500
+MIG_ROUNDS=12
+MIGWS="$TMP/mig_ws"; mkdir -p "$MIGWS/layers/main"
+MIG_OUT="$MIGWS/.rosdep/sources.list.d"
+mig_log="$TMP/mig_reader.log"
+mig_done="$TMP/mig.done"
+mig_bad_rounds=0
+mig_round=0
+while [ "$mig_round" -lt "$MIG_ROUNDS" ]; do
+    mig_round=$((mig_round + 1))
+    # A pre-swap generation: a REAL directory at the published path, fat enough
+    # that removing it is not instantaneous.
+    rm -rf "$MIG_OUT" "$MIGWS/.rosdep/.sources.list.d.slots"
+    mkdir -p "$MIG_OUT"
+    cp "$SYS"/*.list "$MIG_OUT/"
+    : > "$MIG_OUT/30-workspace-local.list"
+    i=0
+    while [ "$i" -lt "$MIG_FILLERS" ]; do : > "$MIG_OUT/filler-$i.list"; i=$((i + 1)); done
+    : > "$mig_log"; rm -f "$mig_done"
+    (
+        while [ ! -e "$mig_done" ]; do
+            if [ ! -d "$MIG_OUT" ]; then
+                echo "MISSING" >> "$mig_log"
+            elif [ ! -f "$MIG_OUT/20-default.list" ] || [ ! -f "$MIG_OUT/10-local.list" ]; then
+                echo "INCOMPLETE" >> "$mig_log"
+            fi
+        done
+    ) &
+    mig_reader=$!
+    "$AGG" "$MIGWS" >/dev/null 2>&1
+    : > "$mig_done"
+    wait "$mig_reader" 2>/dev/null
+    [ -s "$mig_log" ] && mig_bad_rounds=$((mig_bad_rounds + 1))
+done
+rm -f "$mig_done"
+check "no reader ever lost the published dir" eq "$mig_bad_rounds" 0
+check "the migrated path is a symlink"     test -L "$MIG_OUT"
+check "it resolves to a complete dir"      bash -c "[ -f '$MIG_OUT/20-default.list' ] && [ -f '$MIG_OUT/10-local.list' ] && [ -f '$MIG_OUT/30-workspace-local.list' ]"
+check "the old generation is gone"         bash -c "! [ -e '$MIG_OUT/filler-0.list' ]"
+check "no aside copy is left behind"       bash -c "! ls '$MIGWS/.rosdep/'.sources.list.d.aside.* >/dev/null 2>&1"
+
+# The default path swaps the directory and the new symlink atomically
+# (renameat2 RENAME_EXCHANGE). Where that call is unsupported the script falls
+# back to rename-aside-then-publish, whose gap is one rename(2) — small, but
+# the guard above still catches it in every round, which is what shows the
+# guard is sensitive enough to have caught the reviewed defect. The fallback is
+# exercised here for CORRECTNESS only.
+rm -rf "$MIG_OUT" "$MIGWS/.rosdep/.sources.list.d.slots"
+mkdir -p "$MIG_OUT"; echo "stale" > "$MIG_OUT/99-stale.list"
+ROSDEP_SOURCES_FORCE_FALLBACK=1 "$AGG" "$MIGWS" >/dev/null 2>&1
+check "the fallback migration lands too"   test -L "$MIG_OUT"
+check "it drops the old generation"        bash -c "! [ -f '$MIG_OUT/99-stale.list' ]"
+check "and publishes a complete dir"       bash -c "[ -f '$MIG_OUT/20-default.list' ] && [ -f '$MIG_OUT/30-workspace-local.list' ]"
+
 echo "=== rosdep_local_sources.sh: a reader never sees an incomplete dir ==="
 # Concurrent regenerations + a reader loop: at no instant may the published
 # path be missing, be a non-directory, or be missing one of the lists.

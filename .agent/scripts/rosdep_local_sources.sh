@@ -44,6 +44,15 @@
 # docker_run_agent.sh's precedent; where flock is unavailable the run proceeds
 # unserialized and says so — the swap still keeps readers consistent.
 #
+# The FIRST run over a pre-existing REAL directory at <out_dir> (an older
+# generation of this script) has to migrate it, and a symlink cannot be renamed
+# over a directory. That path swaps the two atomically with
+# renameat2(RENAME_EXCHANGE) and deletes the old content afterwards; where that
+# call is unsupported it falls back to rename-aside-then-publish in a single
+# process, whose residual gap is one rename(2) — never the `rm -rf` of a whole
+# tree that it replaced. Steady state (symlink over symlink) is a single
+# rename and is never absent.
+#
 # Callers: bootstrap.sh (step 4), the Makefile's $(STAMP)/rosdep-local.done
 # stamp, and anyone regenerating by hand. Consumers read it via
 # ROSDEP_SOURCE_PATH, which setup.bash exports when the directory exists.
@@ -190,16 +199,71 @@ fi
 
 # ---- publish: atomic symlink swap -------------------------------------------
 # rename(2) over an existing symlink is atomic, so <out_dir> never transiently
-# vanishes or appears half-built. A pre-existing real directory at <out_dir>
-# (an older generation of this script, or a hand-made one) cannot be renamed
-# over, so it is removed first — a one-time migration, inside the lock.
+# vanishes or appears half-built. The one-time migration of a pre-existing REAL
+# directory is handled below, inside the lock.
 TMP_LINK="$OUT_PARENT/.$OUT_BASE.link.$$"
 rm -f "$TMP_LINK"
 ln -s "$SLOT_ROOT_NAME/$slot" "$TMP_LINK"
 if [ -e "$OUT_DIR" ] && [ ! -L "$OUT_DIR" ]; then
-    rm -rf "$OUT_DIR"
+    # MIGRATION: a real directory (an older generation of this script, or a
+    # hand-made one) sits at the published path. A symlink cannot be renamed
+    # over a directory, so the two have to trade places. It is NOT `rm -rf`'d
+    # first: that left the published path absent for as long as removing a
+    # whole directory tree takes, and setup.bash's `[ -d ]` gate and rosdep
+    # itself both read that ENOENT as "no workspace sources at all".
+    #
+    # renameat2(RENAME_EXCHANGE) swaps the two paths in one atomic step, so a
+    # reader sees either the old directory or the new symlink and never a gap.
+    # Where the kernel, the C library or the filesystem does not support it,
+    # the fallback renames the old directory ASIDE and publishes immediately
+    # after — two renames in ONE process, so the residual gap is a single
+    # rename(2) rather than the fork+exec of a second `mv`. Either way the old
+    # content is deleted only AFTER the new symlink is published.
+    ASIDE="$OUT_PARENT/.$OUT_BASE.aside.$$"
+    rm -rf "$ASIDE"
+    if command -v python3 >/dev/null 2>&1; then
+        ROSDEP_SOURCES_FORCE_FALLBACK="${ROSDEP_SOURCES_FORCE_FALLBACK:-0}" \
+        python3 - "$TMP_LINK" "$OUT_DIR" "$ASIDE" <<'PY'
+import ctypes, os, sys
+
+new_link, published, aside = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def exchange():
+    """Atomically swap `new_link` and `published` (renameat2 RENAME_EXCHANGE).
+
+    Returns True on success. Every failure is a fallback, never a crash: the
+    call is unavailable on pre-2.28 glibc, on pre-3.15 kernels and on some
+    filesystems, and each of those reports it differently.
+    """
+    if os.environ.get("ROSDEP_SOURCES_FORCE_FALLBACK") == "1":
+        return False
+    try:
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        renameat2 = libc.renameat2
+    except (OSError, AttributeError):
+        return False
+    AT_FDCWD, RENAME_EXCHANGE = -100, 2
+    rc = renameat2(AT_FDCWD, os.fsencode(new_link),
+                   AT_FDCWD, os.fsencode(published), RENAME_EXCHANGE)
+    return rc == 0
+
+if exchange():
+    # `new_link` now holds the old real directory; the caller removes it.
+    os.rename(new_link, aside)
+else:
+    os.rename(published, aside)
+    os.rename(new_link, published)
+PY
+    else
+        echo "Warning: python3 not found — migrating with two mv(1) calls;" \
+             "$OUT_DIR is briefly absent." >&2
+        mv -T "$OUT_DIR" "$ASIDE"
+        mv -T "$TMP_LINK" "$OUT_DIR"
+    fi
+    rm -rf "$ASIDE"
+else
+    mv -T "$TMP_LINK" "$OUT_DIR"
 fi
-mv -T "$TMP_LINK" "$OUT_DIR"
 
 echo "Aggregated $yaml_count project rosdep.yaml file(s) into $OUT_DIR" \
      "(over ${#system_lists[@]} system source list(s))"
