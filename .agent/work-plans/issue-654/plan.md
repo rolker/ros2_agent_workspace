@@ -52,9 +52,10 @@ generic, with no repo names baked into workspace scripts.
      declaration format) and writes one `yaml file://<abs-path>` line per
      match into `<out_dir>/30-workspace-local.list`, sorted for
      determinism.
-   - Prints the count of `rosdep.yaml` files aggregated (stdout), for the
-     Makefile stamp / staleness check to key off, mirroring
-     `stage_rosdep_manifests.sh`'s "Staged N manifest(s)" print.
+   - Prints the count of `rosdep.yaml` files aggregated (stdout) for the
+     operator and the build log, mirroring
+     `stage_rosdep_manifests.sh`'s "Staged N manifest(s)" print. Callers
+     branch on the **exit code**, not on this line.
    - Exits 0 even with zero `rosdep.yaml` files found (empty local list is
      a valid, common state) — same "degrade gracefully" posture as
      `stage_rosdep_manifests.sh`.
@@ -69,9 +70,31 @@ generic, with no repo names baked into workspace scripts.
      `stage_rosdep_manifests.sh` (not staged, exit 4), `ci_local.sh` (the
      run is refused) and `rosdep_local_staleness_check.sh` (reported as a
      finding). All fail closed when the validator cannot run at all.
+   - **Added after the round-2 review**: the generated directory is
+     never rebuilt **in place**. It is host-shared — `setup.bash` exports
+     it as `ROSDEP_SOURCE_PATH` for every shell, and two worktrees'
+     `make build` both regenerate it — so an in-place `rm -rf` + re-copy
+     handed a concurrent reader a directory with no rosdep sources at
+     all. The new content is built in a sibling slot directory
+     (`.sources.list.d.slots/{a,b}`, alternating) and published by an
+     **atomic symlink swap**, under a bounded `flock` (300s,
+     `ROSDEP_SOURCES_LOCK_TIMEOUT`, following
+     `docker_run_agent.sh`'s precedent; unserialized with a notice where
+     `flock` is absent). `ROSDEP_SOURCE_PATH` therefore always resolves
+     to a **complete** directory — the old generation or the new one,
+     never a half-copied or missing one. A pre-existing real directory
+     at the published path migrates to the symlink form on the next run.
+   - **Added after the round-2 review**: `<workspace_root>` is
+     canonicalized before anything derives from it, in both
+     `rosdep_local_sources.sh` and `stage_rosdep_manifests.sh`. The
+     generated list holds `yaml file://<path>` URIs, and a URI built
+     from a relative path is not resolvable by whatever later reads the
+     list. Every caller happened to pass an absolute path; nothing made
+     it a requirement.
    - `.rosdep/` added to the root `.gitignore` (generated, workspace-root
      only — mirrors `.devcontainer/agent/.rosdep-manifests/`'s existing
-     gitignore entry for the sibling mechanism).
+     gitignore entry for the sibling mechanism). The slot directories and
+     the lock file live under it too.
 
 2. **`setup.bash` export** — after the existing layer-sourcing block, add:
    resolve the workspace root the same way the existing `_VENV_ROOT`
@@ -110,6 +133,20 @@ generic, with no repo names baked into workspace scripts.
    or a repo with one gets checked out for the first time). Recipe: run
    `rosdep_local_sources.sh $(MAIN_ROOT)` then
    `ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update`.
+   **Amended in round 1**: the recipe branches on the generator's exit
+   code. Exit 3 (rosdep not initialized) is the normal state of a clone
+   that has not run `sudo rosdep init` — it prints a note, skips the
+   cache refresh and deliberately leaves the stamp **untouched** so the
+   next `make build` retries. Any other non-zero status — notably exit 4,
+   a `rosdep.yaml` rejected by the shape gate — fails the build.
+   **Amended after the round-2 review**: the wildcard alone cannot see a
+   *deleted* `rosdep.yaml` — a shrinking prerequisite list never makes a
+   stamp stale — and deletion is the documented end of a local key's
+   lifecycle, so the generated list kept a `yaml file://…` line for a
+   file that no longer existed. The stamp therefore also depends on
+   `$(STAMP)/rosdep-local.list`, a file holding the current SET of
+   `rosdep.yaml` paths, rewritten (and so made newer) only when that set
+   actually changes.
    Add `$(STAMP)/rosdep-local.done` to `_build-layers`'s prerequisites
    (alongside `$(LAYER_STAMPS)`) so `make build` keeps the local source
    list current — this is the "make build's setup chain regenerate it"
@@ -131,6 +168,11 @@ generic, with no repo names baked into workspace scripts.
      install` invocations. No dependency on the aggregation script inside
      the container — a single repo's `rosdep.yaml`, not the whole
      workspace glob, since `ci_local.sh` tests one repo in isolation.
+     A run that used one records a `+rosdep-local` steps token **and**
+     (added after the round-2 review — the ADR said so, the code emitted
+     it only in the dry-run report) a
+     `rosdep-local: src/<repo>/rosdep.yaml via ROSDEP_SOURCE_PATH` line
+     in the attestation note, via `NOTE_EXTRA`.
    - Agent container image (`docker_run_agent.sh --build` /
      `stage_rosdep_manifests.sh` / `.devcontainer/agent/Dockerfile` /
      `agent-entrypoint.sh`) — **wire it** (Plan Review finding 1). The
@@ -142,7 +184,11 @@ generic, with no repo names baked into workspace scripts.
      pieces:
      - `stage_rosdep_manifests.sh` additionally stages every
        `layers/main/*_ws/src/*/rosdep.yaml` into
-       `<stage_dir>/rosdep-local/<repo>.yaml` — a sibling directory
+       `<stage_dir>/rosdep-local/<layer_ws>__<repo>.yaml` — keyed by
+       layer **and** repo (amended in round 1: repo directory names are
+       unique only within one layer's `src/`, and a basename key
+       silently overwrote one of two same-named repos) — a sibling
+       directory
        inside the same staged tree the Dockerfile already `COPY`s, so no
        second build-context path, no second lock and no second cleanup
        trap in `docker_run_agent.sh`. It holds no `package.xml`, so
@@ -167,9 +213,18 @@ generic, with no repo names baked into workspace scripts.
        same absolute path — `-v "$ROOT_DIR:$ROOT_DIR"` — so the generated
        `file://` URLs resolve inside the container). rosdep's cache is
        keyed by source URL and the baked cache was built from
-       `/opt/rosdep-local/…` URLs, so the entrypoint runs one
-       best-effort `rosdep update` when — and only when — a non-empty
-       `30-workspace-local.list` exists at that path.
+       `/opt/rosdep-local/…` URLs, so the entrypoint runs **two**
+       best-effort `rosdep update`s — rosdep's cache is per user, and
+       the agent runs as `$TARGET_USER`, not as the root the entrypoint
+       itself is, so root's cache alone would leave an in-session
+       `rosdep resolve` of a local key failing (amended in round 1).
+       Both run only when the list at that path is non-empty,
+       non-comment **and** not byte-identical to the image's own baked
+       `30-workspace-local.list` (amended in round 2: a workspace that
+       generated no list leaves `ROSDEP_SOURCE_PATH` at the baked dir,
+       whose cache is already correct — the unguarded test paid two
+       refreshes per launch and announced the image's sources as the
+       workspace's).
      - **#604 rebuild caveat**: `agent-entrypoint.sh` and
        `fix-volume-ownership.sh` are baked from the MAIN checkout and the
        launcher only builds when the image is *missing*. The agent image
@@ -187,6 +242,19 @@ generic, with no repo names baked into workspace scripts.
      change here (each project repo owns its `.github/workflows/`), but
      the note is the durable reference `rosdep_local_sources.sh`'s header
      and future project-repo CI templates point to.
+     **Recorded after the round-2 review**: this hosted-CI step is the
+     one consumer that does **not** run the shape gate, and that is an
+     **accepted residual gap**, not an oversight. The step must stay
+     self-contained (a project repo's workflow never checks this
+     workspace out), so gating there would mean a second copy of the
+     shape grammar in the template — and two copies of a rule drift. The
+     gate protects *persistent* machines; hosted CI is a throwaway
+     runner container, so an out-of-shape rule there reaches nothing
+     else, and the same file is still gated by `ci_local.sh`, which on a
+     project repo is the ADR-0018 merge verification. The knowledge note
+     says this in its own subsection and the template step carries a
+     one-line comment pointing at it; if hosted CI ever gains a
+     persistent cache or a self-hosted runner, the reasoning expires.
 
 6. **Enforcement check** — new
    `.agent/scripts/rosdep_local_staleness_check.sh` (execute-only),
@@ -220,7 +288,10 @@ generic, with no repo names baked into workspace scripts.
    marker; **2** usage error; **3** SKIPPED (offline / no rosdep). The
    `validate` recipe reports 3 as a printed notice and does **not** fail
    on it, exactly as the workspace already treats offline rosdep state
-   elsewhere; only 1 and 2 fail.
+   elsewhere; only 1 and 2 fail. **Amended after the round-2 review**:
+   one unreadable or unparseable `rosdep.yaml` no longer discards the
+   key report for every other file — it is named, skipped, counted as a
+   finding, and the remaining files are still checked.
 
 7. **`.agent/knowledge/dependency_policy.md`** — new knowledge doc: the
    rule as tested here (ROS packages depend only on what rosdep resolves;
@@ -277,6 +348,10 @@ generic, with no repo names baked into workspace scripts.
 | `docs/decisions/0018-local-first-ci-verification.md` | Format-extension paragraph for the `+rosdep-local` steps token (round-2 review response) |
 | `.agent/templates/ci_workflow.yml`, `.claude/skills/onboard-project/SKILL.md` | Cascade the hosted-CI recipe so a project repo picks it up (round-2 review response) |
 | `README.md` | `make validate` one-line description (round-2 review response) |
+| `.agent/scripts/rosdep_local_sources.sh` (round 3) | Lock + slot build + atomic symlink swap, canonicalized `workspace_root` (round-2 review response) |
+| `.agent/scripts/rosdep_local_staleness_check.sh` (round 3) | Partial-tolerant parse: a broken file is a finding, not a report-killer (round-2 review response) |
+| `Makefile` (round 3) | `$(STAMP)/rosdep-local.list` so a **deleted** `rosdep.yaml` invalidates the stamp (round-2 review response) |
+| `.agent/scripts/ci_local.sh` (round 3) | `rosdep-local:` line written into the attestation note via `NOTE_EXTRA` (round-2 review response) |
 
 ## Principles Self-Check
 
@@ -309,11 +384,16 @@ generic, with no repo names baked into workspace scripts.
 
 ## Documentation & Instruction Impact
 
-- **Stale docs** (must land in this PR): None — this is entirely new
-  plumbing; `AGENTS.md`'s Script Reference table gets new rows (additive,
-  not a correction of stale content) and `stage_rosdep_manifests.sh`'s
-  header comment gets a clarifying note about the local-key interaction
-  (step 5).
+- **Stale docs** (must land in this PR): the plan opened by claiming
+  there were none. Implementation found three, and all three landed
+  here: `README.md` and `AGENTS.md` both described `make validate` as
+  *two* checks when this PR makes it three (as did
+  `test_make_validate.sh`'s own header comment); `AGENTS.md`'s
+  `validate_workspace.py` and `ci_local.sh` rows predated the wiring
+  this PR adds. The rest of the `AGENTS.md` Script Reference work is
+  additive (new rows for the three new scripts, an extended
+  `stage_rosdep_manifests.sh` row), and `stage_rosdep_manifests.sh`'s
+  header comment gains a note about the local-key interaction (step 5).
 - **Agent-instruction candidates** (proposals only): the "Ubuntu doesn't
   ship it at all → venv, deferred" open case from the knowledge note
   could eventually warrant its own ADR once a real library forces the
