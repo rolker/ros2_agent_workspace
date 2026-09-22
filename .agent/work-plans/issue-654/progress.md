@@ -56,3 +56,17 @@ issue: 654
 **Recommendations**
 - Add the AGENTS.md script-table entry and the Makefile wiring explicitly to the plan-task scope (see Actions).
 - During plan-task, confirm the agent-container-image bake path (item 3) either reuses `stage_rosdep_manifests.sh`'s existing manifest-staging pattern or explains why runtime-only `ROSDEP_SOURCE_PATH` resolution is sufficient for the container case.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-22 10:35 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Plan**: `.agent/work-plans/issue-654/plan.md` at `b3f39a6`
+**Branch**: feature/issue-654 at `b3f39a6`
+**Phases**: single
+
+### Open questions
+- [ ] Confirm no second default rosdep sources file exists beyond `20-default.list` before hard-coding the filename in `rosdep_local_sources.sh`.
+- [ ] Confirm whether `run_script_tests.sh` auto-discovers new `test_*.sh` files or needs explicit registration.
+- [ ] Staleness check's "upstream PR owed" comment heuristic is advisory/best-effort, not authoritative — call this out explicitly in the knowledge note.
