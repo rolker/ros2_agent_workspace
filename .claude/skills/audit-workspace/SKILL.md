@@ -50,9 +50,20 @@ examined out of what exists. So each of the seven sections below ends with a
   `<kind>: all N`, with N counted from the input — `all` with an N smaller
   than the directory holds is itself a finding, which is what makes an
   incomplete pass visible rather than assumed.
-- **A section that could not run** (an input missing or unreadable) reports
-  `<kind>: 0 of Y — SKIPPED(<reason>)`, never `OK`. The coverage line is
-  what proves incompleteness; the narrative alone does not.
+- **A never-sampling section that could not cover everything** reports the
+  shortfall rather than a smaller `all N`: `<kind>: M of N — <item>:
+  <reason>`, naming each item it could not read (a script whose file is
+  unreadable, a template that could not be opened). `all N` means *all of
+  them*, and a consumer resolves prior findings against it
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)) — so a
+  run that reached 57 of 58 scripts must say `57 of 58 — <script>:
+  unreadable`, never `all 57`, which is indistinguishable from a workspace
+  that holds 57 scripts. This is the same partial form `audit-project` uses
+  for its non-sampling sections, so the two audits' coverage lines read
+  alike.
+- **A section that could not run** at all (an input missing or unreadable)
+  reports `<kind>: 0 of Y — SKIPPED(<reason>)`, never `OK`. The coverage line
+  is what proves incompleteness; the narrative alone does not.
 
 This makes coverage *reportable*, not self-verifying: nothing stops a run
 from writing `principles: 10 of 10` without reading all ten. That is the
@@ -168,22 +179,25 @@ printed.
 
 ### Coverage
 
-| Section | Coverage | Items examined (when sampled) |
-|---|---|---|
-| 1. Principles enforcement | X of Y examined | <names, or "—" for a full pass> |
-| 2. ADR accuracy | X of Y examined | <ADR numbers, or "—" for a full pass> |
-| 3. Script references | all N | — |
-| 4. Templates | all N | — |
-| 5. Consequences map | all N | — |
-| 6. Instruction consistency | all 3 | — |
-| 7. Stale worktrees | all N | — |
+| Section | Kind | Coverage | Items examined (when sampled) |
+|---|---|---|---|
+| 1. Principles enforcement | principles | X of Y examined | <names, or "—" for a full pass> |
+| 2. ADR accuracy | ADRs | X of Y examined | <ADR numbers, or "—" for a full pass> |
+| 3. Script references | scripts | all N | — |
+| 4. Templates | templates | all N | — |
+| 5. Consequences map | consequences-map items | all N | — |
+| 6. Instruction consistency | adapters | all 3 | — |
+| 7. Stale worktrees | worktrees | all N | — |
 
-<!-- One row per section, always all seven, in this order — a consumer keys
-     on the section name. A section that could not run keeps its row:
-     `0 of Y — SKIPPED(<reason>)`. The Summary table above says what was
-     FOUND; this table says what was LOOKED AT. They are different claims and
-     a reader needs both: "0 gaps" over "2 of 10 examined" is not a clean
-     bill of health. -->
+<!-- One row per section, always all seven, in this order. A consumer may key
+     on either column: the Section cell is the checklist section, the Kind
+     cell is the `<kind>` token the section's own coverage line uses, so the
+     table and the per-section lines are joinable without a glossary. A
+     section that could not run keeps its row: `0 of Y — SKIPPED(<reason>)`;
+     one that covered all but a few items reports `M of N — <item>: <reason>`
+     (§ Coverage). The Summary table above says what was FOUND; this table
+     says what was LOOKED AT. They are different claims and a reader needs
+     both: "0 gaps" over "2 of 10 examined" is not a clean bill of health. -->
 
 ### Findings
 
