@@ -90,3 +90,124 @@ issue: 654
 - Worktree-aware `ROSDEP_SOURCE_PATH` export (step 2): the plan's "resolve the same way `_VENV_ROOT` does" claim checks out against `setup.bash:130-144` — a concrete, correct pattern (main-root hop for both workspace and layer worktrees, unset after use).
 - Makefile stamp content-change detection (step 4): confirmed `$(STAMP)/layer-%.done`'s existing `$$(wildcard ...)` prerequisite pattern re-runs on file edits (mtime bump) and on newly-appearing files (Makefiles are re-parsed and `$(wildcard)` re-evaluated every invocation) — the analogous claim for `rosdep-local.done` is correct in substance, independent of the `.SECONDEXPANSION` question above.
 - `ci_local.sh`'s `repo_file_exists`/`repo_file_content` helpers (step 5) exist and are already used for `upstream.repos` and `.agents/ci_local_rosdep_skip_keys.txt` — the plan's proposed reuse for `rosdep.yaml` is consistent with the existing pattern.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 11:04 -04:00
+**By**: Claude Opus
+
+**Plan**: `.agent/work-plans/issue-654/plan.md` at `836fd3e` (amended)
+**Branch**: feature/issue-654 at `836fd3e`
+**PR**: PR-less (not pushed — dispatch contract)
+
+### Commits
+
+| SHA | Subject |
+|---|---|
+| `0b99a93` | plan: apply plan-review amendments |
+| `180f4f8` | Add rosdep_local_sources.sh: workspace-owned rosdep source list |
+| `6d336bc` | Export ROSDEP_SOURCE_PATH from setup.bash; generate it in bootstrap.sh |
+| `708a0c3` | Makefile: regenerate the local rosdep source list in the build chain |
+| `9524285` | ci_local: overlay the tested repo's own rosdep.yaml via ROSDEP_SOURCE_PATH |
+| `23b4a4f` | Agent image: bake workspace-local rosdep keys, WARN on every skipped key |
+| `5c94d91` | Add rosdep_local_staleness_check.sh, wired into make validate |
+| `34bc560` | Add test_rosdep_local_sources.sh: 39 checks over the local-key mechanism |
+| `2c7df49` | Document the dependency policy and the two new scripts |
+| `c0ddd25` | docker_run_agent: note the rosdep.yaml staging in the build block |
+| `836fd3e` | plan: sync Files to Change with the implemented diff |
+
+### Plan-review findings: all four applied before implementation
+
+Per the operator's "amend plan, then implement" choice, `0b99a93` applied all
+four findings inline in plan.md; the implementation then followed the amended
+plan.
+
+1. **(must-fix) Container image** — the false "picks up local keys
+   automatically" claim is gone and the path is wired: the staging script
+   stages each repo's `rosdep.yaml` into `<stage_dir>/rosdep-local/`, the
+   Dockerfile builds `/opt/rosdep-sources` from every system `*.list` plus a
+   generated local list and sets `ENV ROSDEP_SOURCE_PATH`, and unresolvable
+   keys now end the build step in a labelled `WARNING` block naming each one
+   and how to fix it. `agent-entrypoint.sh` refreshes the cache once when the
+   bind-mounted workspace carries a non-empty local list (rosdep's cache is
+   keyed by source URL, so the baked cache has no entry for the workspace's
+   `file://` URLs; the workspace is mounted at its host absolute path, so
+   those URLs resolve).
+2. **(must-fix) Staleness probe** — `ROSDEP_SOURCE_PATH` unset, `HOME` on a
+   throwaway dir, its own `rosdep update` run first; a failed update yields
+   SKIPPED for every key and **no** resolution verdict. Exit codes 0/1/2/3 are
+   distinct, and `make validate` prints a 3 and clears it.
+3. **(suggestion) Hosted CI** — the knowledge note carries a concrete,
+   copy-pasteable GitHub Actions step that exports through `$GITHUB_ENV`, so a
+   project repo's existing `rosdep install` step needs no change.
+4. **(suggestion) `.SECONDEXPANSION`** — dropped; the new stamp uses a plain
+   `$(wildcard …)` prerequisite list and is placed **before** the
+   `.SECONDEXPANSION` directive so that stays scoped to the one rule needing it.
+
+### Departures from the plan (synced inline)
+
+- **Aggregation copies every system `*.list`, not just `20-default.list`**, and
+  the uninitialized-rosdep refusal is **exit 3**, not 2. This host carries a
+  `10-local.list` alongside the default; naming one file would silently drop a
+  source the caller already had. Open Question 1 resolved in plan.md.
+- **`bootstrap.sh` anchors via `workspace_root.sh`** rather than deriving the
+  root from `BASH_SOURCE`: bootstrapping from a worktree would otherwise create
+  a second, divergent generated directory there.
+- **`ci_local.sh` gained a `+rosdep-local` steps token** (a steps token only, no
+  new note field). The plan said no attestation change was needed; an
+  environment that resolved a key from a repo-carried source is not the same
+  verified environment as one that did not, so the note should say so.
+- **`test_make_validate.sh` and `test_ci_local.sh` were extended**, which the
+  plan's table did not list. The former had to be: it runs the real recipe
+  against stubs, so a third unstubbed invocation would have failed it.
+- Also touched: `.agent/knowledge/README.md` (index), `docker_run_agent.sh`
+  (comment), and the `validate_workspace.py` AGENTS.md row, which said `make
+  validate` runs two checks.
+
+### Tests run
+
+| What | Result |
+|---|---|
+| `make test-scripts` (worktree, no ROS env) | ✅ 29 shell tests + 220 pytest passed |
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` (new) | ✅ 39 passed, 0 failed |
+| `.agent/scripts/tests/test_ci_local.sh` | ✅ 88 passed (was 83; +5 for the `+rosdep-local` path) |
+| `.agent/scripts/tests/test_make_validate.sh` | ✅ 7 passed (was 4; +3 for the exit-3-is-a-notice split) |
+| `.agent/scripts/tests/test_agent_image_build_paths.sh` | ✅ 7 passed — the single-build-path and one-sha256sum-site invariants still hold |
+| `make validate` (worktree) | `validate_workspace.py` exits 3 (no `configs/manifest` in a workspace worktree — the pre-existing, expected state, pinned by `test_make_validate.sh`); layer-sourcing guard PASSED; `rosdep-local: no rosdep.yaml files found — nothing to check` |
+| `bootstrap.sh --dry-run` | ✅ byte-identical to pre-change output on an already-bootstrapped host |
+| Manual: aggregation, staging, staleness check against temp fixtures | ✅ (all folded into the new test file) |
+| pre-commit | ✅ on every commit; never `--no-verify` |
+
+### Not done / owed
+
+- [ ] **The agent image must be rebuilt after merge** — `make agent-build`. Per
+      #604 the launcher only builds when the image is *missing*, and the startup
+      scripts bake from the MAIN checkout, so this worktree's
+      `agent-entrypoint.sh` change cannot be baked until it lands. Until then
+      the startup-scripts staleness marker warns at every launch, which is the
+      intended signal.
+- [ ] **`rosdep install` was never run** — it needs sudo; the operator runs it.
+      The generated source list and `rosdep update`/`rosdep resolve` against it
+      were verified directly; the install itself was not.
+- [ ] **No `rosdep.yaml` was added to any project repo** — deliberately out of
+      scope here; that is `rolker/unh_marine_autonomy#397`'s job. Every path in
+      this PR is exercised by synthetic fixtures, so nothing waits on #397.
+- [ ] **The Dockerfile bake was not executed** — no image build was run (no
+      Docker build in this dispatch). The staging half is covered by tests; the
+      `RUN` block was reviewed for POSIX-`sh` compatibility (`$(( ))`,
+      `${var:+…}`, no bashisms) but not built. First `make agent-build` after
+      merge is the real check.
+- [ ] Open Question 3 stands by design: the upstream-PR-marker test is an
+      advisory text heuristic, called out as such in the knowledge note, the
+      script header, and the AGENTS.md row.
+
+### Notes for review
+
+- `ROSDEP_SOURCE_PATH` **replaces** `sources.list.d`, it does not add to it.
+  Every generator here copies the system lists in; `setup.bash` exports the
+  variable **only** when the directory exists, because pointing it at a path
+  that was never generated leaves rosdep with no sources at all rather than
+  falling back.
+- rosdep's cache is per-user and keyed by source URL. That is why the probe
+  uses a throwaway `HOME`, why `ci_local.sh` bypasses the baked-cache guard on
+  the local-key path, and why the entrypoint refreshes once.
