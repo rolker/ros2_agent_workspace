@@ -1,6 +1,6 @@
 ---
 name: janitor-sweep
-description: Run the workspace's staleness and drift detectors in one pass, split into a workspace scope and a project scope. Workspace scope publishes a committed docs/health.md via PR; project scope stays report-only to a local file. Neither scope files per-finding issues.
+description: Run the workspace's staleness and drift detectors in one pass, split into a workspace scope and a project scope. Local-first - every run writes a local report; committing docs/health.md via PR is opt-in behind --publish. Neither scope files per-finding issues.
 ---
 
 # Janitor Sweep
@@ -8,7 +8,7 @@ description: Run the workspace's staleness and drift detectors in one pass, spli
 ## Usage
 
 ```
-/janitor-sweep [--repos <a,b,c>]
+/janitor-sweep [--repos <a,b,c>] [--publish]
 ```
 
 - `--repos` overrides the repo rotation for a hand-run (comma-separated repo
@@ -18,6 +18,18 @@ description: Run the workspace's staleness and drift detectors in one pass, spli
   A repo named on `--repos` that those filters exclude is reported as excluded,
   not audited anyway — to audit an excluded repo deliberately, run
   `/audit-project <repo>` directly rather than through the sweep.
+- `--publish` commits `docs/health.md` at the workspace repo root and opens a
+  PR for the workspace scope (§ Publish the workspace scope). **Off by
+  default** — the sweep is local-first: every run writes its local report
+  under `.agent/scratchpad/janitor/` regardless, and the flag gates only the
+  commit-and-PR flow and the workspace scope's diff source (§ Run-over-run
+  diff). Read `$PUBLISH` below as `1` when the flag was passed and empty
+  otherwise; it is the one switch this whole document keys on.
+
+  The flag exists rather than the step being deleted, for two stated uses: a
+  hand run that wants to refresh the committed baseline, and the parked cloud
+  trigger ([#636](https://github.com/rolker/ros2_agent_workspace/issues/636)),
+  which is the step's eventual caller. Parked is not obsolete.
 
 ## Overview
 
@@ -35,11 +47,15 @@ chains them into **one sweep** and splits the result into two scopes:
   chunk) + check 3 (`issue-triage`, which already scans only overlay/project
   repos, never the workspace repo).
 
-**Workspace scope publishes: it commits a `docs/health.md` at the repo root
-and opens a PR** (§ Publish the workspace scope). **Project scope stays
-report-only** — its findings land only in the local sweep report under
-`.agent/scratchpad/janitor/`, pending the operator's decision on the
-project-repo health-rollup shape (per-repo PR / one document per project /
+**The sweep is local-first.** Every run's durable output is the local
+report(s) under `.agent/scratchpad/janitor/` — written whether or not the
+run publishes, whether or not it has network or GitHub auth. **Committing
+`docs/health.md` at the repo root and opening a PR is opt-in, behind
+`--publish`** (§ Publish the workspace scope); the committed file on `main`
+is a baseline a non-publishing run neither rewrites nor contradicts.
+**Project scope is never published by this skill** — its findings land only
+in the local report, pending the operator's decision on the project-repo
+health-rollup shape (per-repo PR / one document per project /
 health-follows-roadmap — not yet made). Neither scope files per-finding
 issues or opens issues on its own initiative; the operator triages findings
 into work. See **Deferred: the project-scope rollup and the trigger**.
@@ -78,8 +94,12 @@ in which that write failed
 and this is that state. It is never "the sweep ran clean".
 
 **The workspace-scope commit-and-PR (§ Publish the workspace scope) is a
-sixth, separate state**, on top of the five above: the local report can land
-even when the `docs/health.md` publish fails (a worktree that could not be
+sixth, separate state** — on runs that ask for it. It happens only under
+`--publish`; a default run records
+`## Publish outcome: not requested (--publish off)` and has no sixth state to
+report, which is itself the state and is never rendered as a success or a
+failure. Where the step does run, it sits on top of the five above: the local
+report can land even when the `docs/health.md` publish fails (a worktree that could not be
 created, a push that was rejected, a PR that could not be opened), and the
 reverse also holds (a report-write failure per the fifth state above is
 already terminal for the run and the publish step is never reached). The two
@@ -153,6 +173,13 @@ if ! mkdir -p "$REPORT_DIR"; then
     echo "FAILED(report directory: cannot create $(redact_text "$REPORT_DIR"))"
     exit 1
 fi
+
+# The one switch the rest of this document keys on (§ Usage). Assigned once,
+# here, and never inferred later from whether a PR exists or a worktree was
+# created: `1` when --publish was passed on the invocation, empty otherwise.
+# Set before any branch reads it, so it is never unbound under `set -u`.
+PUBLISH=""
+case " $* " in *" --publish "*) PUBLISH=1 ;; esac
 ```
 
 This is the same snippet `audit-project` step 1 uses. It resolves the workspace
@@ -583,18 +610,55 @@ report): it is not diffed, because the row's own wording already states
 whether a decision has a review scheduled — a New/Resolved/Unchanged tag on
 top would be redundant, not because diffing was skipped.
 
-- **Workspace scope** — the previous run's state is the last **committed**
-  `docs/health.md`. Read it from the main checkout, `$ROOT` — the skill
-  worktree does not exist yet (it is created in § Publish the workspace
-  scope, 7a, after this step and the next) and is not needed for the read,
-  since it branches from the same commit:
+- **Workspace scope** — the previous run's state comes from **whichever
+  source this run is diffing against, and the report says which** (§ Render
+  the report's `**Diffed against**` line). The two branches:
+
+  **When `--publish` was passed**: the last **committed** `docs/health.md`.
+  Read it from the main checkout, `$ROOT` — the skill worktree does not exist
+  yet (it is created in § Publish the workspace scope, 7a, after this step
+  and the next) and is not needed for the read, since it branches from the
+  same commit:
 
   ```bash
   PREV_HEALTH=$(git -C "$ROOT" show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
+  PREV_SOURCE="committed docs/health.md @ $(git -C "$ROOT" rev-parse --short HEAD)"
   ```
 
-  This is the only read of the previous state in the run; nothing later
-  re-reads it.
+  **When `--publish` was not passed (the default)**: the most recent prior
+  **local** workspace-scope report — the `## Workspace` section of the
+  newest `.agent/scratchpad/janitor/<ts>-sweep.md` — read from the
+  retention-pruned set (last 20 runs, step 1). This is the identical
+  best-effort rule project scope has always used, applied to the other
+  scope; the local report's `## Workspace` section is structurally the same
+  bytes `docs/health.md` carries (§ 6 renders `$WORKSPACE_SECTION` once and
+  composes both artifacts around it), so the prior-finding definition below
+  reads correctly off either source:
+
+  ```bash
+  PREV_REPORT=$(ls -1t "$REPORT_DIR"/*-sweep.md 2>/dev/null | head -n 1)
+  if [ -n "$PREV_REPORT" ]; then
+      PREV_HEALTH=$(awk '/^## Workspace$/{f=1;next} /^## Projects$/{f=0} f' "$PREV_REPORT")
+      PREV_SOURCE="local report $(basename "$PREV_REPORT")"
+  else
+      PREV_HEALTH=""
+      PREV_SOURCE=""
+  fi
+  ```
+
+  Say which of the two "nothing to diff against" states applies, plainly,
+  rather than rendering an empty diff as "no changes": **`no prior local
+  report`** (none in the directory at all — first local run on this host) or
+  **`prior report predates retention`** (the directory holds reports but the
+  run this finding would be diffed against was pruned by step 1's last-20
+  rule). These are the same two the Project-scope bullet below already
+  distinguishes.
+
+  `$PREV_HEALTH` and `$PREV_SOURCE` are assigned exactly once, here, on
+  whichever branch ran; nothing later re-reads or re-derives either. Note
+  that a non-publishing run **never reads or rewrites the committed
+  `docs/health.md`** — the baseline on `main` stays as whichever `--publish`
+  run last wrote it (decision 2).
 
   **What in that file counts as "the previous run's findings"**: every
   finding listed under **any** of a tier's four subsections — `New`,
@@ -696,14 +760,17 @@ top would be redundant, not because diffing was skipped.
   `FINDINGS` condition on that check, named in `Detail`, not as a licence to
   resolve prior findings against it.
 
-  **First run — no prior `docs/health.md` in history** (the normal case for
-  this skill's very first publish, and for any repo where the file was never
-  committed, or was removed from the base branch): `git show` fails, `PREV_HEALTH`
-  is empty, and this is **not an error**. Every finding renders under `New`
-  in every tier, with an explicit note in the report — "first committed
-  run — no prior health document" — rather than an empty `Resolved`/
-  `Unchanged` subsection that would read as "nothing changed" on a repo that
-  has never had a health document before.
+  **First run — nothing to diff against**, on either branch: under
+  `--publish`, no prior `docs/health.md` in history (the normal case for a
+  first publish, and for any repo where the file was never committed or was
+  removed from the base branch) — `git show` fails; on the default path, no
+  prior local report in the retention set. Either way `PREV_HEALTH` is empty
+  and this is **not an error**. Every finding renders under `New` in every
+  tier, with an explicit note in the report — "first committed run — no
+  prior health document" under `--publish`, "first local run — no prior
+  report" on the default path — rather than an empty `Resolved`/`Unchanged`
+  subsection that would read as "nothing changed" on a run that had nothing
+  to compare.
 - **Project scope** — no committed history exists (project scope is still
   report-only, § Overview), so the diff is **best-effort** against the most
   recent prior **local** report under `.agent/scratchpad/janitor/` for the
@@ -800,8 +867,8 @@ top would be redundant, not because diffing was skipped.
 
 ### 6. Render, redact, and write the report
 
-This step is **one render pass that produces two artifacts**, and every later
-step consumes them by the names below — nothing downstream re-renders,
+This step is **one render pass that produces up to three artifacts**, and
+every later step consumes them by the names below — nothing downstream re-renders,
 re-extracts, or edits report content. Two earlier revisions of this skill
 had the publish step read a variable that was never assigned, and had the
 report template carry a field (the PR URL) that cannot be known when the
@@ -811,7 +878,7 @@ template is rendered; naming the data flow here is what rules both out.
 |---|---|---|
 | `$WORKSPACE_SECTION` | the `## Workspace` section: check-status table (each row's `Detail` carrying that check's coverage), then findings by tier with `New`/`Resolved`/`Unchanged`/`Not re-examined` subsections | composed into both artifacts below |
 | `$PROJECTS_SECTION` | the `## Projects` section, per the template | `$REPORT_BODY` only — project scope is never published (§ Overview) |
-| `$HEALTH_BODY` | `# Workspace health — <ts>` title + a fixed provenance line + `$WORKSPACE_SECTION` — **exactly the bytes committed to `docs/health.md`** | 7b, written verbatim |
+| `$HEALTH_BODY` | `# Workspace health — <ts>` title + a fixed provenance line + `$WORKSPACE_SECTION` — **exactly the bytes committed to `docs/health.md`**. **Rendered only under `--publish`** | 7b, written verbatim |
 | `$REPORT_BODY` | the local report: `## Janitor Sweep — <ts>` header, `$WORKSPACE_SECTION`, `$PROJECTS_SECTION`, the retention footer | written to `$REPORT` in this step; 7h appends the publish outcome |
 
 Render `$WORKSPACE_SECTION` once and compose both artifacts around it, so the
@@ -820,9 +887,12 @@ bytes by construction, not by a copy step that can drift.
 
 ```bash
 TS=$(date '+%Y-%m-%d %H:%M %:z')          # one timestamp, used by both artifacts
-HEALTH_BODY=$(printf '# Workspace health — %s\n\n%s\n\n%s\n' "$TS" \
-    'Generated by the `janitor-sweep` skill and replaced wholesale each run. The run'"'"'s full record, including project-scope findings, is the local report under `.agent/scratchpad/janitor/` on the host that ran it.' \
-    "$WORKSPACE_SECTION")
+HEALTH_BODY=""
+if [ "$PUBLISH" = "1" ]; then
+    HEALTH_BODY=$(printf '# Workspace health — %s\n\n%s\n\n%s\n' "$TS" \
+        'Generated by the `janitor-sweep` skill under `--publish`, and replaced wholesale by each such run. The run'"'"'s full record, including project-scope findings, is the local report under `.agent/scratchpad/janitor/` on the host that ran it.' \
+        "$WORKSPACE_SECTION")
+fi
 REPORT_BODY=$(printf '## Janitor Sweep — %s\n\n%s\n\n%s\n\n%s\n' "$TS" \
     "$HEADER_LINES" "$WORKSPACE_SECTION" "$PROJECTS_SECTION")
 ```
@@ -839,9 +909,15 @@ and the local report is written to disk and handed around. So this is a
 code-level gate on the rendered content, not an authoring reminder:
 
 ```bash
-HEALTH_BODY=$(redact_text "$HEALTH_BODY")
+[ "$PUBLISH" = "1" ] && HEALTH_BODY=$(redact_text "$HEALTH_BODY")
 REPORT_BODY=$(redact_text "$REPORT_BODY")
 ```
+
+**`$HEALTH_BODY` is not computed on a default run**, and nothing consumes it
+there: step 7 does not run, and the local report carries the identical
+`$WORKSPACE_SECTION` bytes already. Rendering it anyway would be a second
+copy of the same content whose only distinguishing feature is a provenance
+line claiming a commit that never happened.
 
 `redact_text` and `$REDACT_PATH_PREFIXES` were set up in step 1 from the
 run's `$ROOT` and `$HOME`, and that is the right prefix set here: everything
@@ -953,6 +1029,16 @@ reader see both numbers.
 |---|---|---|
 | Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | <findings summary>. Coverage: principles X of Y (<names when X<Y>); ADRs X of Y (<numbers when X<Y>); scripts all N; templates all N; consequences-map items all N; adapters all 3; worktrees all N |
 | Research-digest freshness | ... | last updated <date>, <n> days. Coverage: the one digest file, read |
+
+**Diffed against**: <one of — `committed docs/health.md @ <short-sha>` (the
+`--publish` branch) / `local report <ts>-sweep.md` (the default branch, a
+prior report found) / `none — first local run, no prior report` / `none —
+prior report predates retention` >
+
+<!-- Rendered on every run, directly under the check table (§ 5). The two
+     branches diff against different sources, and which one a reader is
+     looking at changes what "Resolved" means — so the source is stated,
+     never inferred from whether a PR exists. -->
 
 <!-- First committed run for this repo (git show HEAD:docs/health.md fails,
      or docs/health.md has never been committed): say so explicitly here —
@@ -1117,14 +1203,24 @@ under it.
 Fill the **Checks** line from the status table, not from impression. If any
 check is `SKIPPED` or `FAILED`, the report may not describe the workspace as
 clean. The `## Workspace` section, **including its `New`/`Resolved`/`Unchanged`/
-`Not re-examined` run-over-run-diff subsections**, is what `$HEALTH_BODY` carries into
-`docs/health.md` in the next step: those subsections are exactly the
-run-over-run record the issue asked for, and `docs/health.md`'s own git
-history — one committed version per sweep — is where an operator reads it.
-Committing the diff sections (not stripping them) is the deliberate choice
-here.
+`Not re-examined` run-over-run-diff subsections**, is what `$HEALTH_BODY`
+carries into `docs/health.md` in the next step **when `--publish` was
+passed**: those subsections are exactly the run-over-run record the issue
+asked for. Committing the diff sections (not stripping them) is the
+deliberate choice there. On a default run the same section is the run's
+record in the local report, and the run-over-run history is the sequence of
+retained local reports rather than `docs/health.md`'s git history — which is
+why step 1 retains the last 20 rather than one.
 
 ### 7. Publish the workspace scope
+
+**7a–7g run only when `--publish` was passed.** On a default run none of
+them happen — no worktree, no commit, no push, no PR, no GitHub call of any
+kind. **7h always runs**, on both paths: it writes one of two headings to the
+local report, so the report states the publish state explicitly rather than
+leaving a reader to infer it from an absent section. The sweep is
+local-first: the local report from step 6 is the run's record, and it has
+already landed by the time control reaches here.
 
 **Workspace scope only** — never commit `docs/health.md` into a project repo
 in this slice; project-scope findings stay in the local
@@ -1367,26 +1463,38 @@ with the document's top-level numbered steps.
 
    A failure here is a note, not a publish failure: the PR is already open.
 
-7h. **Append the publish outcome to the local report** — on **every** exit
-   path from 7a–7g, success or failure. This is where the PR URL lives; it
+7h. **Append the publish outcome to the local report** — on **every** path:
+   every exit from 7a–7g, success or failure, *and* the default path where
+   7a–7g did not run at all. This is where the PR URL lives; it
    is the one place the outcome is recorded, and it is appended after the
    file's step-6 content rather than rendered into it, because it is not
    known until now:
 
    ```bash
-   # $PUBLISH_LINE was assigned by the sub-step that ended the attempt
-   # (7a/7b/7c/7d on failure, 7d on success) and is one of:
-   #   committed to docs/health.md — PR <url>
-   #   FAILED(workspace publish: <reason>)
-   printf '\n## Publish outcome\n\n%s\n' "$(redact_text "$PUBLISH_LINE")" >> "$REPORT"
+   if [ "$PUBLISH" = "1" ]; then
+       # $PUBLISH_LINE was assigned by the sub-step that ended the attempt
+       # (7a/7b/7c/7d on failure, 7d on success) and is one of:
+       #   committed to docs/health.md — PR <url>
+       #   FAILED(workspace publish: <reason>)
+       printf '\n## Publish outcome\n\n%s\n' "$(redact_text "$PUBLISH_LINE")" >> "$REPORT"
+   else
+       printf '\n## Publish outcome: not requested (--publish off)\n' >> "$REPORT"
+   fi
    ```
+
+   On the default path the **heading itself carries the reason**, so a reader
+   scanning headings sees the state without opening the section and there is
+   no body line to write. `$PUBLISH_LINE` is never assigned on that path —
+   7a–7g did not run, so there is no outcome to report, and inventing one
+   ("not published") would be a sentence about a step that never happened.
 
    The reason string of a failure can carry a path or a remote URL, hence
    `redact_text`. The same line is what step 8 states to the operator.
 
 **Failure is a named, separate state** (the sixth state, § The status
-contract): a worktree that could not be created (7a), a commit that failed
-(7c), a push that was rejected or a PR that could not be opened (7d) is
+contract) — on a run that asked to publish. A worktree that could not be
+created (7a), a commit that failed (7c), a push that was rejected or a PR
+that could not be opened (7d) is
 reported as `FAILED(workspace publish: <reason>)`, next to — not instead of —
 the local report's own status, and recorded in the local report by 7h. The
 local report has already landed by the time this step runs (step 6 precedes
@@ -1402,29 +1510,31 @@ one, and follow it with `audit-workspace`'s coverage line for the two
 sections that may sample (`principles X of Y; ADRs X of Y`) so a shallow
 audit cannot either; name any `Not re-examined` entries the diff produced.
 If the local report write failed, lead with that instead and print the
-findings inline. State the workspace-scope publish outcome explicitly — the
-same `$PUBLISH_LINE` 7h appended: the PR URL on success, or
-`FAILED(workspace publish: <reason>)` — and state plainly that project-scope
-findings are **not** published anywhere beyond the local report.
+findings inline. State the workspace-scope publish outcome explicitly, using whichever
+heading 7h wrote: the PR URL on success, `FAILED(workspace publish:
+<reason>)` on failure, or `not requested (--publish off)` on a default run —
+and say which source the workspace scope diffed against (§ 5's
+`$PREV_SOURCE`), since that decides what `Resolved` meant this run. State
+plainly that project-scope findings are **not** published anywhere beyond
+the local report(s).
 
 ## Known limitations
 
 Deliberate, and each is for the deferred decision below to close — they are
-listed here so that decision meets them rather than rediscovering them. The
-first is now **workspace-scope only** — the workspace half of this limitation
-closed when step 7 shipped a committed `docs/health.md`; the project half is
-unchanged.
+listed here so that decision meets them rather than rediscovering them.
 
-- **The local report is host-local and ephemeral; the workspace half no
-  longer is.** `$REPORT_DIR` lives under `.agent/scratchpad/`, which is
+- **The local report is host-local and ephemeral — on a default run, that is
+  all there is.** `$REPORT_DIR` lives under `.agent/scratchpad/`, which is
   gitignored. Anchoring it at the main workspace root (step 1) means every
   *worktree on a host* shares one report directory, but a sweep run on
   another host, or in an ephemeral container, leaves a local record nobody
-  else can read — and a container's copy dies with the container. The
-  workspace-scope portion of that same record is now also committed to
-  `docs/health.md` (step 7), which is durable and shared regardless of which
-  host ran the sweep. **Project scope is still only as durable as the host it
-  ran on** — pending the health-rollup shape decision, § Deferred below.
+  else can read — and a container's copy dies with the container. **Only a
+  `--publish` run escapes this**, and only for the workspace scope: it
+  commits `docs/health.md` (step 7), which is durable and shared regardless
+  of which host ran the sweep. This is the deliberate trade of local-first —
+  the default run is cheap, offline-capable and side-effect-free, and its
+  durability is the host's disk. **Project scope never escapes it at all**,
+  pending the health-rollup shape decision, § Deferred below.
 - **The rotation has no coverage guarantee while the trigger is deferred.**
   `ISO-week mod chunk-count` cycles every repo in `ceil(N/3)` weeks *only under
   a real weekly trigger*. Two hand-runs in the same week re-audit the same
@@ -1435,9 +1545,16 @@ unchanged.
 
 ## Deferred: the project-scope rollup and the trigger
 
-**Workspace-scope publish is live** as of this change (step 7): a committed,
-PR-reviewed `docs/health.md` at the workspace repo root, per the design
-draft's *Publishing what the sweep finds*. What remains deferred:
+**Workspace-scope publish is opt-in** as of this change (step 7,
+[#652](https://github.com/rolker/ros2_agent_workspace/issues/652)): the
+committed, PR-reviewed `docs/health.md` at the workspace repo root that the
+design draft's *Publishing what the sweep finds* describes is what
+`--publish` produces, and the default run produces a local report instead.
+The step was kept rather than deleted because its eventual caller is parked,
+not cancelled: the cloud trigger
+([#636](https://github.com/rolker/ros2_agent_workspace/issues/636)) is the
+consumer of `--publish`, and unparking it is a change to the trigger, not a
+re-implementation of publishing. What remains deferred:
 
 - **The project-repo health-rollup shape.** The operator's narrowing comment
   on this issue draws the line explicitly: publish-by-commit ships for the
@@ -1450,11 +1567,18 @@ draft's *Publishing what the sweep finds*. What remains deferred:
 - **The (weekly, unattended) trigger** — decided in principle (operator,
   2026-09-14: a weekly Claude Code cloud Routine, on stated grounds of
   smallest credential surface and exact cadence — see the design draft's
-  *The trigger* for the alternatives weighed), but wiring it under a
-  dedicated `Janitor Sweep Agent` identity is
+  *The trigger* for the alternatives weighed), but **backburnered
+  2026-09-21** in favour of the local-first report this change ships, and
+  wiring it under a dedicated `Janitor Sweep Agent` identity is
   [#636](https://github.com/rolker/ros2_agent_workspace/issues/636), not this
-  change. Hand-run testing in this PR uses the implementing agent's own
-  identity for the workspace-scope commit (step 7).
+  change. Recorded there for when it is unparked: a cloud run is
+  **workspace scope only**. A cloud checkout of this repo is configured for
+  no project — the project is per-clone configuration, not a property of the
+  GitHub repo — so checks 2 and 3 render
+  `SKIPPED(no project configured on this checkout)` there, and the sweep
+  must not clone manifests to manufacture one. Hand-run `--publish` testing
+  uses the implementing agent's own identity for the workspace-scope commit
+  (step 7).
 
 A future project-scope publish step is still a GitHub **write**, which is the
 same crux the workspace-scope one already crossed:
@@ -1477,8 +1601,8 @@ scope alike.
 `progress.md` is keyed by issue (ADR-0013), and this skill is not issue-scoped
 — like its three periodic siblings (`audit-workspace`, `audit-project`,
 `issue-triage`), none of which write one. Its durable record is the local
-report file written in step 6, and — for the workspace scope only — the
-committed `docs/health.md` from step 7.
+report file(s) written in step 6, and — for the workspace scope, and only on
+a `--publish` run — the committed `docs/health.md` from step 7.
 
 ## Guidelines
 
@@ -1487,10 +1611,12 @@ committed `docs/health.md` from step 7.
   per-finding issues or comments; the operator has asked explicitly for one
   report over issue spam. The workspace-scope commit-and-PR (step 7) is the
   one deliberate exception to "no PRs" — it publishes the sweep's own
-  measurement, never a fix.
-- **Publish nothing beyond the workspace-scope `docs/health.md` PR.** No
-  issue, no comment on a project repo, no PR against a project repo. Project
-  scope stays report-only pending the rollup-shape decision above.
+  measurement, never a fix, and only when `--publish` asked for it.
+- **Publish nothing beyond the workspace-scope `docs/health.md` PR, and
+  nothing at all without `--publish`.** No issue, no comment on a project
+  repo, no PR against a project repo. A default run makes no GitHub write of
+  any kind. Project scope stays report-only pending the rollup-shape
+  decision above, `--publish` or not.
 - **Never report a check you did not run** — `SKIPPED` and `FAILED` carry a
   reason, and both are visible in the status table and the headline count.
 - **Be specific** — "`research_digest.md` last updated 2026-05-02, 132 days, 6
