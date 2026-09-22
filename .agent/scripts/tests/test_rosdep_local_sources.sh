@@ -64,6 +64,15 @@ check "line is the absolute file:// path" \
     grep -qxF "yaml file://$WS/layers/main/a_ws/src/repo_with/rosdep.yaml" "$LOCAL"
 check "repo without rosdep.yaml absent" bash -c "! grep -q repo_without '$LOCAL'"
 
+echo "=== rosdep_local_sources.sh: a relative workspace_root still yields absolute URIs ==="
+# A file:// URI built from a relative path is unresolvable by whatever process
+# later reads the list — never this script's own working directory.
+( cd "$TMP" && "$AGG" "ws" >/dev/null 2>&1 )
+check "relative root exits 0"          bash -c "( cd '$TMP' && '$AGG' ws >/dev/null 2>&1 )"
+check "the yaml line is still absolute" \
+    grep -qxF "yaml file://$WS/layers/main/a_ws/src/repo_with/rosdep.yaml" "$LOCAL"
+check "no relative file:// URI"        bash -c "! grep -q 'file://[^/]' '$LOCAL'"
+
 echo "=== rosdep_local_sources.sh: the published dir is swapped atomically ==="
 # The generated directory is HOST-SHARED (setup.bash exports it as
 # ROSDEP_SOURCE_PATH for every shell; two worktrees' `make build` both

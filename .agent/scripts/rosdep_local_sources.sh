@@ -84,6 +84,18 @@ if [ ! -d "$ROOT_DIR" ]; then
     exit 2
 fi
 
+# Canonicalize before anything derives from it. The generated list holds
+# `yaml file://<path>` URIs, and a file:// URI built from a RELATIVE path is
+# not resolvable by whatever process later reads the list — which is never
+# this script's own working directory. Every current caller happens to pass an
+# absolute path; nothing made that a requirement, so make it one here instead
+# of documenting a trap. `CDPATH=''` keeps `cd` from printing or hopping.
+ROOT_DIR="$(CDPATH='' cd -- "$ROOT_DIR" && pwd)"
+case "$OUT_DIR" in
+    /*) ;;
+    *)  OUT_DIR="$PWD/$OUT_DIR" ;;
+esac
+
 shopt -s nullglob
 system_lists=("$SYSTEM_SOURCES_DIR"/*.list)
 if [ "${#system_lists[@]}" -eq 0 ]; then

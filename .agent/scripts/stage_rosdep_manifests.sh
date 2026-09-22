@@ -62,6 +62,15 @@ if [ ! -d "$ROOT_DIR" ]; then
     exit 2
 fi
 
+# Canonicalize: the `rel` paths reported below are computed by stripping
+# "$ROOT_DIR/" off a matched path, which only works when both sides are in the
+# same (absolute) form. Same requirement as rosdep_local_sources.sh.
+ROOT_DIR="$(CDPATH='' cd -- "$ROOT_DIR" && pwd)"
+case "$STAGE_DIR" in
+    /*) ;;
+    *)  STAGE_DIR="$PWD/$STAGE_DIR" ;;
+esac
+
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR"
 
