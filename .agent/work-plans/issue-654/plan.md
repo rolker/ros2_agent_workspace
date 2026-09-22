@@ -38,11 +38,15 @@ generic, with no repo names baked into workspace scripts.
    - Refuses to run if sourced (same guard pattern).
    - Rebuilds `<out_dir>` idempotently (`rm -rf` + `mkdir -p`, matching
      `stage_rosdep_manifests.sh`).
-   - Copies the system `/etc/ros/rosdep/sources.list.d/20-default.list`
-     into `<out_dir>/20-default.list`; errors clearly (exit 2) if the
-     system file is missing — rosdep isn't initialized yet, tell the
-     caller to run `bootstrap.sh` first, don't silently produce a half
-     source list.
+   - Copies **every** `*.list` file from the system
+     `/etc/ros/rosdep/sources.list.d/` into `<out_dir>/` — not just
+     `20-default.list`. Verified during implementation: this host also
+     carries a `10-local.list`, and copying only the default would
+     silently drop a source the caller already had (resolving Open
+     Question 1 in the direction of "copy them all"). Errors clearly
+     (exit 3) when the system directory holds no `.list` file at all —
+     rosdep isn't initialized yet; tell the caller to run `bootstrap.sh`
+     first rather than silently producing a half source list.
    - Globs `<workspace_root>/layers/main/*_ws/src/*/rosdep.yaml`
      (non-recursive — one per project-repo root, per the issue's
      declaration format) and writes one `yaml file://<abs-path>` line per
@@ -85,11 +89,14 @@ generic, with no repo names baked into workspace scripts.
 
 4. **Makefile stamp** — new `$(STAMP)/rosdep-local.done` target,
    depending on `$(STAMP)/manifest.done` (needs `layers/` checked out)
-   plus a `$(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)`
-   dependency via `.SECONDEXPANSION`, same pattern as the existing
-   `$(STAMP)/layer-%.done` rule — so the stamp goes stale when any
-   project repo's `rosdep.yaml` changes (added, edited, or a repo with
-   one gets checked out for the first time). Recipe: run
+   plus a **plain** `$(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)`
+   prerequisite list. No `.SECONDEXPANSION` (Plan Review finding 4):
+   unlike `$(STAMP)/layer-%.done`, this target has no `%`, so nothing in
+   its prerequisites needs deferring to a second expansion pass — the
+   wildcard expands correctly at parse time. Makefiles are re-parsed on
+   every invocation, so the wildcard re-evaluates and the stamp goes
+   stale when any project repo's `rosdep.yaml` changes (added, edited,
+   or a repo with one gets checked out for the first time). Recipe: run
    `rosdep_local_sources.sh $(MAIN_ROOT)` then
    `ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update`.
    Add `$(STAMP)/rosdep-local.done` to `_build-layers`'s prerequisites
@@ -114,47 +121,95 @@ generic, with no repo names baked into workspace scripts.
      the container — a single repo's `rosdep.yaml`, not the whole
      workspace glob, since `ci_local.sh` tests one repo in isolation.
    - Agent container image (`docker_run_agent.sh --build` /
-     `stage_rosdep_manifests.sh`): this bakes `package.xml`-derived
-     rosdep keys at image build time; it does not currently install
-     anything by rosdep *key* outside of `package.xml`'s own `<depend>`
-     tags, so local keys aren't needed at bake time unless a package's
-     `package.xml` actually depends on one (not the case yet for
-     unh_marine_autonomy#397, which needs the keys for non-package
-     tooling). Document this explicitly rather than adding unused
-     plumbing: extend `stage_rosdep_manifests.sh`'s header comment and the
-     new knowledge note (step 6) to say the bake path picks up local keys
-     automatically once/if a staged `package.xml` gains a `<depend>` on
-     one, via the same `ROSDEP_SOURCE_PATH` mechanism the Dockerfile's
-     `rosdep install` step would need — but do not add code for a case
-     that doesn't exist yet (matches "Only what's needed").
-   - Hosted CI (project-repo workflow): add a short recipe to the new
-     knowledge note (step 6) — copy `rosdep.yaml` into the workflow's
-     rosdep step, write `30-workspace-local.list`, `rosdep update` before
-     `rosdep install` — as the "documented one-step equivalent" the issue
-     asks for. Not a code change (each project repo's own
-     `.github/workflows/` is out of this repo's scope), but the knowledge
-     note is the durable reference `ci_local.sh`'s own doc-comments and
-     future project-repo CI templates point to.
+     `stage_rosdep_manifests.sh` / `.devcontainer/agent/Dockerfile` /
+     `agent-entrypoint.sh`) — **wire it** (Plan Review finding 1). The
+     earlier "picks up local keys automatically" claim was false:
+     nothing in the image ever sets `ROSDEP_SOURCE_PATH`, and the
+     Dockerfile's `skip_keys` computation would drop an unresolvable
+     local key into a single build-log line and carry on — the silent
+     failure the Quality Standard says not to wave off. Four concrete
+     pieces:
+     - `stage_rosdep_manifests.sh` additionally stages every
+       `layers/main/*_ws/src/*/rosdep.yaml` into
+       `<stage_dir>/rosdep-local/<repo>.yaml` — a sibling directory
+       inside the same staged tree the Dockerfile already `COPY`s, so no
+       second build-context path, no second lock and no second cleanup
+       trap in `docker_run_agent.sh`. It holds no `package.xml`, so
+       `rosdep install --from-paths` ignores it. The script's summary
+       line gains the local-yaml count.
+     - The Dockerfile bake step copies those yamls to a persistent
+       `/opt/rosdep-local/`, builds `/opt/rosdep-sources/` from **all**
+       of `/etc/ros/rosdep/sources.list.d/*.list` plus a generated
+       `30-workspace-local.list`, and exports `ROSDEP_SOURCE_PATH` for
+       its own `rosdep update` / `rosdep check` / `rosdep install`. An
+       `ENV ROSDEP_SOURCE_PATH=/opt/rosdep-sources` after that step makes
+       the later non-root `rosdep update` and every container process
+       inherit it.
+     - Unresolvable keys stop being a one-line aside: the bake prints a
+       clearly labelled `WARNING: rosdep bake: N key(s) NOT installed`
+       block naming each skipped key **at the end** of the build step,
+       after the install, so it is the last thing that layer's log says.
+     - `agent-entrypoint.sh` sources `setup.bash` (step 2) before its
+       `rosdep check`/`rosdep install` loop, so it inherits
+       `ROSDEP_SOURCE_PATH` pointing at the **bind-mounted workspace's**
+       generated dir (`docker_run_agent.sh` mounts the workspace at the
+       same absolute path — `-v "$ROOT_DIR:$ROOT_DIR"` — so the generated
+       `file://` URLs resolve inside the container). rosdep's cache is
+       keyed by source URL and the baked cache was built from
+       `/opt/rosdep-local/…` URLs, so the entrypoint runs one
+       best-effort `rosdep update` when — and only when — a non-empty
+       `30-workspace-local.list` exists at that path.
+     - **#604 rebuild caveat**: `agent-entrypoint.sh` and
+       `fix-volume-ownership.sh` are baked from the MAIN checkout and the
+       launcher only builds when the image is *missing*. The agent image
+       must be rebuilt after this PR merges (`make agent-build`);
+       until then the startup-scripts staleness marker warns on every
+       launch, which is the intended signal.
+   - Hosted CI (project-repo workflow): the new knowledge note (step 7)
+     carries a **concrete, copy-pasteable GitHub Actions step** (Plan
+     Review finding 3 — prose describing the shape is not adoptable "in
+     one step", which is the issue's own bar): `sudo mkdir -p` a sources
+     dir, copy in every `*.list` from the system default, copy the repo's
+     own `rosdep.yaml`, write the `yaml file://…` line, `rosdep update`,
+     and export `ROSDEP_SOURCE_PATH` into `$GITHUB_ENV` so the workflow's
+     existing `rosdep install` step picks it up unchanged. Not a code
+     change here (each project repo owns its `.github/workflows/`), but
+     the note is the durable reference `rosdep_local_sources.sh`'s header
+     and future project-repo CI templates point to.
 
 6. **Enforcement check** — new
    `.agent/scripts/rosdep_local_staleness_check.sh` (execute-only),
    invoked from the `validate` Makefile target (wired explicitly per the
    Issue Review gap). For each `rosdep.yaml` found by the same glob as
    step 1: parse its keys (reuse the `yaml.safe_load` pattern already used
-   in `ci_local.sh`'s `upstream.repos` parsing), and for each key, resolve
-   it with `ROSDEP_SOURCE_PATH` unset (system default sources only, in a
-   subshell so the check doesn't mutate the caller's env) — if it resolves
-   without the local override, flag it (the local entry is stale and
-   ready to delete once the noted upstream PR has actually merged). Also
+   in `ci_local.sh`'s `upstream.repos` parsing), and for each key run a
+   probe that can vouch for its own answer (Plan Review finding 2): a
+   subshell with `ROSDEP_SOURCE_PATH` **unset** and `HOME` pointed at a
+   throwaway temp dir (rosdep's cache is per-user at
+   `$HOME/.ros/rosdep/sources.cache`, so probing under the caller's HOME
+   would rewrite the very cache the local override populates), one
+   `rosdep update` **inside that subshell first**, then `rosdep resolve
+   <key>` per key. If that `rosdep update` fails — offline, no network in
+   CI, `rosdep` not installed — every key is reported **SKIPPED**, never
+   a resolves/does-not-resolve verdict read off a cache state the probe
+   cannot vouch for (same posture as `ci_local.sh`'s "tolerate rosdep
+   update failure (offline field host)"). A key that resolves against the
+   default sources alone is flagged: the local entry is stale and ready
+   to delete once the noted upstream PR has actually merged. Also
    flag any key in a `rosdep.yaml` whose comment doesn't mention "PR" or a
    `ros/rosdistro` URL (heuristic for "upstream PR owed" bookkeeping,
    matching the per-repo declaration format the issue specifies). Wire
    into the `validate` target: add a third `rc=$$?` branch alongside
    `validate_workspace.py` and `test_layer_sourcing.sh`, same
    accumulate-and-report-worst-exit-code pattern already in that recipe.
-   Skips cleanly (exit 0, prints "no rosdep.yaml files found") when no
-   project repo has opted in yet — this check must not fail a fresh
-   workspace with zero local keys.
+   Exit codes, deliberately distinct so that accumulation can tell them
+   apart: **0** clean (including "no `rosdep.yaml` files found" — this
+   check must never fail a fresh workspace with zero local keys); **1** a
+   local key now resolves upstream, or a key lacks the upstream-PR
+   marker; **2** usage error; **3** SKIPPED (offline / no rosdep). The
+   `validate` recipe reports 3 as a printed notice and does **not** fail
+   on it, exactly as the workspace already treats offline rosdep state
+   elsewhere; only 1 and 2 fail.
 
 7. **`.agent/knowledge/dependency_policy.md`** — new knowledge doc: the
    rule as tested here (ROS packages depend only on what rosdep resolves;
@@ -195,19 +250,22 @@ generic, with no repo names baked into workspace scripts.
 | `.agent/scripts/setup.bash` | Export `ROSDEP_SOURCE_PATH` when `.rosdep/sources.list.d` exists (step 2) |
 | `.agent/scripts/bootstrap.sh` | Call aggregation script before final `rosdep update` (step 3) |
 | `.agent/scripts/ci_local.sh` | Inner script: install tested repo's own `rosdep.yaml` via `ROSDEP_SOURCE_PATH` (step 5) |
-| `.agent/scripts/stage_rosdep_manifests.sh` | Header comment note on local-key interaction (step 5, doc-only) |
+| `.agent/scripts/stage_rosdep_manifests.sh` | Stage per-repo `rosdep.yaml` into `<stage_dir>/rosdep-local/` for the image bake (step 5) |
+| `.devcontainer/agent/Dockerfile` | Build `/opt/rosdep-sources`, export `ROSDEP_SOURCE_PATH`, WARN block naming unresolved keys (step 5) |
+| `.devcontainer/agent/agent-entrypoint.sh` | Best-effort `rosdep update` when the mounted workspace has a non-empty local list (step 5) |
 | `Makefile` | New `$(STAMP)/rosdep-local.done` stamp + `_build-layers` prereq + `validate` target third branch (steps 4, 6) |
 | `.gitignore` | Add `.rosdep/` |
 | `.agent/knowledge/dependency_policy.md` | New knowledge note (step 7) |
 | `AGENTS.md` | Script Reference table rows for both new scripts (step 8) |
 | `.agent/scripts/tests/test_rosdep_local_sources.sh` | New test file (step 9) |
+| `.agent/scripts/tests/test_make_validate.sh` | Stub the new check so the `validate`-recipe regression test still exercises the real recipe (step 6 consequence) |
 
 ## Principles Self-Check
 
 | Principle | Consideration |
 |---|---|
 | Enforcement over documentation | Step 6's `validate`-wired staleness check pairs with step 7's knowledge note — the policy isn't just written down, a check nags when a local key should be deleted. |
-| Only what's needed | Step 5's agent-container-image sub-part deliberately documents rather than codes a case that doesn't exist yet (no `package.xml` depends on a local key today). |
+| Only what's needed | Amended after Plan Review: the container image is a *named in-scope CI path* in the issue, and its `skip_keys` design would silently mask a missing local key, so step 5 wires it rather than documenting a claim that was false. Still no speculative plumbing — nothing is added for the "Ubuntu doesn't ship it at all" case. |
 | A change includes its consequences | AGENTS.md script table + Makefile `validate` wiring both included explicitly (Issue Review gaps 1 and 3), plus `.gitignore`. |
 | Workspace vs. project separation | `rosdep_local_sources.sh` glob-scans generically (`layers/main/*_ws/src/*/rosdep.yaml`); no repo names anywhere in the new scripts or knowledge note. |
 | Test what breaks | Step 9 covers idempotent regen, the missing-`20-default.list` failure path, and both staleness-check outcomes (flagged vs. not). |
@@ -247,14 +305,15 @@ generic, with no repo names baked into workspace scripts.
 
 ## Open Questions
 
-- [ ] `rosdep_local_sources.sh`'s exact default `sources.list.d` location
-      to copy from — verified as `/etc/ros/rosdep/sources.list.d/20-default.list`
-      on this host; confirm no second default file exists on a clean
-      install before hard-coding the single filename (quick check during
-      implementation, not expected to change the design).
-- [ ] Whether `run_script_tests.sh`'s test discovery is a glob that picks
-      up `test_rosdep_local_sources.sh` automatically or needs an explicit
-      registration — check during implementation (step 9 note).
+- [x] **Resolved during implementation (2026-09-22)**: a second system
+      source file *does* exist on this host (`10-local.list` alongside
+      `20-default.list`), so `rosdep_local_sources.sh` copies **every**
+      `*.list` in `/etc/ros/rosdep/sources.list.d/` rather than naming
+      one file. Step 1 amended.
+- [x] **Resolved during implementation (2026-09-22)**:
+      `run_script_tests.sh` discovers tests by glob
+      (`"$SCRIPTS_DIR"/test_*.sh` and `"$TESTS_DIR"/test_*.sh`), so a new
+      `test_rosdep_local_sources.sh` is picked up with no registration.
 - [ ] The staleness check's "upstream PR owed" comment heuristic (looking
       for "PR" or a `ros/rosdistro` URL in the yaml comment) is a
       best-effort text match, not a structured field — acceptable for a
