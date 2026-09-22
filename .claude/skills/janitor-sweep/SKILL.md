@@ -841,9 +841,17 @@ by tier (§ Classify findings into tiers). Both scopes carry all four diff
 states (§ Run-over-run diff); the Workspace section splits each tier into
 `New` / `Resolved` / `Unchanged` / `Not re-examined` subsections, while the
 Projects section tags each per-repo finding inline with one of the same four.
-A tier with no findings this
-run is omitted from that scope's section entirely — not rendered as an empty
-heading. Within a rendered workspace tier, `New`/`Resolved`/`Unchanged` are
+A tier is omitted from that scope's section entirely — rather than rendered
+as an empty heading — **only when it has no entries in any of its
+subsections**, carried-forward `Not re-examined` entries included
+([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)). "No
+findings *this run*" is not the test; "nothing to show at all" is. A tier
+whose only content is a `Not re-examined` entry is still rendered: that entry
+is an open finding this run did not look at, and dropping its tier would make
+it vanish from the report entirely — the exact silent vanishing this state
+exists to prevent, arriving one level up. The committed 2026-09-21
+`docs/health.md` renders a tier with zero current-run findings for precisely
+this reason. Within a rendered workspace tier, `New`/`Resolved`/`Unchanged` are
 always present (empty ones say why, as the first-run note does); the
 `Not re-examined` subsection is rendered **only when it has entries**. That
 is a rule specific to this subsection, new with it: on a full-coverage run
