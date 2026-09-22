@@ -57,7 +57,12 @@ no automated test harness:
    - Sections 3–7 report `<kind>: all N` (e.g. `scripts: all 58`,
      `templates: all 12`) — restating the fixed set size makes an
      incomplete run visible (`all` claimed with a smaller N than the
-     directory actually holds is itself a finding) rather than assumed.
+     directory actually holds is itself a finding) rather than assumed —
+     and, when a few items could not be read, the partial form
+     `<kind>: M of N — <item>: <reason>` rather than a smaller `all N`
+     (added in review round 1: `all N` resolves prior findings, so a
+     never-sampling section needed a way to say "all but this one"; it is
+     the same partial form `audit-project` already uses).
    - A section that could not be completed at all (an input file missing or
      unreadable) reports `0 of Y` / `SKIPPED(<reason>)`, per the existing
      "never OK for an incomplete section" rule already in the skill — this
@@ -66,7 +71,9 @@ no automated test harness:
 
    Add a dedicated `### Coverage` summary table between `### Summary` and
    `### Findings` — one row per section, always all seven, in a fixed
-   order — so the coverage numbers are visible in the audit's own output
+   order, each row carrying both the section name and the `<kind>` token its
+   coverage line uses so the table and the per-section lines join without a
+   glossary (the `Kind` column was added in review round 1) — so the coverage numbers are visible in the audit's own output
    as one block `janitor-sweep` can relay and key on, not just implied by
    findings text. (Settled at implementation: a separate table rather than
    a column on each findings table, because the consumer reads it as one
@@ -106,26 +113,49 @@ no automated test harness:
    the section that finding originated from**.
    - Full coverage of that section this run (`all N`, or `X of Y` with
      `X == Y`) and the finding is genuinely absent → `Resolved`.
-   - The section was sampled this run (`X of Y`, `X < Y`) and the specific
-     item the prior finding came from was **not** among the names examined
-     this run → `Not re-examined`, not `Resolved`. (If the sampled items
-     *do* include the one the prior finding came from and it's absent now,
-     that's a genuine `Resolved` — sampling doesn't block resolution of the
-     thing actually re-examined.)
+   - The section was only partially covered this run (`X of Y` with
+     `X < Y` — a sample, or a never-sampling section's `M of N — <item>:
+     <reason>` shortfall) and the specific item the prior finding came from
+     was **not** among the items covered → `Not re-examined`, not
+     `Resolved`. (If the item *was* covered and the finding is absent now,
+     that's a genuine `Resolved` — partial coverage doesn't block resolution
+     of the thing actually re-examined.)
+   - Check 4 (research-digest freshness) has no `audit-workspace` section
+     and so no coverage row. It reads the one digest file whole every run,
+     so its gate is the check's own status: an absent prior check-4 finding
+     is `Resolved` when check 4 completed, `Not re-examined` when it is
+     SKIPPED or FAILED. Stated as its own bullet in `janitor-sweep` § 5 —
+     review round 1 found the section-based procedure unfollowable for
+     these findings.
    - A finding needs a stable enough description to know which named item
      (principle / ADR) it came from — the existing diff key
      (`tier + check + one-line description`, § 5) already includes the
      description; this plan does not change the key, only what a *miss* on
      that key resolves to when coverage is partial.
 
-   Scope of this new state: the workspace scope's diff only (`## Workspace`
-   section, three-subsection-per-tier rendering). Project scope's diff
-   stays three-state (`New`/`Resolved`/`Unchanged`, plus its existing "no
-   prior report" variants) — `audit-project`'s sections are all
-   exhaustive-by-construction (§ below), so nothing in project scope ever
-   produces a partial-coverage miss for the diff to distinguish. Extending
-   the fourth state there would be dead code: a state that can never be
-   selected because its precondition (a sampled section) never occurs.
+   Scope of this new state: **both scopes**, because the gate the issue
+   states is general — "renders `Resolved` only for a finding whose section
+   was fully covered this run" — and nothing about it is specific to the
+   workspace section. A first draft of this plan scoped it to the workspace
+   diff only, on the premise that `audit-project`'s sections, never
+   sampling, are always `N of N`; review round 1 showed that premise is
+   false. `audit-project` does not sample, but its own coverage lines
+   legitimately report `0 of 1 — <reason>`, `N-1 of N — <item>: <reason>`,
+   `2 of 3 — layer: SKIPPED (no layer checkout)` in `clone` mode, `0 of 4 —
+   SKIPPED(<reason>)` for the planning-document probe, and `N of N packages
+   — run: M of N` for a partial test pass. The clone-mode case is the
+   likeliest of all: a repo audited in `layer` mode and re-audited in
+   `clone` mode drops the layer check outright, and its prior finding would
+   have read `Resolved` — the exact failure this issue closes, left live in
+   project scope.
+
+   The **rendering** still differs by scope, because the two scopes' diff
+   histories differ: workspace scope gets a fourth subsection, project scope
+   a fourth value on the inline per-finding tag
+   (`[New/Resolved/Unchanged/Not re-examined]`), keeping its existing
+   per-finding tag shape rather than gaining subsections. Project scope
+   reads the gate off `audit-project`'s `### Coverage` table, section by
+   section, exactly as the workspace scope reads `audit-workspace`'s.
 
    Render `Not re-examined` as a fourth subsection alongside `New` /
    `Resolved` / `Unchanged` under each tier in the `## Workspace` section
@@ -167,15 +197,19 @@ no automated test harness:
      wholesale) — no format change needed there beyond noting the
      convention is already satisfied.
 
-   No new `Not re-examined` diff state for `audit-project`'s per-repo
-   findings (see step 3 above — project scope has nothing to sample).
+   The `Not re-examined` diff state **does** reach `audit-project`'s
+   per-repo findings (see step 3 above): it is gated on coverage, not on
+   sampling, and this audit's coverage is not always full — `0 of 1`,
+   `N-1 of N`, `2 of 3 — layer: SKIPPED`, `0 of 4 — SKIPPED`, `— run: M of
+   N`. `audit-project` states that in its § 2 coverage-convention paragraph
+   so a reader of this skill alone is not told the state cannot apply here.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
 | `.claude/skills/audit-workspace/SKILL.md` | Checklist sections 1–7 each state coverage (`X of Y examined`/`spot-checked`, naming items, for sections 1–2; `all N` for sections 3–7); add a Coverage column/table to the Report Format |
-| `.claude/skills/janitor-sweep/SKILL.md` | § 3 (Run the four checks): note the coverage-line requirement is relayed, not re-collected; § 5 (Run-over-run diff): coverage-gated `Not re-examined` state, workspace scope only; § 6 (report format): `Detail` column carries per-check coverage; add `Not re-examined` subsection to the `## Workspace` tier template |
+| `.claude/skills/janitor-sweep/SKILL.md` | § 3 (Run the four checks): note the coverage-line requirement is relayed, not re-collected; § 5 (Run-over-run diff): coverage-gated `Not re-examined` state in **both** scopes (a fourth subsection in workspace scope, a fourth inline tag value in project scope); § 6 (report format): `Detail` column carries per-check coverage; add `Not re-examined` subsection to the `## Workspace` tier template |
 | `.claude/skills/audit-project/SKILL.md` | § 2–6, 8 and the Report Format: state exhaustive coverage counts (`N of N`) per section, with § 7's already-satisfied convention noted; a `### Coverage` table at the top of the report |
 
 ## Principles Self-Check
@@ -185,7 +219,7 @@ no automated test harness:
 | Enforcement over documentation | This plan makes coverage *reportable as structured data* so the diff mechanism can key off it instead of a human note — a real mechanical improvement over today's ad hoc paragraph. It does **not** make coverage self-verifying: nothing stops a future audit-writing agent from writing `principles: 10 of 10` without actually reading all 10, the same trust boundary every prose judgement-pass skill in this workspace already has. Named explicitly as a known limit below, not papered over. |
 | Capture decisions, not just implementations | Skill-level refinement of the existing New/Resolved/Unchanged mechanism from #635, not a new cross-cutting policy — no ADR (matches the issue's own scope call and the review comment). |
 | A change includes its consequences | All three touched skills change together in one PR so `audit-workspace` and `audit-project` don't diverge in coverage-reporting shape, and `janitor-sweep`'s diff and render logic are updated in the same PR as the data they consume. |
-| Only what's needed | Explicitly does not touch project-scope's diff mechanism (step 3 above) or attempt to make the audits themselves deterministic (issue's own "Not in scope"). |
+| Only what's needed | The gate reaches both scopes because the failure it prevents occurs in both (step 3), but nothing beyond it moves: project scope keeps its inline per-finding tag rendering rather than gaining subsections, and this does not attempt to make the audits themselves deterministic (issue's own "Not in scope"). |
 | Improve incrementally | Extends the diff mechanism #635 introduced with one new state, rather than redesigning it. |
 | Test what breaks | See Documentation & Instruction Impact / manual verification below — no automated harness exists for these prose skills; this plan proposes a concrete replay-based manual check instead of an untested claim. |
 | Workspace vs. project separation | All three files are workspace-repo governance tooling; `audit-project`'s change stays generic (no project-specific content). |
@@ -205,7 +239,7 @@ no automated test harness:
 |---|---|---|
 | `audit-workspace`'s report format (adds coverage data) | `janitor-sweep` § 3 and § 6, which relay `audit-workspace`'s per-check status/detail into the sweep report | Yes — step 2 |
 | `janitor-sweep`'s diff mechanism (adds a 4th state) | The `## Workspace` report-format template block (§ 6) that currently only shows `New`/`Resolved`/`Unchanged` subsections | Yes — step 3 |
-| `audit-project`'s report format | `janitor-sweep` § 3's check-2 rollup description, which currently doesn't mention per-repo coverage detail | Yes — step 4 covers `audit-project` itself; `janitor-sweep`'s check-2 rollup text is prose describing status/FAILED/OK semantics, not coverage — no change needed there since project scope doesn't gain the coverage-gated diff state (step 3's scoping decision) |
+| `audit-project`'s report format | `janitor-sweep` § 3's check-2 rollup description and the `## Projects` check-status `Detail` cell, which relay per-repo coverage; § 5's project-scope diff, which now keys on it | Yes — step 4 covers `audit-project` itself; step 3 covers `janitor-sweep`'s project-scope gate, and the `## Projects` row's `Detail` cell carries the per-repo coverage signal so the rollup shows the same grain the Workspace row does |
 | `docs/design/planning_document_vocabulary.md` | Does it need to document `New`/`Resolved`/`Unchanged`/`Not re-examined`? | No — confirmed by search (no mention of these states in the vocabulary doc today, before or after this change) and by the review comment's own check: the vocabulary doc describes planning-document *kinds and locations*, not the sweep's diff-state vocabulary. Out of scope; not a gap this PR introduces. |
 
 ## Documentation & Instruction Impact
@@ -268,8 +302,8 @@ a reviewer can check the worked example against the rule text.
   so the check-count grain and the new per-check coverage grain never share
   a word.
 - A prior finding whose originating audit section cannot be inferred from
-  its text fails toward `Not re-examined` whenever any section was sampled
-  this run — "not known to be fixed" is the safe default.
+  its text fails toward `Not re-examined` whenever any section was less than
+  fully covered this run — "not known to be fixed" is the safe default.
 
 ## Estimated Scope
 
