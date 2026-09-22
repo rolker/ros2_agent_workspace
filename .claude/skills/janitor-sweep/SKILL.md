@@ -299,7 +299,9 @@ and the sweep is `FAILED`, not empty.
 report-only skill that will run repeatedly:
 
 - `$REPORT_DIR` — keep the **last 20** of **each** report shape; delete older
-  ones at the end of a run. The reports are small, but nothing else will ever
+  ones at the end of a run. The call site is **the end of step 6**, after both
+  report writes, and the snippet is repeated there so it is not left as an
+  exposition nobody runs. The reports are small, but nothing else will ever
   prune them, and a shape that matches no glob here accumulates forever:
 
   ```bash
@@ -1366,6 +1368,22 @@ contract): `FAILED(project health write: <reason>)`, never folded into
 `FAILED(report write: …)` or into a publish failure. It is **not terminal**
 — the primary report landed before this step ran — so the run continues and
 step 8 reports it alongside everything else.
+
+**Prune here, once both writes are done.** Step 1's retention rule (last 20
+of each shape) has to be *run* by something, and this is the point where every
+file this run produces exists: the primary report, and the per-project report
+on the runs that write one. Pruning before the writes would count this run's
+own files wrong; pruning in step 7 or 8 would skip the prune on a default run
+or on a publish failure.
+
+```bash
+# § 1, Retention — two globs, two counts, run at the end of step 6
+ls -1t "$REPORT_DIR"/*-sweep.md  | tail -n +21 | xargs -r rm -f
+ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f
+```
+
+A prune failure is not a sweep failure: the run's record has already landed,
+and the only consequence is a directory that stays larger than intended.
 
 **Keep the prose free of host identity and absolute local paths** as you
 write it — name files relative to the workspace root
