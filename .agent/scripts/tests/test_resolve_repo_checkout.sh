@@ -784,6 +784,31 @@ bootstrap_identity_case \
     3 "" \
     "an unparseable \$BOOTSTRAP_URL is refused even when the pointer file is valid — the override is not silently ignored"
 
+# --- 6h4i. manifest_config_dir's exit 3 still names BOTH absent things ---
+# The extraction moved the pointer diagnostic into manifest_bootstrap_identity,
+# which can only speak about the pointer. manifest_config_dir reaches it only
+# after finding no configs/manifest either, and the operator it sends to
+# `make setup-all` needs both halves: a message about the pointer alone reads
+# as a pointer problem, for which `make setup-all` looks like the wrong remedy.
+root=$(make_root config_dir_exit3_names_both)
+rc=0
+out=$(
+    {
+        unset BOOTSTRAP_URL
+        # shellcheck source=/dev/null
+        source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+        manifest_config_dir "$root"
+    } 2>"$TMPDIR_ROOT/stderr"
+) || rc=$?
+err=$(stderr_text)
+if [ "$rc" -ne 3 ] || [ -n "$out" ]; then
+    fail "manifest_config_dir with no manifest and no pointer → rc=$rc (want 3), out='$out' (want empty)"
+elif [[ "$err" != *"configs/project_bootstrap.url"* ]] || [[ "$err" != *"configs/manifest"* ]]; then
+    fail "manifest_config_dir exit 3 names only one of the two absent things: '$err'"
+else
+    pass "manifest_config_dir exit 3 names both the missing manifest and the missing pointer"
+fi
+
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
 # The early return has to recognise EVERY layout get_overlay_repos reads
 # (configs/manifest/repos AND configs/*.repos). Recognising only the first made
