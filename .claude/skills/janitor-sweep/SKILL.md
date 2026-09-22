@@ -714,9 +714,14 @@ run" is not a status.
 
   ```bash
   # inside check 2's per-repo loop, after that repo's audit-project run
-  [ -n "$PROJECT_REPO_NAME" ] && [ "$REPO" = "$PROJECT_REPO_NAME" ] \
-      && PROJECT_REPO_AUDITED_THIS_RUN=1
+  if [ -n "$PROJECT_REPO_NAME" ] && [ "$REPO" = "$PROJECT_REPO_NAME" ]; then
+      PROJECT_REPO_AUDITED_THIS_RUN=1
+  fi
   ```
+
+  Written as `if … then … fi`, not as an `&&` chain: the chain's value is
+  non-zero on its common path (this repo is not the project root), which under
+  an errexit shell would end the sweep at the most ordinary case there is.
 
   Set it whatever the repo's own audit status was: the per-project report
   re-scopes this run's findings for that repo, and a repo that audited
@@ -1171,9 +1176,15 @@ and the local report is written to disk and handed around. So this is a
 code-level gate on the rendered content, not an authoring reminder:
 
 ```bash
-[ "$PUBLISH" = "1" ] && HEALTH_BODY=$(redact_text "$HEALTH_BODY")
+if [ "$PUBLISH" = "1" ]; then
+    HEALTH_BODY=$(redact_text "$HEALTH_BODY")
+fi
 REPORT_BODY=$(redact_text "$REPORT_BODY")
 ```
+
+The gate is an `if`, not `[ … ] && HEALTH_BODY=…`: the chain returns non-zero
+on the default (non-publishing) run, which is the common path, and would end
+the sweep there under an errexit shell.
 
 **`$HEALTH_BODY` is not computed on a default run**, and nothing consumes it
 there: step 7 does not run, and the local report carries the identical
