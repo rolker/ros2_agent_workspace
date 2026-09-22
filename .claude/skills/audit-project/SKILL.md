@@ -198,12 +198,22 @@ section of this audit ends with one of these, collected in the report's
 `audit-workspace` uses, so a reader of both audits sees the same shape
 ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
 Unlike `audit-workspace`, **no section here samples**: each enumerates a
-set it discovered (every `package.xml` found, a fixed checklist), so every
-line is `all N` or `N of N`, and an `N` smaller than the set actually holds
-— or an item that could not be read, `N-1 of N — <item>: <reason>` — is
-what makes an incomplete pass visible. Because nothing samples, the sweep's
-`Not re-examined` diff state (`janitor-sweep` § 5) never applies to this
-audit's findings; it exists for sampled sections only.
+set it discovered (every `package.xml` found, a fixed checklist), so the
+full-coverage line is `all N` or `N of N`, and an `N` smaller than the set
+actually holds — or an item that could not be read, `N-1 of N — <item>:
+<reason>` — is what makes an incomplete pass visible.
+
+**Not sampling is not the same as always complete**, and the coverage table
+is the only place the difference shows. Sections here legitimately report
+`0 of 1 — <reason>`, `N-1 of N — <item>: <reason>`, `2 of 3 — layer: SKIPPED
+(no layer checkout)` in `clone` mode, `0 of 4 — SKIPPED(<reason>)` for the
+planning-document probe, and `N of N packages — run: M of N` for a partial
+test run. So the sweep's `Not re-examined` diff state (`janitor-sweep` § 5)
+**does** apply to this audit's findings: it is gated on coverage, not on
+sampling, and a prior per-repo finding whose section is anything short of
+fully covered this run is carried forward as `[Not re-examined]` rather than
+resolved. The clone-mode case is the common one — the same repo audited in
+`layer` mode and then in `clone` mode drops the layer check entirely.
 
 ### 3. Check agent guide quality
 
