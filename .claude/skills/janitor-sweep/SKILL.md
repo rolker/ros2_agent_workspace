@@ -884,6 +884,21 @@ top would be redundant, not because diffing was skipped.
   fi
   ```
 
+  **Known limitation — two sweeps on one host can diff against each other.**
+  `ls -1t … | head -n 1` picks the newest file in `$REPORT_DIR`, and on this
+  branch that directory is the *live* one this run will also write into. Two
+  sweeps running on the same host close enough together (same clone, or any
+  two worktrees — `$REPORT_DIR` is anchored at the main root, step 1) can each
+  pick up the other's report, including one still being written, and call it
+  "previous". The committed-`docs/health.md` branch above cannot do this: it
+  reads an immutable commit. This is named rather than fixed — no lock, no pid
+  filtering — because the consequence is bounded: a wrong or partial prior set
+  mis-labels findings as `New`/`Resolved` for one run, the report says which
+  file it diffed against (`$PREV_SOURCE` carries the basename, pid included),
+  and the next run is correct. A sweep is a periodic single-runner job, so
+  making concurrent local runs exact is deliberately not attempted here; if it
+  ever matters, it is a change to this rule, not a lock bolted onto it.
+
   `$PREV_SOURCE` always holds one of the template's own strings (§ Render the
   report's `**Diffed against**` line) — never the empty string, which would
   render as a blank line where a reader expects to be told what `Resolved`
