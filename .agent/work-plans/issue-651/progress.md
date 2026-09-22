@@ -146,3 +146,62 @@ test harness exists for these prose skill files; the hand walkthrough in
 confirm no surviving "workspace scope only" / "never occurs there" /
 three-state claims about the diff outside the deliberate one about
 publishing `docs/health.md`.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 09:03 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-651 at `23eb3d1`
+**Mode**: pre-push
+**Depth**: Standard (reason: three `.claude/skills/**/SKILL.md` governance files — governance-path override; no security/ADR trigger for Deep)
+**Must-fix**: 2 | **Suggestions**: 8
+**Round**: 2 | **Ship**: recommended — both must-fixes are precise, mechanical file:line edits; round 1's design question (extend the gate to project scope) is settled and all 13 round-1 findings verified resolved
+
+### Findings
+- [ ] (must-fix) § 6's unchanged "a tier with no findings **this run** is omitted entirely" swallows a tier whose only content is carried-forward `Not re-examined` entries — the silent-vanishing #651 closes; the committed 2026-09-21 `docs/health.md` renders tier 3 with zero current findings precisely to carry that paragraph, so the case is live. § 5 mandates the carry-forward, § 6 deletes its tier — `.claude/skills/janitor-sweep/SKILL.md:844-846` vs `:638,725`
+- [ ] (must-fix) § 5's project-scope gate does not recognise `audit-project` § 3's literal coverage tokens `checked` / `absent`; `checked` is the FULL-coverage case yet matches no full-coverage form, so a §3-sourced prior finding can never resolve. § 3 also lacks a partial form, unlike every other section. Fix either side — `.claude/skills/janitor-sweep/SKILL.md:718-726` vs `.claude/skills/audit-project/SKILL.md:229-233`
+- [ ] (suggestion) No aging or provenance on carried-forward `Not re-examined` entries; sections 1–2 sample at agent discretion with no rotation, so an entry can park indefinitely and renders identically whether missed once or twenty times — `.claude/skills/janitor-sweep/SKILL.md:599-611,904-916`
+- [ ] (suggestion) `ROADMAP.md`'s "Health document: none yet … the sweep that writes it is not wired up yet" is the same stale claim this PR's ride-along already corrected in `planning_document_vocabulary.md:347` — same class, same one-line fix, should ride along — `ROADMAP.md:19-23`
+- [ ] (suggestion) Absence-as-finding encoded two opposite ways across the two audits this PR explicitly aligned: a missing adapter reduces coverage (`2 of 3 — <file> missing`), a missing agent guide does not (`absent`, "not a coverage gap") — `.claude/skills/audit-workspace/SKILL.md:146-147` vs `.claude/skills/audit-project/SKILL.md:229-232`
+- [ ] (suggestion) "the same convention `audit-workspace` uses, so a reader of both audits sees the same shape" overstates: that table is 4 columns (`Section | Kind | Coverage | Items examined`), this one is 2 — `.claude/skills/audit-project/SKILL.md:196-198` vs `:374`
+- [ ] (suggestion) Project scope has no tier→`audit-project`-section map, unlike workspace scope's explicit all-seven mapping; tier 2 has no `audit-project` section at all and always takes the conservative fallback — pre-existing, but the new gate inherits it silently — `.claude/skills/janitor-sweep/SKILL.md:702-731`
+- [ ] (suggestion) "and the scope was briefly written as if it did" narrates this PR's own unshipped round-1 draft inside a durable instruction file; a future reader has no referent — `.claude/skills/janitor-sweep/SKILL.md:708`
+- [ ] (suggestion) The fenced template's tier 3 says "(same shape)" and then adds an explicit `#### Not re-examined` block, reading as though tier 3 has only that subsection — `.claude/skills/janitor-sweep/SKILL.md:904-916`
+- [ ] (suggestion) Plan drift: Estimated Scope still says the walkthrough is "recorded in the PR description" (it is a committed file) and names only three SKILL.md files, while the diff also touches `docs/design/planning_document_vocabulary.md` and adds `verification.md`; the Files to Change table lists neither — `.agent/work-plans/issue-651/plan.md:318-322`
+
+### Round-1 verification
+All 13 round-1 findings resolved. The design question was settled by extending
+the gate to project scope: `janitor-sweep` § 5 gains a project-scope block keyed
+on `audit-project`'s `### Coverage` table, § 6 carries the fourth tag value
+through every `## Projects` tier, and `audit-project` § 2's "never applies"
+paragraph is replaced with "not sampling is not the same as always complete".
+The check-4 bullet, generic `X of Y` template, section-6 mapping, `M of N`
+partial form, prior-finding-set definition, self-reporting caveat in the
+consumer, per-repo `Detail` coverage, tier-3 example move, `Kind` column, and
+committed `verification.md` are all present and correct. `verification.md`
+walks the rules as finally written — no skill-file commit lands after `77da22f`,
+the baseline it names.
+
+### Governance
+Principles — Enforcement over documentation: **Pass** (the "reportable, not
+self-verifying" caveat is restated in the consumer that turns the number into a
+classification, with an implausible row made a `FINDINGS` condition). A change
+includes its consequences: **Concern** (the tier-omission carve-out is the
+missing consequence of a state that renders without a current-run finding; the
+`ROADMAP.md` twin is a second). Test what breaks: **Pass** (`verification.md`
+committed, and it names what it does not establish). Workspace improvements
+cascade to projects: **Pass** (`audit-project` gained the protection, not just
+the convention). Only what's needed / Improve incrementally / Workspace vs.
+project separation / Capture decisions: **Pass**.
+ADRs — ADR-0013 not triggered; ADR-0017 N/A. Consequences map: framework-skill
+row satisfied (no skill added or removed); health-document row N/A.
+No live instruction file (`AGENTS.md`, `CLAUDE.md`,
+`.github/copilot-instructions.md`, `.agent/knowledge/`) still asserts the
+three-state vocabulary or the old `Coverage: X of 4` PR-body wording — only
+point-in-time `issue-635`/`issue-569` work-plan records, correctly left alone.
+Static analysis: no linter profile for Markdown (review-code § 4);
+`git diff --check` clean.
+Plan adherence: in sync on substance; only Estimated Scope and the Files to
+Change table lag (suggestion above).
