@@ -114,6 +114,16 @@ already terminal for the run and the publish step is never reached). The two
 never stand in for each other — a failed publish is stated by name, next to
 the local report's own status, never folded into it.
 
+**Step 1a's project-root resolution is not a check and has no state of its
+own here** — it decides whether the optional per-project report can be
+written at all, and its four outcomes (§ 1a) are reported on that report's
+own line in step 8, never folded into the four check states. One of them is
+a failure: `FAILED(project root probe: <reason>)`, the checkout was there
+but could not be probed. It is stated exactly as plainly as the other three,
+and it is distinct from the seventh state below — the probe failing means no
+report could be *built*; the seventh means one was built and could not be
+*written*.
+
 **The optional per-project report's write is a seventh state** (§ 6): the
 same "the report write is itself a state" rule as the fifth, named
 separately — `FAILED(project health write: <reason>)` — so it can never be
@@ -1833,6 +1843,9 @@ State the **per-project health outcome** on its own line, from
 - `<repo>: not in this run's chunk — no per-project report`
 - `<repo>: check 2 did not audit it — no per-project report` (it *was* in the
   chunk; check 2's own status says why)
+- `<repo>: FAILED(project root probe: <reason>)` — the checkout is there but
+  `planning_doc_probe.sh` could not read it, so whether it has a roadmap is
+  unknown. Never rendered as "no roadmap"
 - `<repo>: <report path, workspace-relative>`
 - `<repo>: FAILED(project health write: <reason>)`
 
