@@ -50,7 +50,9 @@
 #   <repo>/rosdep.yaml                          rosdep keys with no upstream
 #       ros/rosdistro entry yet, in upstream rosdistro format (#654). Installed
 #       as a ROSDEP_SOURCE_PATH overlay over the image's own sources before
-#       `rosdep install`, and recorded with a `+rosdep-local` steps token. The
+#       `rosdep install`, and recorded with a `+rosdep-local` steps token plus
+#       a `rosdep-local: src/<repo>/rosdep.yaml via ROSDEP_SOURCE_PATH` note
+#       line (ADR-0018 format extension, like #577's upstream-repo:). The
 #       workspace-wide equivalent is .agent/scripts/rosdep_local_sources.sh;
 #       see .agent/knowledge/dependency_policy.md
 #
@@ -509,13 +511,19 @@ LOG_HASH="$(sha256sum "$LOG" | cut -d' ' -f1)"
 # upstream-repo lines record the host-resolved SHAs the container was told to
 # check out — required for scope: full validity on upstream.repos repos
 # (ADR-0018); a rosdep-skip-keys line records deps the verified environment
-# deliberately did not install. Both absent for repos without the respective
-# files (byte-identical note format to pre-#577).
+# deliberately did not install; a rosdep-local line records that a key was
+# resolved from a source this repo carries rather than from upstream
+# ros/rosdistro (#654) — an environment built that way is not the same verified
+# environment as one that resolved everything upstream, so the note has to say
+# which it was. All absent for repos without the respective files
+# (byte-identical note format to pre-#577).
 NOTE_EXTRA=""
 for i in "${!UP_DIRS[@]}"; do
   NOTE_EXTRA+=$'\n'"upstream-repo: ${UP_DIRS[$i]}@${UP_SHAS[$i]}"
 done
 [[ -n "$SKIP_KEYS" ]] && NOTE_EXTRA+=$'\n'"rosdep-skip-keys: $SKIP_KEYS"
+[[ $ROSDEP_LOCAL -eq 1 ]] && \
+  NOTE_EXTRA+=$'\n'"rosdep-local: src/$REPO_NAME/rosdep.yaml via ROSDEP_SOURCE_PATH"
 NOTE="$PASS_LABEL
 repo: $REPO_NAME
 commit: $HEAD_SHA

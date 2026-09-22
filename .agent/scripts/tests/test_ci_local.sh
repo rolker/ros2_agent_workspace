@@ -303,6 +303,7 @@ check "exits 0"                       [ "$rc" -eq 0 ]
 note=$(note_of "$HEAD_SHA")
 check "no upstream-repo lines"        not_contains "$note" "upstream-repo:"
 check "no rosdep-skip-keys line"      not_contains "$note" "rosdep-skip-keys:"
+check "no rosdep-local line"          not_contains "$note" "rosdep-local:"
 check "steps unchanged"               contains "$note" "steps: template"
 
 echo "== repo-local rosdep.yaml is detected and wired (#654) =="
@@ -331,6 +332,11 @@ out=$(bash "$SUT" "$ROSREPO" 2>&1); rc=$?
 check "run exits 0"                   [ "$rc" -eq 0 ]
 rnote=$(git -C "$ROSREPO" notes --ref=ci-local show "$ROSREPO_SHA" 2>/dev/null)
 check "note steps gain rosdep-local"  contains "$rnote" "steps: template+rosdep-local"
+# ADR-0018 records the note FORMAT, not just the steps token: a reader of the
+# attestation must be able to see WHICH source carried the key, exactly as the
+# upstream-repo:/rosdep-skip-keys: lines do for their own deviations.
+check "note carries the rosdep-local line" \
+    contains "$rnote" "rosdep-local: src/rosdep_repo/rosdep.yaml via ROSDEP_SOURCE_PATH"
 
 echo "== a rosdep.yaml outside the accepted shape is refused (#654) =="
 # The file drives a root-level `rosdep install` inside the container, and
