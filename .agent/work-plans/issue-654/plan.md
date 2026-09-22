@@ -262,6 +262,10 @@ generic, with no repo names baked into workspace scripts.
 | `AGENTS.md` | Script Reference table rows for both new scripts, extended `stage_rosdep_manifests.sh` row, corrected `validate_workspace.py` row (step 8) |
 | `.agent/scripts/tests/test_rosdep_local_sources.sh` | New test file (step 9) |
 | `.agent/scripts/tests/test_make_validate.sh` | Stub the new check so the `validate`-recipe regression test still exercises the real recipe (step 6 consequence) |
+| `.agent/scripts/rosdep_yaml_validate.sh` | New — shape gate (added in round-2 review response): these files drive a root-level `rosdep install`, and rosdep's format also accepts `pip`/`npm`/`gem`/`source` rules. List form only; every generator, `ci_local.sh` and the staleness check run it and fail closed |
+| `docs/decisions/0018-local-first-ci-verification.md` | Format-extension paragraph for the `+rosdep-local` steps token (round-2 review response) |
+| `.agent/templates/ci_workflow.yml`, `.claude/skills/onboard-project/SKILL.md` | Cascade the hosted-CI recipe so a project repo picks it up (round-2 review response) |
+| `README.md` | `make validate` one-line description (round-2 review response) |
 
 ## Principles Self-Check
 
@@ -281,7 +285,7 @@ generic, with no repo names baked into workspace scripts.
 | 0003 — Project-agnostic workspace | Yes | All new scripts operate on the generic `layers/main/*_ws/src/*/rosdep.yaml` glob; no BizzyBoat/unh_marine_autonomy names anywhere in workspace code. |
 | 0004/0005 — Enforcement hierarchy | Yes | Staleness check runs via `make validate`, consistent with `validate_workspace.py`'s existing local-only role (not wired into hosted CI, matching current practice — see Issue Review's note that `validate.yml` doesn't call `make validate` today; not a gap this PR needs to close). |
 | 0009 — Python package management | Yes (Tier 1 reference only) | `python3-pystac`/`snakemake` are the consumer's Tier-1 apt/rosdep case; this PR builds the generic mechanism, doesn't touch `.venv` (Tier 2/3). No conflict. |
-| 0018 — Local-first CI verification | Yes | `ci_local.sh`'s inner script gets the local-source install step (step 5); the existing `upstream-repo:`/`rosdep-skip-keys:` attestation note lines are untouched — the local-source install happens before the existing `rosdep install --from-paths ... --skip-keys` line, same combined install, no new note fields needed since this doesn't change what's skipped or what upstream SHA was used. |
+| 0018 — Local-first CI verification | Yes | `ci_local.sh`'s inner script gets the local-source install step (step 5); the existing `upstream-repo:`/`rosdep-skip-keys:` note lines are untouched. **Amended during implementation**: the plan said no attestation change was needed, and that was wrong. An environment that resolved a key from a repo-carried source is not the same verified environment as one that did not, so the run records a **`+rosdep-local` steps token** plus a `rosdep-local: <path> via ROSDEP_SOURCE_PATH` line — the same kind of format extension #577 made for `upstream-repo:`/`rosdep-skip-keys:`, and documented as such in ADR-0018. Notes on repos with no `rosdep.yaml` stay byte-identical. |
 
 ## Consequences
 
