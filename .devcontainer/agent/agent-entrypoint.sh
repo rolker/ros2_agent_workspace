@@ -93,6 +93,21 @@ set -u
 # on a workspace whose deps are already in the base image this skips
 # the 30–60s+ refresh entirely. Set FORCE_DEPS_REFRESH=1 to always
 # refresh (e.g. after editing a package.xml that adds a dependency).
+#
+# setup.bash (sourced above) exports ROSDEP_SOURCE_PATH when the bind-mounted
+# workspace carries a generated .rosdep/sources.list.d — the workspace is
+# mounted at the SAME absolute path it has on the host, so the generated
+# `yaml file://…` URLs resolve in here. That overrides the image's baked
+# /opt/rosdep-sources, and rosdep's cache is keyed by source URL, so the baked
+# cache has no entry for the workspace's URLs. Refresh once, and only when
+# there is actually a non-empty local list to pick up (#654). Best-effort: an
+# offline launch keeps the baked cache rather than failing.
+if [ -n "${ROSDEP_SOURCE_PATH:-}" ] && [ -s "$ROSDEP_SOURCE_PATH/30-workspace-local.list" ] \
+   && grep -qv '^[[:space:]]*#' "$ROSDEP_SOURCE_PATH/30-workspace-local.list" 2>/dev/null; then
+    echo "Workspace-local rosdep sources active ($ROSDEP_SOURCE_PATH) — refreshing cache..."
+    rosdep update || echo "  (rosdep update failed — continuing with the baked cache)"
+fi
+
 echo "Checking rosdep dependencies..."
 APT_REFRESHED=0
 for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
