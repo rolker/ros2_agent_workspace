@@ -64,6 +64,56 @@ check "line is the absolute file:// path" \
     grep -qxF "yaml file://$WS/layers/main/a_ws/src/repo_with/rosdep.yaml" "$LOCAL"
 check "repo without rosdep.yaml absent" bash -c "! grep -q repo_without '$LOCAL'"
 
+echo "=== rosdep_local_sources.sh: the published dir is swapped atomically ==="
+# The generated directory is HOST-SHARED (setup.bash exports it as
+# ROSDEP_SOURCE_PATH for every shell; two worktrees' `make build` both
+# regenerate it). Rebuilding it in place would hand a concurrent reader an
+# empty or half-copied sources dir, which is "rosdep has no sources at all".
+check "out dir is a symlink"           test -L "$OUT_DIR"
+check "it resolves to a directory"     test -d "$OUT_DIR"
+slot1="$(readlink "$OUT_DIR")"
+check "it points into a slots dir"     contains "$slot1" ".sources.list.d.slots/"
+"$AGG" "$WS" >/dev/null 2>&1
+slot2="$(readlink "$OUT_DIR")"
+check "the slot alternates on rebuild" bash -c "[ '$slot1' != '$slot2' ]"
+check "the new slot is complete"       bash -c "[ -f '$OUT_DIR/20-default.list' ] && [ -f '$OUT_DIR/10-local.list' ] && [ -f '$OUT_DIR/30-workspace-local.list' ]"
+
+# A pre-#654-swap generated directory (a REAL dir at the published path) must
+# migrate to the symlink form rather than wedging every later run.
+rm -rf "$OUT_DIR" "$WS/.rosdep/.sources.list.d.slots"
+mkdir -p "$OUT_DIR"
+echo "stale" > "$OUT_DIR/99-stale.list"
+"$AGG" "$WS" >/dev/null 2>&1
+check "a real dir migrates to a link"  test -L "$OUT_DIR"
+check "the stale list is gone"         bash -c "! [ -f '$OUT_DIR/99-stale.list' ]"
+
+echo "=== rosdep_local_sources.sh: a reader never sees an incomplete dir ==="
+# Concurrent regenerations + a reader loop: at no instant may the published
+# path be missing, be a non-directory, or be missing one of the lists.
+reader_log="$TMP/reader.log"
+: > "$reader_log"
+(
+    end=$((SECONDS + 12))
+    while [ "$SECONDS" -lt "$end" ]; do
+        if [ ! -d "$OUT_DIR" ]; then
+            echo "MISSING" >> "$reader_log"
+        elif [ ! -f "$OUT_DIR/20-default.list" ] || [ ! -f "$OUT_DIR/10-local.list" ] \
+             || [ ! -f "$OUT_DIR/30-workspace-local.list" ]; then
+            echo "INCOMPLETE" >> "$reader_log"
+        fi
+    done
+) &
+reader_pid=$!
+for _ in 1 2 3 4 5 6 7 8; do
+    "$AGG" "$WS" >/dev/null 2>&1 &
+done
+wait
+kill "$reader_pid" 2>/dev/null
+wait "$reader_pid" 2>/dev/null
+check "reader saw no torn directory"   bash -c "! [ -s '$reader_log' ]"
+check "the survivor is still complete" bash -c "[ -f '$OUT_DIR/30-workspace-local.list' ]"
+check "and still lists the repo"       grep -q "repo_with" "$LOCAL"
+
 echo "=== rosdep_local_sources.sh: idempotent regeneration ==="
 first="$(cat "$LOCAL")"
 "$AGG" "$WS" >/dev/null 2>&1
