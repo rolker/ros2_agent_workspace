@@ -194,9 +194,14 @@ governance. But missing items should be noted, and a missing root
 
 **Coverage line**: `governance items: all 6` (the six rows above). Every
 section of this audit ends with one of these, collected in the report's
-`### Coverage` table (§ Report Format) — the same convention
-`audit-workspace` uses, so a reader of both audits sees the same shape
-([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+`### Coverage` table (§ Report Format) — the same **convention**
+`audit-workspace` uses, so a reader of both audits reads coverage the same
+way ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+The two tables are not the same shape: `audit-workspace`'s has four columns
+(`Section | Kind | Coverage | Items examined`), this one has two
+(`Section | Coverage`). The `Items examined` column is what names the
+principles or ADRs a *sample* looked at, and nothing here samples, so there
+is nothing for it to hold.
 Unlike `audit-workspace`, **no section here samples**: each enumerates a
 set it discovered (every `package.xml` found, a fixed checklist), so the
 full-coverage line is `all N` or `N of N`, and an `N` smaller than the set
