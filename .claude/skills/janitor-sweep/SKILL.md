@@ -1222,10 +1222,19 @@ most recent prior local report for that repo, best-effort, with `no prior
 report for this repo` / `prior report covered a different chunk` said plainly
 rather than rendered as "no changes". Since the body's findings are the ones
 § 5 already diffed, this report's diff state is **inherited from that
-computation, not recomputed**. The `<ts>-<repo>-health.md` files simply join
-the set of local reports § 5's lookup already reads for that repo; no new
-lookup logic is needed, and step 1's retention prunes them on the same
-last-20 rule.
+computation, not recomputed**.
+
+**The per-project files are not themselves a diff source, and § 5's lookup
+does not read them.** They are a re-scoped copy of a `## Projects` section
+that already exists in full in the run's own `*-sweep.md` report — which is
+what § 5 reads for this repo, as it did before this change, and which is
+written on *every* run rather than only the ones where the project root
+happened to fall in the chunk. Adding `*-<repo>-health.md` to that lookup
+would put a second, narrower copy of the same findings in front of the
+diff for no gain. So there is no new *lookup* logic; there is new
+**retention** logic, because the shape does not match `*-sweep.md` and
+nothing else would ever prune it — step 1 globs it separately, under its own
+last-20 count (§ 1, Retention).
 
 Redact `$PROJECT_HEALTH_BODY` before writing it, exactly as the other two
 artifacts are redacted above — it is built from the same
