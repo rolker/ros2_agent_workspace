@@ -668,6 +668,14 @@ run" is not a status.
   `FAILED` has a finding-set worth reporting (its failure) exactly as one
   that audited clean does.
 
+  **The loop must not be a pipeline.** `... | while read REPO; do ...; done`
+  runs its body in a subshell, so this assignment — and any other state the
+  loop accumulates for later steps — dies with it, and step 6 then reports
+  `SKIPPED(check 2 did not audit <repo>)` for a repo it just audited. Drive
+  the loop from a `for` over the chunk, or from a here-string
+  (`while read REPO; do ...; done <<< "$CHUNK_REPOS"`), both of which keep
+  the body in the current shell.
+
   **Relay each repo's coverage too.** `audit-project`'s per-repo report
   carries its own seven-row `### Coverage` table, near its top; carry it, folded into one clause
   per repo, into the check's `Detail` cell alongside the checkout mode
