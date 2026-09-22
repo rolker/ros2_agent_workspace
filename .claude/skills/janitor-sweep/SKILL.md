@@ -1098,6 +1098,8 @@ not assume success:
 ```bash
 if ! printf '%s\n' "$REPORT_BODY" > "$REPORT"; then
     echo "FAILED(report write: could not write $(redact_text "$REPORT"))"
+    # ... print the findings inline here, then stop. The run is over.
+    exit 1
 fi
 ```
 
@@ -1107,8 +1109,16 @@ A failed write (read-only filesystem, no space, an unwritable or absent
 conversation, print the findings inline so the run is not lost with the file,
 and never describe the sweep as clean**. Checks that completed are still
 reported with their own statuses — the failure is the record, not the checks.
-A report-write failure is terminal for the run: step 7 is not reached
-(§ The status contract, fifth state).
+
+**The stop is part of the state, not a formality.** A report-write failure is
+terminal for the run (§ The status contract, fifth state), and the snippet
+above has to *say so* in code: nothing after this line may append to `$REPORT`
+or report a path that never landed. On `main` the block ended at the `echo`
+and nothing followed it that could be fooled, so the missing stop cost
+nothing. This change makes it load-bearing — the per-project block below
+appends its `## Project health` section to `$REPORT` and can record
+`written: <path>` for its own file — so the `exit 1` is added here rather
+than left implied by the prose.
 
 #### The optional per-project health report
 
