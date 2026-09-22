@@ -149,9 +149,17 @@ deliberate, recorded gap rather than an oversight:
   rule there can install something odd into that runner and nothing else. It
   cannot reach the dev host, the `ci_local` container on it, or the agent image.
 - The same file **is** gated on every path that does reach a persistent
-  machine, including `ci_local.sh` — which on a project repo is the ADR-0018
-  merge verification. So a file that would be rejected is caught before the
-  branch can merge, just not by the hosted job itself.
+  machine: the dev host's generated sources directory, the `ci_local`
+  container, and the agent-image bake. That is the actual guarantee — an
+  out-of-shape rule cannot be *used* on a machine that outlives the job, even
+  if it merges.
+- What is **not** guaranteed is that it is caught before the merge. ADR-0018
+  makes a full-scope `ci_local` attestation *an accepted* merge verification,
+  not a required one: a project-repo PR may equally merge on green hosted
+  Actions, and that route never runs the shape gate. So review — of the
+  `rosdep.yaml` itself, in the PR — is the only pre-merge check that always
+  runs. If the repo takes the `ci_local` route the gate does catch it first,
+  but do not rely on that: it depends on which verification the PR used.
 
 If hosted CI ever gains a persistent cache or a self-hosted runner, this
 reasoning expires and the gate has to reach the workflow step.
@@ -163,7 +171,7 @@ reasoning expires and the gate has to reach the workflow step.
 | Interactive shell / `make build` | `rosdep_local_sources.sh` writes `<main-root>/.rosdep/sources.list.d/` (gitignored). `setup.bash` exports `ROSDEP_SOURCE_PATH` at it when it exists; the `$(STAMP)/rosdep-local.done` Makefile stamp regenerates it whenever a `rosdep.yaml` changes, is added, or first appears with a newly checked-out repo. `bootstrap.sh` generates it between `rosdep init` and its `rosdep update`. Because one directory serves every shell and every worktree on the host, a regeneration never edits it in place: the new content is built in a sibling slot and published by an atomic symlink swap under a bounded `flock`, so `ROSDEP_SOURCE_PATH` always resolves to a complete directory. |
 | `ci_local.sh` | Tests one repo in isolation with no `layers/` tree, so it overlays **that repo's own** `rosdep.yaml` into a container-local sources dir and records a `+rosdep-local` steps token in the attestation note. |
 | Agent container image | `stage_rosdep_manifests.sh` stages each repo's `rosdep.yaml` into the build context; the Dockerfile builds `/opt/rosdep-sources` and sets `ENV ROSDEP_SOURCE_PATH`. A key that still will not resolve ends the build step in a labelled `WARNING` block naming it. At launch, `agent-entrypoint.sh` inherits `ROSDEP_SOURCE_PATH` from the bind-mounted workspace (mounted at its host absolute path, so the `file://` URLs resolve) and refreshes **both** rosdep caches — root's and the agent user's, since the cache is per user and keyed by source URL. It skips that refresh when the list it sees is byte-identical to the image's own baked one: a workspace that generated no local list leaves `ROSDEP_SOURCE_PATH` at the baked dir, whose cache is already correct. |
-| Hosted CI (project repo) | One workflow step, below. The **only** consumer that does not run the shape gate first — an accepted residual gap, reasoned out above. |
+| Hosted CI (project repo) | One workflow step, below. The **only** consumer that does not run the shape gate first — an accepted residual gap, reasoned out above. It is also the merge route that never runs the gate at all (ADR-0018 accepts *either* a `ci_local` attestation or green hosted Actions), so PR review is the pre-merge check that always applies. |
 
 ### Cache gotcha
 

@@ -185,7 +185,13 @@ cd <layer>_ws/src/<repo-name>
     accepted shape is list-form only (no `pip`/`npm`/`gem`/`source` rules) —
     see `.agent/knowledge/dependency_policy.md`. The step itself does not
     enforce that shape (it has to stay self-contained, and the runner is
-    throwaway); `ci_local.sh` does, before the repo can merge. If a `package.xml` depends on
+    throwaway). `ci_local.sh` does enforce it — but only when a PR takes the
+    `ci_local` attestation route, which ADR-0018 makes *an accepted* merge
+    verification, not a required one: a PR that merges on green hosted
+    Actions is never shape-gated, so reviewing the `rosdep.yaml` in the PR is
+    the check that always applies. Every path that puts a key on a
+    **persistent** machine (dev host, `ci_local` container, agent image) is
+    gated regardless. If a `package.xml` depends on
     something with no rosdep key at all, that note is the decision table for
     what to do about it.
 
