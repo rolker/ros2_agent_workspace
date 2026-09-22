@@ -64,10 +64,14 @@ no automated test harness:
      plan makes the *coverage number* the thing that proves incompleteness
      instead of prose.
 
-   Add a **Coverage** column to the existing per-section report tables (or a
-   dedicated `### Coverage` summary table before `### Findings`, whichever
-   reads cleaner once drafted) so the coverage numbers are visible in the
-   audit's own output, not just implied by findings text.
+   Add a dedicated `### Coverage` summary table between `### Summary` and
+   `### Findings` — one row per section, always all seven, in a fixed
+   order — so the coverage numbers are visible in the audit's own output
+   as one block `janitor-sweep` can relay and key on, not just implied by
+   findings text. (Settled at implementation: a separate table rather than
+   a column on each findings table, because the consumer reads it as one
+   unit and the Summary table answers a different question — what was
+   *found* versus what was *looked at*.)
 
 2. **`janitor-sweep`: per-check coverage line in `## Workspace`, distinct
    from the top-line `Checks: X of 4 completed`.**
@@ -128,7 +132,13 @@ no automated test harness:
    (§ 6, report format), replacing today's ad hoc practice of a hand-written
    paragraph after the fact (visible in the current committed
    `docs/health.md`). A tier with no `Not re-examined` findings this run
-   omits that subsection, matching the existing rule for empty subsections.
+   omits that subsection. This is **new behavior specific to this
+   subsection**, not an existing rule: today only a whole *tier* is omitted
+   when empty, and `New`/`Resolved`/`Unchanged` are always rendered inside a
+   rendered tier (empty ones say why, as the first-run note does). The
+   fourth subsection differs because on a full-coverage run it is empty by
+   design, and an always-present empty `Not re-examined` heading would
+   suggest partial coverage where there was none.
 
 4. **`audit-project`: same coverage-line convention, for symmetry.**
 
@@ -139,6 +149,11 @@ no automated test harness:
    just stating the existing exhaustive counts as explicit coverage data so
    the report format matches `audit-workspace`'s new shape and a reader
    doesn't have to infer "was this exhaustive?" from prose. Add:
+   - **Agent Guide** (step 3): a one-item section — `checked` when the
+     guide exists and was read, `absent` when there is none (the absence
+     is a § 2 finding, not a coverage gap), `0 of 1 — <reason>` when it
+     exists but could not be read. Included so all seven sections carry a
+     row; the plan-review round flagged its omission from the first draft.
    - **Package Metadata**: `N of N packages checked` (N = packages found by
      the same `package.xml` search step 4 already uses).
    - **Test Status**: `N of N packages checked` (same N).
@@ -161,7 +176,7 @@ no automated test harness:
 |------|--------|
 | `.claude/skills/audit-workspace/SKILL.md` | Checklist sections 1–7 each state coverage (`X of Y examined`/`spot-checked`, naming items, for sections 1–2; `all N` for sections 3–7); add a Coverage column/table to the Report Format |
 | `.claude/skills/janitor-sweep/SKILL.md` | § 3 (Run the four checks): note the coverage-line requirement is relayed, not re-collected; § 5 (Run-over-run diff): coverage-gated `Not re-examined` state, workspace scope only; § 6 (report format): `Detail` column carries per-check coverage; add `Not re-examined` subsection to the `## Workspace` tier template |
-| `.claude/skills/audit-project/SKILL.md` | § 2, 4, 5, 6, 8 and the Report Format: state exhaustive coverage counts (`N of N`) per section |
+| `.claude/skills/audit-project/SKILL.md` | § 2–6, 8 and the Report Format: state exhaustive coverage counts (`N of N`) per section, with § 7's already-satisfied convention noted; a `### Coverage` table at the top of the report |
 
 ## Principles Self-Check
 
@@ -241,11 +256,20 @@ a reviewer can check the worked example against the rule text.
 
 ## Open Questions
 
-- Whether the Coverage line belongs in `audit-workspace`'s per-section
+- ~~Whether the Coverage line belongs in `audit-workspace`'s per-section
   report tables (adding a column) or as a separate `### Coverage` summary
-  table before `### Findings` — implementation detail to settle while
-  drafting the actual SKILL.md text; both satisfy the issue's requirement
-  that coverage be structured data rather than prose.
+  table before `### Findings`.~~ Settled at implementation: a separate
+  `### Coverage` table (see Approach step 1).
+
+## Implementation notes
+
+- The publish step's PR body and the operator report both labelled the
+  `X of 4 completed` line `Coverage:`. Renamed to `Checks:` in both places
+  so the check-count grain and the new per-check coverage grain never share
+  a word.
+- A prior finding whose originating audit section cannot be inferred from
+  its text fails toward `Not re-examined` whenever any section was sampled
+  this run — "not known to be fixed" is the safe default.
 
 ## Estimated Scope
 
