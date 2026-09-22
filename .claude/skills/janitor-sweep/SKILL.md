@@ -786,9 +786,19 @@ top would be redundant, not because diffing was skipped.
   same commit:
 
   ```bash
-  PREV_HEALTH=$(git -C "$ROOT" show HEAD:docs/health.md 2>/dev/null) || PREV_HEALTH=""
-  PREV_SOURCE="committed docs/health.md @ $(git -C "$ROOT" rev-parse --short HEAD)"
+  if PREV_HEALTH=$(git -C "$ROOT" show HEAD:docs/health.md 2>/dev/null); then
+      PREV_SOURCE="committed docs/health.md @ $(git -C "$ROOT" rev-parse --short HEAD)"
+  else
+      PREV_HEALTH=""
+      PREV_SOURCE="none — first committed run, no prior health document"
+  fi
   ```
+
+  The source is named **only when the read succeeded**. `git show` failing
+  (no `docs/health.md` in history — the normal first `--publish` run) leaves
+  nothing to diff against, and a `**Diffed against**` line naming a commit
+  in that state would attribute an empty prior set to a document that was
+  never read.
 
   **When `--publish` was not passed (the default)**: the most recent prior
   **local** workspace-scope report — the `## Workspace` section of the
@@ -807,17 +817,25 @@ top would be redundant, not because diffing was skipped.
       PREV_SOURCE="local report $(basename "$PREV_REPORT")"
   else
       PREV_HEALTH=""
-      PREV_SOURCE=""
+      PREV_SOURCE="none — first local run, no prior report"
   fi
   ```
 
-  Say which of the two "nothing to diff against" states applies, plainly,
-  rather than rendering an empty diff as "no changes": **`no prior local
-  report`** (none in the directory at all — first local run on this host) or
-  **`prior report predates retention`** (the directory holds reports but the
-  run this finding would be diffed against was pruned by step 1's last-20
-  rule). These are the same two the Project-scope bullet below already
-  distinguishes.
+  `$PREV_SOURCE` always holds one of the template's own strings (§ Render the
+  report's `**Diffed against**` line) — never the empty string, which would
+  render as a blank line where a reader expects to be told what `Resolved`
+  meant this run.
+
+  There is exactly **one** "nothing to diff against" state on this branch,
+  and it is said plainly rather than rendered as "no changes": **`no prior
+  local report`** — the directory holds none at all, the first local run on
+  this host. The Project-scope bullet below distinguishes a second state,
+  `prior report predates retention`, and that one is **not reachable here**:
+  workspace scope diffs against whichever report is newest, so retention
+  pruning older runs is invisible to it — there is no particular prior run it
+  could find missing. Project scope can tell the two apart because it looks
+  for a report covering *a given repo*, which retention can prune out from
+  under it while other reports remain.
 
   `$PREV_HEALTH` and `$PREV_SOURCE` are assigned exactly once, here, on
   whichever branch ran; nothing later re-reads or re-derives either. Note
@@ -1307,9 +1325,11 @@ reader see both numbers.
 | Research-digest freshness | ... | last updated <date>, <n> days. Coverage: the one digest file, read |
 
 **Diffed against**: <one of — `committed docs/health.md @ <short-sha>` (the
-`--publish` branch) / `local report <ts>-sweep.md` (the default branch, a
-prior report found) / `none — first local run, no prior report` / `none —
-prior report predates retention` >
+`--publish` branch, a prior document read) / `none — first committed run, no
+prior health document` (the `--publish` branch, `git show` found none) /
+`local report <ts>-<pid>-sweep.md` (the default branch, a prior report
+found) / `none — first local run, no prior report` (the default branch,
+none in the directory) >
 
 <!-- Rendered on every run, directly under the check table (§ 5). The two
      branches diff against different sources, and which one a reader is
@@ -1318,7 +1338,8 @@ prior report predates retention` >
 
 <!-- First committed run for this repo (git show HEAD:docs/health.md fails,
      or docs/health.md has never been committed): say so explicitly here —
-     "first committed run — no prior health document" — rather than
+     "none — first committed run, no prior health document", the string
+     § 5's --publish branch assigns to $PREV_SOURCE — rather than
      rendering empty Resolved/Unchanged subsections that would read as
      "nothing changed". -->
 
