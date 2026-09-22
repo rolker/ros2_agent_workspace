@@ -192,6 +192,19 @@ This is a **coverage report**, not a mandate — not every repo needs full
 governance. But missing items should be noted, and a missing root
 `AGENTS.md` means Copilot code review runs uninstructed on that repo.
 
+**Coverage line**: `governance items: all 6` (the six rows above). Every
+section of this audit ends with one of these, collected in the report's
+`### Coverage` table (§ Report Format) — the same convention
+`audit-workspace` uses, so a reader of both audits sees the same shape
+([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+Unlike `audit-workspace`, **no section here samples**: each enumerates a
+set it discovered (every `package.xml` found, a fixed checklist), so every
+line is `all N` or `N of N`, and an `N` smaller than the set actually holds
+— or an item that could not be read, `N-1 of N — <item>: <reason>` — is
+what makes an incomplete pass visible. Because nothing samples, the sweep's
+`Not re-examined` diff state (`janitor-sweep` § 5) never applies to this
+audit's findings; it exists for sampled sections only.
+
 ### 3. Check agent guide quality
 
 If `.agents/README.md` exists, check it against the template
@@ -203,6 +216,12 @@ If `.agents/README.md` exists, check it against the template
 - Do listed file paths actually exist in the repo?
 - Does the package inventory match actual `package.xml` files?
 
+**Coverage line**: `agent guide: checked` when the file exists and all
+four questions were answered; `agent guide: absent` when there is no
+`.agents/README.md` (nothing to examine — the absence is the § 2 finding,
+not a coverage gap); `agent guide: 0 of 1 — <reason>` when it exists but
+could not be read.
+
 ### 4. Check package metadata
 
 For each `package.xml` in the repo:
@@ -211,6 +230,9 @@ For each `package.xml` in the repo:
 - Are dependencies listed?
 - Does it have a license?
 - Is the maintainer field populated?
+
+**Coverage line**: `package metadata: N of N packages`, N = the
+`package.xml` files found in step 1's probe.
 
 ### 5. Check test status
 
@@ -240,12 +262,19 @@ source "$ROOT/.agent/scripts/setup.bash" && cd "$ROOT/layers/main/<layer>_ws" \
 
 Report test existence and pass/fail, not test quality.
 
+**Coverage line**: `test status: N of N packages` (existence check, same N
+as § 4); when tests were actually run, append `— run: M of N` so a partial
+`colcon test` pass is visible.
+
 ### 6. Check documentation
 
 - Does a top-level `README.md` exist?
 - Do packages have individual READMEs?
 - Are launch files documented?
 - Are custom message/service/action files documented?
+
+**Coverage line**: `documentation items: all 4` (the four questions above;
+the per-package ones count as answered when every package was checked).
 
 ### 7. Check planning documents
 
@@ -311,6 +340,15 @@ would misreport a probe that never ran as one that ran and found nothing.
 - Does the workspace's `.agent/project_knowledge/` symlink (pointing to
   `.agents/workspace-context/`) include content from this repo?
 
+**Coverage line**: `workspace integration: all 3`; in `clone` mode the
+layer check is SKIPPED by design, so the line reads `2 of 3 — layer:
+SKIPPED (no layer checkout)`.
+
+(§ 7, planning documents, already satisfies the convention by construction:
+the probe emits all four kinds or is SKIPPED wholesale, so its coverage is
+`planning documents: 4 of 4` or `0 of 4 — SKIPPED(<reason>)`, stated in the
+table below.)
+
 ## Report Format
 
 ```markdown
@@ -320,6 +358,21 @@ would misreport a probe that never ran as one that ran and found nothing.
 or `clone` — `.agent/scratchpad/janitor-repos/<repo-name>`)
 **Checkout mode**: layer / clone
 **Packages**: N packages (list)
+
+### Coverage
+
+| Section | Coverage |
+|---|---|
+| 2. Governance | all 6 |
+| 3. Agent guide | checked / absent / 0 of 1 — <reason> |
+| 4. Package metadata | N of N packages |
+| 5. Test status | N of N packages [— run: M of N] |
+| 6. Documentation | all 4 |
+| 7. Planning documents | 4 of 4 / 0 of 4 — SKIPPED(<reason>) |
+| 8. Workspace integration | all 3 / 2 of 3 — layer: SKIPPED (no layer checkout) |
+
+<!-- Always all seven rows, in this order — what was LOOKED AT, as distinct
+     from the per-section tables below, which say what was FOUND. -->
 
 ### Governance Coverage
 
