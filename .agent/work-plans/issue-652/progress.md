@@ -59,3 +59,21 @@ issue: 652
 ---
 **Authored-By**: `Claude Code Agent`
 **Model**: `Claude Sonnet`
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-22 11:40 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-652/plan.md` at `c858ecd`
+**Branch**: feature/issue-652 at `c858ecd`
+**Phases**: single
+
+### Open questions
+- [ ] Confirm step-1a (lettered top-level insertion, not a full renumber) is acceptable style for this 1500-line skill doc.
+- [ ] Confirm whether `manifest_bootstrap_identity()`'s exit codes get a second documented block or fold into `manifest_config_dir`'s existing table.
+- [ ] Confirm per-project report filenames use the repo name (not a distinct "project" label — none exists yet in the vocabulary draft).
+
+---
+**Authored-By**: `Claude Code Agent`
+**Model**: `Claude Sonnet`
