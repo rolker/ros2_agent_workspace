@@ -115,12 +115,24 @@ fi
 # upstream.repos with), plus a raw-text pass for the comments, which the loader
 # discards. A key's marker may sit on its own line (trailing comment) or in the
 # contiguous comment block directly above it.
+#
+# One unreadable or unparseable file must NOT cost the report for every other
+# one: the parser names it, skips it, and keeps going, and the non-zero status
+# is recorded here as a finding rather than discarding the partial TSV. A
+# broken file elsewhere in the workspace used to hide every legitimate stale or
+# unmarked key until someone fixed it.
+parse_bad=0
 KEYS_TSV="$(python3 - "${yamls[@]}" <<'PY'
 import io, re, sys, yaml
 
 rc = 0
 for path in sys.argv[1:]:
-    raw = io.open(path, encoding="utf-8").read()
+    try:
+        raw = io.open(path, encoding="utf-8").read()
+    except (IOError, OSError, UnicodeDecodeError) as e:
+        sys.stderr.write("%s: cannot be read: %s\n" % (path, e))
+        rc = 1
+        continue
     try:
         data = yaml.safe_load(raw)
     except yaml.YAMLError as e:
@@ -150,10 +162,16 @@ for path in sys.argv[1:]:
         print("%s\t%s\t%s" % (path, key, has))
 sys.exit(rc)
 PY
-)" || { echo "rosdep-local: could not parse a rosdep.yaml (see above)." >&2; exit 1; }
+)" || parse_bad=1
+
+if [ "$parse_bad" -eq 1 ]; then
+    echo "❌ rosdep-local: one or more rosdep.yaml files could not be read or parsed"
+    echo "   (named above). The keys from the files that DID parse are still checked."
+fi
 
 if [ -z "$KEYS_TSV" ]; then
     echo "rosdep-local: ${#yamls[@]} rosdep.yaml file(s) found, but no keys declared."
+    [ "$parse_bad" -eq 1 ] && exit 1
     exit 0
 fi
 
@@ -177,6 +195,7 @@ resolves_upstream() {
 
 # ---- report ----------------------------------------------------------------
 rc="$shape_rc"
+[ "$parse_bad" -eq 1 ] && rc=1
 stale=0
 unmarked=0
 skipped=0
@@ -219,6 +238,6 @@ if [ "$rc" -eq 0 ]; then
     echo "✅ rosdep-local: $total local rosdep key(s) across ${#yamls[@]} file(s) — all still needed, all marked, all in the accepted form."
 else
     echo "rosdep-local: $stale stale key(s), $unmarked unmarked key(s), of $total checked" \
-         "(plus any shape rejection reported above)."
+         "(plus any shape rejection or unparseable file reported above)."
 fi
 exit "$rc"

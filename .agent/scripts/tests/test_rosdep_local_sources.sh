@@ -252,6 +252,22 @@ out="$(PATH="$STUB:$PATH" "$CHECK" "$WS" 2>&1)"; rc=$?
 check "unparseable rosdep.yaml fails (1)" eq "$rc" 1
 rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
 
+# One broken file must not cost the report for every other file: a legitimate
+# stale or unmarked key elsewhere used to go unreported until someone fixed the
+# broken one.
+printf 'not: [a\n  mapping\n' > "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
+cat > "$WS/layers/main/a_ws/src/repo_without/rosdep.yaml" <<'EOF'
+mystery-key:
+  ubuntu: [mystery]
+EOF
+out="$(PATH="$STUB:$PATH" "$CHECK" "$WS" 2>&1)"; rc=$?
+check "a broken file is still a failure (1)" eq "$rc" 1
+check "it names the broken file"       contains "$out" "repo_other/rosdep.yaml"
+check "and still reports the other file's key" \
+    contains "$out" "'mystery-key' has no upstream-PR marker"
+rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml" \
+   "$WS/layers/main/a_ws/src/repo_without/rosdep.yaml"
+
 out="$("$CHECK" a b 2>&1)"; rc=$?
 check "too many arguments is a usage error (2)" eq "$rc" 2
 
