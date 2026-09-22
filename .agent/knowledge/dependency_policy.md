@@ -72,13 +72,19 @@ is read by every consumer below, and each of them feeds it to a **root-level**
 - the **`ci_local` container**, where the verified environment an attestation
   vouches for is built;
 - the **agent image bake**, where it lands in a layer every sandboxed agent
-  then runs on.
+  then runs on;
+- **hosted CI**, in the project repo's own GitHub Actions job.
 
 So the review of a one-line `rosdep.yaml` is a review of what gets installed as
-root on three machines' worth of environment, not of a build-config detail. The
+root on four environments' worth of machine, not of a build-config detail. The
 shape rule below is what keeps that blast radius to "an apt package name from a
 reviewed repo"; it is a policy gate, and the load-bearing part is still that
 project repos are reviewed.
+
+Three of those four are **persistent** — the dev host you keep working on, and
+the container images built on it. Hosted CI is the exception: a throwaway
+runner container that is destroyed with the job. That difference is why the
+shape gate is wired where it is (see below).
 
 ### The accepted shape — a rule, and it is enforced
 
@@ -105,7 +111,7 @@ a local key is a short-lived stand-in for an upstream entry, not a place to
 express a per-release matrix.
 
 [`rosdep_yaml_validate.sh`](../scripts/rosdep_yaml_validate.sh) is the gate, and
-every path that can carry a key to a root-level install runs it **first**:
+every path that can carry a key onto a **persistent** machine runs it **first**:
 
 | Path | What a rejected file does |
 |---|---|
@@ -121,6 +127,30 @@ This is a policy gate, not a security boundary — the real defence is that
 project repos are reviewed. It stops the unreviewed shape from reaching root,
 and names the rule when it does.
 
+#### Hosted CI is the ungated fourth path — an accepted residual gap
+
+The workflow step below (and the copy in
+[`.agent/templates/ci_workflow.yml`](../templates/ci_workflow.yml)) writes the
+repo's `rosdep.yaml` straight into a `ROSDEP_SOURCE_PATH` that a root-level
+`rosdep install` then reads. It does **not** run the shape gate, and that is a
+deliberate, recorded gap rather than an oversight:
+
+- The step has to be **self-contained** — a project repo's workflow does not
+  check this workspace out, so the only way to gate there would be to inline a
+  second copy of the shape grammar into the template. Two copies of a rule
+  drift, and the one that drifts is the one that is wrong.
+- The gate exists to protect **persistent** machines. Hosted CI runs in a
+  throwaway container that GitHub destroys with the job, so an out-of-shape
+  rule there can install something odd into that runner and nothing else. It
+  cannot reach the dev host, the `ci_local` container on it, or the agent image.
+- The same file **is** gated on every path that does reach a persistent
+  machine, including `ci_local.sh` — which on a project repo is the ADR-0018
+  merge verification. So a file that would be rejected is caught before the
+  branch can merge, just not by the hosted job itself.
+
+If hosted CI ever gains a persistent cache or a self-hosted runner, this
+reasoning expires and the gate has to reach the workflow step.
+
 ### The four consumers
 
 | Where | How the local keys get in |
@@ -128,7 +158,7 @@ and names the rule when it does.
 | Interactive shell / `make build` | `rosdep_local_sources.sh` writes `<main-root>/.rosdep/sources.list.d/` (gitignored). `setup.bash` exports `ROSDEP_SOURCE_PATH` at it when it exists; the `$(STAMP)/rosdep-local.done` Makefile stamp regenerates it whenever a `rosdep.yaml` changes, is added, or first appears with a newly checked-out repo. `bootstrap.sh` generates it between `rosdep init` and its `rosdep update`. |
 | `ci_local.sh` | Tests one repo in isolation with no `layers/` tree, so it overlays **that repo's own** `rosdep.yaml` into a container-local sources dir and records a `+rosdep-local` steps token in the attestation note. |
 | Agent container image | `stage_rosdep_manifests.sh` stages each repo's `rosdep.yaml` into the build context; the Dockerfile builds `/opt/rosdep-sources` and sets `ENV ROSDEP_SOURCE_PATH`. A key that still will not resolve ends the build step in a labelled `WARNING` block naming it. At launch, `agent-entrypoint.sh` inherits `ROSDEP_SOURCE_PATH` from the bind-mounted workspace (mounted at its host absolute path, so the `file://` URLs resolve) and refreshes the cache once, because rosdep's cache is keyed by source URL. |
-| Hosted CI (project repo) | One workflow step, below. |
+| Hosted CI (project repo) | One workflow step, below. The **only** consumer that does not run the shape gate first — an accepted residual gap, reasoned out above. |
 
 ### Cache gotcha
 
@@ -215,6 +245,7 @@ make agent-build
 
 ## See also
 
+- [`.agent/scripts/rosdep_yaml_validate.sh`](../scripts/rosdep_yaml_validate.sh) — the shape gate
 - [`.agent/scripts/rosdep_local_sources.sh`](../scripts/rosdep_local_sources.sh) — aggregation
 - [`.agent/scripts/rosdep_local_staleness_check.sh`](../scripts/rosdep_local_staleness_check.sh) — enforcement
 - [`.agent/scripts/stage_rosdep_manifests.sh`](../scripts/stage_rosdep_manifests.sh) — agent-image staging

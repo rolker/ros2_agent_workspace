@@ -183,7 +183,9 @@ cd <layer>_ws/src/<repo-name>
     in hosted CI (#654). A `rosdep.yaml` declares keys Ubuntu ships but
     `ros/rosdistro` has no entry for; each owes an upstream PR, and the
     accepted shape is list-form only (no `pip`/`npm`/`gem`/`source` rules) —
-    see `.agent/knowledge/dependency_policy.md`. If a `package.xml` depends on
+    see `.agent/knowledge/dependency_policy.md`. The step itself does not
+    enforce that shape (it has to stay self-contained, and the runner is
+    throwaway); `ci_local.sh` does, before the repo can merge. If a `package.xml` depends on
     something with no rosdep key at all, that note is the decision table for
     what to do about it.
 

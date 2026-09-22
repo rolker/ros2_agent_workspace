@@ -46,6 +46,16 @@ jobs:
       # no pip/npm/gem/source rules); see the workspace's
       # .agent/knowledge/dependency_policy.md. No-op when the file is absent,
       # so this step is safe to keep in every repo.
+      #
+      # This step does NOT run the workspace's shape gate
+      # (rosdep_yaml_validate.sh): the step must stay self-contained — a
+      # project repo's workflow never checks the workspace out — and a second
+      # copy of the grammar here would drift from the real one. Accepted
+      # residual gap: this runner is a throwaway container, so an out-of-shape
+      # rule reaches nothing persistent, and every path that DOES reach a
+      # persistent machine (dev host, ci_local, agent image) gates the same
+      # file first. See dependency_policy.md, "Hosted CI is the ungated
+      # fourth path".
       - name: Install repo-local rosdep keys
         if: hashFiles('rosdep.yaml') != ''
         run: |
