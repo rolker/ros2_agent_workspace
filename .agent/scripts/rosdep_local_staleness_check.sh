@@ -25,6 +25,19 @@
 # create would be worse than no verdict: it flags a live key for deletion, or
 # hides a merged upstream entry.
 #
+# THE SHAPE RULE. The workspace accepts exactly one form:
+#
+#     <rosdep-key>:            # upstream PR owed: ros/rosdistro#NNNNN
+#       <os-name>: [<package>, ...]
+#
+# Every OS value must be a LIST of plain system package names. rosdep's own
+# format is wider — a nested mapping expresses `pip`, `npm`, `gem` and `source`
+# (download-and-run an rdmanifest) rules — and these files drive a ROOT-LEVEL
+# `rosdep install` on the dev host, in the ci_local container and at image-bake
+# time. rosdep_yaml_validate.sh is the gate; the generators (rosdep_local_sources.sh,
+# stage_rosdep_manifests.sh) exclude a rejected file, and this check reports it
+# so `make validate` says so rather than leaving it to a silently-missing key.
+#
 # The "upstream PR owed" test is an advisory TEXT heuristic — it looks for `PR`
 # or a `rosdistro` URL in the comment on, or immediately above, the key. There
 # is no structured field for this in the rosdistro format. It catches the
@@ -37,8 +50,8 @@
 # Exit codes (distinct on purpose — `make validate` treats 3 as a notice):
 #   0  clean, INCLUDING "no rosdep.yaml files found". A workspace where no
 #      project repo has opted in must never fail this check.
-#   1  a local key now resolves upstream (delete it), or a key carries no
-#      upstream-PR marker
+#   1  a local key now resolves upstream (delete it), a key carries no
+#      upstream-PR marker, or a file fails the SHAPE rule below
 #   2  usage error
 #   3  SKIPPED — the probe could not vouch for an answer (offline / no rosdep)
 
@@ -75,6 +88,26 @@ yamls=("$ROOT_DIR"/layers/main/*_ws/src/*/rosdep.yaml)
 if [ "${#yamls[@]}" -eq 0 ]; then
     echo "rosdep-local: no rosdep.yaml files found — nothing to check."
     exit 0
+fi
+
+# ---- shape gate ------------------------------------------------------------
+# Runs before anything else: a file that is not in the accepted form is a
+# finding in its own right, and one the generators have already acted on by
+# excluding it.
+shape_rc=0
+if [ -x "$SCRIPT_DIR/rosdep_yaml_validate.sh" ]; then
+    "$SCRIPT_DIR/rosdep_yaml_validate.sh" "${yamls[@]}" || shape_rc=$?
+else
+    echo "❌ rosdep-local: $SCRIPT_DIR/rosdep_yaml_validate.sh is missing —" >&2
+    echo "   the rosdep.yaml shape rule cannot be enforced." >&2
+    shape_rc=1
+fi
+if [ "$shape_rc" -eq 2 ] || [ "$shape_rc" -eq 3 ]; then
+    # Could not validate at all (no python3/yaml). Say so and treat it as a
+    # finding — "unvalidated" reaches a root-level install exactly as "invalid"
+    # does.
+    echo "❌ rosdep-local: could not run the rosdep.yaml shape check."
+    shape_rc=1
 fi
 
 # ---- parse: file<TAB>key<TAB>has-upstream-PR-marker ------------------------
@@ -143,7 +176,7 @@ resolves_upstream() {
 }
 
 # ---- report ----------------------------------------------------------------
-rc=0
+rc="$shape_rc"
 stale=0
 unmarked=0
 skipped=0
@@ -183,8 +216,9 @@ if [ "$probe_ok" = 0 ]; then
 fi
 
 if [ "$rc" -eq 0 ]; then
-    echo "✅ rosdep-local: $total local rosdep key(s) across ${#yamls[@]} file(s) — all still needed, all marked."
+    echo "✅ rosdep-local: $total local rosdep key(s) across ${#yamls[@]} file(s) — all still needed, all marked, all in the accepted form."
 else
-    echo "rosdep-local: $stale stale key(s), $unmarked unmarked key(s), of $total checked."
+    echo "rosdep-local: $stale stale key(s), $unmarked unmarked key(s), of $total checked" \
+         "(plus any shape rejection reported above)."
 fi
 exit "$rc"

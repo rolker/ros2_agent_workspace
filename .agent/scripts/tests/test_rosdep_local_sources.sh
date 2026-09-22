@@ -4,6 +4,7 @@
 #   .agent/scripts/rosdep_local_sources.sh          (aggregation)
 #   .agent/scripts/rosdep_local_staleness_check.sh  (enforcement)
 #   .agent/scripts/stage_rosdep_manifests.sh        (agent-image staging)
+#   .agent/scripts/rosdep_yaml_validate.sh          (shape gate)
 #
 # Hermetic: temp workspace fixtures, a fake system sources dir via
 # ROSDEP_SYSTEM_SOURCES_DIR, and a stub `rosdep` on PATH. No network, no ROS,
@@ -15,6 +16,7 @@ SCRIPTS_DIR="$(dirname "$TESTS_DIR")"
 AGG="$SCRIPTS_DIR/rosdep_local_sources.sh"
 CHECK="$SCRIPTS_DIR/rosdep_local_staleness_check.sh"
 STAGE="$SCRIPTS_DIR/stage_rosdep_manifests.sh"
+VALIDATE="$SCRIPTS_DIR/rosdep_yaml_validate.sh"
 
 PASS=0; FAIL=0
 check() {
@@ -173,6 +175,67 @@ rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
 
 out="$("$CHECK" a b 2>&1)"; rc=$?
 check "too many arguments is a usage error (2)" eq "$rc" 2
+
+echo "=== rosdep_yaml_validate.sh: the shape gate ==="
+# These files drive a ROOT-LEVEL `rosdep install` on the dev host, in the
+# ci_local container and at image-bake time, and rosdep's own format is wider
+# than the policy: a nested mapping expresses pip/npm/gem/source rules, and a
+# `source` rule downloads an rdmanifest and runs its install script.
+SHAPE="$TMP/shape"; mkdir -p "$SHAPE"
+shape_rc() { "$VALIDATE" "$1" >/dev/null 2>&1; echo $?; }
+
+printf 'python3-pystac:  # upstream PR owed: ros/rosdistro#1\n  ubuntu: [python3-pystac]\n  debian: [python3-pystac]\n' > "$SHAPE/good.yaml"
+check "the documented list form is accepted"  eq "$(shape_rc "$SHAPE/good.yaml")" 0
+: > "$SHAPE/empty.yaml"
+check "an empty file declares nothing, so it conforms" eq "$(shape_rc "$SHAPE/empty.yaml")" 0
+
+for rule in pip npm gem source; do
+    printf 'k:\n  ubuntu:\n    %s:\n      packages: [x]\n' "$rule" > "$SHAPE/$rule.yaml"
+    check "a '$rule' rule is rejected"        eq "$(shape_rc "$SHAPE/$rule.yaml")" 1
+done
+out="$("$VALIDATE" "$SHAPE/pip.yaml" 2>&1)"
+check "the message names the rule"            contains "$out" "'pip' rule(s) are not accepted"
+check "the message states the accepted form"  contains "$out" "<os>: [<package>, ...]"
+
+printf 'k:\n  ubuntu:\n    noble: [x]\n' > "$SHAPE/codename.yaml"
+check "the nested codename form is rejected too" eq "$(shape_rc "$SHAPE/codename.yaml")" 1
+printf 'k:\n  ubuntu: somepkg\n' > "$SHAPE/bare.yaml"
+check "a bare string instead of a list is rejected" eq "$(shape_rc "$SHAPE/bare.yaml")" 1
+printf 'k:\n  ubuntu: [--allow-anything]\n' > "$SHAPE/flag.yaml"
+check "a flag-shaped package name is rejected" eq "$(shape_rc "$SHAPE/flag.yaml")" 1
+printf 'k:\n  ubuntu: [https://example.invalid/x.tar.gz]\n' > "$SHAPE/url.yaml"
+check "a URL instead of a package name is rejected" eq "$(shape_rc "$SHAPE/url.yaml")" 1
+printf -- '- not\n- a mapping\n' > "$SHAPE/seq.yaml"
+check "a top-level sequence is rejected"      eq "$(shape_rc "$SHAPE/seq.yaml")" 1
+printf 'k: [unclosed\n' > "$SHAPE/broken.yaml"
+check "unparseable YAML is rejected"          eq "$(shape_rc "$SHAPE/broken.yaml")" 1
+check "no argument is a usage error (2)"      eq "$("$VALIDATE" >/dev/null 2>&1; echo $?)" 2
+
+echo "=== the shape gate is applied BEFORE a key can reach a root install ==="
+# Aggregation: a rejected file is excluded from the generated list (not merely
+# warned about) and the exit is non-zero, so the Makefile stamp fails the build.
+BADWS="$TMP/bad_ws"
+mkdir -p "$BADWS/layers/main/a_ws/src/good_repo" "$BADWS/layers/main/a_ws/src/bad_repo"
+cp "$SHAPE/good.yaml" "$BADWS/layers/main/a_ws/src/good_repo/rosdep.yaml"
+cp "$SHAPE/pip.yaml"  "$BADWS/layers/main/a_ws/src/bad_repo/rosdep.yaml"
+out="$("$AGG" "$BADWS" 2>&1)"; rc=$?
+BADLIST="$BADWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "aggregation exits 4 on a rejected file" eq "$rc" 4
+check "the rejected repo is NOT in the source list" \
+    bash -c "! grep -q bad_repo '$BADLIST'"
+check "the conforming repo still is"          grep -q good_repo "$BADLIST"
+check "the system lists are still written"    test -f "$BADWS/.rosdep/sources.list.d/20-default.list"
+
+# Staging for the image bake: same gate, same fail-closed answer.
+out="$("$STAGE" "$BADWS" "$TMP/stage_bad" 2>&1)"; rc=$?
+check "staging exits 4 on a rejected file"    eq "$rc" 4
+check "the rejected yaml is not staged"       bash -c "! ls '$TMP/stage_bad/rosdep-local/' 2>/dev/null | grep -q bad_repo"
+check "the conforming yaml is staged"         bash -c "ls '$TMP/stage_bad/rosdep-local/' | grep -q good_repo"
+
+echo "=== rosdep_local_staleness_check.sh: a shape rejection is a finding ==="
+out="$(PATH="$STUB:$PATH" "$CHECK" "$BADWS" 2>&1)"; rc=$?
+check "make validate fails on a rejected file (1)" eq "$rc" 1
+check "it names the file"                     contains "$out" "bad_repo/rosdep.yaml"
 
 echo "=== Makefile \$(STAMP)/rosdep-local.done: recoverable vs. fatal ==="
 # The stamp recipe drives the generator in the `make build` chain, so its

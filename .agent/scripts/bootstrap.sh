@@ -161,9 +161,22 @@ fi
 # worktree must not create a second, divergent one there.
 BOOTSTRAP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$DRY_RUN" = false ]; then
-    if BOOTSTRAP_ROOT_DIR="$("$BOOTSTRAP_SCRIPT_DIR/workspace_root.sh")" \
-       && "$BOOTSTRAP_SCRIPT_DIR/rosdep_local_sources.sh" "$BOOTSTRAP_ROOT_DIR"; then
+    BOOTSTRAP_GEN_RC=0
+    if BOOTSTRAP_ROOT_DIR="$("$BOOTSTRAP_SCRIPT_DIR/workspace_root.sh")"; then
+        "$BOOTSTRAP_SCRIPT_DIR/rosdep_local_sources.sh" "$BOOTSTRAP_ROOT_DIR" \
+            || BOOTSTRAP_GEN_RC=$?
+    else
+        BOOTSTRAP_GEN_RC=1
+    fi
+    if [ "$BOOTSTRAP_GEN_RC" -eq 0 ]; then
         export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+    elif [ "$BOOTSTRAP_GEN_RC" -eq 4 ]; then
+        # The directory WAS written; one or more project rosdep.yaml files were
+        # rejected by the shape gate and left out of it (#654). Use it — the
+        # remaining sources are valid — but say what was dropped.
+        export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+        echo "Note: a project rosdep.yaml was REJECTED (see above) and is not in"
+        echo "      the generated sources. Fix it, then re-run bootstrap.sh."
     else
         echo "Note: workspace-local rosdep sources not generated — using system defaults."
     fi

@@ -332,6 +332,23 @@ check "run exits 0"                   [ "$rc" -eq 0 ]
 rnote=$(git -C "$ROSREPO" notes --ref=ci-local show "$ROSREPO_SHA" 2>/dev/null)
 check "note steps gain rosdep-local"  contains "$rnote" "steps: template+rosdep-local"
 
+echo "== a rosdep.yaml outside the accepted shape is refused (#654) =="
+# The file drives a root-level `rosdep install` inside the container, and
+# rosdep's format also accepts pip/npm/gem/source rules. ci_local must refuse
+# before running anything, not install from an unvalidated rule.
+cat > "$ROSREPO/rosdep.yaml" <<'EOF'
+sneaky:  # upstream PR owed: ros/rosdistro#1
+  ubuntu:
+    pip:
+      packages: [requests]
+EOF
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t add -A
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t commit -qm badshape
+out=$(bash "$SUT" "$ROSREPO" --dry-run 2>&1); rc=$?
+check "a pip rule fails the run"      [ "$rc" -ne 0 ]
+check "names the offending rule"      contains "$out" "'pip' rule(s) are not accepted"
+check "points at the policy note"     contains "$out" "dependency_policy.md"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

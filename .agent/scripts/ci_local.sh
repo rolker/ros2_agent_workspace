@@ -273,8 +273,27 @@ fi
 # ONE repo in isolation, so it uses that repo's own yaml directly rather than
 # the workspace-wide aggregation rosdep_local_sources.sh performs — there is no
 # layers/ tree inside the container.
+# The file drives a root-level `rosdep install` inside the container, so it
+# passes the same shape gate the workspace-side generators apply before it is
+# allowed to: list-form rules only, no pip/npm/gem/source (#654). Validated
+# from the ATTESTED content (git show at HEAD_SHA under --attest), not the
+# working tree, so what was checked is what the note vouches for.
 ROSDEP_LOCAL=0
-repo_file_exists "rosdep.yaml" && ROSDEP_LOCAL=1
+if repo_file_exists "rosdep.yaml"; then
+  ROSDEP_LOCAL=1
+  # Removed inline rather than via a trap: the script installs its own
+  # `trap cleanup EXIT` further down, which would replace one set here.
+  ROSDEP_YAML_TMP="$(mktemp -t ci_local_rosdep.XXXXXX.yaml)"
+  repo_file_content "rosdep.yaml" > "$ROSDEP_YAML_TMP"
+  ROSDEP_SHAPE_RC=0
+  "$SCRIPT_DIR/rosdep_yaml_validate.sh" "$ROSDEP_YAML_TMP" || ROSDEP_SHAPE_RC=$?
+  rm -f "$ROSDEP_YAML_TMP"
+  if [[ $ROSDEP_SHAPE_RC -ne 0 ]]; then
+    err "rosdep.yaml does not conform to the workspace shape rule (see above)."
+    err "See .agent/knowledge/dependency_policy.md (#654)."
+    exit 1
+  fi
+fi
 
 STEPS="template"
 [[ $UPSTREAM_PRESENT -eq 1 ]] && STEPS+="+upstream"

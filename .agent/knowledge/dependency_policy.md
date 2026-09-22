@@ -61,6 +61,47 @@ becoming a permanent private dependency database.
 Workspace scripts never name a repo: they glob
 `layers/main/*_ws/src/*/rosdep.yaml`.
 
+### The accepted shape — a rule, and it is enforced
+
+**A `rosdep.yaml` in this workspace may use exactly one form:**
+
+```yaml
+<rosdep-key>:            # upstream PR owed: ros/rosdistro#NNNNN
+  <os-name>: [<package>, ...]
+```
+
+Every OS value is a **list of plain system package names**. Never a bare
+string, and never a nested mapping.
+
+That last clause is the point. rosdep's own format is wider than this: a nested
+mapping under an OS name is how `pip`, `npm`, `gem` and `source` rules are
+written — and a `source` rule downloads an rdmanifest and *runs its install
+script*. A `pip:` rule would also route around ADR-0009's Python-package tiers
+entirely. These files feed a root-level `rosdep install -y`, so the workspace
+accepts the one documented shape and rejects the rest.
+
+The codename-keyed form (`ubuntu: {noble: [pkg]}`) is a nested mapping too, and
+is rejected along with the others. That is deliberate rather than an oversight:
+a local key is a short-lived stand-in for an upstream entry, not a place to
+express a per-release matrix.
+
+[`rosdep_yaml_validate.sh`](../scripts/rosdep_yaml_validate.sh) is the gate, and
+every path that can carry a key to a root-level install runs it **first**:
+
+| Path | What a rejected file does |
+|---|---|
+| `rosdep_local_sources.sh` (dev host, `make build`) | Excluded from the generated source list; script exits 4, and the Makefile stamp fails the build. |
+| `stage_rosdep_manifests.sh` (agent image) | Not staged; script exits 4, and the image build stops. |
+| `ci_local.sh` | The run is refused before the container starts. |
+| `rosdep_local_staleness_check.sh` (`make validate`) | Reported as a finding (exit 1), so the rejection is visible rather than surfacing later as a silently-missing key. |
+
+All of them **fail closed** when the validator cannot run at all (no python3 or
+no `yaml` module): unvalidated and invalid reach root identically.
+
+This is a policy gate, not a security boundary — the real defence is that
+project repos are reviewed. It stops the unreviewed shape from reaching root,
+and names the rule when it does.
+
 ### The four consumers
 
 | Where | How the local keys get in |

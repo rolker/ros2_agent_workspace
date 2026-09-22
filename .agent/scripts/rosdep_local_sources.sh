@@ -45,6 +45,11 @@
 #      run bootstrap.sh (`sudo rosdep init`) first. Refusing is deliberate: a
 #      generated directory holding ONLY the local list would shadow the real
 #      default sources and break every rosdep call on the host.
+#   4  one or more project rosdep.yaml files were REJECTED by the shape gate
+#      (rosdep_yaml_validate.sh) or could not be validated at all. Those files
+#      are left OUT of the generated list — the rest of the directory is still
+#      written and usable — and the exit is non-zero because a key feeding a
+#      root-level `rosdep install` must not arrive unvalidated.
 
 set -euo pipefail
 
@@ -93,9 +98,29 @@ LOCAL_LIST="$OUT_DIR/30-workspace-local.list"
     echo "# One line per project repo carrying a root rosdep.yaml (#654)."
 } > "$LOCAL_LIST"
 
+# Shape gate (#654): these files drive a root-level `rosdep install`, and
+# rosdep's own format also accepts pip/npm/gem/source rules. A rejected file is
+# EXCLUDED here — never merely warned about — and the script exits 4 so the
+# caller can decide (the Makefile stamp fails the build; bootstrap.sh notes it).
+# A validator that cannot run at all (exit 3) is treated the same way: fail
+# closed, because "unvalidated" and "invalid" reach root identically.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALIDATOR="$SCRIPT_DIR/rosdep_yaml_validate.sh"
+
 yaml_count=0
+rejected_count=0
 if [ "${#local_yamls[@]}" -gt 0 ]; then
     while IFS= read -r yaml; do
+        if [ ! -x "$VALIDATOR" ]; then
+            echo "Error: $VALIDATOR is missing — cannot validate '$yaml'." >&2
+            rejected_count=$((rejected_count + 1))
+            continue
+        fi
+        if ! "$VALIDATOR" "$yaml"; then
+            echo "   excluded from $LOCAL_LIST" >&2
+            rejected_count=$((rejected_count + 1))
+            continue
+        fi
         echo "yaml file://$yaml" >> "$LOCAL_LIST"
         yaml_count=$((yaml_count + 1))
     done < <(printf '%s\n' "${local_yamls[@]}" | LC_ALL=C sort)
@@ -105,4 +130,8 @@ echo "Aggregated $yaml_count project rosdep.yaml file(s) into $OUT_DIR" \
      "(over ${#system_lists[@]} system source list(s))"
 if [ "$yaml_count" -gt 0 ]; then
     echo "Run 'ROSDEP_SOURCE_PATH=$OUT_DIR rosdep update' to refresh the cache."
+fi
+if [ "$rejected_count" -gt 0 ]; then
+    echo "Error: $rejected_count project rosdep.yaml file(s) rejected (see above)." >&2
+    exit 4
 fi

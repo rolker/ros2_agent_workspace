@@ -37,6 +37,10 @@
 # Prints the staged manifest count. Exits 0 even when zero manifests are found
 # (e.g. layers not yet checked out) — the Dockerfile COPY of an empty dir
 # succeeds and the bake degrades to a no-op, deferring deps to launch time.
+# Exit 4: one or more rosdep.yaml files were rejected by the shape gate
+# (rosdep_yaml_validate.sh) or could not be validated. They are NOT staged, and
+# the non-zero exit stops the image build — these keys drive a root-level
+# `rosdep install` inside the bake, so an unvalidated one must not get there.
 
 set -euo pipefail
 
@@ -100,12 +104,28 @@ done
 # directory so the Dockerfile's generated source list is readable, and sorted so
 # a build context (and therefore the image layer's cache key) is deterministic.
 LOCAL_DIR="$STAGE_DIR/rosdep-local"
+STAGE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALIDATOR="$STAGE_SCRIPT_DIR/rosdep_yaml_validate.sh"
 local_count=0
+rejected_count=0
 shopt -s nullglob
 local_yamls=("$ROOT_DIR"/layers/main/*_ws/src/*/rosdep.yaml)
 if [ "${#local_yamls[@]}" -gt 0 ]; then
     mkdir -p "$LOCAL_DIR"
     while IFS= read -r yaml; do
+        # Shape gate (#654) — fail closed, exactly as rosdep_local_sources.sh
+        # does: a file that is invalid, or that could not be validated at all,
+        # is not staged.
+        if [ ! -x "$VALIDATOR" ]; then
+            echo "Error: $VALIDATOR is missing — cannot validate '$yaml'." >&2
+            rejected_count=$((rejected_count + 1))
+            continue
+        fi
+        if ! "$VALIDATOR" "$yaml"; then
+            echo "   not staged for the image bake" >&2
+            rejected_count=$((rejected_count + 1))
+            continue
+        fi
         repo_dir="$(basename "$(dirname "$yaml")")"
         cp "$yaml" "$LOCAL_DIR/$repo_dir.yaml"
         local_count=$((local_count + 1))
@@ -115,3 +135,7 @@ fi
 echo "Staged $manifest_count layer package.xml manifest(s) into $STAGE_DIR" \
      "(skipped $skipped_count ignored package(s);" \
      "$local_count local rosdep.yaml file(s))"
+if [ "$rejected_count" -gt 0 ]; then
+    echo "Error: $rejected_count project rosdep.yaml file(s) rejected (see above)." >&2
+    exit 4
+fi
