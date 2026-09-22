@@ -54,7 +54,7 @@ run publishes, whether or not it has network or GitHub auth. **Committing
 `--publish`** (§ Publish the workspace scope); the committed file on `main`
 is a baseline a non-publishing run neither rewrites nor contradicts.
 A run may also write an **optional second local report for the project this
-clone is configured for** — `<ts>-<repo>-health.md`, beside the workspace
+clone is configured for** — `<ts>-<pid>-<repo>-health.md`, beside the workspace
 one — when that project's root repo keeps a root `ROADMAP.md`: health
 follows the roadmap, and that is the whole opt-in (§ Resolve the configured
 project root; § Render, redact, and write the report). A checkout with no
@@ -308,7 +308,7 @@ report-only skill that will run repeatedly:
   ```
 
   Two globs, two counts, because the two shapes are written at different
-  rates: a `<ts>-<repo>-health.md` (step 6's optional per-project report) is
+  rates: a `<ts>-<pid>-<repo>-health.md` (step 6's optional per-project report) is
   written only on the runs where the project root repo fell in the rotation
   chunk, so pruning both under one combined count would evict per-project
   history spanning far more than 20 sweeps. Separate counts are also what
@@ -839,7 +839,7 @@ top would be redundant, not because diffing was skipped.
 
   **When `--publish` was not passed (the default)**: the most recent prior
   **local** workspace-scope report — the `## Workspace` section of the
-  newest `.agent/scratchpad/janitor/<ts>-sweep.md` — read from the
+  newest `.agent/scratchpad/janitor/<ts>-<pid>-sweep.md` — read from the
   retention-pruned set (last 20 runs, step 1). This is the identical
   best-effort rule project scope has always used, applied to the other
   scope; the local report's `## Workspace` section is structurally the same
@@ -1166,7 +1166,11 @@ overwrite the first run's report — the runs are the record, so they must
 accumulate. Seconds are not enough on their own for the same reason: two runs
 finishing within one second would collide, so the pid disambiguates them. The
 name stays sortable, and `*-sweep.md` still matches it (the retention sweep in
-step 1 globs on that suffix).
+step 1 globs on that suffix). **Both local reports use this same
+`<ts>-<pid>-` prefix** — this one and step 6's optional per-project
+`<ts>-<pid>-<repo>-health.md` — and the prose throughout names them that way,
+pid included, so a reader matching a documented shape against a real
+directory listing finds the same thing twice.
 
 This write depends on neither network nor auth, so a sweep that reached step 6
 produces its record wherever the filesystem is writable. It is the sweep's
@@ -1202,7 +1206,7 @@ than left implied by the prose.
 
 When step 1a resolved a project root **and** check 2 audited that repo this
 run, write a third artifact beside the other two: a health document scoped to
-that one project, `.agent/scratchpad/janitor/<ts>-<repo>-health.md`. Health
+that one project, `.agent/scratchpad/janitor/<ts>-<pid>-<repo>-health.md`. Health
 follows the roadmap — the opt-in is the project root having a root
 `ROADMAP.md`, nothing else; no declaration file and no schema
 ([#652](https://github.com/rolker/ros2_agent_workspace/issues/652),
@@ -1568,7 +1572,7 @@ already landed by the time control reaches here.
 
 **Workspace scope only** — never commit `docs/health.md` into a project repo
 in this slice; project-scope findings stay in the local
-`.agent/scratchpad/janitor/<ts>-sweep.md` report exactly as before this
+`.agent/scratchpad/janitor/<ts>-<pid>-sweep.md` report exactly as before this
 change. This step runs after step 6 wrote the local report, and only when
 check 1 and check 4 both reached a terminal status
 (`OK`/`FINDINGS`/`SKIPPED`/`FAILED` — a crash mid-check never reaches here).
@@ -1940,7 +1944,7 @@ re-implementation of publishing. What remains deferred:
   until the rollup shape is decided — three candidates are on the table
   (per-repo PR, one document per project, health-follows-roadmap), and the
   choice is explicitly **not made** by this change. Project-scope findings
-  stay in the local `.agent/scratchpad/janitor/<ts>-sweep.md` report exactly
+  stay in the local `.agent/scratchpad/janitor/<ts>-<pid>-sweep.md` report exactly
   as before.
 - **The (weekly, unattended) trigger** — decided in principle (operator,
   2026-09-14: a weekly Claude Code cloud Routine, on stated grounds of
