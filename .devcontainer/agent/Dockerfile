@@ -93,26 +93,66 @@ RUN rosdep init 2>/dev/null || true
 # pass them as --skip-keys — one bad key then only skips itself instead of
 # nuking the entire bake (#522). Still best-effort overall: anything skipped
 # or failed falls through to the launch-time install path.
+# Project repos may also carry a root rosdep.yaml declaring keys that have no
+# upstream ros/rosdistro entry yet (#654). stage_rosdep_manifests.sh stages
+# those into rosdep-local/ inside the same staged tree; this step turns them
+# into a ROSDEP_SOURCE_PATH overlay. ROSDEP_SOURCE_PATH REPLACES
+# sources.list.d, so every system *.list is copied in alongside — naming only
+# 20-default.list would drop any other source the base image carries. The yamls
+# are copied to a PERSISTENT /opt/rosdep-local (not left in /tmp, which this
+# step deletes) because rosdep's cache records the source URL and re-reads it.
+# Without this, a package.xml <depend> on such a key lands on skip_keys below
+# and is silently omitted from the image.
+#
 # The image must be built via docker_run_agent.sh --build or `make agent-build`,
 # which create .rosdep-manifests/; a bare `docker build` won't have it.
 COPY .rosdep-manifests/ /tmp/rosdep-manifests/
-RUN apt-get update || echo "WARNING: apt-get update failed — skipping dep bake"; \
+ENV ROSDEP_SOURCE_PATH=/opt/rosdep-sources
+RUN mkdir -p "$ROSDEP_SOURCE_PATH" /opt/rosdep-local; \
+    cp /etc/ros/rosdep/sources.list.d/*.list "$ROSDEP_SOURCE_PATH/" 2>/dev/null || true; \
+    : > "$ROSDEP_SOURCE_PATH/30-workspace-local.list"; \
+    local_count=0; \
+    for y in /tmp/rosdep-manifests/rosdep-local/*.yaml; do \
+        [ -e "$y" ] || continue; \
+        cp "$y" "/opt/rosdep-local/$(basename "$y")"; \
+        echo "yaml file:///opt/rosdep-local/$(basename "$y")" >> "$ROSDEP_SOURCE_PATH/30-workspace-local.list"; \
+        local_count=$((local_count + 1)); \
+    done; \
+    echo "rosdep bake: $local_count workspace-local rosdep.yaml source(s) active"; \
+    apt-get update || echo "WARNING: apt-get update failed — skipping dep bake"; \
     rosdep update || echo "WARNING: rosdep update failed — skipping dep bake"; \
     skip_keys="$(rosdep check --from-paths /tmp/rosdep-manifests --ignore-src --rosdistro jazzy 2>&1 \
         | sed -n 's/.*Cannot locate rosdep definition for \[\([^]]*\)\].*/\1/p' \
         | sort -u | tr '\n' ' ' | sed 's/  *$//')"; \
-    if [ -n "$skip_keys" ]; then \
-        echo "rosdep bake: skipping unresolvable keys: $skip_keys"; \
-    fi; \
     rosdep install --from-paths /tmp/rosdep-manifests --ignore-src -y --rosdistro jazzy \
         ${skip_keys:+--skip-keys "$skip_keys"} \
         || echo "WARNING: some layer deps did not resolve at bake time — they will install at launch"; \
-    rm -rf /tmp/rosdep-manifests /var/lib/apt/lists/*
+    rm -rf /tmp/rosdep-manifests /var/lib/apt/lists/*; \
+    if [ -n "$skip_keys" ]; then \
+        echo "================================================================"; \
+        echo "WARNING: rosdep bake: the following key(s) were NOT installed"; \
+        echo "         (no rosdep definition — neither upstream nor in any"; \
+        echo "          project repo's rosdep.yaml). They are skipped, not"; \
+        echo "          failed, and will be retried at container launch:"; \
+        for k in $skip_keys; do echo "           - $k"; done; \
+        echo "         Fix: add the key to the owning project repo's root"; \
+        echo "         rosdep.yaml (see .agent/knowledge/dependency_policy.md)"; \
+        echo "         and rebuild with 'make agent-build'."; \
+        echo "================================================================"; \
+    fi
 
 USER $USERNAME
 
-# Update rosdep as non-root user (the launch-time `rosdep check` in the
-# entrypoint runs under this user and needs its own populated cache)
+# Update rosdep as non-root user: this is the cache the AGENT reads, since
+# agent-entrypoint.sh drops CMD to this user (rosdep's cache is per-user,
+# $HOME/.ros/rosdep/sources.cache). Inherits ROSDEP_SOURCE_PATH from the ENV
+# above, so this cache sees the BAKED /opt/rosdep-local sources.
+#
+# It does NOT see a bind-mounted workspace's own .rosdep/sources.list.d: those
+# are different `file://` URLs, and rosdep keys its cache by source URL. The
+# entrypoint refreshes this user's cache at launch when the mounted workspace
+# carries a non-empty local list (#654) — for both this user and root, which
+# runs the entrypoint's own rosdep check/install.
 RUN rosdep update
 
 # Entrypoint runs as root to fix volume ownership, then drops to $USERNAME

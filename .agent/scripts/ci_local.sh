@@ -47,6 +47,14 @@
 #       Honored whether or not upstream.repos is present; applied keys are
 #       recorded in the attestation note (`rosdep-skip-keys:` line and a
 #       `+rosdep-skip-keys` steps token)
+#   <repo>/rosdep.yaml                          rosdep keys with no upstream
+#       ros/rosdistro entry yet, in upstream rosdistro format (#654). Installed
+#       as a ROSDEP_SOURCE_PATH overlay over the image's own sources before
+#       `rosdep install`, and recorded with a `+rosdep-local` steps token plus
+#       a `rosdep-local: src/<repo>/rosdep.yaml via ROSDEP_SOURCE_PATH` note
+#       line (ADR-0018 format extension, like #577's upstream-repo:). The
+#       workspace-wide equivalent is .agent/scripts/rosdep_local_sources.sh;
+#       see .agent/knowledge/dependency_policy.md
 #
 # Attestation: on success of an attestable run, a record is added to a git note
 # on the tested commit under refs/notes/ci-local (repo-local; never perturbs
@@ -262,11 +270,39 @@ if repo_file_exists ".agents/ci_local_rosdep_skip_keys.txt"; then
   done < <(repo_file_content ".agents/ci_local_rosdep_skip_keys.txt")
 fi
 
+# Repo-local rosdep keys (#654). A project repo may carry a root rosdep.yaml
+# declaring keys that have no upstream ros/rosdistro entry yet. ci_local tests
+# ONE repo in isolation, so it uses that repo's own yaml directly rather than
+# the workspace-wide aggregation rosdep_local_sources.sh performs — there is no
+# layers/ tree inside the container.
+# The file drives a root-level `rosdep install` inside the container, so it
+# passes the same shape gate the workspace-side generators apply before it is
+# allowed to: list-form rules only, no pip/npm/gem/source (#654). Validated
+# from the ATTESTED content (git show at HEAD_SHA under --attest), not the
+# working tree, so what was checked is what the note vouches for.
+ROSDEP_LOCAL=0
+if repo_file_exists "rosdep.yaml"; then
+  ROSDEP_LOCAL=1
+  # Removed inline rather than via a trap: the script installs its own
+  # `trap cleanup EXIT` further down, which would replace one set here.
+  ROSDEP_YAML_TMP="$(mktemp -t ci_local_rosdep.XXXXXX.yaml)"
+  repo_file_content "rosdep.yaml" > "$ROSDEP_YAML_TMP"
+  ROSDEP_SHAPE_RC=0
+  "$SCRIPT_DIR/rosdep_yaml_validate.sh" "$ROSDEP_YAML_TMP" || ROSDEP_SHAPE_RC=$?
+  rm -f "$ROSDEP_YAML_TMP"
+  if [[ $ROSDEP_SHAPE_RC -ne 0 ]]; then
+    err "rosdep.yaml does not conform to the workspace shape rule (see above)."
+    err "See .agent/knowledge/dependency_policy.md (#654)."
+    exit 1
+  fi
+fi
+
 STEPS="template"
 [[ $UPSTREAM_PRESENT -eq 1 ]] && STEPS+="+upstream"
 [[ -n "$UPSTREAM_HOOK" ]] && STEPS+="+upstream-hook"
 [[ -n "$EXTRA_HOOK" ]] && STEPS+="+extra-hook"
 [[ -n "$SKIP_KEYS" ]] && STEPS+="+rosdep-skip-keys"
+[[ $ROSDEP_LOCAL -eq 1 ]] && STEPS+="+rosdep-local"
 PASS_LABEL="ci-local: pass"
 [[ $PARTIAL -eq 1 ]] && PASS_LABEL="ci-local: pass (partial)"
 
@@ -285,6 +321,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   fi
   # skip-keys apply to the single combined rosdep install, upstream or not
   [[ -n "$SKIP_KEYS" ]] && echo "rosdep-skip-keys: $SKIP_KEYS"
+  [[ $ROSDEP_LOCAL -eq 1 ]] && echo "rosdep-local: src/$REPO_NAME/rosdep.yaml via ROSDEP_SOURCE_PATH"
   echo "source   : $( [[ $ATTEST -eq 1 ]] && echo "pristine snapshot of $HEAD_SHA" || echo 'live working tree (read-only)' )"
   echo "attest   : $( [[ $ATTEST -eq 1 ]] && echo "append '$PASS_LABEL' record, refs/notes/$NOTES_REF on $HEAD_SHA" || echo no )"
   echo "log dir  : $LOG_DIR"
@@ -379,11 +416,35 @@ fi
 cat >> "$INNER" <<EOF
 source /opt/ros/jazzy/setup.bash
 if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then rosdep init; fi
+EOF
+if [[ $ROSDEP_LOCAL -eq 1 ]]; then
+  # ROSDEP_SOURCE_PATH REPLACES sources.list.d, so every system *.list is copied
+  # in alongside the repo's own yaml — naming only 20-default.list would drop a
+  # source the image legitimately carries. The repo mount is read-only; rosdep
+  # only reads the yaml, so file:// straight into the mount is fine.
+  #
+  # The cache guard below is deliberately BYPASSED here: rosdep's cache is keyed
+  # by source URL, so a baked cache (agent image, #520) has no entry for this
+  # repo's file:// source and `rosdep install` would fail on a key it cannot see.
+  # An update failure stays non-fatal, matching the offline-field-host posture.
+  cat >> "$INNER" <<EOF
+export ROSDEP_SOURCE_PATH=/tmp/rosdep-sources
+mkdir -p "\$ROSDEP_SOURCE_PATH"
+cp /etc/ros/rosdep/sources.list.d/*.list "\$ROSDEP_SOURCE_PATH/"
+echo 'yaml file:///ci/src/$REPO_NAME/rosdep.yaml' > "\$ROSDEP_SOURCE_PATH/30-workspace-local.list"
+echo "ci_local(inner): repo-local rosdep keys active (src/$REPO_NAME/rosdep.yaml)"
+rosdep update || echo "ci_local(inner): WARN: rosdep update failed (offline?) — repo-local rosdep keys may not resolve"
+EOF
+else
+  cat >> "$INNER" <<EOF
 # Tolerate rosdep update failure (offline field host with baked deps, #520):
 # rosdep install -r below still resolves against the existing cache/apt state.
 if [ ! -d "\$HOME/.ros/rosdep/sources.cache" ]; then
   rosdep update || echo "ci_local(inner): WARN: rosdep update failed (offline?) — proceeding with baked/existing deps"
 fi
+EOF
+fi
+cat >> "$INNER" <<EOF
 cd /ci
 rosdep install --from-paths $ROSDEP_FROM_PATHS --ignore-src -r -y${SKIP_KEYS:+ --skip-keys "$SKIP_KEYS"}
 EOF
@@ -450,13 +511,19 @@ LOG_HASH="$(sha256sum "$LOG" | cut -d' ' -f1)"
 # upstream-repo lines record the host-resolved SHAs the container was told to
 # check out — required for scope: full validity on upstream.repos repos
 # (ADR-0018); a rosdep-skip-keys line records deps the verified environment
-# deliberately did not install. Both absent for repos without the respective
-# files (byte-identical note format to pre-#577).
+# deliberately did not install; a rosdep-local line records that a key was
+# resolved from a source this repo carries rather than from upstream
+# ros/rosdistro (#654) — an environment built that way is not the same verified
+# environment as one that resolved everything upstream, so the note has to say
+# which it was. All absent for repos without the respective files
+# (byte-identical note format to pre-#577).
 NOTE_EXTRA=""
 for i in "${!UP_DIRS[@]}"; do
   NOTE_EXTRA+=$'\n'"upstream-repo: ${UP_DIRS[$i]}@${UP_SHAS[$i]}"
 done
 [[ -n "$SKIP_KEYS" ]] && NOTE_EXTRA+=$'\n'"rosdep-skip-keys: $SKIP_KEYS"
+[[ $ROSDEP_LOCAL -eq 1 ]] && \
+  NOTE_EXTRA+=$'\n'"rosdep-local: src/$REPO_NAME/rosdep.yaml via ROSDEP_SOURCE_PATH"
 NOTE="$PASS_LABEL
 repo: $REPO_NAME
 commit: $HEAD_SHA

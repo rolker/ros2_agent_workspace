@@ -135,13 +135,51 @@ else
 fi
 
 # 4. Initialize rosdep
+# ROSDEP_SOURCE_PATH (step 4b) OVERRIDES sources.list.d, it does not replace
+# `rosdep init` — the generated directory is built from copies of the system
+# lists this step writes, so this must still run first.
 if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
     run_or_collect sudo rosdep init
 else
     [ "$DRY_RUN" = false ] && echo "rosdep already initialized."
 fi
 
+# 4b. Workspace-owned rosdep sources (#654): aggregate every project repo's
+# root rosdep.yaml into <workspace_root>/.rosdep/sources.list.d/ and point the
+# rosdep update below at it, so local keys land in the cache immediately. This
+# shell has not sourced setup.bash (which is what exports ROSDEP_SOURCE_PATH
+# for interactive use), so set it explicitly for the update call.
+#
+# Best-effort: on a first-ever bootstrap the `sudo rosdep init` above may be a
+# collected dry-run command, leaving nothing to copy — the aggregation exits 3
+# and rosdep update falls back to the system default sources. Bootstrap must
+# not die on a directory it is itself in the middle of creating.
+#
+# Anchored via workspace_root.sh, which hops to the MAIN checkout when invoked
+# from a worktree: the generated directory is main-root-only and shared by every
+# worktree (setup.bash resolves it the same way), so bootstrapping from a
+# worktree must not create a second, divergent one there.
+BOOTSTRAP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$DRY_RUN" = false ]; then
+    BOOTSTRAP_GEN_RC=0
+    if BOOTSTRAP_ROOT_DIR="$("$BOOTSTRAP_SCRIPT_DIR/workspace_root.sh")"; then
+        "$BOOTSTRAP_SCRIPT_DIR/rosdep_local_sources.sh" "$BOOTSTRAP_ROOT_DIR" \
+            || BOOTSTRAP_GEN_RC=$?
+    else
+        BOOTSTRAP_GEN_RC=1
+    fi
+    if [ "$BOOTSTRAP_GEN_RC" -eq 0 ]; then
+        export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+    elif [ "$BOOTSTRAP_GEN_RC" -eq 4 ]; then
+        # The directory WAS written; one or more project rosdep.yaml files were
+        # rejected by the shape gate and left out of it (#654). Use it — the
+        # remaining sources are valid — but say what was dropped.
+        export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+        echo "Note: a project rosdep.yaml was REJECTED (see above) and is not in"
+        echo "      the generated sources. Fix it, then re-run bootstrap.sh."
+    else
+        echo "Note: workspace-local rosdep sources not generated — using system defaults."
+    fi
     rosdep update
 fi
 

@@ -452,6 +452,10 @@ if [ "$BUILD_IMAGE" = true ] && [ "$PRINT_MOUNTS" = false ]; then
     # The gather logic lives in stage_rosdep_manifests.sh. This block is its
     # only caller — `make agent-build` reaches it through --build-only rather
     # than staging on its own (#604), so there is one gather, not two.
+    # That script also stages each project repo's root rosdep.yaml into
+    # <STAGE_DIR>/rosdep-local/ (#654), inside this same staged tree — so this
+    # block keeps one lock, one trap and one COPY. See
+    # .agent/knowledge/dependency_policy.md.
     STAGE_DIR="$DOCKERFILE_DIR/.rosdep-manifests"
 
     # Serialize concurrent builds. STAGE_DIR is a FIXED path — the Dockerfile's

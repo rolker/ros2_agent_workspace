@@ -303,7 +303,57 @@ check "exits 0"                       [ "$rc" -eq 0 ]
 note=$(note_of "$HEAD_SHA")
 check "no upstream-repo lines"        not_contains "$note" "upstream-repo:"
 check "no rosdep-skip-keys line"      not_contains "$note" "rosdep-skip-keys:"
+check "no rosdep-local line"          not_contains "$note" "rosdep-local:"
 check "steps unchanged"               contains "$note" "steps: template"
+
+echo "== repo-local rosdep.yaml is detected and wired (#654) =="
+# A root rosdep.yaml must reach the inner script as a ROSDEP_SOURCE_PATH
+# overlay, and must be visible in both the dry-run report and the attestation
+# steps token — a verified environment that resolved a key from a repo-carried
+# source is not the same environment as one that did not.
+ROSREPO="$TMP/rosdep_repo"
+mkdir -p "$ROSREPO/demo_pkg"
+cp "$REPO/demo_pkg/package.xml" "$ROSREPO/demo_pkg/package.xml"
+cat > "$ROSREPO/rosdep.yaml" <<'EOF'
+snakemake:  # upstream PR owed: https://github.com/ros/rosdistro/pull/00000
+  ubuntu: [snakemake]
+EOF
+git -C "$ROSREPO" init -q
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t add -A
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t commit -qm rosdepfixture
+ROSREPO_SHA="$(git -C "$ROSREPO" rev-parse HEAD)"
+
+out=$(bash "$SUT" "$ROSREPO" --dry-run 2>&1); rc=$?
+check "dry run exits 0"               [ "$rc" -eq 0 ]
+check "steps gains rosdep-local"      contains "$out" "steps    : template+rosdep-local"
+check "dry run names the yaml"        contains "$out" "rosdep-local: src/rosdep_repo/rosdep.yaml"
+
+out=$(bash "$SUT" "$ROSREPO" 2>&1); rc=$?
+check "run exits 0"                   [ "$rc" -eq 0 ]
+rnote=$(git -C "$ROSREPO" notes --ref=ci-local show "$ROSREPO_SHA" 2>/dev/null)
+check "note steps gain rosdep-local"  contains "$rnote" "steps: template+rosdep-local"
+# ADR-0018 records the note FORMAT, not just the steps token: a reader of the
+# attestation must be able to see WHICH source carried the key, exactly as the
+# upstream-repo:/rosdep-skip-keys: lines do for their own deviations.
+check "note carries the rosdep-local line" \
+    contains "$rnote" "rosdep-local: src/rosdep_repo/rosdep.yaml via ROSDEP_SOURCE_PATH"
+
+echo "== a rosdep.yaml outside the accepted shape is refused (#654) =="
+# The file drives a root-level `rosdep install` inside the container, and
+# rosdep's format also accepts pip/npm/gem/source rules. ci_local must refuse
+# before running anything, not install from an unvalidated rule.
+cat > "$ROSREPO/rosdep.yaml" <<'EOF'
+sneaky:  # upstream PR owed: ros/rosdistro#1
+  ubuntu:
+    pip:
+      packages: [requests]
+EOF
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t add -A
+git -C "$ROSREPO" -c user.name=t -c user.email=t@t commit -qm badshape
+out=$(bash "$SUT" "$ROSREPO" --dry-run 2>&1); rc=$?
+check "a pip rule fails the run"      [ "$rc" -ne 0 ]
+check "names the offending rule"      contains "$out" "'pip' rule(s) are not accepted"
+check "points at the policy note"     contains "$out" "dependency_policy.md"
 
 echo
 echo "$PASS passed, $FAIL failed"

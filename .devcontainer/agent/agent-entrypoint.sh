@@ -22,6 +22,9 @@ fi
 TARGET_USER="ros"
 TARGET_UID="$(id -u "$TARGET_USER")"
 TARGET_GID="$(id -g "$TARGET_USER")"
+# Resolved here, not at first use: step 4's rosdep cache refresh needs it too,
+# and it must be the HOME the dropped CMD will actually run with (step 6).
+TARGET_HOME="$(eval echo "~$TARGET_USER")"
 
 # ---------- 1. Fix anonymous volume ownership ----------
 # Docker creates anonymous volumes as root. Entrypoint runs as root so we
@@ -93,6 +96,58 @@ set -u
 # on a workspace whose deps are already in the base image this skips
 # the 30–60s+ refresh entirely. Set FORCE_DEPS_REFRESH=1 to always
 # refresh (e.g. after editing a package.xml that adds a dependency).
+#
+# setup.bash (sourced above) exports ROSDEP_SOURCE_PATH when the bind-mounted
+# workspace carries a generated .rosdep/sources.list.d — the workspace is
+# mounted at the SAME absolute path it has on the host, so the generated
+# `yaml file://…` URLs resolve in here. That overrides the image's baked
+# /opt/rosdep-sources, and rosdep's cache is keyed by source URL, so the baked
+# cache has no entry for the workspace's URLs. Refresh once, and only when
+# there is actually a non-empty local list to pick up (#654). Best-effort: an
+# offline launch keeps the baked cache rather than failing.
+#
+# TWO caches, because rosdep's cache is PER USER ($HOME/.ros/rosdep/sources.cache):
+#   - root's: this entrypoint's own `rosdep check`/`rosdep install` below run as
+#     root (apt needs root; the image has no sudo).
+#   - $TARGET_USER's: step 6 drops CMD to that user with HOME=$TARGET_HOME, and
+#     the agent's in-session `rosdep resolve`/`rosdep install` read THAT cache.
+#     Its baked copy is keyed to the image's /opt/rosdep-local/... URLs, so
+#     without this refresh an in-session resolve of a workspace-local key fails
+#     even though the root-side one succeeded. It must run AS that user (not
+#     just with HOME set) so the cache files land user-owned and writable.
+# rosdep only warns when `update` runs as root; it does not refuse.
+#
+# ...and only when the list is actually the WORKSPACE's. When the mounted
+# workspace never generated one, setup.bash leaves ROSDEP_SOURCE_PATH at the
+# image's own baked dir, whose 30-workspace-local.list is non-empty and
+# non-comment — so an unguarded test fired on the image's own sources, paid two
+# rosdep updates for a cache that is already correct, and announced
+# "workspace-local sources" that are the image's. Comparing the CONTENT (not
+# the path) also covers a workspace that generated a list identical to the
+# baked one. BAKED_ROSDEP_SOURCES mirrors the Dockerfile's
+# `ENV ROSDEP_SOURCE_PATH=/opt/rosdep-sources`.
+# (overridable so the regression test can point it at a fixture dir)
+BAKED_ROSDEP_SOURCES="${BAKED_ROSDEP_SOURCES:-/opt/rosdep-sources}"
+rosdep_list_is_workspaces() {
+    _l="${ROSDEP_SOURCE_PATH:-}/30-workspace-local.list"
+    _b="$BAKED_ROSDEP_SOURCES/30-workspace-local.list"
+    [ -s "$_l" ] || return 1
+    grep -qv '^[[:space:]]*#' "$_l" 2>/dev/null || return 1
+    # No baked list to compare against: whatever we have is the workspace's.
+    [ -f "$_b" ] || return 0
+    [ "$(cat "$_l" 2>/dev/null)" != "$(cat "$_b" 2>/dev/null)" ]
+}
+if [ -n "${ROSDEP_SOURCE_PATH:-}" ] && rosdep_list_is_workspaces; then
+    echo "Workspace-local rosdep sources active ($ROSDEP_SOURCE_PATH) — refreshing cache..."
+    rosdep update \
+        || echo "  (rosdep update failed for root — continuing with the baked cache)"
+    echo "  refreshing $TARGET_USER's rosdep cache (the agent runs as $TARGET_USER)..."
+    setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- \
+        env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" \
+            ROSDEP_SOURCE_PATH="$ROSDEP_SOURCE_PATH" rosdep update \
+        || echo "  (rosdep update failed for $TARGET_USER — continuing with the baked cache)"
+fi
+
 echo "Checking rosdep dependencies..."
 APT_REFRESHED=0
 for ws_dir in "$WORKSPACE_ROOT"/layers/main/*_ws; do
@@ -122,7 +177,6 @@ done
 #   ~/.claude.json              — onboarding state (hasCompletedOnboarding flag)
 #   ~/.claude/settings.json     — user preferences
 #   ~/.claude/.credentials.json — Anthropic subscription auth
-TARGET_HOME="$(eval echo "~$TARGET_USER")"
 mkdir -p "$TARGET_HOME/.claude"
 if [ -f /tmp/claude-state.json ]; then
     cp /tmp/claude-state.json "$TARGET_HOME/.claude.json"

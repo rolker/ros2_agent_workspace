@@ -143,6 +143,35 @@ if [ -x "$_VENV_ROOT/.venv/bin/pre-commit" ]; then
 fi
 unset _VENV_ROOT
 
+# 4b. Workspace-owned rosdep sources (#654).
+# Project repos may carry a root rosdep.yaml declaring keys that have no
+# upstream ros/rosdistro entry yet. rosdep_local_sources.sh aggregates them
+# into <main-root>/.rosdep/sources.list.d/ (gitignored) alongside copies of the
+# system lists; ROSDEP_SOURCE_PATH points rosdep at that directory instead of
+# /etc/ros/rosdep/sources.list.d.
+#
+# Anchored at the MAIN workspace root — same resolution workspace_root.sh
+# performs, and the same worktree hop the .venv block above uses — so every
+# worktree on the host shares one generated directory instead of each
+# regenerating its own.
+#
+# Exported ONLY when the directory exists. ROSDEP_SOURCE_PATH REPLACES
+# sources.list.d; pointing it at a path that was never generated (a fresh
+# clone before make build's first run) would leave rosdep with no sources at
+# all rather than falling back to the system default.
+_ROSDEP_ROOT="$ROOT_DIR"
+if [ ! -d "$_ROSDEP_ROOT/.rosdep/sources.list.d" ] && [ -n "$WORKTREE_CONTEXT" ]; then
+    if [ "$WORKTREE_CONTEXT" = "workspace" ]; then
+        _ROSDEP_ROOT="$(dirname "$(dirname "$ROOT_DIR")")"
+    else
+        _ROSDEP_ROOT="$(dirname "$(dirname "$(dirname "$ROOT_DIR")")")"
+    fi
+fi
+if [ -d "$_ROSDEP_ROOT/.rosdep/sources.list.d" ]; then
+    export ROSDEP_SOURCE_PATH="$_ROSDEP_ROOT/.rosdep/sources.list.d"
+fi
+unset _ROSDEP_ROOT
+
 # 5. Prevent interactive editor hangs (safe for both agents and humans)
 export GIT_EDITOR=true
 

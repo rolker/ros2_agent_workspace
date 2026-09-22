@@ -65,7 +65,7 @@ help:
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
-	@echo "  validate      - Validate workspace config + layer sourcing (CI-oriented)"
+	@echo "  validate      - Validate workspace config + layer sourcing + local rosdep keys (CI-oriented)"
 	@echo "                  make reports 2 for ANY failure here; run"
 	@echo "                  validate_workspace.py directly for 0 match / 1 drift / 3 unconfigured / 4 unreadable repo"
 	@echo ""
@@ -96,7 +96,7 @@ help:
 build: $(STAMP)/manifest.done
 	@$(MAKE) --no-print-directory _build-layers
 
-_build-layers: $(LAYER_STAMPS)
+_build-layers: $(LAYER_STAMPS) $(STAMP)/rosdep-local.done
 	@./.agent/scripts/build.sh
 
 test: build
@@ -146,13 +146,25 @@ test-scripts:
 # workspace worktree and every un-bootstrapped clone, which is exactly where
 # agents work. The layer-sourcing guard needs no configs/manifest, so it has
 # something to say in that state.
+# The third check, rosdep_local_staleness_check.sh (#654), reports exit 3 for
+# SKIPPED — it could not run the isolated `rosdep update` its verdict depends
+# on (offline, no rosdep). That is not a finding, so it is printed and cleared;
+# only its 1 (a stale or unmarked local key) and 2 (usage) fail the recipe.
+# Its exit codes are distinct precisely so this accumulation can tell them
+# apart instead of failing every offline workspace.
+#
 # GNU make flattens whatever this returns to its own 2; the code is preserved
 # for a direct `./.agent/scripts/validate_workspace.py` call, not for `make`.
 validate:
 	@vrc=0; python3 ./.agent/scripts/validate_workspace.py || vrc=$$?; \
 	lrc=0; ./.agent/scripts/test_layer_sourcing.sh || lrc=$$?; \
+	rrc=0; ./.agent/scripts/rosdep_local_staleness_check.sh || rrc=$$?; \
+	if [ "$$rrc" -eq 3 ]; then \
+		echo "  (rosdep-local check SKIPPED — not a validation failure)"; rrc=0; \
+	fi; \
 	if [ "$$vrc" -ne 0 ]; then exit $$vrc; fi; \
-	exit $$lrc
+	if [ "$$lrc" -ne 0 ]; then exit $$lrc; fi; \
+	exit $$rrc
 
 # =============================================================================
 # Tier 1 — Setup chain (stamp-based dependencies)
@@ -198,6 +210,71 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 	fi
 	@./.agent/scripts/setup_layers.sh $(if $(BOOTSTRAP_URL),--bootstrap-url "$(BOOTSTRAP_URL)") --manifest-only
 	@touch $@
+
+# Workspace-owned rosdep sources (#654): aggregate every project repo's root
+# rosdep.yaml into $(MAIN_ROOT)/.rosdep/sources.list.d/ and refresh the cache.
+# The wildcard is a PLAIN prerequisite list — no .SECONDEXPANSION needed, since
+# this target has no `%` (unlike $(STAMP)/layer-%.done, whose prerequisite
+# embeds $*). Makefiles are re-parsed every invocation, so the wildcard
+# re-evaluates and the stamp goes stale when a rosdep.yaml is edited, added, or
+# first appears with a newly checked-out repo.
+#
+# DELETION needs more than the wildcard, though, and deletion is the DOCUMENTED
+# end of a local key's lifecycle (the upstream entry lands → delete the local
+# file). A shrinking prerequisite list never makes a stamp stale, so the
+# generated source list would keep a `yaml file://…` line for a file that no
+# longer exists. The stamp therefore also depends on a file holding the CURRENT
+# set of paths, rewritten (and so made newer than the stamp) only when that set
+# actually changes — added, renamed or removed alike.
+ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+
+# FORCE (an ordinary target with no recipe and no file behind it) makes this
+# rule run every invocation; the cmp keeps the file's MTIME unchanged unless
+# its content differs, so it only triggers the stamp when the set really moved.
+# Deliberately not .PHONY: .PHONY targets in this Makefile are published as
+# /make_* slash commands (see CLAUDE.md), and `/make_FORCE` is not a command.
+#
+# That leaves the idiom's one failure mode unguarded: a real FILE named FORCE
+# makes the target up to date, so the rule below silently stops running and
+# the add/rename/delete detection it exists for disappears with it — quietly,
+# and only for the person who has that file. Fail loudly instead.
+ifneq ($(wildcard FORCE),)
+$(error A file named 'FORCE' exists in $(CURDIR). It shadows the FORCE target that keeps $(STAMP)/rosdep-local.list current, which is how an added, renamed or deleted project rosdep.yaml is detected (#654). Remove or rename it.)
+endif
+
+FORCE:
+
+$(STAMP)/rosdep-local.list: FORCE
+	@mkdir -p $(STAMP)
+	@printf '%s\n' $(ROSDEP_LOCAL_YAMLS) > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+
+# `rosdep update` is best-effort: an offline host must not fail `make build`,
+# and the generated source list is still correct for the next online run.
+#
+# The generator's exit 3 ("rosdep is not initialized" — no *.list under
+# /etc/ros/rosdep/sources.list.d) is RECOVERABLE and must not break `make
+# build`: it is the normal state of a clone that has not run `sudo rosdep init`
+# yet, and the same condition bootstrap.sh treats as a note. The stamp is then
+# deliberately NOT touched, so the next `make build` retries once rosdep is
+# initialized (the prerequisite list would otherwise still be up to date and
+# the generator would never run again). Any OTHER non-zero status — notably
+# exit 4, a project repo's rosdep.yaml rejected by the shape rules — fails the
+# build: those keys feed a root-level `rosdep install`, so a rejected file is a
+# policy violation to fix, not a condition to build past.
+$(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(STAMP)/rosdep-local.list $(ROSDEP_LOCAL_YAMLS)
+	@mkdir -p $(STAMP)
+	@rc=0; ./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT) || rc=$$?; \
+	if [ "$$rc" -eq 3 ]; then \
+		echo "  (workspace-local rosdep sources not generated — rosdep is not"; \
+		echo "   initialized; run .agent/scripts/bootstrap.sh. Using system defaults.)"; \
+	elif [ "$$rc" -ne 0 ]; then \
+		exit $$rc; \
+	else \
+		ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
+			|| echo "  (rosdep update failed — offline? generated source list is still current)"; \
+		touch $@; \
+	fi
 
 # Enable secondary expansion for the layer stamp rule below.
 .SECONDEXPANSION:
