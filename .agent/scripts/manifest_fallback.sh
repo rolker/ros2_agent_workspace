@@ -51,6 +51,22 @@
 #              # FAILED(manifest refresh: <reason>)
 #   esac
 #
+# Second entry point — manifest_bootstrap_identity <workspace-root>:
+#   Prints `<owner>\t<repo>\t<branch>\t<config_path>` for the manifest
+#   (project-root) repo this workspace is configured for, parsed from the same
+#   tracked pointer, with NO clone and no network. Its contract is narrower
+#   than manifest_config_dir's — nothing in it can fail for a cache or remote
+#   reason — so it has two codes only, kept in their own block rather than
+#   folded into the table above, where the absent 5 and 6 would read as codes
+#   it can return:
+#     0  the identity is on stdout
+#     3  no pointer (or no $BOOTSTRAP_URL), an empty pointer, or a url form
+#        this derivation cannot parse safely — stdout is EMPTY in this state
+#   manifest_config_dir calls it and maps its 3 straight through, so the
+#   pointer is parsed in exactly one place. A caller that only needs to know
+#   WHICH project this checkout is configured for calls it directly rather
+#   than paying for a manifest clone (`janitor-sweep`, #652).
+#
 # Environment:
 #   BOOTSTRAP_URL                  overrides the pointer file (same precedence
 #                                  as setup_layers.sh, where it is source 1)
@@ -72,11 +88,11 @@
 #      diagnostics this helper prints into a report could not be redacted
 #
 # Sourced, not executed — the mirror image of resolve_repo_checkout.sh's guard.
-# Run directly, this file would define two functions and exit 0 having done
+# Run directly, this file would define its functions and exit 0 having done
 # nothing at all: a silent success, from a script whose whole job is to refuse
 # to report success it did not earn.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "manifest_fallback.sh must be sourced, not executed: source ${BASH_SOURCE[0]} && manifest_config_dir <workspace-root>" >&2
+    echo "manifest_fallback.sh must be sourced, not executed: source ${BASH_SOURCE[0]} && manifest_config_dir <workspace-root>  (or manifest_bootstrap_identity <workspace-root>)" >&2
     exit 2
 fi
 
@@ -120,8 +136,7 @@ _manifest_fallback_say() { echo "manifest_fallback: $(redact_text "$1")" >&2; }
 # See the exit-code table above.
 manifest_config_dir() {
     local root="${1:-$PWD}"
-    local pointer_file="$root/configs/project_bootstrap.url"
-    local bootstrap_url owner repo branch config_path git_url cache clone_dir
+    local owner repo branch config_path git_url cache clone_dir
     local lock_open
 
     # The normal case: the workspace has its manifest on disk. Print nothing.
@@ -145,40 +160,13 @@ manifest_config_dir() {
         return 0
     done
 
-    bootstrap_url="${BOOTSTRAP_URL:-}"
-    if [[ -z "$bootstrap_url" && -f "$pointer_file" ]]; then
-        bootstrap_url=$(tr -d '[:space:]' < "$pointer_file")
-    fi
-    if [[ -z "$bootstrap_url" ]]; then
-        _manifest_fallback_say "no configs/manifest and no configs/project_bootstrap.url under $root — nothing to enumerate repos from"
-        return 3
-    fi
-
-    # Only the raw.githubusercontent form is derivable without fetching the
-    # bootstrap.yaml itself (which would need the network before we know
-    # whether we can reach it at all, and would put a YAML parser in the
-    # failure path). Anything else is reported as unsupported rather than
-    # guessed at.
-    if [[ ! "$bootstrap_url" =~ ^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)/bootstrap\.yaml$ ]]; then
-        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can"
-        return 3
-    fi
-    owner="${BASH_REMATCH[1]}"
-    repo="${BASH_REMATCH[2]}"
-    branch="${BASH_REMATCH[3]}"
-    config_path="${BASH_REMATCH[4]}"
-    repo="${repo%.git}"
-
-    # Each of these is interpolated into a url, a `git clone --branch`, or a
-    # path. A branch with a `/` in it is indistinguishable from the config path
-    # in a raw url, so it is refused rather than split on a guess.
-    if [[ ! "$owner" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
-       || [[ ! "$repo" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
-       || [[ ! "$branch" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
-       || [[ "$config_path" == /* || "$config_path" == *..* ]]; then
-        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess"
-        return 3
-    fi
+    # The pointer is parsed in exactly one place — manifest_bootstrap_identity
+    # below — so the derivation this function clones from and the identity a
+    # caller reads without cloning can never drift apart. Its exit 3 is this
+    # function's exit 3, unchanged: no pointer, or a url form it cannot parse.
+    local identity
+    identity=$(manifest_bootstrap_identity "$root") || return 3
+    IFS=$'\t' read -r owner repo branch config_path <<< "$identity"
 
     # The base reaches `git clone`, and it is the root of the whole trust chain
     # (manifest repo -> the repo list -> every repo the sweep clones). It comes
@@ -356,6 +344,75 @@ manifest_config_dir() {
 
     printf '%s\n' "$clone_dir/$config_path/repos"
     return 0
+}
+
+# manifest_bootstrap_identity <workspace_root>
+#
+# The IDENTITY of the manifest (project-root) repo this workspace is
+# configured for, derived from the tracked `configs/project_bootstrap.url`
+# pointer — or from `$BOOTSTRAP_URL`, which overrides it with the same
+# precedence `setup_layers.sh` gives it. Prints one tab-separated line:
+#
+#   <owner>\t<repo>\t<branch>\t<config_path>
+#
+# It reads one small file and parses a string: no clone, no network, no
+# filesystem beyond the pointer. That is what makes it usable by a caller
+# that wants to know WHICH project this checkout is configured for without
+# paying for — or being failed by — a manifest clone it does not need
+# (`janitor-sweep`'s per-project health report, #652).
+#
+# Exit codes — a narrower contract than manifest_config_dir's, because
+# nothing here can fail for a network or cache reason:
+#   0  the identity is on stdout
+#   3  no pointer file (and no $BOOTSTRAP_URL), an empty one, or a url this
+#      derivation cannot parse safely. NOTHING is printed on stdout in this
+#      state — the caller never receives a half-parsed line as if it were an
+#      identity (#609's rule, applied one function down)
+#
+# `manifest_config_dir` calls this and maps its 3 straight through, so the
+# pointer is parsed in exactly one place.
+manifest_bootstrap_identity() {
+    local root="${1:-$PWD}"
+    local pointer_file="$root/configs/project_bootstrap.url"
+    local bootstrap_url owner repo branch config_path
+
+    bootstrap_url="${BOOTSTRAP_URL:-}"
+    if [[ -z "$bootstrap_url" && -f "$pointer_file" ]]; then
+        bootstrap_url=$(tr -d '[:space:]' < "$pointer_file")
+    fi
+    if [[ -z "$bootstrap_url" ]]; then
+        _manifest_fallback_say "no configs/project_bootstrap.url under $root (and no \$BOOTSTRAP_URL) — no manifest repo identity to derive"
+        return 3
+    fi
+
+    # Only the raw.githubusercontent form is derivable without fetching the
+    # bootstrap.yaml itself (which would need the network before we know
+    # whether we can reach it at all, and would put a YAML parser in the
+    # failure path). Anything else — an ssh scp-form git url, a repo web url,
+    # a raw url with no `bootstrap.yaml` tail — is reported as unsupported
+    # rather than guessed at.
+    if [[ ! "$bootstrap_url" =~ ^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)/bootstrap\.yaml$ ]]; then
+        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' is not a raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml url — this fallback cannot derive a git url from it; run 'make setup-all' on a host that can"
+        return 3
+    fi
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+    branch="${BASH_REMATCH[3]}"
+    config_path="${BASH_REMATCH[4]}"
+    repo="${repo%.git}"
+
+    # Each of these is interpolated into a url, a `git clone --branch`, or a
+    # path. A branch with a `/` in it is indistinguishable from the config path
+    # in a raw url, so it is refused rather than split on a guess.
+    if [[ ! "$owner" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
+       || [[ ! "$repo" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
+       || [[ ! "$branch" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]] \
+       || [[ "$config_path" == /* || "$config_path" == *..* ]]; then
+        _manifest_fallback_say "'$(redact_url "$bootstrap_url")' does not parse into a safe <owner>/<repo>/<branch>/<path> — refusing to guess"
+        return 3
+    fi
+
+    printf '%s\t%s\t%s\t%s\n' "$owner" "$repo" "$branch" "$config_path"
 }
 
 # The comparison key for two git urls that should name the same manifest repo.
