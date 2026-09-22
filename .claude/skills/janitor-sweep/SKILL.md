@@ -977,10 +977,18 @@ reader see both numbers.
        it is actually for. -->
 
 ### 2. Unowned safety bugs
-(same New/Resolved/Unchanged/Not re-examined shape)
+(same New/Resolved/Unchanged/Not re-examined shape as tier 1 — the shorthand
+below stands for those four subsections in full, under the § 6 rules above:
+`New`/`Resolved`/`Unchanged` always present, `Not re-examined` only when it
+has entries, and the whole tier omitted only when all four are empty)
 
 ### 3. Rules that have bitten with no enforcement
-(same shape)
+#### New
+- ...
+#### Resolved
+- ...
+#### Unchanged
+- ...
 #### Not re-examined
 - <prior finding, verbatim> (since <YYYY-MM-DD>)
   <!-- The state's home tier: these findings come from section 1
