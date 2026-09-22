@@ -1921,22 +1921,27 @@ and say which source the workspace scope diffed against (§ 5's
 plainly that project-scope findings are **not** published anywhere beyond
 the local report(s).
 
-State the **per-project health outcome** on its own line, from
-`$PROJECT_HEALTH_STATUS` (§ 6), in the words the run produced:
+State the **per-project health outcome** on its own line, **quoting
+`$PROJECT_HEALTH_STATUS` verbatim** (§ 6) — the report file and the
+conversation then carry one vocabulary for the same state, so an operator
+reading the file and an operator reading the transcript are looking for the
+same string. Gloss it if the string is terse; do not paraphrase it away:
 
-- `no project configured on this checkout` — step 1a found no pointer, or no
-  layer checkout of the repo it names. Nothing is wrong
-- `<repo> has no root ROADMAP.md — no per-project report`
-- `<repo>: excluded by rotation rule <n>: <reason> — no per-project report`
-  (no week will select it until the exclusion is fixed)
-- `<repo>: not in this run's chunk — no per-project report`
-- `<repo>: check 2 did not audit it — no per-project report` (it *was* in the
-  chunk; check 2's own status says why)
-- `<repo>: FAILED(project root probe: <reason>)` — the checkout is there but
+- `SKIPPED(no project configured on this checkout)` — step 1a found no
+  pointer, or no layer checkout of the repo it names. Nothing is wrong
+- `no-roadmap: <repo>` — probed fine, no root `ROADMAP.md`, so there is no
+  per-project report. Absence of a planning document is never a finding
+- `SKIPPED(project repo excluded by rotation rule <n>: <reason>)` — no week
+  will select it until the exclusion is fixed
+- `SKIPPED(project repo not in this run's chunk)` — eligible, just not this
+  week's chunk
+- `SKIPPED(check 2 did not audit <repo>)` — it *was* in the chunk; check 2's
+  own status says why
+- `FAILED(project root probe: <reason>)` — the checkout is there but
   `planning_doc_probe.sh` could not read it, so whether it has a roadmap is
   unknown. Never rendered as "no roadmap"
-- `<repo>: <report path, workspace-relative>`
-- `<repo>: FAILED(project health write: <reason>)`
+- `written: <report path>` — stated workspace-relative, as below
+- `FAILED(project health write: <reason>)`
 
 Name the file by its path relative to the workspace root, as with the
 primary report. A failure here never changes the headline: the primary
