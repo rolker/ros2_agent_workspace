@@ -211,3 +211,28 @@ plan.
 - rosdep's cache is per-user and keyed by source URL. That is why the probe
   uses a throwaway `HOME`, why `ci_local.sh` bypasses the baked-cache guard on
   the local-key path, and why the entrypoint refreshes once.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 11:13 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-654 at `a5158d1`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1469 lines / 19 files, plus governance-file and CI/container-path triggers)
+**Must-fix**: 4 | **Suggestions**: 5
+**Round**: 1 | **Ship**: continue — one of the must-fixes is a genuine correctness gap in the container (the launch-time cache refresh lands in the wrong user's cache) and one is a missing-validation/trust-boundary concern, not mechanical fixes
+
+**Specialists**: Static Analysis, Governance, Plan Drift, Claude Adversarial Lens A + Lens B (Copilot and Local Adversarial off by default). Static analysis clean at shellcheck `--severity=warning` on all 11 changed shell files; `test_rosdep_local_sources.sh` 39/39, `test_make_validate.sh` 7/7, `test_ci_local.sh` 88/88 all pass.
+
+### Findings
+- [ ] (must-fix) `make build` now hard-fails when the system rosdep sources are uninitialized: the stamp recipe calls `rosdep_local_sources.sh` (exit 3) with no `||` guard, unlike bootstrap.sh's recoverable call of the same script; no test covers the path — `Makefile:223-227`
+- [ ] (must-fix) The launch-time `rosdep update` runs as root (setpriv drop is later, at :187), so the bind-mounted workspace's `file://` sources land in `/root`'s cache; the agent runs as `ros`, inherits the same `ROSDEP_SOURCE_PATH`, and its baked cache is keyed to `/opt/rosdep-local/...` URLs — in-session `rosdep resolve`/`install` of a workspace-local key still fails. The new Dockerfile comment asserts the opposite — `.devcontainer/agent/agent-entrypoint.sh:103-108`, `.devcontainer/agent/Dockerfile:146-149`
+- [ ] (must-fix) Nothing validates a project repo's `rosdep.yaml` shape before it drives `rosdep install -y` as root (image bake, ci_local container, container launch). rosdep's format also accepts `pip`, `npm`, `gem` and `source` (download-and-run an rdmanifest) rules, so a repo-merged file can install outside the documented `{distro: [pkg]}` form — and a `pip:` rule routes around ADR-0009. Enforce the list form (the staleness check already `yaml.safe_load`s) and state the constraint as a rule — `.agent/scripts/rosdep_local_sources.sh:61-83`, `.agent/scripts/stage_rosdep_manifests.sh:99-113`, `.agent/knowledge/dependency_policy.md:22-30`
+- [ ] (must-fix) Plan still contradicts the code: "no new note fields needed" vs. the `+rosdep-local` steps token the implementation deliberately adds — `.agent/work-plans/issue-654/plan.md:284`
+- [ ] (suggestion) Staged local yamls are keyed by repo basename, so two same-named repos under different `*_ws/src/` trees silently overwrite each other while `local_count` counts both — `.agent/scripts/stage_rosdep_manifests.sh:105-110`
+- [ ] (suggestion) ADR-0018 gets no "format extension" paragraph for the `+rosdep-local` steps token, unlike #577's `upstream-repo:`/`rosdep-skip-keys:` precedent — `docs/decisions/0018-local-first-ci-verification.md`
+- [ ] (suggestion) The hosted-CI recipe lives only in prose, so it does not cascade: neither the project-repo CI template nor the onboarding step that handles non-rosdep deps mentions it — `.agent/templates/ci_workflow.yml:35-42`, `.claude/skills/onboard-project/SKILL.md:180`
+- [ ] (suggestion) `dependency_policy.md` never states the trust implication — a `rosdep.yaml` merged in any project repo now has root-level install influence on the dev host, CI containers and the agent image — `.agent/knowledge/dependency_policy.md`
+- [ ] (suggestion) `make validate`'s one-line description was updated in `make help` but not here — `README.md:220`
