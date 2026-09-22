@@ -25,6 +25,7 @@ check() {
     else echo "  ❌ $label"; FAIL=1; fi
 }
 contains() { case "$1" in *"$2"*) return 0;; *) return 1;; esac; }
+lacks()    { case "$1" in *"$2"*) return 1;; *) return 0;; esac; }
 eq() { [ "$1" = "$2" ]; }
 
 TMP="$(mktemp -d -t rosdep_local_test.XXXXXX)"
@@ -164,6 +165,53 @@ ROSDEP_SOURCES_FORCE_FALLBACK=1 "$AGG" "$MIGWS" >/dev/null 2>&1
 check "the fallback migration lands too"   test -L "$MIG_OUT"
 check "it drops the old generation"        bash -c "! [ -f '$MIG_OUT/99-stale.list' ]"
 check "and publishes a complete dir"       bash -c "[ -f '$MIG_OUT/20-default.list' ] && [ -f '$MIG_OUT/30-workspace-local.list' ]"
+
+echo "=== rosdep_local_sources.sh: a lock timeout FAILS, it does not fall through ==="
+# A timeout is not the same condition as "flock is not installed": it proves
+# another writer holds the lock, and two unserialized writers share one build
+# slot, so the swap would publish a mid-mutation directory.
+if command -v flock >/dev/null 2>&1; then
+    LOCKWS="$TMP/lock_ws"; mkdir -p "$LOCKWS/layers/main"
+    "$AGG" "$LOCKWS" >/dev/null 2>&1
+    before="$(readlink "$LOCKWS/.rosdep/sources.list.d")"
+    LOCK_FILE="$LOCKWS/.rosdep/.sources.list.d.lock"
+    flock -x "$LOCK_FILE" -c 'sleep 3' &
+    holder=$!
+    sleep 0.3
+    out="$(ROSDEP_SOURCES_LOCK_TIMEOUT=1 "$AGG" "$LOCKWS" 2>&1)"; rc=$?
+    kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+    check "a held lock times out with 5"   eq "$rc" 5
+    check "it says what timed out"         contains "$out" "timed out"
+    check "it refuses to go unserialized"  lacks "$out" "regenerating unserialized"
+    check "the published dir is untouched" eq "$before" "$(readlink "$LOCKWS/.rosdep/sources.list.d")"
+else
+    echo "  ⏭  flock not installed — timeout cases skipped"
+fi
+
+echo "=== rosdep_local_sources.sh: flock-absent and lock-unopenable are distinct ==="
+# "flock unavailable" for an unopenable lock file misdirects the debugging:
+# the .rosdep tree is written by the host uid, by root in the agent entrypoint
+# and by the agent user, so a permission failure there is plausible.
+FAKEBIN="$TMP/fake_path"; mkdir -p "$FAKEBIN"
+for tool in bash cp ln mv rm mkdir dirname basename readlink sort cat python3 grep; do
+    tp="$(command -v "$tool" 2>/dev/null)" && ln -sf "$tp" "$FAKEBIN/$tool"
+done
+NOFLOCKWS="$TMP/noflock_ws"; mkdir -p "$NOFLOCKWS/layers/main"
+out="$(PATH="$FAKEBIN" "$AGG" "$NOFLOCKWS" 2>&1)"; rc=$?
+check "runs without flock (exit 0)"    eq "$rc" 0
+check "says flock is not installed"    contains "$out" "flock is not installed"
+
+UNOPENWS="$TMP/unopen_ws"; mkdir -p "$UNOPENWS/layers/main/.rosdep"
+mkdir -p "$UNOPENWS/.rosdep"
+chmod 500 "$UNOPENWS/.rosdep"
+out="$("$AGG" "$UNOPENWS" 2>&1)"; rc=$?
+chmod 700 "$UNOPENWS/.rosdep"
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  ⏭  running as root — unopenable-lock case skipped"
+else
+    check "an unopenable lock file says so" contains "$out" "could not open lock file"
+    check "it does not blame flock"         lacks "$out" "flock is not installed"
+fi
 
 echo "=== rosdep_local_sources.sh: a reader never sees an incomplete dir ==="
 # Concurrent regenerations + a reader loop: at no instant may the published

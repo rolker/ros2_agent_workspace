@@ -41,8 +41,11 @@
 # a reader mid-rebuild sees either the old generation or the new one, never a
 # half-copied dir and never a missing one. Concurrent regenerations are
 # serialized by a bounded flock (300s, ROSDEP_SOURCES_LOCK_TIMEOUT), following
-# docker_run_agent.sh's precedent; where flock is unavailable the run proceeds
-# unserialized and says so — the swap still keeps readers consistent.
+# docker_run_agent.sh's precedent; where flock is not installed (or its lock
+# file cannot be opened) the run proceeds unserialized and says which of the
+# two it was — the swap still keeps readers consistent. A flock TIMEOUT is
+# different and is a hard failure (exit 5): it proves another writer holds the
+# lock, so proceeding would put two writers in one build slot.
 #
 # The FIRST run over a pre-existing REAL directory at <out_dir> (an older
 # generation of this script) has to migrate it, and a symlink cannot be renamed
@@ -70,6 +73,9 @@
 #      are left OUT of the generated list — the rest of the directory is still
 #      written and usable — and the exit is non-zero because a key feeding a
 #      root-level `rosdep install` must not arrive unvalidated.
+#   5  timed out waiting for the regeneration lock (ROSDEP_SOURCES_LOCK_TIMEOUT,
+#      default 300s) — another regeneration still holds it. Nothing was
+#      written; the previously published directory is untouched. Retry.
 
 set -euo pipefail
 
@@ -129,12 +135,34 @@ mkdir -p "$OUT_PARENT"
 # "the one the symlink does not point at", which is only safe while no other
 # writer is choosing at the same time. fd 9 is released when this process
 # exits.
-if command -v flock >/dev/null 2>&1 && exec 9>"$LOCK_FILE"; then
-    flock -w "$LOCK_TIMEOUT" 9 \
-        || echo "Warning: could not take $LOCK_FILE within ${LOCK_TIMEOUT}s —" \
-                "regenerating unserialized." >&2
-else
-    echo "Warning: flock unavailable — regenerating unserialized." >&2
+# Three outcomes, deliberately distinguished — they are not the same condition
+# and they do not get the same response:
+#   flock not installed   -> proceed unserialized (the swap still keeps readers
+#                            consistent; this is the documented degraded mode)
+#   lock file unopenable  -> proceed unserialized, but say WHY (the .rosdep tree
+#                            is written by the host uid, by root in the agent
+#                            entrypoint and by the agent user, so a
+#                            permission/ownership failure here is plausible and
+#                            "flock unavailable" would misdirect the debugging)
+#   flock TIMED OUT       -> FAIL (exit 5). A timeout means another writer
+#                            demonstrably holds the lock; falling through would
+#                            put two writers on the same published slot, both
+#                            rm -rf'ing and cp'ing into one BUILD_DIR, and the
+#                            swap would then publish a mid-mutation directory.
+#                            Unserialized is only safe when nobody else is
+#                            writing, which is exactly what a timeout disproves.
+if ! command -v flock >/dev/null 2>&1; then
+    echo "Warning: flock is not installed — regenerating unserialized." >&2
+elif ! exec 9>"$LOCK_FILE"; then
+    echo "Warning: could not open lock file $LOCK_FILE (check ownership and" \
+         "permissions on $OUT_PARENT) — regenerating unserialized." >&2
+elif ! flock -w "$LOCK_TIMEOUT" 9; then
+    echo "Error: timed out after ${LOCK_TIMEOUT}s waiting for $LOCK_FILE —" \
+         "another regeneration is still holding it." >&2
+    echo "       Refusing to regenerate unserialized: a second writer would" \
+         "share the build slot and publish a half-written directory." >&2
+    echo "       Retry, or raise ROSDEP_SOURCES_LOCK_TIMEOUT." >&2
+    exit 5
 fi
 
 # Two slots, alternating: the one currently published is left untouched until
