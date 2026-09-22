@@ -151,6 +151,14 @@ out.
 Exporting through `$GITHUB_ENV` means the workflow's existing
 `rosdep install` step needs no change at all.
 
+The `sudo` calls are for a workflow running directly on a runner. The
+workspace's own CI template
+([`.agent/templates/ci_workflow.yml`](../templates/ci_workflow.yml)) runs in a
+`ros:jazzy-*` **container**, where the job is already root, and carries the
+same step without `sudo` — already in place for every repo onboarded from the
+template, and a no-op (`if: hashFiles('rosdep.yaml') != ''`) in the repos that
+declare no local keys. `onboard-project` says to keep it.
+
 ## The bookkeeping: `make validate` nags
 
 `rosdep_local_staleness_check.sh` runs from `make validate` and reports two

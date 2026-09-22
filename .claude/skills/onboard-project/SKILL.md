@@ -178,6 +178,14 @@ cd <layer>_ws/src/<repo-name>
   - `repo` in the symlink step → the repo directory name
   - Add any known extra dependency cloning steps if discoverable from
     `package.xml` dependencies that aren't in rosdep
+  - Keep the "Install repo-local rosdep keys" step: it is a no-op unless the
+    repo carries a root `rosdep.yaml`, and it is what makes such a repo build
+    in hosted CI (#654). A `rosdep.yaml` declares keys Ubuntu ships but
+    `ros/rosdistro` has no entry for; each owes an upstream PR, and the
+    accepted shape is list-form only (no `pip`/`npm`/`gem`/`source` rules) —
+    see `.agent/knowledge/dependency_policy.md`. If a `package.xml` depends on
+    something with no rosdep key at all, that note is the decision table for
+    what to do about it.
 
 - **Agent guide** (`.agents/README.md`): Use the template from
   `.agent/templates/project_agents_guide.md`. Read the repo's actual code to

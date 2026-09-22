@@ -38,8 +38,30 @@ jobs:
             rosdep init
           fi
 
+      # Repo-local rosdep keys (#654). Keep this BEFORE `rosdep update`:
+      # ROSDEP_SOURCE_PATH must be in the env before the cache is built.
+      # Only applies if this repo carries a root rosdep.yaml — keys that have
+      # no upstream ros/rosdistro entry yet, each owing an upstream PR. The
+      # accepted shape is `<key>: {<os>: [<package>, ...]}` (list form only —
+      # no pip/npm/gem/source rules); see the workspace's
+      # .agent/knowledge/dependency_policy.md. No-op when the file is absent,
+      # so this step is safe to keep in every repo.
+      - name: Install repo-local rosdep keys
+        if: hashFiles('rosdep.yaml') != ''
+        run: |
+          set -euo pipefail
+          SRC=/opt/rosdep-sources
+          mkdir -p "$SRC"
+          # ROSDEP_SOURCE_PATH REPLACES sources.list.d — copy every system
+          # list, not just 20-default.list, or a source the runner has is
+          # dropped.
+          cp /etc/ros/rosdep/sources.list.d/*.list "$SRC/"
+          echo "yaml file://$GITHUB_WORKSPACE/rosdep.yaml" \
+            > "$SRC/30-workspace-local.list"
+          echo "ROSDEP_SOURCE_PATH=$SRC" >> "$GITHUB_ENV"
+
       - name: Update rosdep
-        run: rosdep update
+        run: rosdep update   # picks up ROSDEP_SOURCE_PATH from the step above
 
       - name: Create workspace
         run: mkdir -p ../ws/src && ln -s "$GITHUB_WORKSPACE" ../ws/src/PLACEHOLDER_REPO_NAME
