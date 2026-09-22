@@ -255,8 +255,11 @@ generic, with no repo names baked into workspace scripts.
 | `.devcontainer/agent/agent-entrypoint.sh` | Best-effort `rosdep update` when the mounted workspace has a non-empty local list (step 5) |
 | `Makefile` | New `$(STAMP)/rosdep-local.done` stamp + `_build-layers` prereq + `validate` target third branch (steps 4, 6) |
 | `.gitignore` | Add `.rosdep/` |
+| `.agent/scripts/docker_run_agent.sh` | Comment-only: point the staging block at the new rosdep-local/ staging (step 5) |
 | `.agent/knowledge/dependency_policy.md` | New knowledge note (step 7) |
-| `AGENTS.md` | Script Reference table rows for both new scripts (step 8) |
+| `.agent/knowledge/README.md` | Index the new knowledge note (step 7) |
+| `.agent/scripts/tests/test_ci_local.sh` | Dry-run + attestation assertions for the `+rosdep-local` path (step 5) |
+| `AGENTS.md` | Script Reference table rows for both new scripts, extended `stage_rosdep_manifests.sh` row, corrected `validate_workspace.py` row (step 8) |
 | `.agent/scripts/tests/test_rosdep_local_sources.sh` | New test file (step 9) |
 | `.agent/scripts/tests/test_make_validate.sh` | Stub the new check so the `validate`-recipe regression test still exercises the real recipe (step 6 consequence) |
 
