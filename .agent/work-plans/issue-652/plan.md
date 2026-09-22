@@ -25,6 +25,22 @@ sentences, SKILL.md Overview/Deferred rewrite).
 against. Nothing in #651 conflicts with this issue's three decisions (verified
 in the Issue Review).
 
+**Plan revision (2026-09-22)**: revised after the `## Plan Review` entry in
+this directory's `progress.md` returned *changes-requested*. Three findings,
+all folded in: (must-fix) § 1 now names the test file the extraction's
+coverage lands in and the cases it adds, and Estimated Scope no longer
+justifies "no new tests" with an argument that applies only to the skill
+document; (must-fix) § 2's project-root resolution no longer routes through
+`resolve_repo_checkout.sh` — it resolves identity from the tracked pointer
+and accepts **only** a layer checkout, per the operator's decision 4 that a
+checkout with no `layers/` has no project, which removes both the
+self-listing dependency and the duplicate clone the review found;
+(should-fix) § 2 now states where `$PROJECT_REPO_AUDITED_THIS_RUN` is
+assigned and § 3 states the `SKIPPED(project repo not in this run's chunk)`
+string it gates. Two consequences surfaced while revising — the test
+extension and pruning the new `*-health.md` files — are folded into scope
+rather than deferred.
+
 ## Approach
 
 ### 1. `manifest_fallback.sh` — extract the URL→identity parsing into a reusable function
@@ -51,85 +67,144 @@ identity. Action 1 requires reusing this parsing, not duplicating it, so:
 - This keeps the "only one place parses the pointer" property the workspace
   already relies on for `manifest_config_dir`, and gives `janitor-sweep` (and
   any future caller) the owner/repo identity without a clone.
+- **Cover the new function in the existing script tests.**
+  `.agent/scripts/tests/test_resolve_repo_checkout.sh` already sources
+  `manifest_fallback.sh` directly and exercises its internals (the source
+  guard, `_manifest_fallback_url_key`), so it is the file this extraction's
+  coverage belongs in — extracted code with no direct test is how a
+  "behavior-preserving" refactor stops being one. Add a
+  `bootstrap_identity_case` block, in the same style as the existing
+  `url_key_case` helper, asserting:
+  - a valid `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>/bootstrap.yaml`
+    pointer → exit 0 and the exact four-field TSV;
+  - a pointer whose repo segment carries a trailing `.git` → the `.git` is
+    stripped from the repo field (the normalization moved with the code);
+  - a pointer with a trailing `/` (no `bootstrap.yaml` tail) → exit 3, empty
+    stdout;
+  - an **ssh scp-form** url (`git@github.com:owner/repo.git`) → exit 3, empty
+    stdout: it is a git url, not the raw-content pointer form this function
+    parses, and it is refused rather than guessed at;
+  - a **missing** pointer file and an **empty/whitespace-only** one → exit 3,
+    empty stdout;
+  - `$BOOTSTRAP_URL` set → it overrides the pointer file (same precedence
+    `setup_layers.sh` uses), and an unparseable `$BOOTSTRAP_URL` is exit 3
+    even when a valid pointer file exists.
+
+  Every failure case asserts **empty stdout**, per this suite's standing rule
+  that a caller must never receive an empty string as if it were a value.
+  The whole file, plus `make test-scripts`, must pass — the pre-existing
+  `manifest_config_dir` cases are the behavior-preservation check.
 
 ### 2. `janitor-sweep` SKILL.md — resolve the project root (new step, after step 1)
 
 Add a new step, **"1a. Resolve the configured project root"**, run once per
 sweep, right after the workspace-root/report-directory setup (current step 1)
-and before the repo-rotation build (current step 2 — renumbered to 3, see
-below only if needed; prefer inserting as `1a` to avoid renumbering the many
-cross-references to step 5/6/7/8 elsewhere in the skill and in this plan).
+and before the repo-rotation build (current step 2) — inserted as `1a` rather
+than renumbered, to avoid touching the many existing cross-references to
+"step 5", "step 6", "§ 7" in this 1500-line file.
+
+**The project root is resolved from this host's own layer tree, and never
+cloned.** Identity comes from the tracked `configs/project_bootstrap.url`
+pointer (via § 1's new `manifest_bootstrap_identity`, no clone, no network);
+the *checkout* is only ever one that already exists under
+`$ROOT/layers/main/*/src/<repo>`. When `layers/` is absent, or the pointer's
+repo is not in it, the per-project report is **skipped, not failed and not
+cloned** — the issue's decision 4 is explicit that a checkout with no project
+configured (a cloud runner, a fresh container) has no project, and cloning
+one would manufacture a project this checkout does not have. This also
+removes the plan's earlier dependency on `resolve_repo_checkout.sh`'s
+manifest-lookup path, which only finds the project root when that repo
+happens to **self-list** in its own `.repos` files — an incidental property
+of one manifest's authoring, not a contract — and which would have produced a
+*second* clone of a repo `manifest_config_dir` already clones.
 
 ```bash
-# shellcheck source=/dev/null
-source "$ROOT/.agent/scripts/manifest_fallback.sh" || {
+# 1a. Resolve the configured project root (identity from the tracked pointer,
+# checkout from this host's layer tree only — never cloned).
+PROJECT_ROOT_STATUS=""
+PROJECT_REPO_NAME=""
+PROJECT_ROOT_PATH=""
+PROJECT_REPO_AUDITED_THIS_RUN=""     # set in step 3, check 2 (below)
+
+# `manifest_fallback.sh` was sourced in step 1 and its failure is terminal
+# there, so `manifest_bootstrap_identity` is defined by the time this runs.
+if ! PROJECT_IDENTITY=$(manifest_bootstrap_identity "$ROOT" 2>/dev/null); then
+    # exit 3: no pointer file, or a url form it cannot parse. Not an error —
+    # this checkout is configured for no project (decision 4).
     PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
-}
-if [ -z "${PROJECT_ROOT_STATUS:-}" ]; then
-    if ! identity=$(manifest_bootstrap_identity "$ROOT"); then
-        # exit 3 from manifest_bootstrap_identity: no pointer file, or a url
-        # in a form it cannot parse (e.g. a cloud checkout with no project
-        # configured on this clone — decision 4). Not an error; the run
-        # continues with no per-project health report.
+else
+    PROJECT_REPO_NAME=$(cut -f2 <<< "$PROJECT_IDENTITY")
+    for candidate in "$ROOT"/layers/main/*/src/"$PROJECT_REPO_NAME"; do
+        [ -d "$candidate" ] || continue
+        PROJECT_ROOT_PATH="$candidate"
+        break
+    done
+    if [ -z "$PROJECT_ROOT_PATH" ]; then
+        # No `layers/` at all, or the pointer's repo is not checked out in it.
+        # Same state, same words: there is no project on this checkout.
         PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
+    elif ! PROBE_OUT=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$PROJECT_ROOT_PATH" 2>/dev/null); then
+        PROJECT_ROOT_STATUS="FAILED(project root probe: planning_doc_probe.sh could not read $PROJECT_REPO_NAME)"
     else
-        PROJECT_REPO_NAME=$(cut -f2 <<< "$identity")
-        if ! resolved=$("$ROOT/.agent/scripts/resolve_repo_checkout.sh" "$PROJECT_REPO_NAME"); then
-            PROJECT_ROOT_STATUS="FAILED(project root resolve: could not resolve $PROJECT_REPO_NAME — see stderr)"
-        else
-            PROJECT_ROOT_PATH=${resolved%%$'\t'*}
-            PROJECT_ROOT_MODE=${resolved##*$'\t'}
-            if ! ROADMAP_ROW=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$PROJECT_ROOT_PATH" 2>/dev/null | awk -F'\t' '$1=="roadmap"'); then
-                PROJECT_ROOT_STATUS="FAILED(project root resolve: planning_doc_probe.sh could not run on $PROJECT_REPO_NAME)"
-            elif [ "$(cut -f2 <<< "$ROADMAP_ROW")" = "present" ]; then
-                PROJECT_ROOT_STATUS="configured: $PROJECT_REPO_NAME (mode: $PROJECT_ROOT_MODE)"
-            else
-                PROJECT_ROOT_STATUS="no-roadmap: $PROJECT_REPO_NAME"
-            fi
-        fi
+        ROADMAP_ROW=$(awk -F'\t' '$1=="roadmap"' <<< "$PROBE_OUT")
+        case "$(cut -f2 <<< "$ROADMAP_ROW")" in
+            present) PROJECT_ROOT_STATUS="configured: $PROJECT_REPO_NAME" ;;
+            absent)  PROJECT_ROOT_STATUS="no-roadmap: $PROJECT_REPO_NAME" ;;
+            *)       PROJECT_ROOT_STATUS="FAILED(project root probe: no roadmap row for $PROJECT_REPO_NAME)" ;;
+        esac
     fi
 fi
 ```
 
 - **Never hardcodes a project name** — `$PROJECT_REPO_NAME` comes from the
   tracked pointer, exactly as `manifest_config_dir` already derives it for
-  the manifest clone. This is the same repo in both cases: "the project root"
-  *is* the manifest repo checkout, per the issue's own parenthetical and the
-  two-root rule.
-- Reuses `resolve_repo_checkout.sh` (works without `layers/`) and
-  `planning_doc_probe.sh`'s `probe_all`/CLI TSV output (`probe_roadmap`'s
-  contract, read off the `roadmap` row) rather than a hand-rolled `[ -f
-  ROADMAP.md ]` test — consistent with decision 3 ("no new declaration file,
-  no schema") and with how `audit-project` already probes the same four
-  kinds.
+  the manifest clone (ADR-0003). This is the same repo in both cases: "the
+  project root" *is* the manifest repo checkout, per the issue's own
+  parenthetical and the two-root rule.
+- Uses `planning_doc_probe.sh`'s `roadmap` row rather than a hand-rolled
+  `[ -f ROADMAP.md ]` test — consistent with decision 3 ("no new declaration
+  file, no schema") and with how `audit-project` already probes the same four
+  kinds. A probe that ran but emitted no `roadmap` row is a contract
+  violation, so it is `FAILED`, never silently read as "no roadmap".
 - Four terminal states, all recorded (none silently swallowed):
-  `SKIPPED(no project configured on this checkout)` (no pointer, or a form
-  `manifest_bootstrap_identity` cannot parse — covers both "a cloud checkout
-  configured for no project" per decision 4 and a dev checkout with no
-  pointer at all, since the underlying condition — no project identity
-  derivable — is the same in both places),
-  `FAILED(project root resolve: <reason>)` (pointer parsed but the checkout
-  or the probe could not be produced),
-  `no-roadmap: <repo>` (resolved fine, `ROADMAP.md` absent — decision 3's "a
+  `SKIPPED(no project configured on this checkout)` (no pointer, a form
+  `manifest_bootstrap_identity` cannot parse, or no layer checkout of that
+  repo on this host — one state because the consequence is identical: no
+  project identity *and* checkout this run can report on),
+  `FAILED(project root probe: <reason>)` (the checkout is there but could not
+  be probed),
+  `no-roadmap: <repo>` (probed fine, `ROADMAP.md` absent — decision 3's "a
   project without a root roadmap gets what it gets today": no per-project
   report this run, no error),
-  `configured: <repo> (mode: <layer|clone>)` (per-project report proceeds).
+  `configured: <repo>` (per-project report proceeds, subject to the rotation
+  condition below). There is no `mode:` qualifier: the checkout is always a
+  layer checkout, because that is the only kind this step accepts.
 - This step's outcome feeds the existing `## Projects` section's per-repo
   findings for `$PROJECT_REPO_NAME` (already computed by the rotation, when
   that repo is in this run's chunk) and the new per-project report (§ 3
   below) — it does not run its own separate `audit-project`; it reuses the
   Projects section's data for that one repo.
-- **Rotation interaction, stated explicitly**: the project root repo is
-  audited by the existing rotation exactly like any other repo — only when
-  it falls in this run's ISO-week chunk (current step 2/"Build the repo
-  rotation"). When it is not in this run's chunk, `PROJECT_ROOT_STATUS` may
-  still be `configured: ...`, but there is no per-repo finding data to
-  re-scope this run — the per-project report step (§ 3) renders
-  `not audited this run (not in this week's chunk)` instead of a findings
-  section, and is not diffed against the prior report in that case (nothing
-  new to compare; the prior report's own findings simply carry forward
-  unstated — the reader is pointed at the prior report's own timestamp
-  rather than a synthesized diff against absent data).
+- **Rotation interaction, and where the variable is assigned**: the project
+  root repo is audited by the existing rotation exactly like any other repo —
+  only when it falls in this run's ISO-week chunk (current step 2, "Build the
+  repo rotation"). **Step 3's check 2 sets
+  `PROJECT_REPO_AUDITED_THIS_RUN=1`** when it audits a repo whose name equals
+  `$PROJECT_REPO_NAME`, at the point it iterates the chunk:
+
+  ```bash
+  # inside check 2's per-repo loop, after the repo's audit-project run
+  [ -n "$PROJECT_REPO_NAME" ] && [ "$REPO" = "$PROJECT_REPO_NAME" ] \
+      && PROJECT_REPO_AUDITED_THIS_RUN=1
+  ```
+
+  When it is not in this run's chunk (including a project root that is not
+  listed in any manifest at all, so the rotation never sees it), there is no
+  per-repo finding data to re-scope this run, and the per-project report is
+  **not written**: § 3's gate records
+  `SKIPPED(project repo not in this run's chunk)` instead. The prior
+  per-project report's own findings simply carry forward unstated — the
+  reader is pointed at that report's own timestamp rather than a synthesized
+  diff against absent data.
 
 ### 3. `janitor-sweep` SKILL.md — the per-project local health report (step 6, alongside the existing two artifacts)
 
@@ -185,12 +260,21 @@ having been audited this run (§ 2's rotation-interaction note):
 - **Write** (mirrors `$REPORT_BODY`'s own write in step 6, same style):
 
   ```bash
-  if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ] && [ -n "${PROJECT_REPO_AUDITED_THIS_RUN:-}" ]; then
-      PROJECT_REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-${PROJECT_REPO_NAME}-health.md"
-      if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT"; then
-          PROJECT_HEALTH_STATUS="FAILED(project health write: could not write $(redact_text "$PROJECT_REPORT"))"
+  if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
+      if [ -z "${PROJECT_REPO_AUDITED_THIS_RUN:-}" ]; then
+          # Assigned in step 3, check 2 (§ 2). The project root is in the
+          # manifests like any other repo and is audited only in its own
+          # ISO-week chunk; with no findings for it this run there is nothing
+          # to re-scope, and a report rendered from nothing would read as a
+          # clean project.
+          PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
       else
-          PROJECT_HEALTH_STATUS="written: $(redact_text "$PROJECT_REPORT")"
+          PROJECT_REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-${PROJECT_REPO_NAME}-health.md"
+          if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT"; then
+              PROJECT_HEALTH_STATUS="FAILED(project health write: could not write $(redact_text "$PROJECT_REPORT"))"
+          else
+              PROJECT_HEALTH_STATUS="written: $(redact_text "$PROJECT_REPORT")"
+          fi
       fi
   fi
   ```
@@ -218,6 +302,24 @@ having been audited this run (§ 2's rotation-interaction note):
 - Redact `$PROJECT_HEALTH_BODY` through `redact_text` before writing it, same
   as `$HEALTH_BODY`/`$REPORT_BODY` in step 6 today — it is built from the
   same unredacted-until-now findings text.
+
+- **Retention (consequence of adding a second durable file shape)**: step 1's
+  retention rule prunes `$REPORT_DIR/*-sweep.md` to the last 20 and says
+  plainly that nothing else will ever prune these files. A
+  `<ts>-<repo>-health.md` matches neither that glob nor anything else, so it
+  would accumulate forever. Extend the same rule to it, as its own line with
+  its own count, since the two shapes are written at different rates (a
+  per-project report only on runs where the project repo is in the chunk):
+
+  ```bash
+  ls -1t "$REPORT_DIR"/*-sweep.md  | tail -n +21 | xargs -r rm -f
+  ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f
+  ```
+
+  This also keeps § 5's "prior report predates retention" wording true for
+  the per-project diff: the lookup set is pruned, so "no prior report" and
+  "pruned away" stay distinguishable rather than one silently becoming the
+  other.
 
 ### 4. `janitor-sweep` SKILL.md — `--publish` flag, gating step 7 and `$HEALTH_BODY`
 
@@ -349,7 +451,8 @@ the run").
 | File | Change |
 |------|--------|
 | `.agent/scripts/manifest_fallback.sh` | Extract `manifest_bootstrap_identity()` from `manifest_config_dir()`'s inline parsing; `manifest_config_dir()` calls it internally (behavior-preserving refactor) |
-| `.claude/skills/janitor-sweep/SKILL.md` | Usage: `--publish` flag. New step 1a: resolve project root. Step 5: `--publish`-gated workspace diff source. Step 6: gate `$HEALTH_BODY` on `--publish`; add `$PROJECT_HEALTH_BODY` third artifact + its write + `FAILED(project health write: ...)`; add "Diffed against" report line. Step 7: gated on `--publish`; `## Publish outcome: not requested (--publish off)` heading on the default path. Step 8: report project-health outcome. Overview / Known limitations / Deferred: reworded per § 5 above |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New `manifest_bootstrap_identity()` cases (valid pointer → four-field TSV; trailing `.git`; trailing `/`; ssh scp-form url; missing and empty pointer; `$BOOTSTRAP_URL` override) — the file that already sources `manifest_fallback.sh` and tests its internals (§ 1) |
+| `.claude/skills/janitor-sweep/SKILL.md` | Usage: `--publish` flag. New step 1a: resolve project root (layer checkout only, never cloned). Step 1 retention: prune `*-health.md` alongside `*-sweep.md`. Step 3 check 2: assign `$PROJECT_REPO_AUDITED_THIS_RUN`. Step 5: `--publish`-gated workspace diff source. Step 6: gate `$HEALTH_BODY` on `--publish`; add `$PROJECT_HEALTH_BODY` third artifact + its write + `FAILED(project health write: ...)`; add "Diffed against" report line. Step 7: gated on `--publish`; `## Publish outcome: not requested (--publish off)` heading on the default path. Step 8: report project-health outcome. Overview / Known limitations / Deferred: reworded per § 5 above |
 | `ROADMAP.md` | #636 row → `deferred` with reason; new rows for #652 and #653; confirm/add #651's row |
 | `.agent/knowledge/skill_workflows.md` | Durable-output sentence → local-by-default, `--publish`-gated commit |
 | `.agent/knowledge/principles_review_guide.md` | Consequences Map row: same wording fix + name the third (per-project) durable output and its write-failure naming |
@@ -358,8 +461,8 @@ the run").
 
 | Principle | Consideration |
 |---|---|
-| Workspace vs. project separation | The project-root probe reads only the tracked pointer + existing resolver scripts; no project-specific content enters the workspace repo, and the mechanism stays generic across any project a clone is configured for. |
-| Only what's needed | No new declaration file or schema (decision 3) — reuses `planning_doc_probe.sh`'s existing `ROADMAP.md`-presence probe and `resolve_repo_checkout.sh`'s existing resolution, and re-scopes already-computed Projects-section findings rather than computing new ones for the per-project report. |
+| Workspace vs. project separation | The project-root probe reads only the tracked pointer and this host's existing layer checkout; no project-specific content enters the workspace repo, and the mechanism stays generic across any project a clone is configured for. |
+| Only what's needed | No new declaration file or schema (decision 3) — reuses `planning_doc_probe.sh`'s existing `ROADMAP.md`-presence probe and the pointer parsing `manifest_config_dir` already does, and re-scopes already-computed Projects-section findings rather than computing new ones for the per-project report. No clone is introduced: the project root is read only where it already exists on this host. |
 | Human control and transparency | `--publish` off by default is itself the safety property (no surprise commits/PRs); the `## Publish outcome` heading and the "Diffed against" line make the non-publish path self-describing rather than silent about what didn't happen. |
 | A change includes its consequences | The two knowledge docs and ROADMAP.md are updated in this same PR (§ 6–7); the new report's diff source, coverage-gate inheritance, and write-failure naming are all specified (§ 3), closing all four open actions from the Issue Review. |
 | Capture decisions, not just implementations | This plan records the re-scoping rationale for the per-project report explicitly (action 2's "state this explicitly" instruction) rather than leaving it implicit in code. |
@@ -380,6 +483,8 @@ the run").
 | `manifest_fallback.sh`'s internal structure | Nothing external calls the old inline block directly (only `manifest_config_dir()` did, and it still does, via the new function) | Yes — behavior-preserving, no external caller to update |
 | `janitor-sweep`'s durable-output shape | `skill_workflows.md`, `principles_review_guide.md` Consequences Map | Yes (§ 7) |
 | `docs/health.md`'s publish cadence (no longer every run) | `ROADMAP.md`'s Health document line ("replaces it wholesale on every workspace-scope run") — this line becomes inaccurate once publish is opt-in | Yes — added as a follow-up item below; not silently left stale |
+| Extracting `manifest_bootstrap_identity()` | `.agent/scripts/tests/test_resolve_repo_checkout.sh` — the file that already tests this script's internals; extracted code with no direct test is how a behavior-preserving refactor stops being one | Yes (§ 1, Files to Change) |
+| A second durable file shape under `.agent/scratchpad/janitor/` | Step 1's retention rule globs `*-sweep.md` only, so `<ts>-<repo>-health.md` files would accumulate unpruned — the one thing step 1 says nothing else will ever clean up | Yes (§ 3: retention prunes `*-health.md` to the last 20 the same way) |
 | ROADMAP.md rows for #636/#652/#653 | Nothing else references these rows by number | Yes (§ 6) |
 
 **Follow-up caught during planning, folded into scope rather than deferred**:
@@ -404,6 +509,13 @@ for review to catch.
 
 ## Open Questions
 
+*(All three stand as written. The Plan Review assessed each and raised no
+finding against them: `1a` is acceptable given the skill's `7a`–`7h`
+precedent; a second, clearly-labeled exit-code block reads less ambiguously
+than folding into `manifest_config_dir`'s table; and the repo-name filename
+is correct under the two-root rule, which draws no "project" vs. "project
+root repo" distinction today.)
+
 - [ ] Step-numbering choice: this plan inserts the project-root resolution
   as **step 1a** (not renumbered into the main sequence) specifically to
   avoid touching the many existing cross-references to "step 5", "step 6",
@@ -427,10 +539,22 @@ for review to catch.
 
 ## Estimated Scope
 
-Single PR. Five files: one script refactor (`manifest_fallback.sh`), one
-large skill-doc edit (`janitor-sweep/SKILL.md` — additive in most places,
-touching Usage + steps 1/5/6/7/8 + Overview/Known limitations/Deferred), and
-three doc updates (`ROADMAP.md`, two knowledge docs). No new scripts, no new
-tests (the skill has no executable test harness of its own — verification is
-by hand-running the sweep, per this skill's existing practice for prior
-changes such as #648's first live run).
+Single PR. Six files: one script refactor (`manifest_fallback.sh`), its test
+extension (`.agent/scripts/tests/test_resolve_repo_checkout.sh` — new
+`manifest_bootstrap_identity()` cases, § 1), one large skill-doc edit
+(`janitor-sweep/SKILL.md` — additive in most places, touching Usage + steps
+1/1a/3/5/6/7/8 + Overview/Known limitations/Deferred), and three doc updates
+(`ROADMAP.md`, two knowledge docs). No new scripts and no new test *file*:
+the script change lands its cases in the existing
+`test_resolve_repo_checkout.sh`, which already sources `manifest_fallback.sh`
+and exercises its internals. The **skill-doc** half genuinely has no
+executable harness — a SKILL.md is prose an agent follows, so its
+verification is by hand-running the sweep, per this skill's existing practice
+for prior changes such as #648's first live run. That is a statement about
+the skill document, not about `manifest_fallback.sh`, which does have
+script-level tests today and gets them extended here.
+
+**Verification commands**: `bash .agent/scripts/tests/test_resolve_repo_checkout.sh`
+(the whole file, not just the new cases — the pre-existing
+`manifest_config_dir` cases are what prove the extraction is
+behavior-preserving) and `make test-scripts`. Both must pass.
