@@ -295,9 +295,14 @@ having been audited this run (§ 2's rotation-interaction note):
   same way, with the same non-terminal relationship to the states before it.
 
   `$PROJECT_HEALTH_STATUS` is appended to `$REPORT` (the primary local
-  report) alongside the existing `## Publish outcome` section (§ 4 below),
-  so a reader of the primary report always sees whether a per-project report
-  was attempted, written, or skipped, without opening a second file.
+  report) as its own `## Project health` section, **in step 6**, so a reader
+  of the primary report always sees whether a per-project report was
+  attempted, written, or skipped, without opening a second file. It is
+  written in step 6 rather than alongside 7h's `## Publish outcome` because
+  step 7 does not run at all on a default run, and this outcome is not a
+  publish outcome — it exists on every run. It defaults to step 1a's own
+  `$PROJECT_ROOT_STATUS`, so the section states the reason there was no
+  report just as plainly as it states the path when there was one.
 
 - Redact `$PROJECT_HEALTH_BODY` through `redact_text` before writing it, same
   as `$HEALTH_BODY`/`$REPORT_BODY` in step 6 today — it is built from the
@@ -323,6 +328,11 @@ having been audited this run (§ 2's rotation-interaction note):
 
 ### 4. `janitor-sweep` SKILL.md — `--publish` flag, gating step 7 and `$HEALTH_BODY`
 
+- **Where `$PUBLISH` comes from** (settled during implementation): parsed
+  once at the end of step 1, beside the report-directory setup, so it is
+  assigned before any branch reads it and is never unbound under `set -u` —
+  and never inferred later from whether a PR exists or a worktree was
+  created.
 - **Usage section**: add `[--publish]` — "Commit `docs/health.md` and open a
   PR for the workspace scope (§ 7). Off by default (local-first) — every run
   writes the local report regardless; `--publish` only gates the
@@ -424,10 +434,10 @@ having been audited this run (§ 2's rotation-interaction note):
 - New row: #653 (the what-next port) — `Status: planned`, `Notes`: "Health-
   report refresh trigger + per-area ranking for parallel agents; design draft
   first (per #653's own title)."
-- (#651's own row: already landed per the Issue Review's Consequences check;
-  confirm at implementation time whether a row for it is still missing and
-  add one only if so — the issue text asks for "rows for this issue, #651
-  and the what-next port," so do not skip it if absent.)
+- #651's own row: it was missing, and #651 is **closed** (PR #655 merged
+  2026-09-22), so it belongs in `## Recently completed` with its PR rather
+  than as an active-thread row — that table's own rule ("kept for one cycle,
+  then pruned") is what an item finished this cycle is for. Added there.
 
 ### 7. `.agent/knowledge/skill_workflows.md` and `principles_review_guide.md`
 
@@ -503,9 +513,13 @@ for review to catch.
   `.agent/knowledge/principles_review_guide.md`'s Consequences Map row for
   `janitor-sweep`; `.claude/skills/janitor-sweep/SKILL.md` itself (Overview,
   Known limitations, Deferred, Usage, steps 1/5/6/7/8).
-- **Agent-instruction candidates** (proposals only — operator decides): None
-  — this issue is itself the instruction change; nothing further surfaced
-  that would belong in a separate `.agent/knowledge/` doc.
+- **Agent-instruction candidates** (proposals only — operator decides):
+  `AGENTS.md`'s Script Reference row for `manifest_fallback.sh` documents
+  `manifest_config_dir` as that file's only entry point; § 1 adds a second,
+  `manifest_bootstrap_identity`. Updating that row would keep the table
+  accurate — **not done in this PR**: `AGENTS.md` is an instruction file and
+  AGENTS.md § Boundaries puts editing one under *Ask First*. Surfaced for the
+  operator to approve or decline, rather than edited silently or dropped.
 
 ## Open Questions
 
