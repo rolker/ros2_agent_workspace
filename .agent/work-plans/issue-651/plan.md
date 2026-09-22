@@ -211,6 +211,9 @@ no automated test harness:
 | `.claude/skills/audit-workspace/SKILL.md` | Checklist sections 1–7 each state coverage (`X of Y examined`/`spot-checked`, naming items, for sections 1–2; `all N` for sections 3–7); add a Coverage column/table to the Report Format |
 | `.claude/skills/janitor-sweep/SKILL.md` | § 3 (Run the four checks): note the coverage-line requirement is relayed, not re-collected; § 5 (Run-over-run diff): coverage-gated `Not re-examined` state in **both** scopes (a fourth subsection in workspace scope, a fourth inline tag value in project scope); § 6 (report format): `Detail` column carries per-check coverage; add `Not re-examined` subsection to the `## Workspace` tier template |
 | `.claude/skills/audit-project/SKILL.md` | § 2–6, 8 and the Report Format: state exhaustive coverage counts (`N of N`) per section, with § 7's already-satisfied convention noted; a `### Coverage` table at the top of the report |
+| `docs/design/planning_document_vocabulary.md` | Ride-along: correct the stale "no `docs/health.md` exists anywhere yet" claim — one was committed 2026-09-21 |
+| `ROADMAP.md` | Ride-along, same class: correct "Health document: none yet … the sweep that writes it is not wired up yet" |
+| `.agent/work-plans/issue-651/verification.md` | New file: the manual-verification walkthrough of the rules as written, committed rather than left in the PR description |
 
 ## Principles Self-Check
 
@@ -317,6 +320,13 @@ walkthrough does **not** establish.
 
 ## Estimated Scope
 
-Single PR — three `.claude/skills/*/SKILL.md` files, all instruction-text
-edits with no code, plus the plan's manual-verification walkthrough
-recorded in the PR description.
+Single PR, all instruction/documentation text with no code:
+
+- three `.claude/skills/*/SKILL.md` files (the substance of the change);
+- `docs/design/planning_document_vocabulary.md` and `ROADMAP.md` — ride-along
+  corrections of the same stale "no health document exists yet" claim, which
+  this work's subject matter makes visible;
+- `.agent/work-plans/issue-651/verification.md` — the manual-verification
+  walkthrough, **committed as its own file** rather than left in the PR
+  description, so it survives the merge as reference material for the next
+  agent to touch these rules.
