@@ -126,8 +126,15 @@ if [ "${#local_yamls[@]}" -gt 0 ]; then
             rejected_count=$((rejected_count + 1))
             continue
         fi
+        # Named <layer_ws>__<repo>.yaml, not <repo>.yaml: repo directory names
+        # are only unique WITHIN a layer's src/, so two same-named repos under
+        # different *_ws/src/ trees silently overwrote each other here while
+        # local_count still reported both — one repo's keys would vanish from
+        # the image with nothing said.
         repo_dir="$(basename "$(dirname "$yaml")")"
-        cp "$yaml" "$LOCAL_DIR/$repo_dir.yaml"
+        rel="${yaml#"$ROOT_DIR"/layers/main/}"
+        layer_ws="${rel%%/*}"
+        cp "$yaml" "$LOCAL_DIR/${layer_ws}__${repo_dir}.yaml"
         local_count=$((local_count + 1))
     done < <(printf '%s\n' "${local_yamls[@]}" | LC_ALL=C sort)
 fi

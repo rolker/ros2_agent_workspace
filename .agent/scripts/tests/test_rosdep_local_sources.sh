@@ -102,9 +102,29 @@ check "refuses without clobbering"     grep -q '^yaml ' "$LOCAL"
 
 echo "=== stage_rosdep_manifests.sh: stages rosdep.yaml for the image bake ==="
 "$STAGE" "$WS" "$TMP/stage" >/dev/null 2>&1
-check "staged under rosdep-local/"     test -f "$TMP/stage/rosdep-local/repo_with.yaml"
+check "staged under rosdep-local/"     test -f "$TMP/stage/rosdep-local/a_ws__repo_with.yaml"
 check "named after the repo dir"       bash -c "! test -e '$TMP/stage/rosdep-local/rosdep.yaml'"
-check "content preserved"              grep -q snakemake "$TMP/stage/rosdep-local/repo_with.yaml"
+check "content preserved"              grep -q snakemake "$TMP/stage/rosdep-local/a_ws__repo_with.yaml"
+# Repo directory names are unique only WITHIN a layer's src/. Keyed by basename
+# alone, two same-named repos in different layers overwrote each other while
+# the reported count still claimed both.
+mkdir -p "$WS/layers/main/b_ws/src/repo_with"
+cat > "$WS/layers/main/b_ws/src/repo_with/rosdep.yaml" <<'EOF'
+# upstream PR owed: https://github.com/ros/rosdistro/pull/00001
+python3-pystac:
+  ubuntu: [python3-pystac]
+EOF
+out="$("$STAGE" "$WS" "$TMP/stage_dup" 2>&1)"
+check "two same-named repos both stage"  eq "$(ls "$TMP/stage_dup/rosdep-local" | wc -l)" 2
+check "the staged count matches"         contains "$out" "2 local rosdep.yaml file(s)"
+check "each layer's copy keeps its keys" bash -c "
+    grep -q snakemake '$TMP/stage_dup/rosdep-local/a_ws__repo_with.yaml' &&
+    grep -q python3-pystac '$TMP/stage_dup/rosdep-local/b_ws__repo_with.yaml'"
+# The aggregation path is keyed by absolute path, so it never collided — pin it.
+"$AGG" "$WS" >/dev/null 2>&1
+check "aggregation lists both copies"    eq "$(grep -c '^yaml ' "$LOCAL")" 2
+rm -rf "$WS/layers/main/b_ws/src/repo_with"
+"$AGG" "$WS" >/dev/null 2>&1
 check "no package.xml in that dir"     bash -c "! find '$TMP/stage/rosdep-local' -name package.xml | grep -q ."
 out="$("$STAGE" "$EMPTY" "$TMP/stage_empty" 2>&1)"
 check "reports zero local yamls"       contains "$out" "0 local rosdep.yaml file(s)"
