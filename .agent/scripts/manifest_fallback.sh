@@ -166,13 +166,18 @@ manifest_config_dir() {
     # function's exit 3, unchanged: no pointer, or a url form it cannot parse.
     #
     # It says only what IT knows — that the pointer is missing or unusable.
-    # Reaching this point means the loop above already found no configs/manifest
-    # either, and that half of the diagnostic is this function's to add: an
-    # operator sent to `make setup-all` needs to know BOTH are absent, or the
+    # Reaching this point means the loop above already found no
+    # configs/manifest, and that half of the diagnostic is this function's to
+    # add: an operator sent to `make setup-all` needs BOTH halves, or the
     # message reads as a pointer problem alone and the remedy looks wrong.
+    #
+    # Worded so it holds over the pointer diagnostic's THREE branches, not just
+    # the missing-pointer one: "no configs/manifest ... either" reads as a
+    # second absence, which is wrong after "'<url>' is not a raw.githubuser-
+    # content ... url" — there the pointer is present and unusable.
     local identity
     if ! identity=$(manifest_bootstrap_identity "$root"); then
-        _manifest_fallback_say "no configs/manifest under $root either — nothing to enumerate repos from; run 'make setup-all' on a host that can"
+        _manifest_fallback_say "there is also no configs/manifest under $root — nothing to enumerate repos from; run 'make setup-all' on a host that can"
         return 3
     fi
     IFS=$'\t' read -r owner repo branch config_path <<< "$identity"

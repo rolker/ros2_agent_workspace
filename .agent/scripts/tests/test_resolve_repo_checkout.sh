@@ -809,6 +809,33 @@ else
     pass "manifest_config_dir exit 3 names both the missing manifest and the missing pointer"
 fi
 
+# A pointer that is PRESENT but unusable takes the same exit 3, and the added
+# half has to read correctly there too: "no configs/manifest ... either" claims
+# a second absence when the first thing was a malformed presence. Only the
+# missing-pointer branch was covered before, so the wording could regress
+# unseen on the branch operators actually hit after editing the pointer.
+root=$(make_root config_dir_exit3_malformed_pointer)
+echo "https://github.com/someowner/somerepo" > "$root/configs/project_bootstrap.url"
+rc=0
+out=$(
+    {
+        unset BOOTSTRAP_URL
+        # shellcheck source=/dev/null
+        source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+        manifest_config_dir "$root"
+    } 2>"$TMPDIR_ROOT/stderr"
+) || rc=$?
+err=$(stderr_text)
+if [ "$rc" -ne 3 ] || [ -n "$out" ]; then
+    fail "manifest_config_dir with a malformed pointer → rc=$rc (want 3), out='$out' (want empty)"
+elif [[ "$err" != *"raw.githubusercontent.com"* ]] || [[ "$err" != *"configs/manifest"* ]]; then
+    fail "malformed-pointer exit 3 names only one of the two halves: '$err'"
+elif [[ "$err" == *"either"* ]]; then
+    fail "malformed-pointer exit 3 says 'either', which claims the pointer was absent: '$err'"
+else
+    pass "manifest_config_dir exit 3 reads correctly for a PRESENT but unusable pointer"
+fi
+
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
 # The early return has to recognise EVERY layout get_overlay_repos reads
 # (configs/manifest/repos AND configs/*.repos). Recognising only the first made
