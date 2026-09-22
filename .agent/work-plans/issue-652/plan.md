@@ -438,6 +438,18 @@ having been audited this run (§ 2's rotation-interaction note):
   2026-09-22), so it belongs in `## Recently completed` with its PR rather
   than as an active-thread row — that table's own rule ("kept for one cycle,
   then pruned") is what an item finished this cycle is for. Added there.
+- **Ride-along, not planned in advance** (recorded here after the fact, in
+  the round-1 review): #635's row still read `planned` although the sweep
+  rewrite merged 2026-09-21 (PR #647, first live run PR #648). Flipped to
+  `done` while this section was being edited, with its notes updated to say
+  the committed `docs/health.md` is now `--publish`-only. It rides along
+  because leaving one row of this table stale while rewriting the rows
+  around it — including #636's, whose deferral is *because* #635 landed —
+  would publish a table that contradicts itself. It is a status correction
+  to an already-merged issue, not scope: no behaviour, no other file.
+- Also in the `**Health document**:` paragraph above the tables: it said the
+  skill "replaces it wholesale on every workspace-scope run", which this
+  change makes untrue. Reworded to `--publish` runs.
 
 ### 7. `.agent/knowledge/skill_workflows.md` and `principles_review_guide.md`
 
@@ -461,9 +473,9 @@ the run").
 | File | Change |
 |------|--------|
 | `.agent/scripts/manifest_fallback.sh` | Extract `manifest_bootstrap_identity()` from `manifest_config_dir()`'s inline parsing; `manifest_config_dir()` calls it internally (behavior-preserving refactor) |
-| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New `manifest_bootstrap_identity()` cases (valid pointer → four-field TSV; trailing `.git`; trailing `/`; ssh scp-form url; missing and empty pointer; `$BOOTSTRAP_URL` override) — the file that already sources `manifest_fallback.sh` and tests its internals (§ 1) |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New `manifest_bootstrap_identity()` cases (valid pointer → four-field TSV; trailing `.git`; trailing `/`; ssh scp-form url; missing and empty pointer; `$BOOTSTRAP_URL` override) — the file that already sources `manifest_fallback.sh` and tests its internals (§ 1). Plus one `manifest_config_dir` case asserting its exit-3 diagnostic still names **both** the absent `configs/manifest` and the absent pointer (added in the round-1 review) |
 | `.claude/skills/janitor-sweep/SKILL.md` | Usage: `--publish` flag. New step 1a: resolve project root (layer checkout only, never cloned). Step 1 retention: prune `*-health.md` alongside `*-sweep.md`. Step 3 check 2: assign `$PROJECT_REPO_AUDITED_THIS_RUN`. Step 5: `--publish`-gated workspace diff source. Step 6: gate `$HEALTH_BODY` on `--publish`; add `$PROJECT_HEALTH_BODY` third artifact + its write + `FAILED(project health write: ...)`; add "Diffed against" report line. Step 7: gated on `--publish`; `## Publish outcome: not requested (--publish off)` heading on the default path. Step 8: report project-health outcome. Overview / Known limitations / Deferred: reworded per § 5 above |
-| `ROADMAP.md` | #636 row → `deferred` with reason; new rows for #652 and #653; confirm/add #651's row |
+| `ROADMAP.md` | #636 row → `deferred` with reason; new rows for #652 and #653; confirm/add #651's row; **#635 row `planned` → `done`** (ride-along status correction, § 6); `**Health document**:` paragraph → `--publish` runs |
 | `.agent/knowledge/skill_workflows.md` | Durable-output sentence → local-by-default, `--publish`-gated commit |
 | `.agent/knowledge/principles_review_guide.md` | Consequences Map row: same wording fix + name the third (per-project) durable output and its write-failure naming |
 
