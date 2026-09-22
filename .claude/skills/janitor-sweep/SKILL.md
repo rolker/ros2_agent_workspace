@@ -53,8 +53,16 @@ run publishes, whether or not it has network or GitHub auth. **Committing
 `docs/health.md` at the repo root and opening a PR is opt-in, behind
 `--publish`** (§ Publish the workspace scope); the committed file on `main`
 is a baseline a non-publishing run neither rewrites nor contradicts.
+A run may also write an **optional second local report for the project this
+clone is configured for** — `<ts>-<repo>-health.md`, beside the workspace
+one — when that project's root repo keeps a root `ROADMAP.md`: health
+follows the roadmap, and that is the whole opt-in (§ Resolve the configured
+project root; § Render, redact, and write the report). A checkout with no
+project configured, and a project with no root roadmap, each simply get what
+they get today.
+
 **Project scope is never published by this skill** — its findings land only
-in the local report, pending the operator's decision on the project-repo
+in the local report(s), pending the operator's decision on the project-repo
 health-rollup shape (per-repo PR / one document per project /
 health-follows-roadmap — not yet made). Neither scope files per-finding
 issues or opens issues on its own initiative; the operator triages findings
@@ -105,6 +113,15 @@ reverse also holds (a report-write failure per the fifth state above is
 already terminal for the run and the publish step is never reached). The two
 never stand in for each other — a failed publish is stated by name, next to
 the local report's own status, never folded into it.
+
+**The optional per-project report's write is a seventh state** (§ 6): the
+same "the report write is itself a state" rule as the fifth, named
+separately — `FAILED(project health write: <reason>)` — so it can never be
+confused with the primary report's write failure or with a publish failure.
+Unlike the fifth, it is **not terminal for the run**: by the time it is
+attempted the primary report has already been written successfully, so it is
+reported alongside the run's other outcomes (step 8), never in place of
+them. The same relationship the sixth state has to the fifth.
 
 ## Steps
 
@@ -271,9 +288,23 @@ and the sweep is `FAILED`, not empty.
 **Retention.** Both outputs are caches with no automatic cleanup, and this is a
 report-only skill that will run repeatedly:
 
-- `$REPORT_DIR` — keep the **last 20** reports; delete older ones at the end of
-  a run (`ls -1t "$REPORT_DIR"/*-sweep.md | tail -n +21 | xargs -r rm -f`). The
-  reports are small, but nothing else will ever prune them.
+- `$REPORT_DIR` — keep the **last 20** of **each** report shape; delete older
+  ones at the end of a run. The reports are small, but nothing else will ever
+  prune them, and a shape that matches no glob here accumulates forever:
+
+  ```bash
+  ls -1t "$REPORT_DIR"/*-sweep.md  | tail -n +21 | xargs -r rm -f
+  ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f
+  ```
+
+  Two globs, two counts, because the two shapes are written at different
+  rates: a `<ts>-<repo>-health.md` (step 6's optional per-project report) is
+  written only on the runs where the project root repo fell in the rotation
+  chunk, so pruning both under one combined count would evict per-project
+  history spanning far more than 20 sweeps. Separate counts are also what
+  keeps § 5's `prior report predates retention` wording true for each shape:
+  "no prior report" and "pruned away" stay distinguishable instead of one
+  silently becoming the other.
 - `.agent/scratchpad/janitor-repos/` and `.agent/scratchpad/manifest-repo/` —
   disposable shallow clones that self-heal: the next run re-creates what it
   needs, so the whole-directory `rm -rf` is the reclaim to reach for. It is
@@ -304,6 +335,101 @@ report-only skill that will run repeatedly:
   (`du -sh "$ROOT/.agent/scratchpad/janitor-repos" "$ROOT/.agent/scratchpad/manifest-repo"`),
   rather than leaving the operator to discover the number when the disk is
   already full.
+
+### 1a. Resolve the configured project root
+
+The sweep writes an **optional second local report** for the project this
+clone is configured for, when that project keeps a root `ROADMAP.md` (§ 6;
+health follows the roadmap, per the design draft's expected-location table
+and the two-root rule). This step decides whether there is such a project at
+all. It is lettered `1a` rather than renumbered into the sequence so the many
+existing cross-references to steps 5–8 stay correct; the skill already uses
+lettered sub-steps (7a–7h).
+
+**Identity from the tracked pointer; checkout from this host only; nothing is
+cloned.** The project root is the manifest repo that
+`configs/project_bootstrap.url` names — the repo a manifest entry points at,
+per the two-root rule. Its *identity* is a string parse of that tracked
+pointer (`manifest_bootstrap_identity`, no clone, no network). Its *checkout*
+is only ever one that already exists under `$ROOT/layers/main/*/src/<repo>`.
+Where `layers/` is absent, or the pointer's repo is not in it, **there is no
+project on this checkout** and the per-project report is skipped — not
+failed, and emphatically not cloned. That is
+[#652](https://github.com/rolker/ros2_agent_workspace/issues/652)'s
+decision 4: the project is per-clone configuration, not a property of the
+GitHub repo, so a cloud runner or a fresh container is configured for no
+project, and cloning manifests to find one would manufacture a project the
+checkout does not have.
+
+```bash
+PROJECT_ROOT_STATUS=""
+PROJECT_REPO_NAME=""
+PROJECT_ROOT_PATH=""
+PROJECT_REPO_AUDITED_THIS_RUN=""     # assigned in step 3, check 2
+
+# manifest_fallback.sh was sourced in step 1 and its failure is terminal
+# there, so manifest_bootstrap_identity is defined by the time this runs.
+# Its only failure is 3 — no pointer, or a url form it cannot parse safely —
+# and it prints nothing on stdout in that state.
+if ! PROJECT_IDENTITY=$(manifest_bootstrap_identity "$ROOT" 2>/dev/null); then
+    PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
+else
+    PROJECT_REPO_NAME=$(cut -f2 <<< "$PROJECT_IDENTITY")
+    for candidate in "$ROOT"/layers/main/*/src/"$PROJECT_REPO_NAME"; do
+        [ -d "$candidate" ] || continue
+        PROJECT_ROOT_PATH="$candidate"
+        break
+    done
+    if [ -z "$PROJECT_ROOT_PATH" ]; then
+        # No layers/ at all, or the pointer's repo is not checked out in it.
+        PROJECT_ROOT_STATUS="SKIPPED(no project configured on this checkout)"
+    elif ! PROBE_OUT=$(bash "$ROOT/.agent/scripts/planning_doc_probe.sh" "$PROJECT_ROOT_PATH" 2>/dev/null); then
+        PROJECT_ROOT_STATUS="FAILED(project root probe: planning_doc_probe.sh could not read $PROJECT_REPO_NAME)"
+    else
+        ROADMAP_ROW=$(awk -F'\t' '$1=="roadmap"' <<< "$PROBE_OUT")
+        case "$(cut -f2 <<< "$ROADMAP_ROW")" in
+            present) PROJECT_ROOT_STATUS="configured: $PROJECT_REPO_NAME" ;;
+            absent)  PROJECT_ROOT_STATUS="no-roadmap: $PROJECT_REPO_NAME" ;;
+            *)       PROJECT_ROOT_STATUS="FAILED(project root probe: no roadmap row for $PROJECT_REPO_NAME)" ;;
+        esac
+    fi
+fi
+```
+
+**No project name appears anywhere in this skill** (ADR-0003):
+`$PROJECT_REPO_NAME` comes from the tracked pointer, exactly as
+`manifest_config_dir` already derives it for its own clone, so a fork of this
+workspace resolves its own project.
+
+The `ROADMAP.md` test goes through `planning_doc_probe.sh`'s **`roadmap`
+row**, not a hand-rolled `[ -f ROADMAP.md ]` — the probe is the one reader of
+the expected-location table, and `audit-project` already probes the same four
+kinds through it. A probe that ran but emitted no `roadmap` row is a contract
+violation, so it is `FAILED`; it is never quietly read as "no roadmap".
+
+**Four terminal states, every one recorded** (step 8 states whichever
+applies; none is silently swallowed):
+
+| `$PROJECT_ROOT_STATUS` | Means |
+|---|---|
+| `SKIPPED(no project configured on this checkout)` | No pointer, a url form the derivation cannot parse, **or** no layer checkout of that repo on this host. One state, because the consequence is identical: no project this run can report on |
+| `FAILED(project root probe: <reason>)` | The checkout is there but could not be probed |
+| `no-roadmap: <repo>` | Probed fine, `ROADMAP.md` absent. Decision 3's "a project without a root roadmap gets what it gets today": its repos' findings still appear in the workspace run's `## Projects` section, and there is no second report. Absence of a planning document is never a finding |
+| `configured: <repo>` | The per-project report proceeds — subject to the rotation condition below |
+
+There is no `mode:` qualifier on these: the checkout is always a layer
+checkout, because that is the only kind this step accepts.
+
+**Rotation interaction.** The project root repo is audited by the ordinary
+rotation like any other repo — only when it falls in this run's ISO-week
+chunk (step 2). The per-project report is a *re-scoping* of findings the
+`## Projects` section already computed for that repo (§ 6), so on a run where
+the repo was not audited there is nothing to re-scope, and the report is not
+written: step 6 records `SKIPPED(project repo not in this run's chunk)`
+instead. This also covers a project root that is listed in no manifest at
+all, which the rotation therefore never sees. The prior per-project report's
+findings carry forward unstated — a reader is pointed at that report's own
+timestamp rather than at a diff synthesized against absent data.
 
 ### 2. Build the repo rotation
 
@@ -502,6 +628,22 @@ run" is not a status.
   rate-limited, offline); a chunk that legitimately holds repos which all
   audited clean → `OK`, with a non-zero count. `Project governance | OK | 0
   repos audited` is a report this skill must never produce.
+
+  **Note when the project root repo is the one being audited.** Step 1a
+  resolved which repo that is; the per-project report (§ 6) is written only
+  when this run actually audited it, so the flag is set here, in the one
+  place that knows:
+
+  ```bash
+  # inside check 2's per-repo loop, after that repo's audit-project run
+  [ -n "$PROJECT_REPO_NAME" ] && [ "$REPO" = "$PROJECT_REPO_NAME" ] \
+      && PROJECT_REPO_AUDITED_THIS_RUN=1
+  ```
+
+  Set it whatever the repo's own audit status was: the per-project report
+  re-scopes this run's findings for that repo, and a repo that audited
+  `FAILED` has a finding-set worth reporting (its failure) exactly as one
+  that audited clean does.
 
   **Relay each repo's coverage too.** `audit-project`'s per-repo report
   carries its own seven-row `### Coverage` table, near its top; carry it, folded into one clause
@@ -880,6 +1022,7 @@ template is rendered; naming the data flow here is what rules both out.
 | `$PROJECTS_SECTION` | the `## Projects` section, per the template | `$REPORT_BODY` only — project scope is never published (§ Overview) |
 | `$HEALTH_BODY` | `# Workspace health — <ts>` title + a fixed provenance line + `$WORKSPACE_SECTION` — **exactly the bytes committed to `docs/health.md`**. **Rendered only under `--publish`** | 7b, written verbatim |
 | `$REPORT_BODY` | the local report: `## Janitor Sweep — <ts>` header, `$WORKSPACE_SECTION`, `$PROJECTS_SECTION`, the retention footer | written to `$REPORT` in this step; 7h appends the publish outcome |
+| `$PROJECT_HEALTH_BODY` | the optional per-project report: `$PROJECTS_SECTION`'s own findings **re-scoped to the project root repo**, re-headed as its own document. **Rendered only when step 1a said `configured:` and check 2 audited that repo this run** | written to `$PROJECT_REPORT` in this step; nothing else consumes it |
 
 Render `$WORKSPACE_SECTION` once and compose both artifacts around it, so the
 committed section and the local report's workspace section are the same
@@ -966,6 +1109,91 @@ and never describe the sweep as clean**. Checks that completed are still
 reported with their own statuses — the failure is the record, not the checks.
 A report-write failure is terminal for the run: step 7 is not reached
 (§ The status contract, fifth state).
+
+#### The optional per-project health report
+
+When step 1a resolved a project root **and** check 2 audited that repo this
+run, write a third artifact beside the other two: a health document scoped to
+that one project, `.agent/scratchpad/janitor/<ts>-<repo>-health.md`. Health
+follows the roadmap — the opt-in is the project root having a root
+`ROADMAP.md`, nothing else; no declaration file and no schema
+([#652](https://github.com/rolker/ros2_agent_workspace/issues/652),
+decision 3). It is **local only**: this skill never commits it, and never
+publishes it under `--publish` either, which gates the workspace scope alone.
+
+**It is a re-scoping, never a second computation.** `$PROJECT_HEALTH_BODY` is
+built from the *same* per-repo findings already rendered into
+`$PROJECTS_SECTION` for that repo — the same tier sections, the same inline
+`[New/Resolved/Unchanged/Not re-examined …]` tags, the same Planning
+Documents sub-table, the same "no findings this run" and tier-omission
+rules — filtered to that one repo and re-headed:
+
+```markdown
+# Project health — <repo> — <ts>
+
+Generated by the `janitor-sweep` skill's optional per-project report (opt-in:
+the project root has a root `ROADMAP.md`). Re-scopes this run's findings for
+<repo> from the workspace run's `## Projects` section — not independently
+computed. Full record (all repos, all tiers): that run's own local report,
+`.agent/scratchpad/janitor/<sweep-report-file>`.
+
+<the `## Projects` tier sections, filtered to this repo>
+```
+
+Re-scoping rather than recomputing is what makes this report inherit the
+#651 coverage gate for free: its findings are the already-tagged lines, so a
+prior finding reads `[Not re-examined]` here for exactly the reasons it does
+there. A second, independently-computed pass could disagree with the
+`## Projects` section about the same repo in the same run, which is a report
+that argues with itself.
+
+**Diff source**: this *is* project scope, narrowed to one repo, so it takes
+project scope's existing rule verbatim (§ 5's Project-scope bullet) — the
+most recent prior local report for that repo, best-effort, with `no prior
+report for this repo` / `prior report covered a different chunk` said plainly
+rather than rendered as "no changes". Since the body's findings are the ones
+§ 5 already diffed, this report's diff state is **inherited from that
+computation, not recomputed**. The `<ts>-<repo>-health.md` files simply join
+the set of local reports § 5's lookup already reads for that repo; no new
+lookup logic is needed, and step 1's retention prunes them on the same
+last-20 rule.
+
+Redact `$PROJECT_HEALTH_BODY` before writing it, exactly as the other two
+artifacts are redacted above — it is built from the same
+unredacted-until-now findings text — then:
+
+```bash
+PROJECT_HEALTH_BODY=$(redact_text "$PROJECT_HEALTH_BODY")
+PROJECT_HEALTH_STATUS="$PROJECT_ROOT_STATUS"   # 1a's answer, unless we write
+if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
+    if [ -z "${PROJECT_REPO_AUDITED_THIS_RUN:-}" ]; then
+        # 1a found a project, but this week's chunk did not include it —
+        # there are no findings for it to re-scope. A report rendered from
+        # nothing would read as a project with a clean bill of health.
+        PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
+    else
+        PROJECT_REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-${PROJECT_REPO_NAME}-health.md"
+        if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT"; then
+            PROJECT_HEALTH_STATUS="FAILED(project health write: could not write $(redact_text "$PROJECT_REPORT"))"
+        else
+            PROJECT_HEALTH_STATUS="written: $(redact_text "$PROJECT_REPORT")"
+        fi
+    fi
+fi
+printf '\n## Project health\n\n%s\n' "$(redact_text "$PROJECT_HEALTH_STATUS")" >> "$REPORT"
+```
+
+`$PROJECT_HEALTH_STATUS` is appended to the **primary** local report as its
+own `## Project health` section, so a reader of that one file always sees
+whether a per-project report was written, skipped, or failed — without
+having to notice the absence of a second file. The same timestamp-plus-pid
+naming rule as `$REPORT` applies, for the same reason: runs accumulate.
+
+**The write failure is its own named state** (the seventh, § The status
+contract): `FAILED(project health write: <reason>)`, never folded into
+`FAILED(report write: …)` or into a publish failure. It is **not terminal**
+— the primary report landed before this step ran — so the run continues and
+step 8 reports it alongside everything else.
 
 **Keep the prose free of host identity and absolute local paths** as you
 write it — name files relative to the workspace root
@@ -1190,7 +1418,8 @@ run):
 | <repo> | not in this week's chunk |
 
 ---
-Reports here are kept for the last 20 runs. The shallow clones under
+Reports here are kept for the last 20 of each shape (`*-sweep.md`, and
+`*-health.md` where a per-project report is written). The shallow clones under
 `.agent/scratchpad/janitor-repos/` (<size>) and
 `.agent/scratchpad/manifest-repo/` (<size>) are caches, never pruned by this
 skill and the only output here that grows without bound. Deleting either
@@ -1518,6 +1747,20 @@ and say which source the workspace scope diffed against (§ 5's
 plainly that project-scope findings are **not** published anywhere beyond
 the local report(s).
 
+State the **per-project health outcome** on its own line, from
+`$PROJECT_HEALTH_STATUS` (§ 6), in the words the run produced:
+
+- `no project configured on this checkout` — step 1a found no pointer, or no
+  layer checkout of the repo it names. Nothing is wrong
+- `<repo> has no root ROADMAP.md — no per-project report`
+- `<repo>: not in this run's chunk — no per-project report`
+- `<repo>: <report path, workspace-relative>`
+- `<repo>: FAILED(project health write: <reason>)`
+
+Name the file by its path relative to the workspace root, as with the
+primary report. A failure here never changes the headline: the primary
+report already landed.
+
 ## Known limitations
 
 Deliberate, and each is for the deferred decision below to close — they are
@@ -1534,7 +1777,12 @@ listed here so that decision meets them rather than rediscovering them.
   of which host ran the sweep. This is the deliberate trade of local-first —
   the default run is cheap, offline-capable and side-effect-free, and its
   durability is the host's disk. **Project scope never escapes it at all**,
-  pending the health-rollup shape decision, § Deferred below.
+  pending the health-rollup shape decision, § Deferred below — and that
+  includes the optional per-project report, which is written to the same
+  gitignored directory and is exactly as host-local and ephemeral as the
+  primary one. It is also **rotation-limited**: written only on the runs
+  where the project root repo fell in this week's chunk, so its cadence is
+  the rotation's, not the sweep's.
 - **The rotation has no coverage guarantee while the trigger is deferred.**
   `ISO-week mod chunk-count` cycles every repo in `ceil(N/3)` weeks *only under
   a real weekly trigger*. Two hand-runs in the same week re-audit the same
