@@ -344,10 +344,11 @@ sweep excludes them by URL before its rotation is built.
 > first.
 
 That sentence is what makes the two documents a loop rather than two files. The
-qualification is not a hedge: no `docs/health.md` exists anywhere yet — the sweep
-that writes one is
-[#635](https://github.com/rolker/ros2_agent_workspace/issues/635) — and a
-missing health document is normal, never a finding, so the rule has to read
+qualification is not a hedge: the first `docs/health.md` anywhere was committed
+in this workspace repo on 2026-09-21, by the sweep
+[#635](https://github.com/rolker/ros2_agent_workspace/issues/635) added, and the
+sweep's project scope is still report-only, so a project repo need not have one.
+A missing health document is normal, never a finding, so the rule has to read
 correctly in the scope that has only a roadmap.
 
 ## Decisions and drafts across the deployment boundary
