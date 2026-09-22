@@ -65,7 +65,7 @@ help:
 	@echo "  dashboard-ui  - Start web-based dashboard (http://localhost:3000)"
 	@echo "  test-dashboard - Run dashboard unit/integration tests (ephemeral port)"
 	@echo "  test-scripts  - Run .agent/scripts/tests/ (shell + pytest, no ROS build)"
-	@echo "  validate      - Validate workspace config + layer sourcing (CI-oriented)"
+	@echo "  validate      - Validate workspace config + layer sourcing + local rosdep keys (CI-oriented)"
 	@echo "                  make reports 2 for ANY failure here; run"
 	@echo "                  validate_workspace.py directly for 0 match / 1 drift / 3 unconfigured / 4 unreadable repo"
 	@echo ""
