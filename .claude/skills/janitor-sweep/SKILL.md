@@ -1170,10 +1170,16 @@ last-20 rule.
 
 Redact `$PROJECT_HEALTH_BODY` before writing it, exactly as the other two
 artifacts are redacted above — it is built from the same
-unredacted-until-now findings text — then:
+unredacted-until-now findings text. **Redact it where it is written, not
+before the guard**: `$PROJECT_HEALTH_BODY` is rendered only on the branch
+that writes the report, so on every other path — no project configured, no
+root roadmap, project repo not in this run's chunk, which together are the
+common case — it was never assigned, and a `redact_text "$PROJECT_HEALTH_BODY"`
+above the guard is an unbound read that kills the sweep under `set -u` after
+its primary report has already landed. The redaction therefore sits inside
+the write branch, immediately before the write it protects:
 
 ```bash
-PROJECT_HEALTH_BODY=$(redact_text "$PROJECT_HEALTH_BODY")
 PROJECT_HEALTH_STATUS="$PROJECT_ROOT_STATUS"   # 1a's answer, unless we write
 if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
     if [ -z "${PROJECT_REPO_AUDITED_THIS_RUN:-}" ]; then
@@ -1182,6 +1188,7 @@ if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
         # nothing would read as a project with a clean bill of health.
         PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
     else
+        PROJECT_HEALTH_BODY=$(redact_text "$PROJECT_HEALTH_BODY")
         PROJECT_REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-${PROJECT_REPO_NAME}-health.md"
         if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT"; then
             PROJECT_HEALTH_STATUS="FAILED(project health write: could not write $(redact_text "$PROJECT_REPORT"))"
