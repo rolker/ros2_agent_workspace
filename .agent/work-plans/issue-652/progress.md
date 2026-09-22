@@ -191,15 +191,15 @@ Tests run by the reviewer: `bash .agent/scripts/tests/test_resolve_repo_checkout
 Both must-fixes are new material this round — neither is a re-opened round-1 finding. Both are places outside `SKILL.md` that the change's own consequences reach.
 
 ### Findings
-- [ ] (must-fix) the per-project report is documented as `<ts>-<repo>-health.md`, but the code writes `<ts>-<pid>-<repo>-health.md` — the round-1 naming fix was applied throughout `SKILL.md` and not to the knowledge doc the same PR edits — `.agent/knowledge/principles_review_guide.md:50` (vs `.claude/skills/janitor-sweep/SKILL.md:1291`)
-- [ ] (must-fix) the planning-document vocabulary draft still states the sweep's durable output is a `docs/health.md` "replaced each run, via a pull request", which `--publish` makes false by default — the PR carries this consequence into ROADMAP.md and two knowledge docs but not into the draft that defines the health kind and is slated for ADR promotion (#637) — `docs/design/planning_document_vocabulary.md:48,275-277,332`
-- [ ] (suggestion) `SKIPPED(project repo not in this run's chunk)` also fires when the project root repo was *excluded* by step 2's rule 2/3 (non-GitHub origin, no root `AGENTS.md`) — `$PROJECT_REPO_IN_CHUNK` is tested against the post-exclusion `$CHUNK_REPOS` — and "not in this run's chunk" points the operator at waiting when the remedy is a fix — `.claude/skills/janitor-sweep/SKILL.md:602-608` (state described at 458-462)
-- [ ] (suggestion) `manifest_config_dir`'s added half reads "no configs/manifest under $root **either**", which is right for a missing pointer and misleading for a malformed one; the new regression case covers only the missing-pointer branch — `.agent/scripts/manifest_fallback.sh:169-176`, `.agent/scripts/tests/test_resolve_repo_checkout.sh:786-807`
-- [ ] (suggestion) the default workspace diff source (`ls -1t .../*-sweep.md | head -n 1`) is a new concurrency exposure for a scope that previously read an immutable commit — two runs sharing one host can each read the other's report as "previous"; not named anywhere, unlike the same caveat in the resolver's own header — `.claude/skills/janitor-sweep/SKILL.md:838-852`
-- [ ] (suggestion) step 8's per-project bullets say they state `$PROJECT_HEALTH_STATUS` "in the words the run produced", then re-word every one of them (`no-roadmap: <repo>` → `<repo> has no root ROADMAP.md`), so the report file and the conversation carry two vocabularies for the same state — `.claude/skills/janitor-sweep/SKILL.md:1880-1891` vs `404`
-- [ ] (suggestion) `[ "$PUBLISH" = "1" ] && HEALTH_BODY=$(redact_text …)` and the `&&`-chained `PROJECT_REPO_AUDITED_THIS_RUN=1` both return non-zero on their common path; the document reasons carefully about `set -u` elsewhere, so an `if … then … fi` would keep them safe under an errexit shell too — `.claude/skills/janitor-sweep/SKILL.md:1133,691-692`
-- [ ] (suggestion) the retention prune snippet (now two globs) still lives only inside step 1's exposition with no call site in the numbered steps, though it says "at the end of a run" — pre-existing shape, but the second glob makes an unrun prune costlier — `.claude/skills/janitor-sweep/SKILL.md:298-317`
-- [ ] (suggestion) the plan still names the file `<ts>-<project-repo-name>-health.md` / `<ts>-<repo>-health.md` at three places, the pre-pid-fix shape — `.agent/work-plans/issue-652/plan.md:244,254,314`
+- [x] (must-fix) the per-project report is documented as `<ts>-<repo>-health.md`, but the code writes `<ts>-<pid>-<repo>-health.md` — the round-1 naming fix was applied throughout `SKILL.md` and not to the knowledge doc the same PR edits — `.agent/knowledge/principles_review_guide.md:50` (vs `.claude/skills/janitor-sweep/SKILL.md:1291`)
+- [x] (must-fix) the planning-document vocabulary draft still states the sweep's durable output is a `docs/health.md` "replaced each run, via a pull request", which `--publish` makes false by default — the PR carries this consequence into ROADMAP.md and two knowledge docs but not into the draft that defines the health kind and is slated for ADR promotion (#637) — `docs/design/planning_document_vocabulary.md:48,275-277,332`
+- [x] (suggestion) `SKIPPED(project repo not in this run's chunk)` also fires when the project root repo was *excluded* by step 2's rule 2/3 (non-GitHub origin, no root `AGENTS.md`) — `$PROJECT_REPO_IN_CHUNK` is tested against the post-exclusion `$CHUNK_REPOS` — and "not in this run's chunk" points the operator at waiting when the remedy is a fix — `.claude/skills/janitor-sweep/SKILL.md:602-608` (state described at 458-462)
+- [x] (suggestion) `manifest_config_dir`'s added half reads "no configs/manifest under $root **either**", which is right for a missing pointer and misleading for a malformed one; the new regression case covers only the missing-pointer branch — `.agent/scripts/manifest_fallback.sh:169-176`, `.agent/scripts/tests/test_resolve_repo_checkout.sh:786-807`
+- [x] (suggestion) the default workspace diff source (`ls -1t .../*-sweep.md | head -n 1`) is a new concurrency exposure for a scope that previously read an immutable commit — two runs sharing one host can each read the other's report as "previous"; not named anywhere, unlike the same caveat in the resolver's own header — `.claude/skills/janitor-sweep/SKILL.md:838-852`
+- [x] (suggestion) step 8's per-project bullets say they state `$PROJECT_HEALTH_STATUS` "in the words the run produced", then re-word every one of them (`no-roadmap: <repo>` → `<repo> has no root ROADMAP.md`), so the report file and the conversation carry two vocabularies for the same state — `.claude/skills/janitor-sweep/SKILL.md:1880-1891` vs `404`
+- [x] (suggestion) `[ "$PUBLISH" = "1" ] && HEALTH_BODY=$(redact_text …)` and the `&&`-chained `PROJECT_REPO_AUDITED_THIS_RUN=1` both return non-zero on their common path; the document reasons carefully about `set -u` elsewhere, so an `if … then … fi` would keep them safe under an errexit shell too — `.claude/skills/janitor-sweep/SKILL.md:1133,691-692`
+- [x] (suggestion) the retention prune snippet (now two globs) still lives only inside step 1's exposition with no call site in the numbered steps, though it says "at the end of a run" — pre-existing shape, but the second glob makes an unrun prune costlier — `.claude/skills/janitor-sweep/SKILL.md:298-317`
+- [x] (suggestion) the plan still names the file `<ts>-<project-repo-name>-health.md` / `<ts>-<repo>-health.md` at three places, the pre-pid-fix shape — `.agent/work-plans/issue-652/plan.md:244,254,314`
 
 ### Noted, not a finding
 - Out of scope and pre-existing: step 1's manifest-fallback `case` says "Every arm is terminal" but no arm exits — the same gap this round's must-fix 2 closed at the step-6 write (`.claude/skills/janitor-sweep/SKILL.md:252-262`). Cheap to close in this PR while the pattern is in hand.
@@ -207,3 +207,32 @@ Both must-fixes are new material this round — neither is a re-opened round-1 f
 
 ### Specialists
 Static analysis: `bash -n` clean on `manifest_fallback.sh` and the test file; pre-commit (incl. shellcheck) ran on every commit on this branch. Claude Adversarial: 2 passes (Lens A logic/correctness, Lens B systemic/safety), fresh context each. Copilot Adversarial: off (not passed; Premium quota exhausted for September). Local Adversarial: off (not passed). Must-fix 1 was found independently by the lead and by Lens B — cross-pass confirmed; must-fix 2 by the lead and Lens B (Lens B graded it a suggestion).
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-22 12:51 -04:00
+**By**: Claude Code Agent (Claude Opus)
+
+**Branch**: feature/issue-652 at `62062e5`
+**Addressed**: `## Local Review (Pre-Push)` (Round 2, changes-requested), When 2026-09-22 12:42 -04:00, branch at `470ec23`
+**Commits**: `ee85e5f`, `9750373`, `b8040a8`, `e290bb0`, `524ab01`, `6fb43c5`, `77fd480`, `4bea45a`, `07279bf`, `62062e5`
+
+### Actions
+- [x] (must-fix) per-project report filename in the knowledge doc now carries the pid, matching the code — `.agent/knowledge/principles_review_guide.md:50` (`ee85e5f`)
+- [x] (must-fix) the vocabulary draft's health kind now reads "a local report by default; the committed `docs/health.md` replaced wholesale on each `--publish` run, via a pull request" — kinds table, *Publish means commit, not post*, and the Routine write-access note — `docs/design/planning_document_vocabulary.md:48,274-281,332`. Design-draft edit only, confined to those sentences; no ADR promotion (`9750373`)
+- [x] (suggestion) a rotation-**excluded** project root is now its own state, `SKIPPED(project repo excluded by rotation rule <n>: <reason>)`, recorded where rules 2/3 decide the exclusion and reported separately from `not in this run's chunk` — step 1a prose, step 2 snippet, step 6 `elif`, step 8 bullet (`b8040a8`)
+- [x] (suggestion) `manifest_config_dir`'s added half no longer says "either" (wrong for a *present* but unusable pointer): "there is also no configs/manifest under $root …"; new regression case covers the malformed-pointer branch and asserts the word is gone — `.agent/scripts/manifest_fallback.sh:163-182`, `.agent/scripts/tests/test_resolve_repo_checkout.sh` (`e290bb0`)
+- [x] (suggestion) the default diff source's concurrency exposure is named in place, beside the `ls -1t … | head -n 1`: two sweeps on one host can each read the other's report — including one still being written — as "previous"; bounded consequence, deliberately no lock — `.claude/skills/janitor-sweep/SKILL.md` § 5 (`524ab01`)
+- [x] (suggestion) step 8 now **quotes `$PROJECT_HEALTH_STATUS` verbatim** and glosses it, instead of re-wording every state — one vocabulary across the report file and the conversation (`6fb43c5`)
+- [x] (suggestion) both conditional assignments (`$HEALTH_BODY` redaction gate, `PROJECT_REPO_AUDITED_THIS_RUN`) converted from `&&` chains to `if … then … fi`, with the errexit reason stated (`77fd480`)
+- [x] (suggestion) the retention prune has a call site: end of step 6, after both writes, with the reason it sits there and a note at step 1's exposition saying where it is run (`4bea45a`)
+- [x] (suggestion) the plan's three pre-pid filename mentions now read `<ts>-<pid>-<repo>-health.md`; Files to Change and the Consequences Map also pick up this round's edits and the new `docs/design/planning_document_vocabulary.md` row — `.agent/work-plans/issue-652/plan.md` (`07279bf`)
+- [x] (noted, not a finding) step 1's manifest-fallback `case` now ends in `exit 1`, so "every arm is terminal" is true in code as well as prose (`62062e5`)
+
+### Deferred
+- The `AGENTS.md` Script Reference row for `manifest_bootstrap_identity` (`AGENTS.md:587`) — deferred by the operator to the publish gate (Ask-First), not re-raised by this round and not applied here.
+
+### Verification
+- `bash .agent/scripts/tests/test_resolve_repo_checkout.sh` → **72 passed / 0 failed** (71 before, +1 malformed-pointer case)
+- `make test-scripts` → all script suites green + 220 pytest passed, exit 0
+- pre-commit (incl. shellcheck) ran on every commit; `bash -n` clean on `manifest_fallback.sh` and the test file
