@@ -917,14 +917,33 @@ top would be redundant, not because diffing was skipped.
 
   ```bash
   PREV_REPORT=$(ls -1t "$REPORT_DIR"/*-sweep.md 2>/dev/null | head -n 1)
-  if [ -n "$PREV_REPORT" ]; then
-      PREV_HEALTH=$(awk '/^## Workspace$/{f=1;next} /^## Projects$/{f=0} f' "$PREV_REPORT")
-      PREV_SOURCE="local report $(basename "$PREV_REPORT")"
-  else
-      PREV_HEALTH=""
+  PREV_HEALTH=""
+  if [ -z "$PREV_REPORT" ]; then
       PREV_SOURCE="none — first local run, no prior report"
+  elif [ ! -s "$PREV_REPORT" ]; then
+      PREV_SOURCE="none — newest local report $(basename "$PREV_REPORT") is empty or has no ## Workspace section"
+  else
+      PREV_HEALTH=$(awk '/^## Workspace$/{f=1;next} /^## Projects$/{f=0} f' "$PREV_REPORT")
+      if [ -z "$PREV_HEALTH" ]; then
+          PREV_SOURCE="none — newest local report $(basename "$PREV_REPORT") is empty or has no ## Workspace section"
+      else
+          PREV_SOURCE="local report $(basename "$PREV_REPORT")"
+      fi
   fi
   ```
+
+  **A file being newest is not the same as its having a prior set in it.**
+  The source is named only when the read produced something: `[ -s … ]`
+  rejects a zero-byte file, and the emptiness check on `$PREV_HEALTH` rejects
+  one that has bytes but no `## Workspace` section — a report from an older
+  revision of this skill, or one truncated by whatever left the file short.
+  Without both, an empty `$PREV_HEALTH` would tag every finding `[New]` while
+  the `**Diffed against**` line claimed a real prior run by name, which reads
+  as "all of this appeared since that run" — the strongest possible claim,
+  made from no evidence. Saying `none — …` instead attributes the empty prior
+  set to what actually happened. (§ 6's temp-and-rename makes a *half-written*
+  report unreachable here; these guards are for a file that is genuinely
+  empty or genuinely not of this shape.)
 
   **Known limitation — two sweeps on one host can diff against each other.**
   `ls -1t … | head -n 1` picks the newest file in `$REPORT_DIR`, and on this
@@ -956,14 +975,19 @@ top would be redundant, not because diffing was skipped.
   render as a blank line where a reader expects to be told what `Resolved`
   meant this run.
 
-  There is exactly **one** "nothing to diff against" state on this branch,
-  and it is said plainly rather than rendered as "no changes": **`no prior
-  local report`** — the directory holds none at all, the first local run on
-  this host. The Project-scope bullet below distinguishes a second state,
+  Every "nothing to diff against" state on this branch is said plainly rather
+  than rendered as "no changes". There are **two**: **`no prior local
+  report`** — the directory holds none at all, the first local run on this
+  host — and **the newest one carries no `## Workspace` section to read**,
+  empty or of some other shape. Both leave an empty prior set; they are kept
+  apart because they call for different things from a reader, one being
+  normal and the other being a file worth looking at.
+  The Project-scope bullet below distinguishes a further state,
   `prior report predates retention`, and that one is **not reachable here**:
   workspace scope diffs against whichever report is newest, so retention
   pruning older runs is invisible to it — there is no particular prior run it
-  could find missing. Project scope can tell the two apart because it looks
+  could find missing. Project scope can tell that state apart from its own
+"no prior report" because it looks
   for a report covering *a given repo*, which retention can prune out from
   under it while other reports remain.
 
@@ -1574,7 +1598,9 @@ reader see both numbers.
 prior health document` (the `--publish` branch, `git show` found none) /
 `local report <ts>-<pid>-sweep.md` (the default branch, a prior report
 found) / `none — first local run, no prior report` (the default branch,
-none in the directory) >
+none in the directory) / `none — newest local report <ts>-<pid>-sweep.md is
+empty or has no ## Workspace section` (the default branch, a file was found
+but held no prior set) >
 
 <!-- Rendered on every run, directly under the check table (§ 5). The two
      branches diff against different sources, and which one a reader is
