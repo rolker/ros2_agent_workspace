@@ -67,8 +67,13 @@ Be deliberate about merging one. A `rosdep.yaml` merged in **any** project repo
 is read by every consumer below, and each of them feeds it to a **root-level**
 `rosdep install -y`:
 
-- the **dev host**, via the generated `ROSDEP_SOURCE_PATH` — `make build`'s
-  rosdep pass installs into the machine you work on;
+- the **dev host**, via the generated `ROSDEP_SOURCE_PATH` — the install is
+  the manual `rosdep install --from-paths layers/main/<layer>_ws/src
+  --ignore-src -r -y` the README reaches for when a build fails on a missing
+  dependency, and it installs into the machine you work on. (`make build`
+  itself never installs: its `$(STAMP)/rosdep-local.done` recipe regenerates
+  the sources directory and runs `rosdep update` — the *resolution* side. What
+  the local key changes is what that manual install resolves to.);
 - the **`ci_local` container**, where the verified environment an attestation
   vouches for is built;
 - the **agent image bake**, where it lands in a layer every sandboxed agent
