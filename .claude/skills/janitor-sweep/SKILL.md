@@ -636,7 +636,8 @@ top would be redundant, not because diffing was skipped.
   - Section partially covered and the item was **not** covered, or the
     section reported `0 of Y` / `SKIPPED`, or has no coverage row →
     **`Not re-examined`**. The prior finding is carried forward verbatim
-    under that subsection; nothing about it is known to have changed.
+    under that subsection, with a `(since <YYYY-MM-DD>)` stamp; nothing about
+    it is known to have changed.
   - **A prior finding from check 4** (research-digest freshness) has no
     `audit-workspace` section and no coverage row in check 1's table — it is
     workspace scope and tier 5, but it comes from a different check, whose
@@ -658,6 +659,21 @@ top would be redundant, not because diffing was skipped.
   what changes is what a *miss* on that key resolves to when coverage is
   partial. `Unchanged` and `New` are unaffected: a finding present in both
   runs, or only in this one, is what it is regardless of coverage.
+
+  **Every `Not re-examined` entry carries a `(since <YYYY-MM-DD>)` stamp**
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)) — the
+  date of the health document that **first** carried this finding forward,
+  not this run's date. When a finding becomes `Not re-examined` for the first
+  time, stamp it with this run's date; on every later run that carries it
+  forward again, copy the stamp from the previous file verbatim. The date is
+  what makes age visible: sections 1–2 sample at the agent's discretion with
+  no rotation mechanism, so an entry can park under this subsection
+  indefinitely, and without a date one missed once and one missed twenty
+  times render identically. A finding that leaves the subsection — because
+  its section was covered and it was found again (`Unchanged`) or was gone
+  (`Resolved`) — drops the stamp; if it later returns to `Not re-examined` it
+  is stamped afresh. This is the whole mechanism: a date, not a rotation
+  schedule or an escalation rule.
 
   **The gate is the rule in both scopes**, not a workspace-section
   peculiarity: a prior finding renders `Resolved` only when the section it
@@ -744,8 +760,10 @@ top would be redundant, not because diffing was skipped.
     the test run), reported `0 of Y` / `SKIPPED`, reported `absent` without
     the § 2 finding that establishes it, or carrying no coverage row
     at all, and the prior finding is absent → **`[Not re-examined]`**. The
-    prior finding is carried forward verbatim with that tag; nothing about it
-    is known to have changed.
+    prior finding is carried forward verbatim, tagged
+    `[Not re-examined since <YYYY-MM-DD>]` — the same stamp the workspace
+    scope uses, and read from the prior local report when one already carries
+    it. Nothing about the finding is known to have changed.
   - A prior finding whose originating section cannot be determined from its
     text → `[Not re-examined]` when *any* of that repo's sections was less
     than fully covered this run, `[Resolved]` only when all seven were fully
@@ -925,10 +943,13 @@ reader see both numbers.
 #### Unchanged
 - ...
 #### Not re-examined
-- ... <!-- Only when non-empty (§ 5). Tier 1's findings come from section 7,
-           stale worktrees, which never samples — so this subsection is
-           almost always empty here; see tier 3 below for the case it is
-           actually for. -->
+- <prior finding, verbatim> (since <YYYY-MM-DD>)
+  <!-- Only when non-empty (§ 5). The `since` date is the date of the health
+       document that FIRST carried this finding forward, copied verbatim on
+       every later run — not this run's date (§ 5). Tier 1's findings come
+       from section 7, stale worktrees, which never samples — so this
+       subsection is almost always empty here; see tier 3 below for the case
+       it is actually for. -->
 
 ### 2. Unowned safety bugs
 (same New/Resolved/Unchanged/Not re-examined shape)
@@ -936,14 +957,15 @@ reader see both numbers.
 ### 3. Rules that have bitten with no enforcement
 (same shape)
 #### Not re-examined
-- <prior finding, verbatim> <!-- The state's home tier: these findings come
-           from section 1 (principles), one of the two sections that may
-           sample. Example: the prior run found "principle X has no
-           enforcement"; this run examined 2 of 10 principles and X was not
-           among them, so the finding is absent from this run's findings but
-           is NOT resolved — it is carried forward verbatim here. Absence
-           from this subsection is not resolution; presence is not a new
-           finding. Rendered only when non-empty. -->
+- <prior finding, verbatim> (since <YYYY-MM-DD>)
+  <!-- The state's home tier: these findings come from section 1
+       (principles), one of the two sections that may sample. Example: the
+       prior run found "principle X has no enforcement"; this run examined
+       2 of 10 principles and X was not among them, so the finding is absent
+       from this run's findings but is NOT resolved — it is carried forward
+       verbatim here, stamped with the date it was first carried forward.
+       Absence from this subsection is not resolution; presence is not a new
+       finding. Rendered only when non-empty. -->
 
 ### 4. Contradictions in the record
 (same shape)
@@ -962,8 +984,8 @@ reader see both numbers.
 decided — § Deferred: the project-scope rollup and the trigger)
 
 Every tier below carries the same diff-state tag per finding —
-`[New/Resolved/Unchanged/Not re-examined, or "no prior report for this repo"
-/ "prior report covered a different chunk"]` — per § Run-over-run diff's "for
+`[New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or "no prior
+report for this repo" / "prior report covered a different chunk"]` — per § Run-over-run diff's "for
 **each scope**" mandate. Project scope renders it inline per finding
 (`- **<repo>** [tag]: ...`) rather than as subsections, because unlike
 the workspace scope's single committed `docs/health.md`, project-scope
@@ -978,20 +1000,24 @@ audited in `clone` mode this run whose prior finding came from a check that
 mode skips.
 
 ### 1. Work that can be lost
-- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
-  this repo" / "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or
+  "no prior report for this repo" / "prior report covered a different
+  chunk"]: ...
 
 ### 2. Unowned safety bugs
-- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
-  this repo" / "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or
+  "no prior report for this repo" / "prior report covered a different
+  chunk"]: ...
 
 ### 3. Rules that have bitten with no enforcement
-- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
-  this repo" / "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or
+  "no prior report for this repo" / "prior report covered a different
+  chunk"]: ...
 
 ### 4. Contradictions in the record
-- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
-  this repo" / "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or
+  "no prior report for this repo" / "prior report covered a different
+  chunk"]: ...
 
 **Provisional decisions with no review scheduled** (distinct labeled
 sub-list, not merged into the tier's other findings — not diffed: a
@@ -1004,8 +1030,9 @@ would be redundant):
   deployment` heading): "no provisional decisions found this run"
 
 ### 5. Drift
-- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
-  this repo" / "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined since <YYYY-MM-DD>, or
+  "no prior report for this repo" / "prior report covered a different
+  chunk"]: ...
 
 #### Planning Documents — <repo> (mode: layer/clone)
 
