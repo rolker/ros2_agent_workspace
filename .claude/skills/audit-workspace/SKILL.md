@@ -144,8 +144,17 @@ Check that framework adapter files are consistent with `AGENTS.md`:
 
 Flag any rules in AGENTS.md that should be reflected in adapters but aren't.
 
-**Coverage line**: `adapters: all 3` (the three files above; a missing
-adapter is a finding, and the line then reads `2 of 3 — <file> missing`).
+**Coverage line**: `adapters: all 3` — the three files above are a fixed
+checklist, and all three are always examined. **A missing
+adapter is a finding, not a coverage shortfall**
+([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)): the
+audit looked at the expected path and established that nothing is there, so
+the section is fully covered and the absence is what it found. This is the
+same rule `audit-project` § 3 applies to a missing `.agents/README.md`
+(`absent`, reported as a § 2 finding) — an input that is itself a finding
+never reduces coverage, in either audit. The line drops below `all 3` only
+when an adapter that **exists** could not be read: `2 of 3 — <file>:
+<reason>`.
 
 ### 7. Stale worktrees
 
@@ -186,7 +195,7 @@ printed.
 | 3. Script references | scripts | all N | — |
 | 4. Templates | templates | all N | — |
 | 5. Consequences map | consequences-map items | all N | — |
-| 6. Instruction consistency | adapters | all 3 | — |
+| 6. Instruction consistency | adapters | all 3 (a missing adapter is a finding, not a shortfall) | — |
 | 7. Stale worktrees | worktrees | all N | — |
 
 <!-- One row per section, always all seven, in this order. A consumer may key
