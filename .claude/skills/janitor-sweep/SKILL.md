@@ -441,6 +441,18 @@ run" is not a status.
   inside the audit and makes the check `FINDINGS` at worst, never `OK`. Probe
   the inputs before reporting the check's status; do not infer it from the
   narrative.
+
+  **Relay its coverage, do not re-collect it.** `audit-workspace` ends with a
+  `### Coverage` table — one row per checklist section, `X of Y examined`
+  (naming the items when X < Y) for the two sections that may sample and
+  `all N` for the five that never do ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+  Carry that table, folded into one line, into the check's `Detail` cell
+  (§ Render the report) and hold it for the run-over-run diff (§ 5), which
+  keys on it. A section with no coverage row counts as `0 of Y` for the
+  diff — its findings still render, but nothing from a prior run can be
+  `Resolved` against it — and the check is `FINDINGS` at best, with the
+  missing row named in `Detail`. Coverage rows are the audit's claim about
+  itself, not this skill's: relay what it reported.
 - **Check 2 — `audit-project`** rolls up its per-repo runs, and the rollup
   covers the rotation as well as the audits: `FAILED` if **any candidate failed
   its rule-3 probe**, if any repo in the chunk failed to resolve (any non-zero
@@ -543,9 +555,10 @@ stable key: `tier + check + one-line description`. Every tier in every scope
 carries this diff state — there is no tier that goes undiffed by default.
 The **rendering shape** differs by scope (both described fully in § Write
 the report, so the two steps must be read together, not just this one): the
-Workspace scope renders three subsections per tier — `New`, `Resolved`,
-`Unchanged` — because it diffs against one committed `docs/health.md`.
-Project scope renders the same three states as a `[New/Resolved/Unchanged]`
+Workspace scope renders four subsections per tier — `New`, `Resolved`,
+`Unchanged`, and the coverage-gated `Not re-examined` below — because it
+diffs against one committed `docs/health.md`.
+Project scope renders three states as a `[New/Resolved/Unchanged]`
 tag inline on each per-repo finding, because it diffs many repos against
 independent, best-effort local-report history, where per-tier subsections
 spanning dozens of repos would be unreadable. The one stated exception is
@@ -566,6 +579,44 @@ top would be redundant, not because diffing was skipped.
 
   This is the only read of the previous state in the run; nothing later
   re-reads it.
+
+  **A miss is `Resolved` only when this run looked** ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+  A prior finding absent from this run's findings used to render as
+  `Resolved` unconditionally, so a shallow `audit-workspace` run — 2 of 10
+  principles spot-checked, "no gaps found" — would have read as the prior
+  run's four enforcement gaps being fixed. Before classifying an absent
+  prior finding, read the coverage row (check 1's `### Coverage` table,
+  relayed in § 3) of the audit **section the finding came from** (tier 3
+  findings come from section 1, principles; ADR drift and Consequences-map
+  findings from sections 2 and 5; tier 1 stale worktrees from section 7;
+  script-table and template findings from sections 3 and 4):
+  - Section fully covered this run (`all N`, or `X of Y` with `X == Y`) and
+    the finding is absent → **`Resolved`**.
+  - Section sampled (`X of Y`, `X < Y`) and the item the finding is about
+    (a named principle, an ADR number) **is among the items examined** and
+    the finding is absent → **`Resolved`** — sampling does not block
+    resolution of the thing actually re-examined.
+  - Section sampled and the item is **not** among the items examined, or
+    the section reported `0 of Y` / `SKIPPED`, or has no coverage row →
+    **`Not re-examined`**. The prior finding is carried forward verbatim
+    under that subsection; nothing about it is known to have changed.
+  - A prior finding whose section cannot be determined from its text (the
+    stable key carries the check but the section is inferred from the
+    finding's kind) → `Not re-examined` when *any* of check 1's sections
+    was sampled this run, `Resolved` only when all seven were fully
+    covered. Fail toward "not known to be fixed".
+
+  The diff key itself (`tier + check + one-line description`) is unchanged;
+  what changes is what a *miss* on that key resolves to when coverage is
+  partial. `Unchanged` and `New` are unaffected: a finding present in both
+  runs, or only in this one, is what it is regardless of coverage.
+
+  This state is **workspace scope only**. Project scope stays three-state:
+  `audit-project`'s sections are exhaustive by construction — each
+  enumerates a discovered set (every `package.xml`, a fixed checklist) rather
+  than sampling a larger one — so its coverage rows (its own § Coverage)
+  are always `N of N`, and the precondition for `Not re-examined` never
+  occurs there.
 
   **First run — no prior `docs/health.md` in history** (the normal case for
   this skill's very first publish, and for any repo where the file was never
@@ -597,7 +648,7 @@ template is rendered; naming the data flow here is what rules both out.
 
 | Variable | Rendered here as | Consumed by |
 |---|---|---|
-| `$WORKSPACE_SECTION` | the `## Workspace` section: check-status table, then findings by tier with `New`/`Resolved`/`Unchanged` subsections | composed into both artifacts below |
+| `$WORKSPACE_SECTION` | the `## Workspace` section: check-status table (each row's `Detail` carrying that check's coverage), then findings by tier with `New`/`Resolved`/`Unchanged`/`Not re-examined` subsections | composed into both artifacts below |
 | `$PROJECTS_SECTION` | the `## Projects` section, per the template | `$REPORT_BODY` only — project scope is never published (§ Overview) |
 | `$HEALTH_BODY` | `# Workspace health — <ts>` title + a fixed provenance line + `$WORKSPACE_SECTION` — **exactly the bytes committed to `docs/health.md`** | 7b, written verbatim |
 | `$REPORT_BODY` | the local report: `## Janitor Sweep — <ts>` header, `$WORKSPACE_SECTION`, `$PROJECTS_SECTION`, the retention footer | written to `$REPORT` in this step; 7h appends the publish outcome |
@@ -691,11 +742,27 @@ Report format — **two top-level sections, `## Workspace` and `## Projects`**,
 replacing the single flat `### Check Status` table a prior revision of this
 skill used. Each carries its own check-status line and its findings grouped
 by tier (§ Classify findings into tiers), each tier further split into `New`
-/ `Resolved` / `Unchanged` (§ Run-over-run diff). A tier with no findings this
+/ `Resolved` / `Unchanged`, plus — workspace scope only — `Not re-examined`
+(§ Run-over-run diff). A tier with no findings this
 run is omitted from that scope's section entirely — not rendered as an empty
-heading. The `## Workspace` section carries no publish line: the outcome is
-appended to the end of this file by 7h as its own `## Publish outcome`
-section, once it is known.
+heading. Within a rendered workspace tier, `New`/`Resolved`/`Unchanged` are
+always present (empty ones say why, as the first-run note does); the
+`Not re-examined` subsection is rendered **only when it has entries**. That
+is a rule specific to this subsection, new with it: on a full-coverage run
+it is empty by design, and an always-present empty `Not re-examined` would
+suggest partial coverage where there was none. The `## Workspace` section
+carries no publish line: the outcome is appended to the end of this file by
+7h as its own `## Publish outcome` section, once it is known.
+
+**Two coverage grains, kept visibly apart.** The top-line **`Checks: X of 4
+completed`** counts the sweep's four checks — did each *run*. The
+`Detail` cell of each `## Workspace` row carries that check's **own**
+coverage — how much of its input it *looked at*: for `audit-workspace`, its
+seven-row `### Coverage` table folded into one line (`principles 2 of 10
+(names); ADRs 1 of 19 (0017); scripts all 58; templates all 12; …`); for
+research-digest freshness, the one file read. `4 of 4 completed` over
+`principles 2 of 10` is a complete sweep of a shallow audit, and the health
+doc must let a reader see both numbers.
 
 ```markdown
 ## Janitor Sweep — <YYYY-MM-DD HH:MM ±HH:MM>
@@ -707,8 +774,8 @@ section, once it is known.
 
 | Check | Status | Detail |
 |---|---|---|
-| Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | ... |
-| Research-digest freshness | ... | last updated <date>, <n> days |
+| Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | <findings summary>. Coverage: principles X of 10 (<names when X<10>); ADRs X of 19 (<numbers when X<19>); scripts all N; templates all N; consequences-map items all N; adapters all 3; worktrees all N |
+| Research-digest freshness | ... | last updated <date>, <n> days. Coverage: the one digest file, read |
 
 <!-- First committed run for this repo (git show HEAD:docs/health.md fails,
      or docs/health.md has never been committed): say so explicitly here —
@@ -723,9 +790,13 @@ section, once it is known.
 - ...
 #### Unchanged
 - ...
+#### Not re-examined
+- ... <!-- only when non-empty: prior findings whose audit section was
+           sampled this run and whose item was not in the sample (§ 5).
+           Carried forward verbatim; absence here is not resolution. -->
 
 ### 2. Unowned safety bugs
-(same New/Resolved/Unchanged shape)
+(same New/Resolved/Unchanged/Not re-examined shape)
 
 ### 3. Rules that have bitten with no enforcement
 (same shape)
@@ -837,8 +908,8 @@ under it.
 
 Fill the **Checks** line from the status table, not from impression. If any
 check is `SKIPPED` or `FAILED`, the report may not describe the workspace as
-clean. The `## Workspace` section, **including its `New`/`Resolved`/`Unchanged`
-run-over-run-diff subsections**, is what `$HEALTH_BODY` carries into
+clean. The `## Workspace` section, **including its `New`/`Resolved`/`Unchanged`/
+`Not re-examined` run-over-run-diff subsections**, is what `$HEALTH_BODY` carries into
 `docs/health.md` in the next step: those subsections are exactly the
 run-over-run record the issue asked for, and `docs/health.md`'s own git
 history — one committed version per sweep — is where an operator reads it.
@@ -978,7 +1049,7 @@ with the document's top-level numbered steps.
    ```bash
    BODY_FILE=$(mktemp /tmp/gh_body.XXXXXX.md)
    cat << 'EOF' > "$BODY_FILE"
-   Coverage: X of 4 completed.
+   Checks: X of 4 completed.
    Full record (workspace and project findings): .agent/scratchpad/janitor/<report-file>
    EOF
 
@@ -998,7 +1069,9 @@ with the document's top-level numbered steps.
    `gh pr create` prints the new PR's URL to stdout on success; `$NEW_PR_URL`
    is captured from that, so there is no placeholder anywhere to fill in
    later. Title format: `Janitor sweep: workspace health <YYYY-MM-DD>`. The
-   body states the coverage line (`X of 4 completed`) and names the local
+   body states the checks line (`X of 4 completed` — labelled `Checks`, not
+   `Coverage`, since per-check coverage is a different grain and lives in
+   the health doc's `Detail` cells, § 6) and names the local
    report, by workspace-relative path, for the full record (workspace
    **and** project findings — `docs/health.md` carries only the workspace
    half).
@@ -1116,8 +1189,11 @@ are not yet committed.
 
 Summarise in the conversation and name the report file by its path **relative
 to the workspace root** (`.agent/scratchpad/janitor/<file>`). Lead with the
-coverage line — `X of 4 completed` — so a partial sweep cannot read as a clean
-one. If the local report write failed, lead with that instead and print the
+checks line — `X of 4 completed` — so a partial sweep cannot read as a clean
+one, and follow it with `audit-workspace`'s coverage line for the two
+sections that may sample (`principles X of Y; ADRs X of Y`) so a shallow
+audit cannot either; name any `Not re-examined` entries the diff produced.
+If the local report write failed, lead with that instead and print the
 findings inline. State the workspace-scope publish outcome explicitly — the
 same `$PUBLISH_LINE` 7h appended: the PR URL on success, or
 `FAILED(workspace publish: <reason>)` — and state plainly that project-scope
