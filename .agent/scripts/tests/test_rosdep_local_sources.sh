@@ -114,7 +114,8 @@ STUB="$TMP/bin"; mkdir -p "$STUB"
 cat > "$STUB/rosdep" <<'EOF'
 #!/bin/bash
 case "${1:-}" in
-    update)  [ -n "${STUB_UPDATE_FAILS:-}" ] && { echo "ERROR: offline" >&2; exit 1; }; exit 0 ;;
+    update)  [ -n "${STUB_UPDATE_MARKER:-}" ] && touch "$STUB_UPDATE_MARKER"; \
+             [ -n "${STUB_UPDATE_FAILS:-}" ] && { echo "ERROR: offline" >&2; exit 1; }; exit 0 ;;
     resolve) [ "${2:-}" = "python3-numpy" ] && exit 0; exit 1 ;;
 esac
 exit 1
@@ -172,6 +173,51 @@ rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
 
 out="$("$CHECK" a b 2>&1)"; rc=$?
 check "too many arguments is a usage error (2)" eq "$rc" 2
+
+echo "=== Makefile \$(STAMP)/rosdep-local.done: recoverable vs. fatal ==="
+# The stamp recipe drives the generator in the `make build` chain, so its
+# handling of the generator's exit codes is load-bearing: exit 3 (rosdep not
+# initialized) is the normal state of a clone that has not run `sudo rosdep
+# init`, and must not break the build; a rejected rosdep.yaml (exit 4) must.
+# Runs the REAL recipe in a sandbox — MAIN_ROOT falls back to CURDIR — against
+# a stub generator and the stub rosdep above.
+REPO_ROOT="$(cd "$SCRIPTS_DIR/../.." && pwd)"
+MKS="$TMP/mk"
+mkdir -p "$MKS/.agent/scripts" "$MKS/.make"
+cp "$REPO_ROOT/Makefile" "$MKS/Makefile"
+# Prerequisite stamps, back-dated so make treats them as up to date and does
+# not try to re-run the bootstrap/manifest recipes.
+touch -d '2 hours ago' "$MKS/.make/bootstrap.done"
+touch -d '1 hour ago'  "$MKS/.make/manifest.done"
+
+# Runs the stamp recipe with the generator stubbed to exit $1.
+# Echoes "<recipe-rc> <stamp|no-stamp> <updated|no-update>".
+run_stamp() {
+    local grc="$1" rc
+    printf '#!/bin/bash\ntouch "%s/gen_ran"\nexit %s\n' "$MKS" "$grc" \
+        > "$MKS/.agent/scripts/rosdep_local_sources.sh"
+    chmod +x "$MKS/.agent/scripts/rosdep_local_sources.sh"
+    rm -f "$MKS/.make/rosdep-local.done" "$MKS/gen_ran" "$TMP/rosdep_update_ran"
+    ( cd "$MKS" && PATH="$STUB:$PATH" STUB_UPDATE_MARKER="$TMP/rosdep_update_ran" \
+        make "$MKS/.make/rosdep-local.done" >"$TMP/mk.out" 2>&1 )
+    rc=$?
+    printf '%s %s %s' "$rc" \
+        "$([ -f "$MKS/.make/rosdep-local.done" ] && echo stamp || echo no-stamp)" \
+        "$([ -f "$TMP/rosdep_update_ran" ] && echo updated || echo no-update)"
+}
+
+got="$(run_stamp 0)"
+check "generator success stamps and refreshes the cache" eq "$got" "0 stamp updated"
+got="$(run_stamp 3)"
+check "uninitialized rosdep (3) does not fail make build" contains "$got" "0 "
+check "uninitialized rosdep leaves no stamp, so the next build retries" \
+    contains "$got" "no-stamp"
+check "uninitialized rosdep skips the cache refresh" contains "$got" "no-update"
+check "uninitialized rosdep says how to fix it" \
+    grep -q "bootstrap.sh" "$TMP/mk.out"
+got="$(run_stamp 4)"
+check "a rejected rosdep.yaml (4) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
+check "a rejected rosdep.yaml leaves no stamp" contains "$got" "no-stamp"
 
 echo ""
 echo "$PASS passed, $FAIL failed"

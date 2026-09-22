@@ -220,12 +220,30 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # first appears with a newly checked-out repo.
 # `rosdep update` is best-effort: an offline host must not fail `make build`,
 # and the generated source list is still correct for the next online run.
+#
+# The generator's exit 3 ("rosdep is not initialized" — no *.list under
+# /etc/ros/rosdep/sources.list.d) is RECOVERABLE and must not break `make
+# build`: it is the normal state of a clone that has not run `sudo rosdep init`
+# yet, and the same condition bootstrap.sh treats as a note. The stamp is then
+# deliberately NOT touched, so the next `make build` retries once rosdep is
+# initialized (the prerequisite list would otherwise still be up to date and
+# the generator would never run again). Any OTHER non-zero status — notably
+# exit 4, a project repo's rosdep.yaml rejected by the shape rules — fails the
+# build: those keys feed a root-level `rosdep install`, so a rejected file is a
+# policy violation to fix, not a condition to build past.
 $(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
 	@mkdir -p $(STAMP)
-	@./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT)
-	@ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
-		|| echo "  (rosdep update failed — offline? generated source list is still current)"
-	@touch $@
+	@rc=0; ./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT) || rc=$$?; \
+	if [ "$$rc" -eq 3 ]; then \
+		echo "  (workspace-local rosdep sources not generated — rosdep is not"; \
+		echo "   initialized; run .agent/scripts/bootstrap.sh. Using system defaults.)"; \
+	elif [ "$$rc" -ne 0 ]; then \
+		exit $$rc; \
+	else \
+		ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
+			|| echo "  (rosdep update failed — offline? generated source list is still current)"; \
+		touch $@; \
+	fi
 
 # Enable secondary expansion for the layer stamp rule below.
 .SECONDEXPANSION:
