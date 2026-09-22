@@ -385,7 +385,9 @@ echo "=== agent-entrypoint.sh: the launch-time refresh must reach the AGENT's ca
 # entrypoint, against stub `rosdep` and `setpriv`.
 ENTRY="$REPO_ROOT/.devcontainer/agent/agent-entrypoint.sh"
 BLOCK="$TMP/refresh_block.sh"
-sed -n '/^if \[ -n "${ROSDEP_SOURCE_PATH:-}"/,/^fi$/p' "$ENTRY" > "$BLOCK"
+# The slice starts at BAKED_ROSDEP_SOURCES= — the helper the `if` calls is
+# defined there, and slicing from the `if` alone would leave it undefined.
+sed -n '/^# (overridable so the regression test/,/^fi$/p' "$ENTRY" > "$BLOCK"
 check "the refresh block was found in the entrypoint" \
     bash -c "grep -q 'rosdep update' '$BLOCK'"
 # TARGET_HOME must be resolved BEFORE the block, not at its old first use in
@@ -418,6 +420,7 @@ run_refresh() {
       export TARGET_USER=ros TARGET_UID="$uid" TARGET_GID="$gid" \
              TARGET_HOME="$ROS_HOME" ROSDEP_SOURCE_PATH="$ESRC" \
              REFRESH_LOG="$TMP/refresh.log"
+      [ -n "${BAKED_ROSDEP_SOURCES:-}" ] && export BAKED_ROSDEP_SOURCES
       PATH="$STUB2:$PATH" bash "$BLOCK" >/dev/null 2>&1 )
     cat "$TMP/refresh.log" 2>/dev/null
 }
@@ -436,6 +439,26 @@ check "the dropped refresh keeps ROSDEP_SOURCE_PATH" \
 printf '# only a comment\n' > "$ESRC/30-workspace-local.list"
 log="$(run_refresh)"
 check "a comment-only local list refreshes nothing" bash -c "[ -z \"\$1\" ]" _ "$log"
+
+# The image bakes its OWN non-empty 30-workspace-local.list. When the mounted
+# workspace never generated one, setup.bash leaves ROSDEP_SOURCE_PATH pointing
+# at the baked dir — the list is then non-empty and non-comment, and an
+# unguarded test paid two rosdep updates per launch to rebuild a cache that was
+# already correct, while announcing the image's sources as the workspace's.
+BAKED="$TMP/baked_sources"; mkdir -p "$BAKED"
+printf '# generated\nyaml file:///opt/rosdep-local/a_ws__r.yaml\n' \
+    > "$BAKED/30-workspace-local.list"
+cp "$BAKED/30-workspace-local.list" "$ESRC/30-workspace-local.list"
+log="$(BAKED_ROSDEP_SOURCES="$BAKED" run_refresh)"
+check "the image's own baked list refreshes nothing" bash -c "[ -z \"\$1\" ]" _ "$log"
+log="$(BAKED_ROSDEP_SOURCES="$ESRC" run_refresh)"
+check "ROSDEP_SOURCE_PATH == the baked dir refreshes nothing" \
+    bash -c "[ -z \"\$1\" ]" _ "$log"
+printf '# generated\nyaml file:///ws/layers/main/a_ws/src/r/rosdep.yaml\n' \
+    > "$ESRC/30-workspace-local.list"
+log="$(BAKED_ROSDEP_SOURCES="$BAKED" run_refresh)"
+check "a list that differs from the baked one still refreshes" \
+    eq "$(grep -c '^rosdep update' <<< "$log")" 2
 
 echo ""
 echo "$PASS passed, $FAIL failed"

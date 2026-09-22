@@ -116,8 +116,28 @@ set -u
 #     even though the root-side one succeeded. It must run AS that user (not
 #     just with HOME set) so the cache files land user-owned and writable.
 # rosdep only warns when `update` runs as root; it does not refuse.
-if [ -n "${ROSDEP_SOURCE_PATH:-}" ] && [ -s "$ROSDEP_SOURCE_PATH/30-workspace-local.list" ] \
-   && grep -qv '^[[:space:]]*#' "$ROSDEP_SOURCE_PATH/30-workspace-local.list" 2>/dev/null; then
+#
+# ...and only when the list is actually the WORKSPACE's. When the mounted
+# workspace never generated one, setup.bash leaves ROSDEP_SOURCE_PATH at the
+# image's own baked dir, whose 30-workspace-local.list is non-empty and
+# non-comment — so an unguarded test fired on the image's own sources, paid two
+# rosdep updates for a cache that is already correct, and announced
+# "workspace-local sources" that are the image's. Comparing the CONTENT (not
+# the path) also covers a workspace that generated a list identical to the
+# baked one. BAKED_ROSDEP_SOURCES mirrors the Dockerfile's
+# `ENV ROSDEP_SOURCE_PATH=/opt/rosdep-sources`.
+# (overridable so the regression test can point it at a fixture dir)
+BAKED_ROSDEP_SOURCES="${BAKED_ROSDEP_SOURCES:-/opt/rosdep-sources}"
+rosdep_list_is_workspaces() {
+    _l="${ROSDEP_SOURCE_PATH:-}/30-workspace-local.list"
+    _b="$BAKED_ROSDEP_SOURCES/30-workspace-local.list"
+    [ -s "$_l" ] || return 1
+    grep -qv '^[[:space:]]*#' "$_l" 2>/dev/null || return 1
+    # No baked list to compare against: whatever we have is the workspace's.
+    [ -f "$_b" ] || return 0
+    [ "$(cat "$_l" 2>/dev/null)" != "$(cat "$_b" 2>/dev/null)" ]
+}
+if [ -n "${ROSDEP_SOURCE_PATH:-}" ] && rosdep_list_is_workspaces; then
     echo "Workspace-local rosdep sources active ($ROSDEP_SOURCE_PATH) — refreshing cache..."
     rosdep update \
         || echo "  (rosdep update failed for root — continuing with the baked cache)"
