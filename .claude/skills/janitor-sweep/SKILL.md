@@ -425,9 +425,14 @@ rotation like any other repo — only when it falls in this run's ISO-week
 chunk (step 2). The per-project report is a *re-scoping* of findings the
 `## Projects` section already computed for that repo (§ 6), so on a run where
 the repo was not audited there is nothing to re-scope, and the report is not
-written: step 6 records `SKIPPED(project repo not in this run's chunk)`
-instead. This also covers a project root that is listed in no manifest at
-all, which the rotation therefore never sees. The prior per-project report's
+written. Step 6 records **which** of the two reasons applied:
+`SKIPPED(project repo not in this run's chunk)` when the rotation did not
+select it — which also covers a project root listed in no manifest at all,
+which the rotation therefore never sees — and
+`SKIPPED(check 2 did not audit <repo>)` when it *was* selected but check 2
+was itself `SKIPPED` or `FAILED` before auditing it. The second is a check
+that did not run, not a quiet week, and saying the first there would read as
+reassurance. The prior per-project report's
 findings carry forward unstated — a reader is pointed at that report's own
 timestamp rather than at a diff synthesized against absent data.
 
@@ -560,6 +565,24 @@ Then, in order:
    [ "$CHUNK_COUNT" -gt 0 ] || { echo "SKIPPED/FAILED per rule 4"; return; }
    CHUNK_INDEX=$(( 10#$WEEK % CHUNK_COUNT ))
    ```
+
+   Once the chunk is selected, record whether step 1a's project root repo is
+   in it — **here, where chunk membership is decided**, and independently of
+   whether check 2 later manages to audit anything:
+
+   ```bash
+   # $CHUNK_REPOS: the selected chunk, one repo name per line.
+   PROJECT_REPO_IN_CHUNK=""
+   if [ -n "$PROJECT_REPO_NAME" ] && grep -qxF "$PROJECT_REPO_NAME" <<< "$CHUNK_REPOS"; then
+       PROJECT_REPO_IN_CHUNK=1
+   fi
+   ```
+
+   Step 6 needs the two facts separately: *in the chunk* (this flag) and
+   *actually audited* (`$PROJECT_REPO_AUDITED_THIS_RUN`, set in check 2). A
+   repo that was in the chunk but whose audit never ran — because check 2
+   itself was `SKIPPED` or `FAILED` — must not be reported as "not in this
+   run's chunk", which is a different and reassuring statement.
 
 The report always lists the **full** candidate set with each repo's in/out
 status and reason, plus the chunk index and the ISO week used.
@@ -1183,10 +1206,18 @@ the write branch, immediately before the write it protects:
 PROJECT_HEALTH_STATUS="$PROJECT_ROOT_STATUS"   # 1a's answer, unless we write
 if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
     if [ -z "${PROJECT_REPO_AUDITED_THIS_RUN:-}" ]; then
-        # 1a found a project, but this week's chunk did not include it —
-        # there are no findings for it to re-scope. A report rendered from
-        # nothing would read as a project with a clean bill of health.
-        PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
+        # 1a found a project, but there are no findings for it to re-scope
+        # this run. A report rendered from nothing would read as a project
+        # with a clean bill of health. Which of the two reasons applies is
+        # stated, never collapsed into the friendlier one.
+        if [ -n "${PROJECT_REPO_IN_CHUNK:-}" ]; then
+            # In the chunk (step 2), but check 2 never reached its audit —
+            # check 2 was SKIPPED or FAILED — so the ## Projects section has
+            # nothing for this repo either.
+            PROJECT_HEALTH_STATUS="SKIPPED(check 2 did not audit $PROJECT_REPO_NAME)"
+        else
+            PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
+        fi
     else
         PROJECT_HEALTH_BODY=$(redact_text "$PROJECT_HEALTH_BODY")
         PROJECT_REPORT="$REPORT_DIR/$(date '+%Y%m%dT%H%M%S')-$$-${PROJECT_REPO_NAME}-health.md"
@@ -1771,6 +1802,8 @@ State the **per-project health outcome** on its own line, from
   layer checkout of the repo it names. Nothing is wrong
 - `<repo> has no root ROADMAP.md — no per-project report`
 - `<repo>: not in this run's chunk — no per-project report`
+- `<repo>: check 2 did not audit it — no per-project report` (it *was* in the
+  chunk; check 2's own status says why)
 - `<repo>: <report path, workspace-relative>`
 - `<repo>: FAILED(project health write: <reason>)`
 
