@@ -919,15 +919,25 @@ top would be redundant, not because diffing was skipped.
   branch that directory is the *live* one this run will also write into. Two
   sweeps running on the same host close enough together (same clone, or any
   two worktrees — `$REPORT_DIR` is anchored at the main root, step 1) can each
-  pick up the other's report, including one still being written, and call it
-  "previous". The committed-`docs/health.md` branch above cannot do this: it
-  reads an immutable commit. This is named rather than fixed — no lock, no pid
-  filtering — because the consequence is bounded: a wrong or partial prior set
-  mis-labels findings as `New`/`Resolved` for one run, the report says which
-  file it diffed against (`$PREV_SOURCE` carries the basename, pid included),
-  and the next run is correct. A sweep is a periodic single-runner job, so
-  making concurrent local runs exact is deliberately not attempted here; if it
-  ever matters, it is a change to this rule, not a lock bolted onto it.
+  pick up the other's **finished** report and call it "previous". The
+  committed-`docs/health.md` branch above cannot do this: it reads an
+  immutable commit.
+
+  What is **not** a limitation, because § 6 rules it out: picking up a report
+  that is still being written. Both local reports are written to a
+  dot-prefixed `.tmp` name in `$REPORT_DIR` and renamed into place, and no
+  glob in this skill matches that name, so a `*-sweep.md` file that this
+  lookup can see is a complete one. A half-written prior set never reaches
+  the diff.
+
+  Diffing against a concurrent run's completed report is named rather than
+  fixed — no lock, no pid filtering — because the consequence is bounded: a
+  wrong prior set mis-labels findings as `New`/`Resolved` for one run, the
+  report says which file it diffed against (`$PREV_SOURCE` carries the
+  basename, pid included), and the next run is correct. A sweep is a periodic
+  single-runner job, so making concurrent local runs exact is deliberately not
+  attempted here; if it ever matters, it is a change to this rule, not a lock
+  bolted onto it.
 
   `$PREV_SOURCE` always holds one of the template's own strings (§ Render the
   report's `**Diffed against**` line) — never the empty string, which would
@@ -1260,12 +1270,29 @@ durable output — and, being the durable output, the one place the sweep must
 not assume success:
 
 ```bash
-if ! printf '%s\n' "$REPORT_BODY" > "$REPORT"; then
+# Written to a temp name in the SAME directory, then mv'd into place: the
+# rename is atomic, so `$REPORT` either does not exist or is complete. The
+# temp name is dot-prefixed and `.tmp`-suffixed, so neither the diff-source
+# lookup (§ 5, `*-sweep.md`) nor the retention prune (§ 1) can ever match it.
+REPORT_TMP="$REPORT_DIR/.$(basename "$REPORT").tmp"
+if ! printf '%s\n' "$REPORT_BODY" > "$REPORT_TMP" || ! mv "$REPORT_TMP" "$REPORT"; then
+    rm -f "$REPORT_TMP"
     echo "FAILED(report write: could not write $(redact_text "$REPORT"))"
     # ... print the findings inline here, then stop. The run is over.
     exit 1
 fi
 ```
+
+**Why the temp-and-rename rather than a plain redirect.** `$REPORT_DIR` is
+shared by every worktree on the host (step 1), and on a default run it is
+also the directory § 5 reads its diff source from — the newest `*-sweep.md`
+in it. A plain `> "$REPORT"` makes the final filename appear empty and fill
+in over time, so a concurrent sweep's `ls -1t … | head -n 1` could pick a
+half-written report and diff against a truncated prior set. `mv` within one
+directory is a rename: the name appears only when the content behind it is
+whole. The failure handling is unchanged — a full or read-only filesystem
+fails at the `printf`, an unwritable directory at either step, and both land
+in the same terminal `FAILED(report write: …)`.
 
 A failed write (read-only filesystem, no space, an unwritable or absent
 `$REPORT_DIR`, a container whose scratchpad volume is not mounted) is
@@ -1411,7 +1438,13 @@ if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
             "$PROJECT_FINDINGS")
         PROJECT_HEALTH_BODY=$(redact_text "$PROJECT_HEALTH_BODY")
         PROJECT_REPORT="$REPORT_DIR/$FILE_TS-$$-${PROJECT_REPO_NAME}-health.md"
-        if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT"; then
+        # Same temp-and-rename as the primary report above, and for the same
+        # reason: a dot-prefixed `.tmp` name no glob in this skill matches,
+        # renamed into place so the file is never observed half-written.
+        PROJECT_REPORT_TMP="$REPORT_DIR/.$(basename "$PROJECT_REPORT").tmp"
+        if ! printf '%s\n' "$PROJECT_HEALTH_BODY" > "$PROJECT_REPORT_TMP" ||
+           ! mv "$PROJECT_REPORT_TMP" "$PROJECT_REPORT"; then
+            rm -f "$PROJECT_REPORT_TMP"
             PROJECT_HEALTH_STATUS="FAILED(project health write: could not write $(redact_text "$PROJECT_REPORT"))"
         else
             PROJECT_HEALTH_STATUS="written: $(redact_text "$PROJECT_REPORT")"
