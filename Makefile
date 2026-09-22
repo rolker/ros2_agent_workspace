@@ -232,7 +232,16 @@ ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml
 # rule run every invocation; the cmp keeps the file's MTIME unchanged unless
 # its content differs, so it only triggers the stamp when the set really moved.
 # Deliberately not .PHONY: .PHONY targets in this Makefile are published as
-# /make_* slash commands.
+# /make_* slash commands (see CLAUDE.md), and `/make_FORCE` is not a command.
+#
+# That leaves the idiom's one failure mode unguarded: a real FILE named FORCE
+# makes the target up to date, so the rule below silently stops running and
+# the add/rename/delete detection it exists for disappears with it — quietly,
+# and only for the person who has that file. Fail loudly instead.
+ifneq ($(wildcard FORCE),)
+$(error A file named 'FORCE' exists in $(CURDIR). It shadows the FORCE target that keeps $(STAMP)/rosdep-local.list current, which is how an added, renamed or deleted project rosdep.yaml is detected (#654). Remove or rename it.)
+endif
+
 FORCE:
 
 $(STAMP)/rosdep-local.list: FORCE

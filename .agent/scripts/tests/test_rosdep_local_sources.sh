@@ -519,6 +519,20 @@ rm -f "$MKS/layers/main/x_ws/src/r/rosdep.yaml"
 run_stamp_keep
 check "a deleted rosdep.yaml re-runs it"       test -f "$MKS/gen_ran"
 
+echo "=== Makefile: a stray file named FORCE must not silently disable it ==="
+# The FORCE idiom is deliberately not .PHONY (.PHONY targets in this Makefile
+# are published as /make_* slash commands), so nothing stopped a real FILE
+# named FORCE from making the target up to date — which turns off the
+# add/rename/delete detection above, silently, and only for whoever has that
+# file. The guard turns that into a parse-time error.
+: > "$MKS/FORCE"
+out="$( cd "$MKS" && make -n "$MKS/.make/rosdep-local.done" 2>&1 )"; rc=$?
+rm -f "$MKS/FORCE"
+check "a stray FORCE file stops make"      bash -c "[ $rc -ne 0 ]"
+check "it names the file and what it hides" contains "$out" "A file named 'FORCE' exists"
+check "it says why that matters"           contains "$out" "rosdep.yaml"
+check "make parses again once removed"     bash -c "( cd '$MKS' && make -n '$MKS/.make/rosdep-local.done' >/dev/null 2>&1 )"
+
 echo "=== agent-entrypoint.sh: the launch-time refresh must reach the AGENT's cache ==="
 # rosdep's cache is per-user ($HOME/.ros/rosdep/sources.cache). The entrypoint
 # runs as root and drops CMD to $TARGET_USER, so a bare `rosdep update` there
