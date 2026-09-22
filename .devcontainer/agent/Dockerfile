@@ -143,10 +143,16 @@ RUN mkdir -p "$ROSDEP_SOURCE_PATH" /opt/rosdep-local; \
 
 USER $USERNAME
 
-# Update rosdep as non-root user (the launch-time `rosdep check` in the
-# entrypoint runs under this user and needs its own populated cache).
-# Inherits ROSDEP_SOURCE_PATH from the ENV above, so this cache sees the
-# workspace-local sources too.
+# Update rosdep as non-root user: this is the cache the AGENT reads, since
+# agent-entrypoint.sh drops CMD to this user (rosdep's cache is per-user,
+# $HOME/.ros/rosdep/sources.cache). Inherits ROSDEP_SOURCE_PATH from the ENV
+# above, so this cache sees the BAKED /opt/rosdep-local sources.
+#
+# It does NOT see a bind-mounted workspace's own .rosdep/sources.list.d: those
+# are different `file://` URLs, and rosdep keys its cache by source URL. The
+# entrypoint refreshes this user's cache at launch when the mounted workspace
+# carries a non-empty local list (#654) — for both this user and root, which
+# runs the entrypoint's own rosdep check/install.
 RUN rosdep update
 
 # Entrypoint runs as root to fix volume ownership, then drops to $USERNAME

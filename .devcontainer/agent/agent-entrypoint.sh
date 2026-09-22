@@ -22,6 +22,9 @@ fi
 TARGET_USER="ros"
 TARGET_UID="$(id -u "$TARGET_USER")"
 TARGET_GID="$(id -g "$TARGET_USER")"
+# Resolved here, not at first use: step 4's rosdep cache refresh needs it too,
+# and it must be the HOME the dropped CMD will actually run with (step 6).
+TARGET_HOME="$(eval echo "~$TARGET_USER")"
 
 # ---------- 1. Fix anonymous volume ownership ----------
 # Docker creates anonymous volumes as root. Entrypoint runs as root so we
@@ -102,10 +105,27 @@ set -u
 # cache has no entry for the workspace's URLs. Refresh once, and only when
 # there is actually a non-empty local list to pick up (#654). Best-effort: an
 # offline launch keeps the baked cache rather than failing.
+#
+# TWO caches, because rosdep's cache is PER USER ($HOME/.ros/rosdep/sources.cache):
+#   - root's: this entrypoint's own `rosdep check`/`rosdep install` below run as
+#     root (apt needs root; the image has no sudo).
+#   - $TARGET_USER's: step 6 drops CMD to that user with HOME=$TARGET_HOME, and
+#     the agent's in-session `rosdep resolve`/`rosdep install` read THAT cache.
+#     Its baked copy is keyed to the image's /opt/rosdep-local/... URLs, so
+#     without this refresh an in-session resolve of a workspace-local key fails
+#     even though the root-side one succeeded. It must run AS that user (not
+#     just with HOME set) so the cache files land user-owned and writable.
+# rosdep only warns when `update` runs as root; it does not refuse.
 if [ -n "${ROSDEP_SOURCE_PATH:-}" ] && [ -s "$ROSDEP_SOURCE_PATH/30-workspace-local.list" ] \
    && grep -qv '^[[:space:]]*#' "$ROSDEP_SOURCE_PATH/30-workspace-local.list" 2>/dev/null; then
     echo "Workspace-local rosdep sources active ($ROSDEP_SOURCE_PATH) — refreshing cache..."
-    rosdep update || echo "  (rosdep update failed — continuing with the baked cache)"
+    rosdep update \
+        || echo "  (rosdep update failed for root — continuing with the baked cache)"
+    echo "  refreshing $TARGET_USER's rosdep cache (the agent runs as $TARGET_USER)..."
+    setpriv --reuid="$TARGET_UID" --regid="$TARGET_GID" --init-groups -- \
+        env HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" \
+            ROSDEP_SOURCE_PATH="$ROSDEP_SOURCE_PATH" rosdep update \
+        || echo "  (rosdep update failed for $TARGET_USER — continuing with the baked cache)"
 fi
 
 echo "Checking rosdep dependencies..."
@@ -137,7 +157,6 @@ done
 #   ~/.claude.json              — onboarding state (hasCompletedOnboarding flag)
 #   ~/.claude/settings.json     — user preferences
 #   ~/.claude/.credentials.json — Anthropic subscription auth
-TARGET_HOME="$(eval echo "~$TARGET_USER")"
 mkdir -p "$TARGET_HOME/.claude"
 if [ -f /tmp/claude-state.json ]; then
     cp /tmp/claude-state.json "$TARGET_HOME/.claude.json"

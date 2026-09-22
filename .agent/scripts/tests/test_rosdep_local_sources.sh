@@ -219,6 +219,66 @@ got="$(run_stamp 4)"
 check "a rejected rosdep.yaml (4) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
 check "a rejected rosdep.yaml leaves no stamp" contains "$got" "no-stamp"
 
+echo "=== agent-entrypoint.sh: the launch-time refresh must reach the AGENT's cache ==="
+# rosdep's cache is per-user ($HOME/.ros/rosdep/sources.cache). The entrypoint
+# runs as root and drops CMD to $TARGET_USER, so a bare `rosdep update` there
+# populates /root's cache only and an in-session resolve of a workspace-local
+# key still fails. Executes the real refresh block, sliced out of the
+# entrypoint, against stub `rosdep` and `setpriv`.
+ENTRY="$REPO_ROOT/.devcontainer/agent/agent-entrypoint.sh"
+BLOCK="$TMP/refresh_block.sh"
+sed -n '/^if \[ -n "${ROSDEP_SOURCE_PATH:-}"/,/^fi$/p' "$ENTRY" > "$BLOCK"
+check "the refresh block was found in the entrypoint" \
+    bash -c "grep -q 'rosdep update' '$BLOCK'"
+# TARGET_HOME must be resolved BEFORE the block, not at its old first use in
+# step 5 — under `set -u` a late assignment is an unbound-variable abort.
+check "TARGET_HOME is assigned before the refresh block" bash -c "
+    home_ln=\$(grep -n '^TARGET_HOME=' '$ENTRY' | head -1 | cut -d: -f1)
+    blk_ln=\$(grep -n '^if \[ -n \"\\\${ROSDEP_SOURCE_PATH:-}\"' '$ENTRY' | head -1 | cut -d: -f1)
+    [ -n \"\$home_ln\" ] && [ -n \"\$blk_ln\" ] && [ \"\$home_ln\" -lt \"\$blk_ln\" ]"
+
+STUB2="$TMP/bin2"; mkdir -p "$STUB2"
+cat > "$STUB2/rosdep" <<'EOF'
+#!/bin/bash
+echo "rosdep $1 HOME=$HOME UID=$(id -u) SRC=${ROSDEP_SOURCE_PATH:-unset}" >> "$REFRESH_LOG"
+exit 0
+EOF
+cat > "$STUB2/setpriv" <<'EOF'
+#!/bin/bash
+echo "setpriv $*" >> "$REFRESH_LOG"
+while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done
+shift
+exec "$@"
+EOF
+chmod +x "$STUB2/rosdep" "$STUB2/setpriv"
+
+ESRC="$TMP/entry_sources"; mkdir -p "$ESRC"
+ROS_HOME="$TMP/ros_home"; mkdir -p "$ROS_HOME"
+run_refresh() {
+    rm -f "$TMP/refresh.log"
+    ( uid="$(id -u)"; gid="$(id -g)"
+      export TARGET_USER=ros TARGET_UID="$uid" TARGET_GID="$gid" \
+             TARGET_HOME="$ROS_HOME" ROSDEP_SOURCE_PATH="$ESRC" \
+             REFRESH_LOG="$TMP/refresh.log"
+      PATH="$STUB2:$PATH" bash "$BLOCK" >/dev/null 2>&1 )
+    cat "$TMP/refresh.log" 2>/dev/null
+}
+
+printf '# generated\nyaml file:///ws/layers/main/a_ws/src/r/rosdep.yaml\n' \
+    > "$ESRC/30-workspace-local.list"
+log="$(run_refresh)"
+check "refreshes twice — once per cache"  eq "$(grep -c '^rosdep update' <<< "$log")" 2
+check "one refresh runs under the agent's HOME" \
+    bash -c "grep -q 'rosdep update HOME=$ROS_HOME' <<< \"\$1\"" _ "$log"
+check "that refresh is dropped to the target user via setpriv" \
+    bash -c "grep -q 'setpriv .*--reuid=' <<< \"\$1\"" _ "$log"
+check "the dropped refresh keeps ROSDEP_SOURCE_PATH" \
+    bash -c "grep -q 'rosdep update HOME=$ROS_HOME .*SRC=$ESRC' <<< \"\$1\"" _ "$log"
+
+printf '# only a comment\n' > "$ESRC/30-workspace-local.list"
+log="$(run_refresh)"
+check "a comment-only local list refreshes nothing" bash -c "[ -z \"\$1\" ]" _ "$log"
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
