@@ -454,14 +454,19 @@ rotation like any other repo — only when it falls in this run's ISO-week
 chunk (step 2). The per-project report is a *re-scoping* of findings the
 `## Projects` section already computed for that repo (§ 6), so on a run where
 the repo was not audited there is nothing to re-scope, and the report is not
-written. Step 6 records **which** of the two reasons applied:
-`SKIPPED(project repo not in this run's chunk)` when the rotation did not
-select it — which also covers a project root listed in no manifest at all,
-which the rotation therefore never sees — and
+written. Step 6 records **which** of the three reasons applied:
+`SKIPPED(project repo excluded by rotation rule <n>: <reason>)` when step 2
+excluded the repo from the rotation altogether (non-GitHub origin, no root
+`AGENTS.md`, an inaccessible optional layer) — a state no later week will
+change, so it names the remedy rather than a wait;
+`SKIPPED(project repo not in this run's chunk)` when the repo is eligible but
+this week's chunk did not select it — which also covers a project root listed
+in no manifest at all, which the rotation therefore never sees — and
 `SKIPPED(check 2 did not audit <repo>)` when it *was* selected but check 2
-was itself `SKIPPED` or `FAILED` before auditing it. The second is a check
-that did not run, not a quiet week, and saying the first there would read as
-reassurance. The prior per-project report's
+was itself `SKIPPED` or `FAILED` before auditing it. The third is a check
+that did not run, not a quiet week, and saying the second there would read as
+reassurance. Collapsing the first into the second would be worse still: it
+would report a fixable misconfiguration as a scheduling accident. The prior per-project report's
 findings carry forward unstated — a reader is pointed at that report's own
 timestamp rather than at a diff synthesized against absent data.
 
@@ -607,11 +612,32 @@ Then, in order:
    fi
    ```
 
-   Step 6 needs the two facts separately: *in the chunk* (this flag) and
+   `$CHUNK_REPOS` is built from the **survivors**, so a project root that
+   rules 2 or 3 excluded never reaches it — and "not in this run's chunk"
+   would then point the operator at waiting for a later week when the remedy
+   is a fix (onboard the repo, or accept that a non-GitHub origin is out of
+   reach). So each exclusion also records itself when the repo being excluded
+   is the project root, at the point the exclusion is decided:
+
+   ```bash
+   # In rules 2 and 3, beside each `excluded: …` the rule already emits:
+   if [ "$REPO_NAME" = "${PROJECT_REPO_NAME:-}" ]; then
+       PROJECT_REPO_EXCLUSION="excluded by rotation rule 2: non-GitHub origin"
+   fi
+   ```
+
+   The reason text is the rule's own — `non-GitHub origin`, `no root
+   AGENTS.md`, `optional layer <name>, not accessible from this host` — so the
+   per-project line and the rotation's own listing read the same way.
+
+   Step 6 needs three facts separately: *excluded, and why*
+   (`$PROJECT_REPO_EXCLUSION`), *in the chunk* (`$PROJECT_REPO_IN_CHUNK`), and
    *actually audited* (`$PROJECT_REPO_AUDITED_THIS_RUN`, set in check 2). A
    repo that was in the chunk but whose audit never ran — because check 2
    itself was `SKIPPED` or `FAILED` — must not be reported as "not in this
-   run's chunk", which is a different and reassuring statement.
+   run's chunk", which is a different and reassuring statement; and a repo the
+   rotation excluded outright must not be reported as either, which would hide
+   a remediable state behind a wait.
 
 The report always lists the **full** candidate set with each repo's in/out
 status and reason, plus the chunk index and the ISO week used.
@@ -1264,8 +1290,8 @@ artifacts are redacted above — it is built from the same
 unredacted-until-now findings text. **Redact it where it is written, not
 before the guard**: `$PROJECT_HEALTH_BODY` is rendered only on the branch
 that writes the report, so on every other path — no project configured, no
-root roadmap, project repo not in this run's chunk, which together are the
-common case — it was never assigned, and a `redact_text "$PROJECT_HEALTH_BODY"`
+root roadmap, project repo excluded from the rotation, project repo not in
+this run's chunk, which together are the common case — it was never assigned, and a `redact_text "$PROJECT_HEALTH_BODY"`
 above the guard is an unbound read that kills the sweep under `set -u` after
 its primary report has already landed. The redaction therefore sits inside
 the write branch, immediately before the write it protects:
@@ -1283,6 +1309,10 @@ if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
             # check 2 was SKIPPED or FAILED — so the ## Projects section has
             # nothing for this repo either.
             PROJECT_HEALTH_STATUS="SKIPPED(check 2 did not audit $PROJECT_REPO_NAME)"
+        elif [ -n "${PROJECT_REPO_EXCLUSION:-}" ]; then
+            # Step 2 excluded the repo from the rotation: no week will select
+            # it until the exclusion is fixed, so say which rule and why.
+            PROJECT_HEALTH_STATUS="SKIPPED(project repo $PROJECT_REPO_EXCLUSION)"
         else
             PROJECT_HEALTH_STATUS="SKIPPED(project repo not in this run's chunk)"
         fi
@@ -1882,6 +1912,8 @@ State the **per-project health outcome** on its own line, from
 - `no project configured on this checkout` — step 1a found no pointer, or no
   layer checkout of the repo it names. Nothing is wrong
 - `<repo> has no root ROADMAP.md — no per-project report`
+- `<repo>: excluded by rotation rule <n>: <reason> — no per-project report`
+  (no week will select it until the exclusion is fixed)
 - `<repo>: not in this run's chunk — no per-project report`
 - `<repo>: check 2 did not audit it — no per-project report` (it *was* in the
   chunk; check 2's own status says why)
