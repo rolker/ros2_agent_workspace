@@ -438,7 +438,7 @@ run" is not a status.
   read (`$ROOT/docs/PRINCIPLES.md`, `$ROOT/docs/decisions/`, `$ROOT/AGENTS.md`,
   `$ROOT/.agent/templates/`), or when its run ends without producing all seven
   checklist sections. A section it could not complete is `SKIPPED(<reason>)`
-  inside the audit and makes the check `FINDINGS` at worst, never `OK`. Probe
+  inside the audit and makes the check `FINDINGS` at best, never `OK`. Probe
   the inputs before reporting the check's status; do not infer it from the
   narrative.
 
@@ -878,7 +878,7 @@ reader see both numbers.
 
 | Check | Status | Detail |
 |---|---|---|
-| Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | <findings summary>. Coverage: principles X of 10 (<names when X<10>); ADRs X of 19 (<numbers when X<19>); scripts all N; templates all N; consequences-map items all N; adapters all 3; worktrees all N |
+| Workspace governance (`audit-workspace`) | OK / FINDINGS / SKIPPED(...) / FAILED(...) | <findings summary>. Coverage: principles X of Y (<names when X<Y>); ADRs X of Y (<numbers when X<Y>); scripts all N; templates all N; consequences-map items all N; adapters all 3; worktrees all N |
 | Research-digest freshness | ... | last updated <date>, <n> days. Coverage: the one digest file, read |
 
 <!-- First committed run for this repo (git show HEAD:docs/health.md fails,
