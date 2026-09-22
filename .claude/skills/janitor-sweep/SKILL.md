@@ -311,9 +311,26 @@ report-only skill that will run repeatedly:
   prune them, and a shape that matches no glob here accumulates forever:
 
   ```bash
-  ls -1t "$REPORT_DIR"/*-sweep.md  | tail -n +21 | xargs -r rm -f
-  ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f
+  prune_shape() {   # $1 = filename suffix glob, e.g. '*-sweep.md'
+      find "$REPORT_DIR" -maxdepth 1 -name "$1" -printf '%T@ %p\n' 2>/dev/null |
+          sort -rn | tail -n +21 | cut -d' ' -f2- | xargs -r -d '\n' rm -f
+  }
+  prune_shape '*-sweep.md'
+  prune_shape '*-health.md'
   ```
+
+  **An empty match is the normal case, and it must be silent.** `ls -1t
+  "$REPORT_DIR"/*-<shape>.md` fails when the glob matches nothing — the shell
+  hands `ls` the unexpanded pattern, `ls` exits 2 and prints `No such file or
+  directory`. On a checkout with no project configured, or before the first
+  per-project report is ever written, `*-health.md` matches nothing on every
+  run; under `set -o pipefail` that ends the sweep at the prune, which § 6
+  states must never happen ("a prune failure is not a sweep failure"). `find`
+  answers an empty directory with an empty list and exit 0, so the pipeline
+  is silent and succeeds. `xargs -d '\n'` is the other half: file names are
+  newline-delimited here, and the default whitespace splitting would tear a
+  path apart if `$REPORT_DIR` — anchored at whatever the main workspace root
+  is on this host — ever contained a space.
 
   Two globs, two counts, because the two shapes are written at different
   rates: a `<ts>-<pid>-<repo>-health.md` (step 6's optional per-project report) is
@@ -1419,9 +1436,15 @@ own files wrong; pruning in step 7 or 8 would skip the prune on a default run
 or on a publish failure.
 
 ```bash
-# § 1, Retention — two globs, two counts, run at the end of step 6
-ls -1t "$REPORT_DIR"/*-sweep.md  | tail -n +21 | xargs -r rm -f
-ls -1t "$REPORT_DIR"/*-health.md | tail -n +21 | xargs -r rm -f
+# § 1, Retention — two shapes, two counts, run at the end of step 6.
+# find (not a glob) so that a shape matching nothing is silent and exits 0;
+# xargs -d '\n' so a $REPORT_DIR containing a space is not split.
+prune_shape() {   # $1 = filename suffix glob, e.g. '*-sweep.md'
+    find "$REPORT_DIR" -maxdepth 1 -name "$1" -printf '%T@ %p\n' 2>/dev/null |
+        sort -rn | tail -n +21 | cut -d' ' -f2- | xargs -r -d '\n' rm -f
+}
+prune_shape '*-sweep.md'
+prune_shape '*-health.md'
 ```
 
 A prune failure is not a sweep failure: the run's record has already landed,
