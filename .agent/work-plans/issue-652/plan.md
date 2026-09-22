@@ -241,7 +241,7 @@ having been audited this run (§ 2's rotation-interaction note):
   because it is built from those same tagged lines.
 
 - **Diff source (action 2)**: best-effort against the most recent prior local
-  `.agent/scratchpad/janitor/<ts>-<project-repo-name>-health.md`, same rule
+  `.agent/scratchpad/janitor/<ts>-<pid>-<repo>-health.md`, same rule
   and same "no prior report" wording project scope already uses today (§ 5's
   Project-scope bullet: `no prior report for this repo` /
   `prior report covered a different chunk`) — this report *is* project scope,
@@ -251,7 +251,7 @@ having been audited this run (§ 2's rotation-interaction note):
   report's diff state is **inherited from that computation**, not
   recomputed — the retention-pruned local-report lookup in § 5's Project
   scope bullet already reads `.agent/scratchpad/janitor/` for the repo's own
-  prior local reports; the per-project `<ts>-<project>-health.md` files
+  prior local reports; the per-project `<ts>-<pid>-<repo>-health.md` files
   become part of that same lookup set for `$PROJECT_REPO_NAME` (they are
   local reports "for the same repo" per § 5's existing wording, so no new
   lookup logic is needed — just confirming in the skill text that this
@@ -311,7 +311,7 @@ having been audited this run (§ 2's rotation-interaction note):
 - **Retention (consequence of adding a second durable file shape)**: step 1's
   retention rule prunes `$REPORT_DIR/*-sweep.md` to the last 20 and says
   plainly that nothing else will ever prune these files. A
-  `<ts>-<repo>-health.md` matches neither that glob nor anything else, so it
+  `<ts>-<pid>-<repo>-health.md` matches neither that glob nor anything else, so it
   would accumulate forever. Extend the same rule to it, as its own line with
   its own count, since the two shapes are written at different rates (a
   per-project report only on runs where the project repo is in the chunk):
@@ -473,11 +473,12 @@ the run").
 | File | Change |
 |------|--------|
 | `.agent/scripts/manifest_fallback.sh` | Extract `manifest_bootstrap_identity()` from `manifest_config_dir()`'s inline parsing; `manifest_config_dir()` calls it internally (behavior-preserving refactor) |
-| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New `manifest_bootstrap_identity()` cases (valid pointer → four-field TSV; trailing `.git`; trailing `/`; ssh scp-form url; missing and empty pointer; `$BOOTSTRAP_URL` override) — the file that already sources `manifest_fallback.sh` and tests its internals (§ 1). Plus one `manifest_config_dir` case asserting its exit-3 diagnostic still names **both** the absent `configs/manifest` and the absent pointer (added in the round-1 review) |
-| `.claude/skills/janitor-sweep/SKILL.md` | Usage: `--publish` flag. New step 1a: resolve project root (layer checkout only, never cloned). Step 1 retention: prune `*-health.md` alongside `*-sweep.md`. Step 3 check 2: assign `$PROJECT_REPO_AUDITED_THIS_RUN`. Step 5: `--publish`-gated workspace diff source. Step 6: gate `$HEALTH_BODY` on `--publish`; add `$PROJECT_HEALTH_BODY` third artifact + its write + `FAILED(project health write: ...)`; add "Diffed against" report line. Step 7: gated on `--publish`; `## Publish outcome: not requested (--publish off)` heading on the default path. Step 8: report project-health outcome. Overview / Known limitations / Deferred: reworded per § 5 above |
+| `.agent/scripts/tests/test_resolve_repo_checkout.sh` | New `manifest_bootstrap_identity()` cases (valid pointer → four-field TSV; trailing `.git`; trailing `/`; ssh scp-form url; missing and empty pointer; `$BOOTSTRAP_URL` override) — the file that already sources `manifest_fallback.sh` and tests its internals (§ 1). Plus two `manifest_config_dir` cases asserting its exit-3 diagnostic still names **both** the absent `configs/manifest` and the pointer — one for a missing pointer (round-1 review), one for a pointer that is present but unusable (round-2 review) |
+| `.claude/skills/janitor-sweep/SKILL.md` | Usage: `--publish` flag. New step 1a: resolve project root (layer checkout only, never cloned). Step 1 retention: prune `*-health.md` alongside `*-sweep.md`. Step 3 check 2: assign `$PROJECT_REPO_AUDITED_THIS_RUN`. Step 5: `--publish`-gated workspace diff source. Step 6: gate `$HEALTH_BODY` on `--publish`; add `$PROJECT_HEALTH_BODY` third artifact + its write + `FAILED(project health write: ...)`; add "Diffed against" report line. Step 7: gated on `--publish`; `## Publish outcome: not requested (--publish off)` heading on the default path. Step 8: report project-health outcome, quoting `$PROJECT_HEALTH_STATUS` verbatim. Overview / Known limitations / Deferred: reworded per § 5 above. Round-2 review: a rotation-excluded project repo gets its own `SKIPPED(project repo excluded by rotation rule <n>: <reason>)` state (recorded in step 2, reported in steps 6 and 8); the local diff source's concurrency exposure is named in § 5; the retention prune gets its call site at the end of step 6; the two conditional assignments become `if … then … fi` |
 | `ROADMAP.md` | #636 row → `deferred` with reason; new rows for #652 and #653; confirm/add #651's row; **#635 row `planned` → `done`** (ride-along status correction, § 6); `**Health document**:` paragraph → `--publish` runs |
 | `.agent/knowledge/skill_workflows.md` | Durable-output sentence → local-by-default, `--publish`-gated commit |
 | `.agent/knowledge/principles_review_guide.md` | Consequences Map row: same wording fix + name the third (per-project) durable output and its write-failure naming |
+| `docs/design/planning_document_vocabulary.md` | Health-kind wording (kinds table, *Publish means commit, not post*, and the Routine's write-access note): the sweep's durable output is a local report by default; the committed `docs/health.md` is replaced wholesale on each `--publish` run, via PR. Design-draft edit only — no ADR promotion here (round-2 review) |
 
 ## Principles Self-Check
 
@@ -504,7 +505,7 @@ the run").
 |---|---|---|
 | `manifest_fallback.sh`'s internal structure | Nothing external calls the old inline block directly (only `manifest_config_dir()` did, and it still does, via the new function) | Yes — behavior-preserving, no external caller to update |
 | `janitor-sweep`'s durable-output shape | `skill_workflows.md`, `principles_review_guide.md` Consequences Map | Yes (§ 7) |
-| `docs/health.md`'s publish cadence (no longer every run) | `ROADMAP.md`'s Health document line ("replaces it wholesale on every workspace-scope run") — this line becomes inaccurate once publish is opt-in | Yes — added as a follow-up item below; not silently left stale |
+| `docs/health.md`'s publish cadence (no longer every run) | `ROADMAP.md`'s Health document line ("replaces it wholesale on every workspace-scope run"), **and** the health-kind wording in `docs/design/planning_document_vocabulary.md`, which defines the kind — both become inaccurate once publish is opt-in | Yes — added as a follow-up item below; not silently left stale |
 | Extracting `manifest_bootstrap_identity()` | `.agent/scripts/tests/test_resolve_repo_checkout.sh` — the file that already tests this script's internals; extracted code with no direct test is how a behavior-preserving refactor stops being one | Yes (§ 1, Files to Change) |
 | A second durable file shape under `.agent/scratchpad/janitor/` | Step 1's retention rule globs `*-sweep.md` only, so `<ts>-<repo>-health.md` files would accumulate unpruned — the one thing step 1 says nothing else will ever clean up | Yes (§ 3: retention prunes `*-health.md` to the last 20 the same way) |
 | ROADMAP.md rows for #636/#652/#653 | Nothing else references these rows by number | Yes (§ 6) |
