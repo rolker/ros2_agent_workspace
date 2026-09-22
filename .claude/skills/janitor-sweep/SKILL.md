@@ -442,10 +442,14 @@ run" is not a status.
   the inputs before reporting the check's status; do not infer it from the
   narrative.
 
-  **Relay its coverage, do not re-collect it.** `audit-workspace` ends with a
-  `### Coverage` table — one row per checklist section, `X of Y examined`
+  **Relay its coverage, do not re-collect it.** `audit-workspace`'s report
+  carries a `### Coverage` table, between its `### Summary` and `### Findings`
+  sections — one row per checklist section, with the section's
+  name, its `<kind>` token, `X of Y examined`
   (naming the items when X < Y) for the two sections that may sample and
-  `all N` for the five that never do ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
+  `all N` — or `M of N — <item>: <reason>` when a few items could not be
+  read — for the five that never do
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
   Carry that table, folded into one line, into the check's `Detail` cell
   (§ Render the report) and hold it for the run-over-run diff (§ 5), which
   keys on it. A section with no coverage row counts as `0 of Y` for the
@@ -471,6 +475,15 @@ run" is not a status.
   rate-limited, offline); a chunk that legitimately holds repos which all
   audited clean → `OK`, with a non-zero count. `Project governance | OK | 0
   repos audited` is a report this skill must never produce.
+
+  **Relay each repo's coverage too.** `audit-project`'s per-repo report
+  carries its own seven-row `### Coverage` table, near its top; carry it, folded into one clause
+  per repo, into the check's `Detail` cell alongside the checkout mode
+  (§ Render the report) and hold it for the run-over-run diff (§ 5), whose
+  project-scope gate keys on it exactly as the workspace-scope gate keys on
+  check 1's. A repo with no coverage table counts as unexamined for the diff:
+  its findings still render, but nothing from a prior run can be `Resolved`
+  against it.
 - **Check 3 — `issue-triage`** is `FAILED` when it scanned no repos (its step 1
   now carries the same empty-manifest guard as rule 1 above — a scan of zero
   repos reports no stale issues, which is not the same as there being none),
@@ -558,10 +571,13 @@ the report, so the two steps must be read together, not just this one): the
 Workspace scope renders four subsections per tier — `New`, `Resolved`,
 `Unchanged`, and the coverage-gated `Not re-examined` below — because it
 diffs against one committed `docs/health.md`.
-Project scope renders three states as a `[New/Resolved/Unchanged]`
-tag inline on each per-repo finding, because it diffs many repos against
+Project scope renders the same four states as a
+`[New/Resolved/Unchanged/Not re-examined]` tag inline on each per-repo
+finding, because it diffs many repos against
 independent, best-effort local-report history, where per-tier subsections
-spanning dozens of repos would be unreadable. The one stated exception is
+spanning dozens of repos would be unreadable. The **states** are the same in
+both scopes — the coverage gate below is the rule in both — and only the
+rendering differs. The one stated exception is
 the Projects section's "Provisional decisions" sub-list (§ Write the
 report): it is not diffed, because the row's own wording already states
 whether a decision has a review scheduled — a New/Resolved/Unchanged tag on
@@ -580,6 +596,20 @@ top would be redundant, not because diffing was skipped.
   This is the only read of the previous state in the run; nothing later
   re-reads it.
 
+  **What in that file counts as "the previous run's findings"**: every
+  finding listed under **any** of a tier's four subsections — `New`,
+  `Resolved`, `Unchanged` **and `Not re-examined`** — minus the `Resolved`
+  ones, which by definition were gone as of that run. So the prior-finding
+  set is the union of the previous file's `New`, `Unchanged` and
+  `Not re-examined` entries, across all tiers. Including `Not re-examined`
+  is the load-bearing part: an entry carried forward verbatim because its
+  section was not looked at is still an open finding, and dropping it from
+  the prior set would make it render as `New` the next time the section *is*
+  examined — resetting its age on every partial run and hiding exactly the
+  long-lived gaps this state exists to keep visible. A `Not re-examined`
+  entry that is still absent, from a section still not covered, stays
+  `Not re-examined` for as many runs as that lasts.
+
   **A miss is `Resolved` only when this run looked** ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)).
   A prior finding absent from this run's findings used to render as
   `Resolved` unconditionally, so a shallow `audit-workspace` run — 2 of 10
@@ -589,34 +619,66 @@ top would be redundant, not because diffing was skipped.
   relayed in § 3) of the audit **section the finding came from** (tier 3
   findings come from section 1, principles; ADR drift and Consequences-map
   findings from sections 2 and 5; tier 1 stale worktrees from section 7;
-  script-table and template findings from sections 3 and 4):
+  script-table and template findings from sections 3 and 4;
+  instruction-file/adapter-consistency findings from section 6 — all seven
+  sections are named here, so no section falls through to the
+  can't-determine bullet by omission):
   - Section fully covered this run (`all N`, or `X of Y` with `X == Y`) and
     the finding is absent → **`Resolved`**.
-  - Section sampled (`X of Y`, `X < Y`) and the item the finding is about
-    (a named principle, an ADR number) **is among the items examined** and
-    the finding is absent → **`Resolved`** — sampling does not block
-    resolution of the thing actually re-examined.
-  - Section sampled and the item is **not** among the items examined, or
-    the section reported `0 of Y` / `SKIPPED`, or has no coverage row →
+  - Section partially covered (`X of Y` with `X < Y`, whether a sample from
+    sections 1–2 or a never-sampling section's `M of N — <item>: <reason>`
+    shortfall) and the item the finding is about (a named principle, an ADR
+    number, a named script or template) **was covered** — it is among the
+    items the sampled section names as examined, or it is not among the
+    items the shortfall names as unread — and the finding is absent →
+    **`Resolved`**. Partial coverage does not block resolution of the thing
+    actually re-examined.
+  - Section partially covered and the item was **not** covered, or the
+    section reported `0 of Y` / `SKIPPED`, or has no coverage row →
     **`Not re-examined`**. The prior finding is carried forward verbatim
     under that subsection; nothing about it is known to have changed.
+  - **A prior finding from check 4** (research-digest freshness) has no
+    `audit-workspace` section and no coverage row in check 1's table — it is
+    workspace scope and tier 5, but it comes from a different check, whose
+    coverage is not sampled at all: check 4 reads the one digest file, whole,
+    every run. So its gate is the check's own status, not a section row: an
+    absent prior check-4 finding is **`Resolved`** when check 4 completed
+    this run (`OK` or `FINDINGS`), and **`Not re-examined`** when check 4 is
+    `SKIPPED` or `FAILED` — the digest was not read, so nothing about a prior
+    digest finding is known to have changed. Do not route check-4 findings
+    through the section bullets above or the can't-determine bullet below;
+    neither applies to them.
   - A prior finding whose section cannot be determined from its text (the
     stable key carries the check but the section is inferred from the
     finding's kind) → `Not re-examined` when *any* of check 1's sections
-    was sampled this run, `Resolved` only when all seven were fully
-    covered. Fail toward "not known to be fixed".
+    was less than fully covered this run, `Resolved` only when all seven
+    were fully covered. Fail toward "not known to be fixed".
 
   The diff key itself (`tier + check + one-line description`) is unchanged;
   what changes is what a *miss* on that key resolves to when coverage is
   partial. `Unchanged` and `New` are unaffected: a finding present in both
   runs, or only in this one, is what it is regardless of coverage.
 
-  This state is **workspace scope only**. Project scope stays three-state:
-  `audit-project`'s sections are exhaustive by construction — each
-  enumerates a discovered set (every `package.xml`, a fixed checklist) rather
-  than sampling a larger one — so its coverage rows (its own § Coverage)
-  are always `N of N`, and the precondition for `Not re-examined` never
-  occurs there.
+  **The gate is the rule in both scopes**, not a workspace-section
+  peculiarity: a prior finding renders `Resolved` only when the section it
+  came from was fully covered this run. Project scope applies the same gate
+  against `audit-project`'s own `### Coverage` table — see the Project scope
+  bullet below. What differs between the scopes is only the rendering shape
+  (four subsections here, a fourth inline tag value there), never the rule.
+
+  **Coverage is reportable, not self-verifying** — and this skill is where
+  that matters most, because this is the step that turns a self-reported
+  number into a *classification*. `audit-workspace` states the limit for
+  itself (its own § Coverage: nothing stops a run from writing
+  `principles: 10 of 10` without reading all ten); the consequence lands
+  here. An inflated coverage row silently converts a real, unexamined gap
+  into `Resolved` — the exact failure this state exists to prevent, arriving
+  by a different door. Relay the number as given (it is the audit's claim,
+  not this skill's), and treat a coverage row that is implausible against the
+  audit's own narrative — `all N` from a section whose prose describes no
+  work, a full pass from a run that reported nothing examined — as a
+  `FINDINGS` condition on that check, named in `Detail`, not as a licence to
+  resolve prior findings against it.
 
   **First run — no prior `docs/health.md` in history** (the normal case for
   this skill's very first publish, and for any repo where the file was never
@@ -636,6 +698,40 @@ top would be redundant, not because diffing was skipped.
   chunk — say so plainly (`no prior report for this repo` / `prior report
   covered a different chunk`) rather than rendering an empty diff as "no
   changes."
+
+  **A miss is `Resolved` only when this run looked** — here too
+  ([#651](https://github.com/rolker/ros2_agent_workspace/issues/651)). Read
+  the gate off `audit-project`'s `### Coverage` table for the repo in hand
+  (its own § Report Format), section by section, exactly as the workspace
+  scope reads check 1's. `audit-project` never *samples* — every section
+  enumerates a set it discovered — but that does not make its coverage always
+  `N of N`, and the scope was briefly written as if it did. Its own lines
+  admit `0 of 1 — <reason>` (an agent guide that exists but could not be
+  read), `N-1 of N — <item>: <reason>` (an item that could not be read),
+  `2 of 3 — layer: SKIPPED (no layer checkout)` (clone mode), `0 of 4 —
+  SKIPPED(<reason>)` (the planning-document probe), and `N of N packages —
+  run: M of N` (a partial `colcon test` pass). A repo audited in `layer` mode
+  last run and in `clone` mode this run drops the layer check outright —
+  resolving its prior finding would be precisely the "not looked at reads as
+  fixed" failure this issue closes, in the scope where it is likeliest to
+  happen, since checkout mode changes with the host and not with the code.
+  - Section fully covered this run (`all N`, `X of Y` with `X == Y`, or
+    `N of N packages` with no `— run: M of N` shortfall bearing on the
+    finding) and the prior finding is absent → **`[Resolved]`**.
+  - Section partially covered (`0 of 1`, `N-1 of N — <item>: <reason>`,
+    `2 of 3 — layer: SKIPPED`, or `— run: M of N` where the finding came from
+    the test run), reported `0 of Y` / `SKIPPED`, or carrying no coverage row
+    at all, and the prior finding is absent → **`[Not re-examined]`**. The
+    prior finding is carried forward verbatim with that tag; nothing about it
+    is known to have changed.
+  - A prior finding whose originating section cannot be determined from its
+    text → `[Not re-examined]` when *any* of that repo's sections was less
+    than fully covered this run, `[Resolved]` only when all seven were fully
+    covered. Fail toward "not known to be fixed", the same default the
+    workspace scope uses.
+
+  `Unchanged` and `New` are unaffected here as well: a finding present in both
+  runs, or only in this one, is what it is regardless of coverage.
 
 ### 6. Render, redact, and write the report
 
@@ -741,9 +837,11 @@ Excluded repo *names* are fine — they are already in the tracked manifests.
 Report format — **two top-level sections, `## Workspace` and `## Projects`**,
 replacing the single flat `### Check Status` table a prior revision of this
 skill used. Each carries its own check-status line and its findings grouped
-by tier (§ Classify findings into tiers), each tier further split into `New`
-/ `Resolved` / `Unchanged`, plus — workspace scope only — `Not re-examined`
-(§ Run-over-run diff). A tier with no findings this
+by tier (§ Classify findings into tiers). Both scopes carry all four diff
+states (§ Run-over-run diff); the Workspace section splits each tier into
+`New` / `Resolved` / `Unchanged` / `Not re-examined` subsections, while the
+Projects section tags each per-repo finding inline with one of the same four.
+A tier with no findings this
 run is omitted from that scope's section entirely — not rendered as an empty
 heading. Within a rendered workspace tier, `New`/`Resolved`/`Unchanged` are
 always present (empty ones say why, as the first-run note does); the
@@ -756,13 +854,19 @@ carries no publish line: the outcome is appended to the end of this file by
 
 **Two coverage grains, kept visibly apart.** The top-line **`Checks: X of 4
 completed`** counts the sweep's four checks — did each *run*. The
-`Detail` cell of each `## Workspace` row carries that check's **own**
-coverage — how much of its input it *looked at*: for `audit-workspace`, its
-seven-row `### Coverage` table folded into one line (`principles 2 of 10
-(names); ADRs 1 of 19 (0017); scripts all 58; templates all 12; …`); for
-research-digest freshness, the one file read. `4 of 4 completed` over
-`principles 2 of 10` is a complete sweep of a shallow audit, and the health
-doc must let a reader see both numbers.
+`Detail` cell of **every** check row, in both sections, carries that check's
+**own** coverage — how much of its input it *looked at*: for
+`audit-workspace`, its seven-row `### Coverage` table folded into one line
+(`principles 2 of 10 (names); ADRs 1 of 19 (0017); scripts all 58; templates
+all 12; …`); for research-digest freshness, the one file read; for
+`audit-project`, each audited repo's own seven-row `### Coverage` table,
+folded the same way, one clause per repo, naming its checkout mode and every
+section short of full — that is the data § 5's project-scope gate keys on, so
+the rollup must show it rather than a bare repo count; for `issue-triage`,
+how many of the scanned repos' issue lists were actually fetched. `4 of 4
+completed` over `principles 2 of 10`, or over `integration 2 of 3 — layer:
+SKIPPED`, is a complete sweep of a shallow look, and the report must let a
+reader see both numbers.
 
 ```markdown
 ## Janitor Sweep — <YYYY-MM-DD HH:MM ±HH:MM>
@@ -791,15 +895,25 @@ doc must let a reader see both numbers.
 #### Unchanged
 - ...
 #### Not re-examined
-- ... <!-- only when non-empty: prior findings whose audit section was
-           sampled this run and whose item was not in the sample (§ 5).
-           Carried forward verbatim; absence here is not resolution. -->
+- ... <!-- Only when non-empty (§ 5). Tier 1's findings come from section 7,
+           stale worktrees, which never samples — so this subsection is
+           almost always empty here; see tier 3 below for the case it is
+           actually for. -->
 
 ### 2. Unowned safety bugs
 (same New/Resolved/Unchanged/Not re-examined shape)
 
 ### 3. Rules that have bitten with no enforcement
 (same shape)
+#### Not re-examined
+- <prior finding, verbatim> <!-- The state's home tier: these findings come
+           from section 1 (principles), one of the two sections that may
+           sample. Example: the prior run found "principle X has no
+           enforcement"; this run examined 2 of 10 principles and X was not
+           among them, so the finding is absent from this run's findings but
+           is NOT resolved — it is carried forward verbatim here. Absence
+           from this subsection is not resolution; presence is not a new
+           finding. Rendered only when non-empty. -->
 
 ### 4. Contradictions in the record
 (same shape)
@@ -811,39 +925,43 @@ doc must let a reader see both numbers.
 
 | Check | Status | Detail |
 |---|---|---|
-| Project governance (`audit-project`) | ... | <n> repos audited |
-| Issue staleness (`issue-triage`) | ... | <n> repos scanned |
+| Project governance (`audit-project`) | ... | <n> repos audited (<n> layer, <n> clone). Coverage: <repo> governance all 6, agent guide checked, packages N of N, tests N of N (run: M of N), docs all 4, planning 4 of 4, integration 2 of 3 — layer: SKIPPED; <repo> ... — one clause per repo, naming every section short of full |
+| Issue staleness (`issue-triage`) | ... | <n> repos scanned. Coverage: <n> of <n> repos' issue lists fetched |
 
 **Publish**: report-only, not committed (project health-rollup shape not yet
 decided — § Deferred: the project-scope rollup and the trigger)
 
 Every tier below carries the same diff-state tag per finding —
-`[New/Resolved/Unchanged, or "no prior report for this repo" / "prior report
-covered a different chunk"]` — per § Run-over-run diff's "for **each scope**"
-mandate. Project scope renders it inline per finding (`- **<repo>** [tag]:
-...`) rather than as `New`/`Resolved`/`Unchanged` subsections, because unlike
+`[New/Resolved/Unchanged/Not re-examined, or "no prior report for this repo"
+/ "prior report covered a different chunk"]` — per § Run-over-run diff's "for
+**each scope**" mandate. Project scope renders it inline per finding
+(`- **<repo>** [tag]: ...`) rather than as subsections, because unlike
 the workspace scope's single committed `docs/health.md`, project-scope
 findings span many repos with independent, best-effort local-report history —
 a per-finding tag is legible where a per-tier subsection split across dozens
 of repos would not be. This is a deliberate shape difference from the
 Workspace section above, not an omission: every tier still carries run-over-run
-information, just in this scope's own shape.
+information, and the same four states, just in this scope's own shape.
+`[Not re-examined]` is the coverage-gated state (§ Run-over-run diff), keyed
+on the repo's own `audit-project` `### Coverage` table — most often a repo
+audited in `clone` mode this run whose prior finding came from a check that
+mode skips.
 
 ### 1. Work that can be lost
-- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
-  "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
+  this repo" / "prior report covered a different chunk"]: ...
 
 ### 2. Unowned safety bugs
-- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
-  "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
+  this repo" / "prior report covered a different chunk"]: ...
 
 ### 3. Rules that have bitten with no enforcement
-- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
-  "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
+  this repo" / "prior report covered a different chunk"]: ...
 
 ### 4. Contradictions in the record
-- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
-  "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
+  this repo" / "prior report covered a different chunk"]: ...
 
 **Provisional decisions with no review scheduled** (distinct labeled
 sub-list, not merged into the tier's other findings — not diffed: a
@@ -856,8 +974,8 @@ would be redundant):
   deployment` heading): "no provisional decisions found this run"
 
 ### 5. Drift
-- **<repo>** [New/Resolved/Unchanged, or "no prior report for this repo" /
-  "prior report covered a different chunk"]: ...
+- **<repo>** [New/Resolved/Unchanged/Not re-examined, or "no prior report for
+  this repo" / "prior report covered a different chunk"]: ...
 
 #### Planning Documents — <repo> (mode: layer/clone)
 
