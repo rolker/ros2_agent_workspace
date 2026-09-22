@@ -419,7 +419,7 @@ to reset stamps and force a full re-setup.
 ```bash
 make build                                       # Build all layers (auto-setup on first run)
 make test                                        # Run all tests (builds first if needed)
-make validate                                    # Validate workspace config (CI-oriented)
+make validate                                    # Validate workspace config + layer sourcing + local rosdep keys (CI-oriented)
 make dashboard                                   # Unified workspace status
 make dashboard QUICK=1                           # Quick mode (skip sync + GitHub)
 

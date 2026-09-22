@@ -217,7 +217,7 @@ make clean           # Clean build artifacts and reset stamps
 make setup-all       # Run full setup without building
 make dashboard       # Unified workspace status (worktrees, PRs, health)
 make dashboard QUICK=1  # Quick local-only mode
-make validate        # Validate workspace config (CI-oriented)
+make validate        # Validate workspace config + layer sourcing + local rosdep keys (CI-oriented)
 ```
 
 **Claude Code users**: All `.PHONY` Makefile targets (except `help`) are available as `/make_*` slash commands
