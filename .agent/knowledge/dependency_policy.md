@@ -61,6 +61,25 @@ becoming a permanent private dependency database.
 Workspace scripts never name a repo: they glob
 `layers/main/*_ws/src/*/rosdep.yaml`.
 
+### What declaring a key is trusted to do
+
+Be deliberate about merging one. A `rosdep.yaml` merged in **any** project repo
+is read by every consumer below, and each of them feeds it to a **root-level**
+`rosdep install -y`:
+
+- the **dev host**, via the generated `ROSDEP_SOURCE_PATH` — `make build`'s
+  rosdep pass installs into the machine you work on;
+- the **`ci_local` container**, where the verified environment an attestation
+  vouches for is built;
+- the **agent image bake**, where it lands in a layer every sandboxed agent
+  then runs on.
+
+So the review of a one-line `rosdep.yaml` is a review of what gets installed as
+root on three machines' worth of environment, not of a build-config detail. The
+shape rule below is what keeps that blast radius to "an apt package name from a
+reviewed repo"; it is a policy gate, and the load-bearing part is still that
+project repos are reviewed.
+
 ### The accepted shape — a rule, and it is enforced
 
 **A `rosdep.yaml` in this workspace may use exactly one form:**
