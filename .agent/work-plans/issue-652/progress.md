@@ -171,3 +171,39 @@ every commit.
 
 ### Deferred
 - The `AGENTS.md` Script Reference row for `manifest_bootstrap_identity` — Ask-First per AGENTS.md § Boundaries. Left for the operator at the publish gate; it is a one-line addition to the `manifest_fallback.sh` row, not a behaviour change.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-22 12:42 -04:00
+**By**: Claude Code Agent (Claude Opus)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-652 at `470ec23`
+**Mode**: pre-push
+**Depth**: Deep (reason: 1611 lines changed; skill/knowledge/governance override triggers)
+**Must-fix**: 2 | **Suggestions**: 7
+**Round**: 2 | **Ship**: recommended — must-fix down 3 → 2, both single-location doc edits with an obvious correction; no design or correctness question left open
+
+Round-1 verification: all 14 addressed findings are present in the diff and each does what the Implementation entry claims (`exit 1` at the primary-report write; `redact_text` moved inside the write branch; the Deferred text rewritten as what #636 must implement, with today's no-`layers/` behaviour stated and step 1a's status string no longer reused as a check status; `$PROJECT_REPO_IN_CHUNK` recorded in step 2 where chunk membership is decided, with the new `SKIPPED(check 2 did not audit <repo>)`; the exit-3 message re-composed so `manifest_config_dir` adds the missing-`configs/manifest` half on top of the extracted function's pointer half, with a regression case). The 15th (the AGENTS.md Script Reference row) is deliberately deferred to the operator and is not re-raised here. The plan's Files to Change matches the diff exactly, including the ROADMAP #635 ride-along.
+
+Tests run by the reviewer: `bash .agent/scripts/tests/test_resolve_repo_checkout.sh` → 71 passed / 0 failed; `make test-scripts` → all script suites + 220 pytest passed, exit 0.
+
+Both must-fixes are new material this round — neither is a re-opened round-1 finding. Both are places outside `SKILL.md` that the change's own consequences reach.
+
+### Findings
+- [ ] (must-fix) the per-project report is documented as `<ts>-<repo>-health.md`, but the code writes `<ts>-<pid>-<repo>-health.md` — the round-1 naming fix was applied throughout `SKILL.md` and not to the knowledge doc the same PR edits — `.agent/knowledge/principles_review_guide.md:50` (vs `.claude/skills/janitor-sweep/SKILL.md:1291`)
+- [ ] (must-fix) the planning-document vocabulary draft still states the sweep's durable output is a `docs/health.md` "replaced each run, via a pull request", which `--publish` makes false by default — the PR carries this consequence into ROADMAP.md and two knowledge docs but not into the draft that defines the health kind and is slated for ADR promotion (#637) — `docs/design/planning_document_vocabulary.md:48,275-277,332`
+- [ ] (suggestion) `SKIPPED(project repo not in this run's chunk)` also fires when the project root repo was *excluded* by step 2's rule 2/3 (non-GitHub origin, no root `AGENTS.md`) — `$PROJECT_REPO_IN_CHUNK` is tested against the post-exclusion `$CHUNK_REPOS` — and "not in this run's chunk" points the operator at waiting when the remedy is a fix — `.claude/skills/janitor-sweep/SKILL.md:602-608` (state described at 458-462)
+- [ ] (suggestion) `manifest_config_dir`'s added half reads "no configs/manifest under $root **either**", which is right for a missing pointer and misleading for a malformed one; the new regression case covers only the missing-pointer branch — `.agent/scripts/manifest_fallback.sh:169-176`, `.agent/scripts/tests/test_resolve_repo_checkout.sh:786-807`
+- [ ] (suggestion) the default workspace diff source (`ls -1t .../*-sweep.md | head -n 1`) is a new concurrency exposure for a scope that previously read an immutable commit — two runs sharing one host can each read the other's report as "previous"; not named anywhere, unlike the same caveat in the resolver's own header — `.claude/skills/janitor-sweep/SKILL.md:838-852`
+- [ ] (suggestion) step 8's per-project bullets say they state `$PROJECT_HEALTH_STATUS` "in the words the run produced", then re-word every one of them (`no-roadmap: <repo>` → `<repo> has no root ROADMAP.md`), so the report file and the conversation carry two vocabularies for the same state — `.claude/skills/janitor-sweep/SKILL.md:1880-1891` vs `404`
+- [ ] (suggestion) `[ "$PUBLISH" = "1" ] && HEALTH_BODY=$(redact_text …)` and the `&&`-chained `PROJECT_REPO_AUDITED_THIS_RUN=1` both return non-zero on their common path; the document reasons carefully about `set -u` elsewhere, so an `if … then … fi` would keep them safe under an errexit shell too — `.claude/skills/janitor-sweep/SKILL.md:1133,691-692`
+- [ ] (suggestion) the retention prune snippet (now two globs) still lives only inside step 1's exposition with no call site in the numbered steps, though it says "at the end of a run" — pre-existing shape, but the second glob makes an unrun prune costlier — `.claude/skills/janitor-sweep/SKILL.md:298-317`
+- [ ] (suggestion) the plan still names the file `<ts>-<project-repo-name>-health.md` / `<ts>-<repo>-health.md` at three places, the pre-pid-fix shape — `.agent/work-plans/issue-652/plan.md:244,254,314`
+
+### Noted, not a finding
+- Out of scope and pre-existing: step 1's manifest-fallback `case` says "Every arm is terminal" but no arm exits — the same gap this round's must-fix 2 closed at the step-6 write (`.claude/skills/janitor-sweep/SKILL.md:252-262`). Cheap to close in this PR while the pattern is in hand.
+- Deferred by the operator's call, not re-raised: the `AGENTS.md` Script Reference row for `manifest_bootstrap_identity` (`AGENTS.md:587`) — Ask-First, left for the publish gate.
+
+### Specialists
+Static analysis: `bash -n` clean on `manifest_fallback.sh` and the test file; pre-commit (incl. shellcheck) ran on every commit on this branch. Claude Adversarial: 2 passes (Lens A logic/correctness, Lens B systemic/safety), fresh context each. Copilot Adversarial: off (not passed; Premium quota exhausted for September). Local Adversarial: off (not passed). Must-fix 1 was found independently by the lead and by Lens B — cross-pass confirmed; must-fix 2 by the lead and Lens B (Lens B graded it a suggestion).
