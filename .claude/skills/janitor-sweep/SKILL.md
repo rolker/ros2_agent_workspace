@@ -101,6 +101,18 @@ in which that write failed
 ([`principles_review_guide.md`](../../../.agent/knowledge/principles_review_guide.md)),
 and this is that state. It is never "the sweep ran clean".
 
+**An append to an already-written report is its own failure, and it is not
+terminal.** Two sections are appended to `$REPORT` after step 6's write has
+succeeded: `## Project health` (§ 6) and `## Publish outcome` (7h, on both
+its branches). A `>>` can fail on its own — the filesystem filled between the
+two writes, the file was removed under the run, the volume went read-only —
+and an unchecked append would let the sweep report a section the sole
+durable record does not contain. Each append is checked, and a failure is
+`FAILED(report append: <section>: <reason>)`, stated to the operator in step
+8 alongside everything else. Unlike the fifth state it does **not** end the
+run: the report and its findings already landed, and only the named section
+is missing. The section is never described as written.
+
 **The workspace-scope commit-and-PR (§ Publish the workspace scope) is a
 sixth, separate state** — on runs that ask for it. It happens only under
 `--publish`; a default run records
@@ -1451,7 +1463,12 @@ if [ "${PROJECT_ROOT_STATUS#configured:}" != "$PROJECT_ROOT_STATUS" ]; then
         fi
     fi
 fi
-printf '\n## Project health\n\n%s\n' "$(redact_text "$PROJECT_HEALTH_STATUS")" >> "$REPORT"
+# $APPEND_FAILURES collects every failed append to the already-written
+# report, for step 8. Initialise it here, once, right after step 6's write.
+APPEND_FAILURES=""
+if ! printf '\n## Project health\n\n%s\n' "$(redact_text "$PROJECT_HEALTH_STATUS")" >> "$REPORT"; then
+    APPEND_FAILURES="FAILED(report append: ## Project health: could not append to $(redact_text "$REPORT"))"
+fi
 ```
 
 `$PROJECT_HEALTH_STATUS` is appended to the **primary** local report as its
@@ -2015,8 +2032,18 @@ with the document's top-level numbered steps.
        printf '\n## Publish outcome\n\n%s\n' "$(redact_text "$PUBLISH_LINE")" >> "$REPORT"
    else
        printf '\n## Publish outcome: not requested (--publish off)\n' >> "$REPORT"
-   fi
+   fi || APPEND_FAILURES="${APPEND_FAILURES}${APPEND_FAILURES:+; }FAILED(report append: ## Publish outcome: could not append to $(redact_text "$REPORT"))"
    ```
+
+   **Both branches are checked, and the failure is named.** The append is to
+   a file step 6 already wrote and already reported, so a `>>` that fails
+   here (filesystem filled between the two writes, the file removed under
+   the run, a volume gone read-only) leaves a report whose publish outcome
+   — the PR URL included — is simply absent. Recording that in
+   `$APPEND_FAILURES` is what keeps step 8 from telling the operator to read
+   a section the file does not carry. It is not terminal (§ The status
+   contract): the publish itself already happened or already failed, and
+   whichever it was is still stated in the conversation.
 
    On the default path the **heading itself carries the reason**, so a reader
    scanning headings sees the state without opening the section and there is
@@ -2047,12 +2074,19 @@ sections that may sample (`principles X of Y; ADRs X of Y`) so a shallow
 audit cannot either; name any `Not re-examined` entries the diff produced.
 If the local report write failed, lead with that instead and print the
 findings inline. State the workspace-scope publish outcome explicitly, using whichever
-heading 7h wrote: the PR URL on success, `FAILED(workspace publish:
+heading 7h wrote — or, if 7h's append failed, saying so and stating the
+outcome from `$PUBLISH_LINE` anyway: the PR URL on success, `FAILED(workspace publish:
 <reason>)` on failure, or `not requested (--publish off)` on a default run —
 and say which source the workspace scope diffed against (§ 5's
 `$PREV_SOURCE`), since that decides what `Resolved` meant this run. State
 plainly that project-scope findings are **not** published anywhere beyond
 the local report(s).
+
+If `$APPEND_FAILURES` is non-empty, state each of its
+`FAILED(report append: <section>: <reason>)` entries on its own line, and do
+**not** describe that section as present in the report — the run's findings
+landed, one named section did not. It never changes the headline and never
+becomes the report's own write failure (§ The status contract).
 
 State the **per-project health outcome** on its own line, **quoting
 `$PROJECT_HEALTH_STATUS` verbatim** (§ 6) — the report file and the
