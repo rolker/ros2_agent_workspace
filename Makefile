@@ -218,6 +218,28 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # embeds $*). Makefiles are re-parsed every invocation, so the wildcard
 # re-evaluates and the stamp goes stale when a rosdep.yaml is edited, added, or
 # first appears with a newly checked-out repo.
+#
+# DELETION needs more than the wildcard, though, and deletion is the DOCUMENTED
+# end of a local key's lifecycle (the upstream entry lands → delete the local
+# file). A shrinking prerequisite list never makes a stamp stale, so the
+# generated source list would keep a `yaml file://…` line for a file that no
+# longer exists. The stamp therefore also depends on a file holding the CURRENT
+# set of paths, rewritten (and so made newer than the stamp) only when that set
+# actually changes — added, renamed or removed alike.
+ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+
+# FORCE (an ordinary target with no recipe and no file behind it) makes this
+# rule run every invocation; the cmp keeps the file's MTIME unchanged unless
+# its content differs, so it only triggers the stamp when the set really moved.
+# Deliberately not .PHONY: .PHONY targets in this Makefile are published as
+# /make_* slash commands.
+FORCE:
+
+$(STAMP)/rosdep-local.list: FORCE
+	@mkdir -p $(STAMP)
+	@printf '%s\n' $(ROSDEP_LOCAL_YAMLS) > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+
 # `rosdep update` is best-effort: an offline host must not fail `make build`,
 # and the generated source list is still correct for the next online run.
 #
@@ -231,7 +253,7 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # exit 4, a project repo's rosdep.yaml rejected by the shape rules — fails the
 # build: those keys feed a root-level `rosdep install`, so a rejected file is a
 # policy violation to fix, not a condition to build past.
-$(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+$(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(STAMP)/rosdep-local.list $(ROSDEP_LOCAL_YAMLS)
 	@mkdir -p $(STAMP)
 	@rc=0; ./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT) || rc=$$?; \
 	if [ "$$rc" -eq 3 ]; then \

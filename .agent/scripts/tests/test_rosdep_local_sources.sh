@@ -352,6 +352,31 @@ got="$(run_stamp 4)"
 check "a rejected rosdep.yaml (4) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
 check "a rejected rosdep.yaml leaves no stamp" contains "$got" "no-stamp"
 
+echo "=== Makefile \$(STAMP)/rosdep-local.done: a DELETED rosdep.yaml invalidates it ==="
+# Deleting the file is the DOCUMENTED end of a local key's lifecycle. A
+# $(wildcard) prerequisite list only ever shrinks, which never makes a stamp
+# stale, so the generated source list kept a `yaml file://…` line for a file
+# that no longer existed. The stamp also depends on a file recording the
+# current SET of paths, so a removal moves it.
+mkdir -p "$MKS/layers/main/x_ws/src/r"
+printf 'k:\n  ubuntu: [p]\n' > "$MKS/layers/main/x_ws/src/r/rosdep.yaml"
+printf '#!/bin/bash\ntouch "%s/gen_ran"\nexit 0\n' "$MKS" \
+    > "$MKS/.agent/scripts/rosdep_local_sources.sh"
+chmod +x "$MKS/.agent/scripts/rosdep_local_sources.sh"
+run_stamp_keep() {
+    ( cd "$MKS" && PATH="$STUB:$PATH" STUB_UPDATE_MARKER="$TMP/rosdep_update_ran" \
+        make "$MKS/.make/rosdep-local.done" >"$TMP/mk.out" 2>&1 )
+}
+rm -f "$MKS/.make/rosdep-local.done" "$MKS/.make/rosdep-local.list" "$MKS/gen_ran"
+run_stamp_keep
+check "stamp is created with the yaml present" test -f "$MKS/.make/rosdep-local.done"
+rm -f "$MKS/gen_ran"
+run_stamp_keep
+check "an unchanged set does not re-run it"    bash -c "! [ -f '$MKS/gen_ran' ]"
+rm -f "$MKS/layers/main/x_ws/src/r/rosdep.yaml"
+run_stamp_keep
+check "a deleted rosdep.yaml re-runs it"       test -f "$MKS/gen_ran"
+
 echo "=== agent-entrypoint.sh: the launch-time refresh must reach the AGENT's cache ==="
 # rosdep's cache is per-user ($HOME/.ros/rosdep/sources.cache). The entrypoint
 # runs as root and drops CMD to $TARGET_USER, so a bare `rosdep update` there
