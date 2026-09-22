@@ -721,7 +721,7 @@ top would be redundant, not because diffing was skipped.
   (its own § Report Format), section by section, exactly as the workspace
   scope reads check 1's. `audit-project` never *samples* — every section
   enumerates a set it discovered — but that does not make its coverage always
-  `N of N`, and the scope was briefly written as if it did. Its own lines
+  `N of N`. Its own lines
   admit `0 of 1 — <reason>` (an agent guide that exists but could not be
   read — § 3's partial form), `N-1 of N — <item>: <reason>` (an item that could not be read),
   `2 of 3 — layer: SKIPPED (no layer checkout)` (clone mode), `0 of 4 —
