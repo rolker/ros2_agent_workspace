@@ -146,13 +146,25 @@ test-scripts:
 # workspace worktree and every un-bootstrapped clone, which is exactly where
 # agents work. The layer-sourcing guard needs no configs/manifest, so it has
 # something to say in that state.
+# The third check, rosdep_local_staleness_check.sh (#654), reports exit 3 for
+# SKIPPED — it could not run the isolated `rosdep update` its verdict depends
+# on (offline, no rosdep). That is not a finding, so it is printed and cleared;
+# only its 1 (a stale or unmarked local key) and 2 (usage) fail the recipe.
+# Its exit codes are distinct precisely so this accumulation can tell them
+# apart instead of failing every offline workspace.
+#
 # GNU make flattens whatever this returns to its own 2; the code is preserved
 # for a direct `./.agent/scripts/validate_workspace.py` call, not for `make`.
 validate:
 	@vrc=0; python3 ./.agent/scripts/validate_workspace.py || vrc=$$?; \
 	lrc=0; ./.agent/scripts/test_layer_sourcing.sh || lrc=$$?; \
+	rrc=0; ./.agent/scripts/rosdep_local_staleness_check.sh || rrc=$$?; \
+	if [ "$$rrc" -eq 3 ]; then \
+		echo "  (rosdep-local check SKIPPED — not a validation failure)"; rrc=0; \
+	fi; \
 	if [ "$$vrc" -ne 0 ]; then exit $$vrc; fi; \
-	exit $$lrc
+	if [ "$$lrc" -ne 0 ]; then exit $$lrc; fi; \
+	exit $$rrc
 
 # =============================================================================
 # Tier 1 — Setup chain (stamp-based dependencies)
