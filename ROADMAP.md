@@ -18,7 +18,10 @@ first one expected to, with the BizzyBoat roadmap
 
 **Health document**: [`docs/health.md`](docs/health.md), first committed
 2026-09-21 by the `janitor-sweep` skill, which replaces it wholesale on every
-workspace-scope run (see *How this roadmap stays useful*). That path is the one
+`--publish` run — the sweep is local-first as of
+[#652](https://github.com/rolker/ros2_agent_workspace/issues/652), so an
+ordinary run leaves this file alone and writes its report to the host that
+ran it (see *How this roadmap stays useful*). That path is the one
 the [planning-document vocabulary draft](docs/design/planning_document_vocabulary.md)
 fixes for it — a workspace choice, with no external convention either way, and
 deliberately under `docs/` rather than beside this file at the root.
@@ -63,8 +66,10 @@ loop — which is why it is first.*
 |---|---|---|---|
 | Planning-document vocabulary + two-root rule (draft + this roadmap) | #628 | in progress | The draft in [`docs/design/`](docs/design/planning_document_vocabulary.md); this is its first roadmap instance |
 | Conventional-path discovery in `janitor-sweep` / `audit-project` | [#634](https://github.com/rolker/ros2_agent_workspace/issues/634) | planned | Probes exactly the draft's expected-location table; graceful absence is the headline requirement |
-| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | [#635](https://github.com/rolker/ros2_agent_workspace/issues/635) | planned | Writes `docs/health.md` in each graded repo. Gated on the redaction class in #626 |
-| The trigger — weekly cloud Routine under `Janitor Sweep Agent` | [#636](https://github.com/rolker/ros2_agent_workspace/issues/636) | planned | The last step of #569, which stays open until it lands. Must first confirm the run cap and that the GitHub connection reaches every overlay repo with write access |
+| Sweep split by scope + commit-via-PR publish + run-over-run diff + finding tiers | [#635](https://github.com/rolker/ros2_agent_workspace/issues/635) | done | Merged 2026-09-21 as PR #647; first live run PR #648. Committed `docs/health.md` is now `--publish`-only (#652) |
+| The trigger — weekly cloud Routine under `Janitor Sweep Agent` | [#636](https://github.com/rolker/ros2_agent_workspace/issues/636) | deferred | Backburnered 2026-09-21 (operator direction, recorded in [#652](https://github.com/rolker/ros2_agent_workspace/issues/652)) in favour of a local health report. Parked, not cancelled: `--publish` (#652) keeps the commit-and-PR path this issue will use once unparked. Still owes the run cap and confirmation that the GitHub connection reaches every overlay repo with write access. #569 stays open until it lands |
+| Local-first sweep: `--publish` opt-in, local diff source, optional per-project health report | [#652](https://github.com/rolker/ros2_agent_workspace/issues/652) | in progress | Every run writes a local report; committing `docs/health.md` is opt-in. Health follows the roadmap: a project root with a `ROADMAP.md` gets a second local report |
+| What-next port: health-report refresh trigger + per-area ranking for parallel agents | [#653](https://github.com/rolker/ros2_agent_workspace/issues/653) | planned | Design draft first, per the issue's own framing — it is a port of an existing idea, not a new mechanism |
 | `unh_marine_autonomy`: `VISION.md` folded into README § Vision, root `ROADMAP.md`, kind markers | [unh_marine_autonomy#394](https://github.com/rolker/unh_marine_autonomy/issues/394) | planned | Filed in that repo, not here |
 | `unh_echoboats_project11`: roadmap parent line, move to root `ROADMAP.md`, health placement | [unh_echoboats_project11#492](https://github.com/rolker/unh_echoboats_project11/issues/492) | planned | Filed in that repo, not here; the move is a rename, so history is preserved |
 | Promote the vocabulary draft to an ADR | [#637](https://github.com/rolker/ros2_agent_workspace/issues/637) | planned | Gated on the reader, the sweep, and a second ROS 2 project exercising the rule |
@@ -106,6 +111,7 @@ Kept for one cycle — one sweep — then pruned out. Empty is a normal state.
 |---|---|---|
 | Staleness detectors chained into one local sweep report | [#569](https://github.com/rolker/ros2_agent_workspace/issues/569) | [PR#625](https://github.com/rolker/ros2_agent_workspace/pull/625) merged 2026-09-14. #569 itself stays open for the trigger |
 | False-green sweep across `sync` / `pull` / `validate` | [#609](https://github.com/rolker/ros2_agent_workspace/issues/609) | Closed 2026-08-24 |
+| Audit coverage as data: a `Resolved` finding must mean the run looked | [#651](https://github.com/rolker/ros2_agent_workspace/issues/651) | [PR#655](https://github.com/rolker/ros2_agent_workspace/pull/655) merged 2026-09-22. `audit-workspace` / `audit-project` now report a `### Coverage` table the sweep's diff gates on; an unexamined section carries its findings forward as `Not re-examined` rather than resolving them |
 
 ## Deferred
 

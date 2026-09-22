@@ -46,6 +46,7 @@ cleanup() { chmod -R u+rwX "$TMPDIR_ROOT" 2>/dev/null; rm -rf "$TMPDIR_ROOT"; }
 trap cleanup EXIT
 
 GIT_ID=(-c user.name=Test -c user.email=test@example.invalid)
+TAB=$'\t'
 
 # A fake workspace root whose .agent/scripts is the real one. $1 = case name.
 make_root() {
@@ -688,6 +689,152 @@ url_key_case "file:///tmp/mirror" "https://github.com/o/r.git" "file:///tmp/mirr
     "with GIT_BASE set the host is exempt — only <owner>/<repo> must agree"
 url_key_case "file:///tmp/mirror" "https://github.com/o/r.git" "file:///tmp/mirror/o/other.git" differ \
     "with GIT_BASE set a different repo still disagrees"
+
+# --- 6h4h. manifest_bootstrap_identity: the pointer is parsed in ONE place ---
+# The identity derivation (which owner/repo/branch/config_path the tracked
+# `configs/project_bootstrap.url` names) was extracted out of
+# manifest_config_dir so a caller can ask WHICH project a checkout is
+# configured for without paying for — or being failed by — a manifest clone it
+# does not need (#652). Extracted code with no direct test is how a
+# "behaviour-preserving" refactor quietly stops being one: the
+# manifest_config_dir cases above cover the happy path through the clone, and
+# these cover the parse itself, including every refusal that must NOT print a
+# half-parsed line to stdout.
+IDENTITY_CASE_N=0
+bootstrap_identity_case() {
+    # $1 = pointer file contents ("<none>" writes no pointer file at all),
+    # $2 = BOOTSTRAP_URL value ("" = unset), $3 = expected rc,
+    # $4 = expected stdout (empty on every refusal), $5 = description
+    local pointer="$1" bootstrap_env="$2" want_rc="$3" want_out="$4" desc="$5"
+    local root out rc
+    IDENTITY_CASE_N=$((IDENTITY_CASE_N + 1))
+    root=$(make_root "bootstrap_identity_$IDENTITY_CASE_N")
+    if [ "$pointer" != "<none>" ]; then
+        printf '%s\n' "$pointer" > "$root/configs/project_bootstrap.url"
+    fi
+    # The redirection lives INSIDE the substitution: on `out=$(...) 2>file`
+    # bash expands the substitution before applying the assignment's own
+    # redirection, so the reason would reach the terminal and the file would
+    # be left empty — and this helper's "a refusal states a reason" assertion
+    # would then fail on every correctly-behaving refusal.
+    out=$(
+        {
+            if [ -n "$bootstrap_env" ]; then export BOOTSTRAP_URL="$bootstrap_env"; else unset BOOTSTRAP_URL; fi
+            # shellcheck source=/dev/null
+            source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+            manifest_bootstrap_identity "$root"
+        } 2>"$TMPDIR_ROOT/stderr"
+    )
+    rc=$?
+    if [ "$rc" -ne "$want_rc" ] || [ "$out" != "$want_out" ]; then
+        fail "bootstrap identity: $desc — rc=$rc (want $want_rc), out='$out' (want '$want_out'), stderr='$(stderr_text)'"
+    elif [ "$want_rc" -ne 0 ] && [ ! -s "$TMPDIR_ROOT/stderr" ]; then
+        # A refusal with no reason on stderr is the same dead end as an empty
+        # success: the caller is told nothing it can act on.
+        fail "bootstrap identity: $desc — refused at rc $rc with no reason on stderr"
+    else
+        pass "bootstrap identity: $desc"
+    fi
+}
+
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/someowner/somerepo/main/config/bootstrap.yaml" "" \
+    0 "someowner${TAB}somerepo${TAB}main${TAB}config" \
+    "a valid pointer prints the four-field TSV"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/someowner/somerepo/jazzy/some/deep/config/bootstrap.yaml" "" \
+    0 "someowner${TAB}somerepo${TAB}jazzy${TAB}some/deep/config" \
+    "a multi-segment config path stays whole, and the branch is the segment before it"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/someowner/somerepo.git/main/config/bootstrap.yaml" "" \
+    0 "someowner${TAB}somerepo${TAB}main${TAB}config" \
+    "a trailing .git on the repo segment is stripped"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/someowner/somerepo/main/config/" "" \
+    3 "" \
+    "a pointer with a trailing / and no bootstrap.yaml tail is refused, stdout empty"
+bootstrap_identity_case \
+    "git@github.com:someowner/somerepo.git" "" \
+    3 "" \
+    "an ssh scp-form git url is refused, not guessed at — stdout empty"
+bootstrap_identity_case \
+    "https://github.com/someowner/somerepo" "" \
+    3 "" \
+    "a repo web url is refused as well — only the raw-content form is derivable"
+bootstrap_identity_case \
+    "<none>" "" \
+    3 "" \
+    "no pointer file at all → 3 with an empty stdout, never a blank identity"
+bootstrap_identity_case \
+    "" "" \
+    3 "" \
+    "an empty (whitespace-only) pointer file → 3, not a parse of the empty string"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/someowner/somerepo/main/../../etc/bootstrap.yaml" "" \
+    3 "" \
+    "a config path containing .. is refused rather than interpolated into a path"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/pointerowner/pointerrepo/main/config/bootstrap.yaml" \
+    "https://raw.githubusercontent.com/envowner/envrepo/rolling/cfg/bootstrap.yaml" \
+    0 "envowner${TAB}envrepo${TAB}rolling${TAB}cfg" \
+    "\$BOOTSTRAP_URL overrides the tracked pointer, as in setup_layers.sh"
+bootstrap_identity_case \
+    "https://raw.githubusercontent.com/pointerowner/pointerrepo/main/config/bootstrap.yaml" \
+    "not-a-url" \
+    3 "" \
+    "an unparseable \$BOOTSTRAP_URL is refused even when the pointer file is valid — the override is not silently ignored"
+
+# --- 6h4i. manifest_config_dir's exit 3 still names BOTH absent things ---
+# The extraction moved the pointer diagnostic into manifest_bootstrap_identity,
+# which can only speak about the pointer. manifest_config_dir reaches it only
+# after finding no configs/manifest either, and the operator it sends to
+# `make setup-all` needs both halves: a message about the pointer alone reads
+# as a pointer problem, for which `make setup-all` looks like the wrong remedy.
+root=$(make_root config_dir_exit3_names_both)
+rc=0
+out=$(
+    {
+        unset BOOTSTRAP_URL
+        # shellcheck source=/dev/null
+        source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+        manifest_config_dir "$root"
+    } 2>"$TMPDIR_ROOT/stderr"
+) || rc=$?
+err=$(stderr_text)
+if [ "$rc" -ne 3 ] || [ -n "$out" ]; then
+    fail "manifest_config_dir with no manifest and no pointer → rc=$rc (want 3), out='$out' (want empty)"
+elif [[ "$err" != *"configs/project_bootstrap.url"* ]] || [[ "$err" != *"configs/manifest"* ]]; then
+    fail "manifest_config_dir exit 3 names only one of the two absent things: '$err'"
+else
+    pass "manifest_config_dir exit 3 names both the missing manifest and the missing pointer"
+fi
+
+# A pointer that is PRESENT but unusable takes the same exit 3, and the added
+# half has to read correctly there too: "no configs/manifest ... either" claims
+# a second absence when the first thing was a malformed presence. Only the
+# missing-pointer branch was covered before, so the wording could regress
+# unseen on the branch operators actually hit after editing the pointer.
+root=$(make_root config_dir_exit3_malformed_pointer)
+echo "https://github.com/someowner/somerepo" > "$root/configs/project_bootstrap.url"
+rc=0
+out=$(
+    {
+        unset BOOTSTRAP_URL
+        # shellcheck source=/dev/null
+        source "$REAL_SCRIPTS_DIR/manifest_fallback.sh"
+        manifest_config_dir "$root"
+    } 2>"$TMPDIR_ROOT/stderr"
+) || rc=$?
+err=$(stderr_text)
+if [ "$rc" -ne 3 ] || [ -n "$out" ]; then
+    fail "manifest_config_dir with a malformed pointer → rc=$rc (want 3), out='$out' (want empty)"
+elif [[ "$err" != *"raw.githubusercontent.com"* ]] || [[ "$err" != *"configs/manifest"* ]]; then
+    fail "malformed-pointer exit 3 names only one of the two halves: '$err'"
+elif [[ "$err" == *"either"* ]]; then
+    fail "malformed-pointer exit 3 says 'either', which claims the pointer was absent: '$err'"
+else
+    pass "manifest_config_dir exit 3 reads correctly for a PRESENT but unusable pointer"
+fi
 
 # --- 6h5. a configs/*.repos manifest on disk is never bypassed for a clone ---
 # The early return has to recognise EVERY layout get_overlay_repos reads
