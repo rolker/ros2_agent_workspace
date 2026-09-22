@@ -117,6 +117,20 @@ zero; it is environment diversity.
   repos — it replicates hosted CI exactly and avoids relying on the agent
   image having the upstream sources' rosdep deps baked (the #520 bake covers
   layer manifests, not upstream workspaces).
+- **Repos carrying a root `rosdep.yaml` (#654)**: a project repo may declare
+  rosdep keys that have no upstream `ros/rosdistro` entry yet. `ci_local.sh`
+  overlays that file via `ROSDEP_SOURCE_PATH` before the single `rosdep
+  install`, and records it: a `+rosdep-local` steps token plus a
+  `rosdep-local: src/<repo>/rosdep.yaml via ROSDEP_SOURCE_PATH` line. An
+  environment that resolved a dependency from a repo-carried source is not the
+  same verified environment as one that resolved everything upstream, so the
+  note has to say which it was — the same reasoning as #577's `upstream-repo:`
+  and `rosdep-skip-keys:` lines. The file is validated against the workspace's
+  shape rule (list form only; no `pip`/`npm`/`gem`/`source` rules — see
+  `.agent/knowledge/dependency_policy.md`) before the container starts, and a
+  run whose `rosdep.yaml` fails that gate is refused rather than attested.
+  Like #577's, this is a **format extension only**: notes on repos without a
+  `rosdep.yaml` are byte-identical to before and their meaning is unchanged.
 - The hosted-CI speed fix (prebuilt/GHCR image, cube-style) remains worth
   doing independently — a faster, less fragile mirror is a better mirror.
 
