@@ -371,9 +371,9 @@ race window. Ran both regression suites locally and confirmed green:
 `test_worktree_create.sh` 33/33 as an unrelated-regression check).
 
 ### Findings
-- [ ] (must-fix) `worktree_remove.sh:442-443` — `if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then REGEN_RC=$?` captures `$?` from the negated `!` test, not the wrapped command's real exit status — `$?` is always 0 inside that `then` branch (empirically verified: `f(){ return 4;}; if ! f; then echo $?; fi` prints `0`). The operator-facing warning "exit $REGEN_RC — see messages above" therefore always claims "exit 0" regardless of whether the generator actually hit a lock timeout (5), shape rejection (4), conflict (6), or vanished file (7) — misleading for exactly the person the message is written to help triage. The existing test (`test_layer_removal_regen_failure_does_not_fail_removal`) only asserts the substring "regeneration exited non-zero", never the printed number, so it doesn't catch this. Fix: `"$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?` (the form `bootstrap.sh` already uses correctly) or an un-negated `if`. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
-- [ ] (must-fix) `rosdep_local_sources.sh:277-279,397-399` — the two test-only hooks (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `..._AFTER_CONFLICT`) run `rm -f "$path"` unconditionally whenever the env var is non-empty, with no confinement to a test/tmp root, no second "under test" sentinel, and no check that the path is one this run itself discovered. This script runs at root/build scope in dev shells, `make build`, `bootstrap.sh`, `worktree_remove.sh` (a new caller added by this PR), CI, and the agent-image bake — several of which can inherit env from a longer-lived parent process. An accidentally-set env var (e.g. left exported in a dev shell after running the test suite by hand) turns a normal production run into an arbitrary `rm -f` of whatever path the var holds — not scoped to rosdep.yaml files. AGENTS.md's Never section treats unapproved deletion as a hard stop; this is the same risk class in a code path, not an operator action. The code's own comment ("mirrors the ROSDEP_SOURCES_FORCE_FALLBACK precedent") doesn't hold — that existing hook only forces a non-destructive fallback branch, never deletes anything. Recommend either (a) a second gate var (e.g. also require `ROSDEP_LOCAL_SOURCES_TEST_MODE=1`), (b) restricting the deletable path to ones already in this run's own `passed_yamls`/`local_yamls` set, or (c) moving both hooks out of the production script into a thin test-only wrapper/stub instead of shipping delete capability in the file every real invocation runs. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
-- [ ] (suggestion) Exit 7 ("file vanished mid-run", described in the script's own header as a routine, transient worktree-teardown race) is treated as a hard build failure by the Makefile's `rosdep-local.done` stamp recipe (any non-zero, non-3 exit fails the recipe) but as a soft, still-usable note by `bootstrap.sh`. A `make build` racing a concurrent `worktree_remove.sh` can fail outright on something self-describedly transient/benign, even though the directory was still written correctly minus the one raced file. Not a new inconsistency — it exactly mirrors the already-shipped exit-4 precedent (same asymmetry exists today) — so not blocking this PR, but worth a follow-up issue if the transient-race framing is meant to be acted on (e.g. retry the Makefile recipe, or special-case 7 the way exit 3 already is). — Claude Adversarial / Lens A
+- [x] (must-fix) `worktree_remove.sh:442-443` — `if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then REGEN_RC=$?` captures `$?` from the negated `!` test, not the wrapped command's real exit status — `$?` is always 0 inside that `then` branch (empirically verified: `f(){ return 4;}; if ! f; then echo $?; fi` prints `0`). The operator-facing warning "exit $REGEN_RC — see messages above" therefore always claims "exit 0" regardless of whether the generator actually hit a lock timeout (5), shape rejection (4), conflict (6), or vanished file (7) — misleading for exactly the person the message is written to help triage. The existing test (`test_layer_removal_regen_failure_does_not_fail_removal`) only asserts the substring "regeneration exited non-zero", never the printed number, so it doesn't catch this. Fix: `"$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?` (the form `bootstrap.sh` already uses correctly) or an un-negated `if`. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
+- [x] (must-fix) `rosdep_local_sources.sh:277-279,397-399` — the two test-only hooks (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `..._AFTER_CONFLICT`) run `rm -f "$path"` unconditionally whenever the env var is non-empty, with no confinement to a test/tmp root, no second "under test" sentinel, and no check that the path is one this run itself discovered. This script runs at root/build scope in dev shells, `make build`, `bootstrap.sh`, `worktree_remove.sh` (a new caller added by this PR), CI, and the agent-image bake — several of which can inherit env from a longer-lived parent process. An accidentally-set env var (e.g. left exported in a dev shell after running the test suite by hand) turns a normal production run into an arbitrary `rm -f` of whatever path the var holds — not scoped to rosdep.yaml files. AGENTS.md's Never section treats unapproved deletion as a hard stop; this is the same risk class in a code path, not an operator action. The code's own comment ("mirrors the ROSDEP_SOURCES_FORCE_FALLBACK precedent") doesn't hold — that existing hook only forces a non-destructive fallback branch, never deletes anything. Recommend either (a) a second gate var (e.g. also require `ROSDEP_LOCAL_SOURCES_TEST_MODE=1`), (b) restricting the deletable path to ones already in this run's own `passed_yamls`/`local_yamls` set, or (c) moving both hooks out of the production script into a thin test-only wrapper/stub instead of shipping delete capability in the file every real invocation runs. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
+- [x] (suggestion) Exit 7 ("file vanished mid-run", described in the script's own header as a routine, transient worktree-teardown race) is treated as a hard build failure by the Makefile's `rosdep-local.done` stamp recipe (any non-zero, non-3 exit fails the recipe) but as a soft, still-usable note by `bootstrap.sh`. A `make build` racing a concurrent `worktree_remove.sh` can fail outright on something self-describedly transient/benign, even though the directory was still written correctly minus the one raced file. Not a new inconsistency — it exactly mirrors the already-shipped exit-4 precedent (same asymmetry exists today) — so not blocking this PR, but worth a follow-up issue if the transient-race framing is meant to be acted on (e.g. retry the Makefile recipe, or special-case 7 the way exit 3 already is). — Claude Adversarial / Lens A
 
 ### Round 3 context
 Two fresh-context adversarial passes (Lens A: logic/correctness; Lens B:
@@ -429,3 +429,92 @@ before pushing. Not ready to ship as-is — not because the feature work is
 wrong, but because the two new findings are in the exact class of thing
 (misleading failure diagnostics, unconfined delete capability) this
 workspace's own Quality Standard calls out as not-a-nit.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-23 13:59 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Branch**: feature/issue-659 at `b31bbd3`
+**Addressed**: the owner's binding "Pre-push round 3 decision" comment on issue #659 (2026-09-23 13:52 -04:00), which resolved Local Review (Pre-Push) round 3's two must-fix findings and one suggestion (When 2026-09-23 13:43 -04:00, SHA `efd2ade`)
+**Commits**: b3c7c3e, 9801e44, e81a00b, b31bbd3
+
+### Changes
+- `.agent/scripts/rosdep_local_sources.sh`: `ROSDEP_LOCAL_SOURCES_TEST_VANISH`
+  and `..._TEST_VANISH_AFTER_CONFLICT` no longer `rm -f` anything. Each hook
+  now checks whether its named path is one of this run's own shape-gate-passed
+  discovered files (`passed_yamls`) — if not, it is a no-op with a stderr note
+  ("is not one of this run's own discovered files"); if so, the path is
+  recorded and the run *simulates* it as missing at its checkpoint instead of
+  deleting it. The conflict-check hook's simulated paths are passed to the
+  conflict-detection Python subprocess via a new
+  `ROSDEP_LOCAL_SOURCES_SIMULATE_VANISH` env var; the subprocess treats a
+  listed path as unreadable without ever opening it, reporting it identically
+  to a real read failure (`UNREADABLE`). The publish-time hook's simulated
+  path is checked directly in the existing `[ -f "$yaml" ]` publish-loop
+  recheck. Script header and the two inline hook comments rewritten to
+  describe simulation, not deletion.
+- `Makefile`: the `rosdep-local.done` stamp recipe gained an
+  `elif "$$rc" -eq 7` branch (ordered before the general `-ne 0` fail
+  branch) that prints a note and leaves the stamp stale, exactly mirroring
+  the existing exit-3 handling — a vanished-file race is, by the script's
+  own header, transient and self-describedly not a build failure. Exits 4
+  and 6 are unchanged and still fail the recipe. Comment block above the
+  recipe updated to describe the new branch.
+- `AGENTS.md`: the `rosdep_local_sources.sh` Script Reference row updated —
+  the test-hook description now says "simulate ... never delete it", and a
+  new sentence documents the Makefile's softened exit-7 handling.
+- `.agent/scripts/worktree_remove.sh`: replaced
+  `if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then REGEN_RC=$?`
+  (which captured `$?` from the negated `!` test — always 0 — not the
+  wrapped command's real exit status) with
+  `REGEN_RC=0; "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?`,
+  the same `cmd || rc=$?` form `bootstrap.sh` already used correctly
+  (required here too since `set -e` is active in this script).
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: the two round-2
+  vanish sections and both precedence tests gained a
+  "the hook never deletes — the fixture file still exists" assertion
+  (four call sites). A new section exercises the ignored-path case: a hook
+  target outside this run's own discovery set exits 0, prints the ignore
+  note, resolves the real file normally, and leaves the out-of-scope path
+  untouched. The Makefile stamp section gained exit-7 (soft, retries) and
+  exit-6 (still hard-fails) cases alongside the existing exit-3/exit-4 ones.
+- `.agent/scripts/tests/test_worktree_remove.sh`:
+  `test_layer_removal_regen_failure_does_not_fail_removal` now asserts the
+  warning names the stub's actual exit code ("exit 5 — see messages
+  above"), which the pre-fix `$?`-after-`!` bug would have failed (it
+  always printed "exit 0" regardless of the stub's real exit code).
+- `.agent/work-plans/issue-659/plan.md`: added an r5 revision section
+  recording the round-3 decision, the implementation, and test counts;
+  no Files-to-Change rows needed updating (all touched files were already
+  listed from earlier rounds).
+
+### Test results
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: **185 passed, 0
+  failed** (was 171; +14 across the hook-simulation and Makefile exit-7/6
+  cases).
+- `.agent/scripts/tests/test_worktree_remove.sh`: **5 passed, 0 failed**
+  (unchanged count — same 3 round-2 cases, one strengthened with the
+  exit-code assertion).
+- `.agent/scripts/tests/test_worktree_create.sh`: **33 passed, 0 failed**
+  (unchanged — no target file touched, re-run to confirm no regression).
+- All 4 commits' pre-commit hooks (including shellcheck) passed at commit
+  time.
+
+### Deviations from the decision
+None — implemented exactly as decided: test hooks simulate rather than
+delete (scoped to this run's own discovered files, with an ignore note for
+anything else), the Makefile stamp softens exit 7 like exit 3, and
+`worktree_remove.sh` captures the regen's real exit code via `|| rc=$?`.
+
+### Actions
+- [x] must-fix: `worktree_remove.sh`'s `$?`-after-`!` exit-code capture bug
+      fixed with `cmd || REGEN_RC=$?` — `.agent/scripts/worktree_remove.sh:441-443`
+- [x] must-fix: the two test-only vanish hooks in `rosdep_local_sources.sh`
+      now simulate rather than delete, scoped to the run's own discovered
+      files — `.agent/scripts/rosdep_local_sources.sh:270-311,428-450`
+- [x] suggestion: exit 7 softened to a note-and-retry in the Makefile
+      stamp recipe, matching exit 3's treatment — `Makefile`
+
+### Next step
+Lifecycle: **Implementation** → **review-code** (re-review the fixes, pre-push round 4)
