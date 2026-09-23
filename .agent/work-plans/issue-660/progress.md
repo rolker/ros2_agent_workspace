@@ -20,3 +20,15 @@ issue: 660
 - [ ] Treat `_resolve_work_plans_dir.sh` / `_resolve_default_branch.sh` as net-new shared helpers in this workspace (no existing equivalent — `check_branch_updates.sh` resolves the default branch inline today); scope the port to what the cross-model scripts need, and do not fold in a repo-wide refactor of existing inline resolvers into the new helpers.
 - [ ] Re-verify the port table's script contents against `~/agent_workspace` `main` at plan/implementation time rather than this review's snapshot (`48b0d82`, "Merge pull request #341 from rolker/feature/issue-320") — the issue's own follow-up comment notes the source was still moving as of 2026-09-22.
 - [ ] Decide design point 3 (new step 5g vs. replacing 5e's body) — recommend **5g** (new step): 5e's Copilot-specific machinery (skip-reasons, untrusted-PR safety gate, `--allow-all-tools` security note) doesn't generalize cleanly to a `--agents gemini,codex,copilot` call, and keeping them separate avoids destabilizing the working Copilot path.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-23 14:42 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Plan**: `.agent/work-plans/issue-660/plan.md` at `9ceaf11`
+**Branch**: feature/issue-660 at `9ceaf11`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready.
