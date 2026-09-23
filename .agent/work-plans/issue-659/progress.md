@@ -229,3 +229,25 @@ named in the issue (`unh_marine_autonomy#397`'s rosdep.yaml).
       never false-include — so it cannot reopen the security gap this
       round exists to close; not trivially fixable within `--porcelain`'s
       newline-delimited format) — `.agent/scripts/_worktree_helpers.sh:163-176`
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-23 13:13 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-659 at `86d779c`
+**Mode**: pre-push
+**Depth**: Deep (reason: ~490 changed lines across the script/test set, override-trigger files Makefile and AGENTS.md, and a security-relevant trust-check function feeding a host-shared rosdep source path)
+**Must-fix**: 1 | **Suggestions**: 1
+**Round**: 2 | **Ship**: recommended — must-fix count held at 1 (not rising vs. round 1), the fix is a precise mechanical existence-recheck, not a design question
+
+### Findings
+- [ ] (must-fix) `wt_is_registered`'s round-1 rewrite is verified sound (independently re-derived and empirically re-tested by both adversarial passes: git-common-dir identity + main repo's own `worktree list --porcelain` correctly rejects a rogue standalone repo and a worktree of an unrelated repo) — no new finding on it, confirming the round-1 must-fix is genuinely fixed — `.agent/scripts/_worktree_helpers.sh:157-231`
+- [ ] (must-fix) A file that passes the shape gate into `passed_yamls` can be deleted before the final publish loop (routine now that worktree teardown races feed this generator, not just a theoretical layers/main race) — the conflict-detection Python subprocess's bare `except Exception: continue` on a later read failure silently treats it as "declares no keys" rather than excluding it, and the publish loop at the end writes `yaml file://<path>` for every `passed_yamls` entry not explicitly excluded, with no re-check that the file still exists. A worktree removed between the shape-gate pass and publish lands a dangling source line in the host-shared `ROSDEP_SOURCE_PATH`, which every `rosdep install -y` on the host (make build, ci_local, agent-image bake) consults until the next regeneration — Claude Adversarial / Lens B — `.agent/scripts/rosdep_local_sources.sh:235-246,270-282,327-334`
+- [ ] (suggestion) Conflict-detection canonicalization sorts each OS's package list but doesn't dedupe first, so an accidental in-file duplicate (`ubuntu: [foo, foo]`) canonicalizes differently from a clean `ubuntu: [foo]` declared elsewhere for the same key — two semantically-identical declarations could spuriously exit 6 as a conflict. Low likelihood, easy fix (`sorted(set(pkgs))`) — Claude Adversarial / Lens A — `.agent/scripts/rosdep_local_sources.sh:~287`
+
+### Round 2 context
+Round 1's must-fix (`wt_is_registered` fail-open on a rogue standalone repo) is CONFIRMED FIXED — both fresh-context adversarial passes independently re-derived and empirically re-tested the two-check identity mechanism (git-common-dir match + main repo's own worktree registry) against the same adversarial scenarios and found it sound, with no way to make it wrongly admit an untrusted directory. The two round-1 deferred suggestions (YAML alias-bomb DoS, `--porcelain` embedded-newline misparse) were not re-raised and remain accepted low-priority limitations per round 1's own assessment.
+
+The new must-fix is a distinct issue from round 1's, surfaced only by Lens B's focus on concurrency under the widened discovery set: #659 turns worktree churn (routine create/remove by concurrent agent sessions) into content feeding a directory every build on the host consults, which makes a shape-gate-to-publish TOCTOU gap a realistic failure mode rather than a theoretical one.
