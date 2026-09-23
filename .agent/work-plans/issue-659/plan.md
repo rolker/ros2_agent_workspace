@@ -111,6 +111,36 @@ Stale/abandoned worktree persistence (Finding 3) is now addressed directly by
 decision 1 above (unregistered ⇒ excluded), so it is no longer an open
 consequence to merely document.
 
+## Revision (r3) — pre-push review must-fix (address-findings, 2026-09-23)
+
+The pre-push `review-code` pass (Local Review round 1) found decision 1's
+"Mechanism chosen" above incomplete: `git -C <pkg_dir> worktree list
+--porcelain`, run from the discovered directory itself, proves only that
+`<pkg_dir>` is *some* live git repo whose own registry lists itself —
+trivially true for ANY standalone git repo, worktree or not, not just a
+genuine linked worktree of the corresponding `layers/main` repo. A
+rogue/coincidental standalone repo placed at the worktree path shape would
+have passed this check and had its `rosdep.yaml` silently merged into the
+host-shared `ROSDEP_SOURCE_PATH`.
+
+`wt_is_registered` now takes the corresponding `layers/main/<ws>/src/<pkg>`
+repo as a second argument (computed by `wt_discover_local_rosdep_yamls` from
+the worktree path's own layer/package basenames) and requires BOTH: (a) the
+discovered checkout shares that repo's `git rev-parse --path-format=absolute
+--git-common-dir` (the identity anchor the r2 mechanism note argued was
+unnecessary — it turned out to be exactly the missing check), and (b) that
+repo's OWN `worktree list --porcelain`, queried from the main repo rather
+than from the discovered directory, still names it. A worktree path whose
+corresponding `layers/main` repo does not exist at all (a stale path
+outliving a rename/removal of the main repo — the case the #659 checkpoint
+asked to be decided explicitly) is also excluded, fail-closed, with its own
+named reason distinct from "not registered".
+
+New tests: a rogue standalone repo at the worktree path shape (excluded,
+even though its own `worktree list` trivially lists itself) and a worktree
+with no corresponding `layers/main` repo (excluded, "no corresponding ...
+repo exists"). Full suite: 154 passed, 0 failed.
+
 ## Approach
 
 1. **Extend discovery in `rosdep_local_sources.sh`.** Add a second glob,
@@ -250,12 +280,12 @@ consequence to merely document.
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/_worktree_helpers.sh` | New shared helper: `wt_is_registered <dir>` (git-worktree registration check, revision r2 decision 1) and `wt_discover_local_rosdep_yamls <root_dir>` (the two-glob, symlink-skipping, registration-filtering discovery walk, shared verbatim by the generator and the staleness check so their key sets can never drift apart) |
+| `.agent/scripts/_worktree_helpers.sh` | New shared helper: `wt_is_registered <dir> <main_repo_dir>` (git-worktree registration check against the SPECIFIC corresponding `layers/main` repo — git-common-dir identity + that repo's own worktree registry; revision r2 decision 1, revised r3 per the pre-push must-fix) and `wt_discover_local_rosdep_yamls <root_dir>` (the two-glob, symlink-skipping, registration-filtering discovery walk, shared verbatim by the generator and the staleness check so their key sets can never drift apart; computes each worktree's corresponding `layers/main` path and fails closed with a named reason when it doesn't exist) |
 | `.agent/scripts/rosdep_local_sources.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; key-conflict detection pass; new exit code 6; header-comment update (discovery + exit codes) |
 | `.agent/scripts/rosdep_local_staleness_check.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; header-comment note |
 | `.agent/scripts/bootstrap.sh` | New `elif [ "$BOOTSTRAP_GEN_RC" -eq 6 ]` branch mirroring the existing exit-4 branch (revision r2 decision 2) |
 | `Makefile` | `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard, feeding both the direct prerequisite and the `FORCE`-diffed `rosdep-local.list` deletion/rename detection; comment reconciling symlink-following with decision 3 |
-| `.agent/scripts/tests/test_rosdep_local_sources.sh` | New cases: worktree-only discovery (registered checkout), deregistered/leftover worktree exclusion, symlinked-package skip, symlinked-layer skip, main-vs-worktree conflict, worktree-vs-worktree conflict, identical-declaration dedupe, shape-vs-conflict precedence, Makefile wildcard grep guard, staleness-check worktree glob |
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` | New cases: worktree-only discovery (registered checkout), deregistered/leftover worktree exclusion, rogue-standalone-repo exclusion (r3), missing-corresponding-main-repo exclusion (r3), symlinked-package skip, symlinked-layer skip, main-vs-worktree conflict, worktree-vs-worktree conflict, identical-declaration dedupe, shape-vs-conflict precedence, Makefile wildcard grep guard, staleness-check worktree glob |
 | `AGENTS.md` | `rosdep_local_sources.sh` Script Reference row: document worktree discovery, the registration/symlink filters, and exit code 6; note the same for `rosdep_local_staleness_check.sh`'s row and `bootstrap.sh`'s Environment Setup mention if their own discovery/exit-code documentation needs it |
 
 ## Principles Self-Check
