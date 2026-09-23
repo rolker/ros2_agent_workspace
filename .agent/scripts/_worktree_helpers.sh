@@ -136,6 +136,111 @@ extract_gh_slug() {
     fi
 }
 
+# Check whether `dir` is still a git worktree that git's OWN worktree
+# registry recognizes for its repo (main checkout or any linked worktree)
+# (#659). Fails closed: any git failure — not a git checkout at all, a
+# deregistered admin dir behind a dangling `.git` gitdir pointer (the shape a
+# merge_pr.sh exit-3 worktree-removal failure or an interrupted removal
+# leaves), an unreadable `worktree list` — counts as "not registered", and
+# the caller should EXCLUDE the directory rather than include it.
+#
+# `git worktree list` enumerates every worktree of the repository (main +
+# linked) regardless of which one it is invoked FROM, so running it from
+# `dir` itself is sufficient — there is no need to separately locate the
+# repo's main checkout. This also collapses two checks into one command: if
+# `dir`'s `.git` gitdir pointer can't be resolved (its admin directory under
+# the main checkout's `.git/worktrees/<name>` was removed), the command
+# itself fails rather than merely omitting `dir` from its output — "is this a
+# live git checkout at all" and "is it still registered" fail the same way.
+#
+# Usage: if wt_is_registered "$dir"; then ... fi
+wt_is_registered() {
+    local dir="$1"
+    local real_dir
+    real_dir="$(CDPATH='' cd -- "$dir" 2>/dev/null && pwd -P)" || return 1
+
+    local list
+    list="$(git -C "$dir" worktree list --porcelain 2>/dev/null)" || return 1
+
+    local line path
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*)
+                path="${line#worktree }"
+                # Resolve for a like-for-like compare: `worktree list` may
+                # print the path in a different (but equivalent) form.
+                path="$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P)" || continue
+                [ "$path" = "$real_dir" ] && return 0
+                ;;
+        esac
+    done <<< "$list"
+    return 1
+}
+
+# Discover every project repo's root rosdep.yaml under BOTH layers/main and
+# registered layer worktrees (#659). Prints one absolute path per line
+# (unsorted — callers sort as needed); "Note:" lines for a skipped worktree
+# entry go to stderr, never stdout.
+#
+# layers/main is globbed unconditionally, exactly as before #659. Under
+# layers/worktrees/*, a `*_ws` directory or a `src/*` package entry that is a
+# SYMLINK is skipped, following the wt_layer_* convention above:
+# worktree_create.sh symlinks every sibling package not in the worktree's own
+# --packages, and every non-target layer wholesale, straight back to
+# layers/main — walking through those transparently (bash's `*` glob follows
+# symlinked directory components) would rediscover layers/main content a
+# second time under a different path, once per active worktree that happens
+# to include that layer/package.
+#
+# A surviving package directory's rosdep.yaml is admitted only when
+# wt_is_registered confirms git still knows about that worktree; otherwise
+# it is skipped with a named reason (never silently included — see
+# wt_is_registered above).
+#
+# Requires `shopt -s nullglob` to already be set in the calling shell (every
+# caller sets it before its own glob use; this function relies on that
+# rather than toggling the option itself, to avoid a surprising global
+# side effect from a plain function call).
+#
+# Usage: wt_discover_local_rosdep_yamls "$root_dir"
+wt_discover_local_rosdep_yamls() {
+    local root_dir="$1"
+    local yaml
+
+    for yaml in "$root_dir"/layers/main/*_ws/src/*/rosdep.yaml; do
+        echo "$yaml"
+    done
+
+    local wt_dir ws_dir src_dir pkg_dir
+    for wt_dir in "$root_dir"/layers/worktrees/*; do
+        [ -d "$wt_dir" ] || continue
+
+        for ws_dir in "$wt_dir"/*_ws; do
+            [ -d "$ws_dir" ] || continue
+            [ -L "$ws_dir" ] && continue  # skip symlinked layers
+
+            src_dir="$ws_dir/src"
+            [ -d "$src_dir" ] || continue
+
+            for pkg_dir in "$src_dir"/*; do
+                [ -d "$pkg_dir" ] || continue
+                [ -L "$pkg_dir" ] && continue  # skip symlinked packages
+
+                yaml="$pkg_dir/rosdep.yaml"
+                [ -f "$yaml" ] || continue
+
+                if wt_is_registered "$pkg_dir"; then
+                    echo "$yaml"
+                else
+                    echo "Note: '$yaml' skipped — '$pkg_dir' is not a" \
+                         "git-registered worktree (leftover or deregistered" \
+                         "directory)." >&2
+                fi
+            done
+        done
+    done
+}
+
 # Find the most recent skill worktree matching a skill name.
 # Skill worktree dirs are named: skill-{REPO_SLUG}-{SKILL}-{TIMESTAMP}
 # Usage: path=$(find_worktree_by_skill "$base_dir" "$skill_name" ["$repo_slug"])
