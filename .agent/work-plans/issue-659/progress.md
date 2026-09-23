@@ -518,3 +518,78 @@ anything else), the Makefile stamp softens exit 7 like exit 3, and
 
 ### Next step
 Lifecycle: **Implementation** → **review-code** (re-review the fixes, pre-push round 4)
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-23 14:04 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: approved
+
+**Branch**: feature/issue-659 at `d5ab0c8`
+**Mode**: pre-push
+**Depth**: Deep (reason: ~1128 lines changed across the script/test set, plus override-trigger files Makefile and AGENTS.md, plus a security-relevant worktree-trust-check function feeding a host-shared rosdep source path)
+**Must-fix**: 0 | **Suggestions**: 0
+**Round**: 4 | **Ship**: recommended — no must-fix findings; both independent adversarial passes and this reviewer's own full re-read confirm all three round-3 fixes hold and found nothing new
+
+### Round 4 verification of round 3's must-fixes and suggestion
+Independently re-verified, by direct reading of the diff and both regression
+suites (185/185 in `test_rosdep_local_sources.sh`, 5/5 in
+`test_worktree_remove.sh`, both re-run locally), plus two fresh-context
+adversarial passes:
+- `worktree_remove.sh:441-443` — `REGEN_RC=0; "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?`
+  correctly captures the wrapped command's real exit status (no more
+  `$?`-after-`!`). `test_worktree_remove.sh`'s
+  `test_layer_removal_regen_failure_does_not_fail_removal` asserts the
+  literal "exit 5" from a stub, guarding against regression to the old bug.
+- `rosdep_local_sources.sh`'s two test-only hooks
+  (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `..._AFTER_CONFLICT`) no longer `rm`
+  anything — each only simulates a named path as missing at its checkpoint,
+  and only when that path is one of the run's own shape-gate-passed
+  discovered files (`passed_yamls`); an out-of-scope path is a no-op with a
+  stderr note. Verified with the dedicated "ignored path" test section.
+- Makefile's `rosdep-local.done` stamp recipe treats exit 7 like exit 3
+  (note printed, stamp left stale, build not failed) — verified against the
+  script's own header description of exit 7 as a transient, self-describedly
+  benign race.
+
+### Findings
+- [ ] No issues found. LGTM.
+
+### Specialist notes
+- **Claude Adversarial / Lens A** (logic & correctness): read `_worktree_helpers.sh`,
+  `rosdep_local_sources.sh` in full, `rosdep_local_staleness_check.sh`,
+  `bootstrap.sh`'s exit-code switch, `worktree_remove.sh`, the Makefile
+  stamp recipe, and both test files in full — independently re-derived and
+  re-tested all three round-3 fixes as sound. No new findings. One purely
+  cosmetic observation (not a finding): `HAD_ROSDEP_YAML` in
+  `worktree_remove.sh` is set from a raw `[ -f ... ]` check without
+  re-verifying `wt_is_registered`, but the package being checked is always
+  the worktree currently being torn down, so no incorrect result was
+  constructible — at most a harmless extra regeneration call.
+- **Claude Adversarial / Lens B** (systemic & safety): read the same file
+  set with focus on the trust-check function, the simulate-only hooks, and
+  the flock/atomic-swap concurrency mechanism (unchanged by this diff). No
+  new findings; confirmed the exit-7-as-soft-retry Makefile handling is
+  safe (the published directory is always internally consistent — only the
+  stamp is left stale) and noted a pre-existing, non-blocking asymmetry
+  (rosdep's cache isn't refreshed on exit 7, same as exit 3, a staleness
+  window rather than a safety issue).
+- **Governance / Plan Drift** (this reviewer, lead pass): owner's three
+  binding decision comments on issue #659 (plan checkpoint, round 2, round 3)
+  all correctly implemented; plan.md's Files-to-Change table matches the
+  actual diff with no drift; AGENTS.md's two Script Reference rows
+  (`rosdep_local_sources.sh`, `worktree_remove.sh`) correctly reflect the
+  final behavior (exit 6/7, test-hook simulation semantics, Makefile exit-7
+  softening, regen-on-removal contract). No governance concerns.
+- **Static analysis**: pre-commit's shellcheck ran clean at commit time on
+  every touched file (per the Implementation entries above); a standalone
+  `shellcheck` binary was not available in this review's shell to re-run
+  independently, so this round relies on the commit-time hook rather than a
+  fresh invocation.
+
+### Convergence note
+This is round 4 of a narrow infra fix (rosdep.yaml discovery + a TOCTOU
+race + an exit-code bug, all previously found and now fixed). No
+must-fix or suggestion-level findings survived three independent fresh
+reads (two adversarial sub-agents plus this lead pass) against the same
+code. Shippable as-is.
