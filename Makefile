@@ -270,16 +270,26 @@ $(STAMP)/rosdep-local.list: FORCE
 # yet, and the same condition bootstrap.sh treats as a note. The stamp is then
 # deliberately NOT touched, so the next `make build` retries once rosdep is
 # initialized (the prerequisite list would otherwise still be up to date and
-# the generator would never run again). Any OTHER non-zero status — notably
-# exit 4, a project repo's rosdep.yaml rejected by the shape rules — fails the
-# build: those keys feed a root-level `rosdep install`, so a rejected file is a
-# policy violation to fix, not a condition to build past.
+# the generator would never run again). Exit 7 (#659 round-3 pre-push
+# review — one or more discovered rosdep.yaml files vanished mid-run, e.g. a
+# `worktree_remove.sh` racing this generator) is treated the SAME way: the
+# script's own header describes it as a transient, single-file race whose
+# remedy is "re-run; the file may still be there", so it is a note, not a
+# build failure, and the stamp is left stale so the next `make build` retries.
+# Any OTHER non-zero status — notably exit 4, a project repo's rosdep.yaml
+# rejected by the shape rules, or exit 6, a genuine cross-file key conflict —
+# fails the build: those are policy violations to fix, not conditions to
+# build past.
 $(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(STAMP)/rosdep-local.list $(ROSDEP_LOCAL_YAMLS)
 	@mkdir -p $(STAMP)
 	@rc=0; ./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT) || rc=$$?; \
 	if [ "$$rc" -eq 3 ]; then \
 		echo "  (workspace-local rosdep sources not generated — rosdep is not"; \
 		echo "   initialized; run .agent/scripts/bootstrap.sh. Using system defaults.)"; \
+	elif [ "$$rc" -eq 7 ]; then \
+		echo "  (workspace-local rosdep sources partially generated — one or more"; \
+		echo "   rosdep.yaml files vanished mid-run, typically a worktree removal"; \
+		echo "   racing this build; transient, will retry on the next 'make build'.)"; \
 	elif [ "$$rc" -ne 0 ]; then \
 		exit $$rc; \
 	else \
