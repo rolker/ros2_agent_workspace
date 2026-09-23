@@ -28,6 +28,35 @@ contains() { case "$1" in *"$2"*) return 0;; *) return 1;; esac; }
 lacks()    { case "$1" in *"$2"*) return 1;; *) return 0;; esac; }
 eq() { [ "$1" = "$2" ]; }
 
+# ---- worktree fixture helpers (#659) ----------------------------------------
+# The registration check (wt_is_registered) needs a GENUINE git worktree to
+# inspect — a plain directory can't exercise it. These build a throwaway
+# "project repo" and register/deregister linked worktrees against it, the
+# same shape layers/worktrees/<name>/<layer>_ws/src/<repo>/ has in the real
+# workspace.
+new_git_repo() {
+    local dir="$1"
+    mkdir -p "$dir"
+    git -C "$dir" init -q -b main
+    git -C "$dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+}
+add_git_worktree() {
+    local repo_dir="$1" wt_path="$2" branch="$3"
+    mkdir -p "$(dirname "$wt_path")"
+    git -C "$repo_dir" worktree add -q -b "$branch" "$wt_path" >/dev/null
+}
+# Deregisters a linked worktree WITHOUT touching its working directory or
+# files — the same shape a merge_pr.sh exit-3 worktree-removal failure (or an
+# interrupted manual removal) leaves: the directory and its rosdep.yaml are
+# still on disk, but git no longer knows about the worktree.
+deregister_git_worktree() {
+    local wt_path="$1"
+    local gitdir_line admin_dir
+    gitdir_line="$(cat "$wt_path/.git")"
+    admin_dir="${gitdir_line#gitdir: }"
+    rm -rf "$admin_dir"
+}
+
 TMP="$(mktemp -d -t rosdep_local_test.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -276,6 +305,153 @@ check "uninitialized rosdep is 3"      eq "$rc" 3
 check "names bootstrap.sh as the fix"  contains "$out" "bootstrap.sh"
 check "refuses without clobbering"     grep -q '^yaml ' "$LOCAL"
 
+echo "=== rosdep_local_sources.sh: worktree discovery (#659) ==="
+# A rosdep.yaml added on a feature branch lives under
+# layers/worktrees/<name>/<layer>_ws/src/<repo>/ until the PR merges — the
+# generator must discover it there too, but ONLY while git still registers
+# the worktree.
+WTREPO="$TMP/wt_repo"; new_git_repo "$WTREPO"
+WTWS="$TMP/wt_ws"; mkdir -p "$WTWS/layers/main"
+WT_PKG="$WTWS/layers/worktrees/issue-900/a_ws/src/repo_wt"
+add_git_worktree "$WTREPO" "$WT_PKG" wt-900
+cat > "$WT_PKG/rosdep.yaml" <<'EOF'
+# upstream PR owed: https://github.com/ros/rosdistro/pull/00002
+snakemake:
+  ubuntu: [snakemake]
+EOF
+out="$("$AGG" "$WTWS" 2>&1)"; rc=$?
+WT_LOCAL="$WTWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "a registered worktree yaml is picked up" \
+    grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a leftover/deregistered worktree is excluded ==="
+WT_PKG2="$WTWS/layers/worktrees/issue-901/a_ws/src/repo_wt2"
+add_git_worktree "$WTREPO" "$WT_PKG2" wt-901
+cat > "$WT_PKG2/rosdep.yaml" <<'EOF'
+mystery-wt-key:
+  ubuntu: [mystery]
+EOF
+deregister_git_worktree "$WT_PKG2"
+out="$("$AGG" "$WTWS" 2>&1)"; rc=$?
+check "exits 0 despite the leftover directory" eq "$rc" 0
+check "the leftover/deregistered worktree yaml is skipped" \
+    bash -c "! grep -q repo_wt2 '$WT_LOCAL'"
+check "it says the directory is not git-registered" \
+    contains "$out" "not a git-registered worktree"
+check "the still-registered worktree yaml survives the same run" \
+    grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
+
+echo "=== rosdep_local_sources.sh: worktree discovery skips symlinked entries ==="
+# worktree_create.sh symlinks untouched siblings/non-target layers straight
+# back to layers/main; bash's glob follows those transparently, so without
+# the skip they would be rediscovered a second time under layers/worktrees.
+SYMWS="$TMP/sym_ws"
+mkdir -p "$SYMWS/layers/main/a_ws/src/repo_with"
+cat > "$SYMWS/layers/main/a_ws/src/repo_with/rosdep.yaml" <<'EOF'
+snakemake:
+  ubuntu: [snakemake]
+EOF
+mkdir -p "$SYMWS/layers/worktrees/issue-902"
+ln -s "../../main/a_ws" "$SYMWS/layers/worktrees/issue-902/a_ws"
+out="$("$AGG" "$SYMWS" 2>&1)"; rc=$?
+SYMLIST="$SYMWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                             eq "$rc" 0
+check "a symlinked non-target layer is not rediscovered" \
+    eq "$(grep -c '^yaml ' "$SYMLIST")" 1
+
+mkdir -p "$SYMWS/layers/worktrees/issue-903/b_ws/src"
+ln -s "$SYMWS/layers/main/a_ws/src/repo_with" \
+      "$SYMWS/layers/worktrees/issue-903/b_ws/src/repo_with"
+out="$("$AGG" "$SYMWS" 2>&1)"; rc=$?
+check "exits 0 with a symlinked package entry too" eq "$rc" 0
+check "a symlinked package entry is not rediscovered" \
+    eq "$(grep -c '^yaml ' "$SYMLIST")" 1
+
+echo "=== rosdep_local_sources.sh: conflicting keys across layers/main and a worktree ==="
+CONFREPO="$TMP/conf_repo"; new_git_repo "$CONFREPO"
+CONFWS="$TMP/conf_ws"
+mkdir -p "$CONFWS/layers/main/a_ws/src/repo_main"
+cat > "$CONFWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
+sharedkey:
+  ubuntu: [pkg-a]
+EOF
+CONF_WT="$CONFWS/layers/worktrees/issue-904/a_ws/src/repo_wt"
+add_git_worktree "$CONFREPO" "$CONF_WT" wt-904
+cat > "$CONF_WT/rosdep.yaml" <<'EOF'
+sharedkey:
+  ubuntu: [pkg-b]
+EOF
+out="$("$AGG" "$CONFWS" 2>&1)"; rc=$?
+CONFLIST="$CONFWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 6 on a main-vs-worktree conflict" eq "$rc" 6
+check "names the conflicting key"      contains "$out" "sharedkey"
+check "names the layers/main file"     contains "$out" "repo_main"
+check "names the worktree file"        contains "$out" "repo_wt"
+check "excludes the layers/main file"  bash -c "! grep -q repo_main '$CONFLIST'"
+check "excludes the worktree file"     bash -c "! grep -q repo_wt '$CONFLIST'"
+
+echo "=== rosdep_local_sources.sh: conflicting keys worktree-vs-worktree ==="
+CONF2REPO="$TMP/conf2_repo"; new_git_repo "$CONF2REPO"
+CONFWS2="$TMP/conf_ws2"; mkdir -p "$CONFWS2/layers/main"
+CONF2_A="$CONFWS2/layers/worktrees/issue-905/a_ws/src/repo_a"
+CONF2_B="$CONFWS2/layers/worktrees/issue-906/a_ws/src/repo_b"
+add_git_worktree "$CONF2REPO" "$CONF2_A" wt-905
+add_git_worktree "$CONF2REPO" "$CONF2_B" wt-906
+cat > "$CONF2_A/rosdep.yaml" <<'EOF'
+wtkey:
+  ubuntu: [x]
+EOF
+cat > "$CONF2_B/rosdep.yaml" <<'EOF'
+wtkey:
+  ubuntu: [y]
+EOF
+out="$("$AGG" "$CONFWS2" 2>&1)"; rc=$?
+check "exits 6 on a worktree-vs-worktree conflict" eq "$rc" 6
+check "names the key"                  contains "$out" "wtkey"
+
+echo "=== rosdep_local_sources.sh: an identical declaration in main and a worktree dedupes cleanly ==="
+DEDUPREPO="$TMP/dedup_repo"; new_git_repo "$DEDUPREPO"
+DEDUPWS="$TMP/dedup_ws"
+mkdir -p "$DEDUPWS/layers/main/a_ws/src/repo_main"
+cat > "$DEDUPWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [same-pkg]
+EOF
+DEDUP_WT="$DEDUPWS/layers/worktrees/issue-907/a_ws/src/repo_wt"
+add_git_worktree "$DEDUPREPO" "$DEDUP_WT" wt-907
+cat > "$DEDUP_WT/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [same-pkg]
+EOF
+out="$("$AGG" "$DEDUPWS" 2>&1)"; rc=$?
+check "identical declarations exit 0, no false conflict" eq "$rc" 0
+check "no conflict reported"           lacks "$out" "conflict"
+
+echo "=== rosdep_local_sources.sh: a shape rejection (4) wins over a simultaneous conflict (6) ==="
+PRECREPO="$TMP/prec_repo"; new_git_repo "$PRECREPO"
+PRECWS="$TMP/prec_ws"
+mkdir -p "$PRECWS/layers/main/a_ws/src/repo_bad" "$PRECWS/layers/main/a_ws/src/repo_main2"
+printf 'k:\n  ubuntu:\n    pip:\n      packages: [x]\n' \
+    > "$PRECWS/layers/main/a_ws/src/repo_bad/rosdep.yaml"
+cat > "$PRECWS/layers/main/a_ws/src/repo_main2/rosdep.yaml" <<'EOF'
+otherkey:
+  ubuntu: [b]
+EOF
+PREC_WT="$PRECWS/layers/worktrees/issue-908/a_ws/src/repo_wt"
+add_git_worktree "$PRECREPO" "$PREC_WT" wt-908
+cat > "$PREC_WT/rosdep.yaml" <<'EOF'
+otherkey:
+  ubuntu: [a]
+EOF
+out="$("$AGG" "$PRECWS" 2>&1)"; rc=$?
+check "shape rejection (4) wins over the simultaneous conflict (6)" eq "$rc" 4
+
+echo "=== Makefile: ROSDEP_LOCAL_YAMLS includes the worktree glob (#659) ==="
+MFILE="$(cd "$SCRIPTS_DIR/../.." && pwd)/Makefile"
+check "the worktree wildcard is present in the Makefile" \
+    grep -q 'layers/worktrees/\*/\*_ws/src/\*/rosdep.yaml' "$MFILE"
+
 echo "=== stage_rosdep_manifests.sh: stages rosdep.yaml for the image bake ==="
 "$STAGE" "$WS" "$TMP/stage" >/dev/null 2>&1
 check "staged under rosdep-local/"     test -f "$TMP/stage/rosdep-local/a_ws__repo_with.yaml"
@@ -346,6 +522,19 @@ EOF
 out="$(PATH="$STUB:$PATH" "$CHECK" "$WS" 2>&1)"; rc=$?
 check "key with no upstream-PR marker fails (1)" eq "$rc" 1
 check "names the unmarked key"         contains "$out" "'mystery-key' has no upstream-PR marker"
+
+echo "=== rosdep_local_staleness_check.sh: a worktree-only rosdep.yaml is audited too (#659) ==="
+STALEREPO="$TMP/stale_repo"; new_git_repo "$STALEREPO"
+STALEWS="$TMP/stale_ws"; mkdir -p "$STALEWS/layers/main"
+STALE_WT="$STALEWS/layers/worktrees/issue-909/a_ws/src/repo_wt"
+add_git_worktree "$STALEREPO" "$STALE_WT" wt-909
+cat > "$STALE_WT/rosdep.yaml" <<'EOF'
+mystery-wt-key:
+  ubuntu: [mystery]
+EOF
+out="$(PATH="$STUB:$PATH" "$CHECK" "$STALEWS" 2>&1)"; rc=$?
+check "a worktree-only unmarked key fails (1)" eq "$rc" 1
+check "names the unmarked worktree key" contains "$out" "'mystery-wt-key' has no upstream-PR marker"
 
 echo "=== rosdep_local_staleness_check.sh: offline is SKIPPED, never a verdict ==="
 rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
