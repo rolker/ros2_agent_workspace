@@ -27,3 +27,19 @@ issue: 659
       scope** here — they operate on a repo already resolved to a specific
       checkout, not on a dev-host-wide glob — but a reviewer should confirm
       that reasoning rather than assume it silently.
+
+## Plan Authored
+**Status**: complete
+**When**: 2026-09-23 12:26 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+
+**Plan**: `.agent/work-plans/issue-659/plan.md` at `fbadffa`
+**Branch**: feature/issue-659 at `fbadffa`
+**Phases**: single
+
+### Open questions
+- [ ] No open questions — plan is review-plan-ready. (Two implementation-level
+      calls the plan itself made, flagged for review-plan to confirm rather
+      than re-decided as policy: staleness-check glob extended to match the
+      generator (step 5); shape-rejection exit 4 takes precedence over the
+      new conflict exit 6 when both occur in one run (step 3).)
