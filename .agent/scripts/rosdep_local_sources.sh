@@ -117,7 +117,19 @@
 #      semantics for the already-shipped cases (4, 6). Like 4 and 6, the
 #      directory is still written, minus the excluded file(s), so a
 #      transient worktree-removal race never costs every OTHER key on the
-#      host — only the raced one, until the next regeneration.
+#      host — only the raced one, until the next regeneration. Treated as
+#      transient/soft by the Makefile stamp (like exit 3 — a note, stamp
+#      left stale, next `make build` retries) and by bootstrap.sh
+#      (#659 round-3 pre-push review).
+#
+# Test-only hooks (ROSDEP_LOCAL_SOURCES_TEST_VANISH,
+# ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT), #659 round-3: reproduce
+# the exit-7 race deterministically WITHOUT deleting anything — shipped
+# code must never `rm` an env-supplied path. Each hook only makes this
+# script TREAT the named path as missing at its checkpoint (conflict-check
+# read / publish existence recheck), and only when that path is one of
+# this run's own discovered files; any other value is ignored, with a
+# stderr note. Both are no-ops when unset, which is every real invocation.
 
 set -euo pipefail
 
@@ -269,13 +281,36 @@ for yaml in "${local_yamls[@]}"; do
     passed_yamls+=("$yaml")
 done
 
-# Test-only hook (#659): lets the regression suite deterministically
-# reproduce "a shape-gate-passed file vanishes before the conflict-check
-# subprocess reads it" without racing a real background deletion against
-# this script's own execution speed. Unset in every real run; harmless
-# no-op then. Mirrors the ROSDEP_SOURCES_FORCE_FALLBACK precedent above.
+# Test-only hook (#659, simulation-only per round-3 pre-push review — never
+# deletes): lets the regression suite deterministically reproduce "a
+# shape-gate-passed file vanishes before the conflict-check subprocess reads
+# it" without racing a real background deletion against this script's own
+# execution speed, and WITHOUT an `rm` in shipped code — an unconfined
+# `rm -f` of an env-supplied path is the same risk class as the unapproved
+# deletion AGENTS.md's Never section rules out, just reached through a code
+# path instead of an operator action. Instead of deleting, the named path is
+# treated as missing by the conflict-check read below (via
+# ROSDEP_LOCAL_SOURCES_SIMULATE_VANISH, passed to the python subprocess) —
+# and only when it is one of THIS run's own discovered files
+# (passed_yamls); any other value is ignored, with a note, since simulating
+# a vanish for a path this run never touched would be meaningless. Unset in
+# every real run; harmless no-op then.
+declare -A simulate_vanish_conflict=()
 if [ -n "${ROSDEP_LOCAL_SOURCES_TEST_VANISH:-}" ]; then
-    rm -f "${ROSDEP_LOCAL_SOURCES_TEST_VANISH:-}"
+    _tv="$ROSDEP_LOCAL_SOURCES_TEST_VANISH"
+    _tv_is_own=0
+    for yaml in "${passed_yamls[@]}"; do
+        if [ "$yaml" = "$_tv" ]; then
+            _tv_is_own=1
+            break
+        fi
+    done
+    if [ "$_tv_is_own" -eq 1 ]; then
+        simulate_vanish_conflict["$_tv"]=1
+    else
+        echo "Note: ROSDEP_LOCAL_SOURCES_TEST_VANISH='$_tv' is not one of" \
+             "this run's own discovered files — ignored." >&2
+    fi
 fi
 
 # Conflict detection (#659): rosdep's own root-level merge across multiple
@@ -300,13 +335,24 @@ vanished_count=0
 declare -A excluded_by_conflict=()
 declare -A vanished_files=()
 if [ "${#passed_yamls[@]}" -gt 0 ]; then
-    conflict_report="$(python3 - "${passed_yamls[@]}" <<'PY'
-import sys, yaml, json
+    conflict_report="$(ROSDEP_LOCAL_SOURCES_SIMULATE_VANISH="$(printf '%s\n' "${!simulate_vanish_conflict[@]}")" \
+        python3 - "${passed_yamls[@]}" <<'PY'
+import os, sys, yaml, json
 from collections import defaultdict
+
+# #659 round-3: simulation-only test hook, never a real deletion — see the
+# bash-side comment above this subprocess call. A path listed here is
+# treated as unreadable without ever touching the filesystem entry itself.
+simulated_vanish = set(
+    p for p in os.environ.get("ROSDEP_LOCAL_SOURCES_SIMULATE_VANISH", "").split("\n") if p
+)
 
 key_entries = defaultdict(list)
 unreadable = []
 for path in sys.argv[1:]:
+    if path in simulated_vanish:
+        unreadable.append(path)
+        continue
     try:
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -390,12 +436,30 @@ PY
     fi
 fi
 
-# Test-only hook (#659): lets the regression suite deterministically
-# reproduce "a file survives conflict-check but vanishes before publish" —
-# the second half of the race window this exit code closes. Unset in every
-# real run; harmless no-op then.
+# Test-only hook (#659, simulation-only per round-3 pre-push review — never
+# deletes): lets the regression suite deterministically reproduce "a file
+# survives conflict-check but vanishes before publish" — the second half of
+# the race window this exit code closes — without an `rm` in shipped code.
+# The named path is treated as missing by the publish loop's existence
+# re-check below, and only when it is one of THIS run's own discovered
+# files (passed_yamls); any other value is ignored, with a note. Unset in
+# every real run; harmless no-op then.
+declare -A simulate_vanish_publish=()
 if [ -n "${ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT:-}" ]; then
-    rm -f "${ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT:-}"
+    _tv2="$ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT"
+    _tv2_is_own=0
+    for yaml in "${passed_yamls[@]}"; do
+        if [ "$yaml" = "$_tv2" ]; then
+            _tv2_is_own=1
+            break
+        fi
+    done
+    if [ "$_tv2_is_own" -eq 1 ]; then
+        simulate_vanish_publish["$_tv2"]=1
+    else
+        echo "Note: ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT='$_tv2'" \
+             "is not one of this run's own discovered files — ignored." >&2
+    fi
 fi
 
 yaml_count=0
@@ -409,8 +473,10 @@ for yaml in "${passed_yamls[@]}"; do
     # Re-check existence immediately before writing the publish line — the
     # remaining half of the race window (#659 round-2): a file can pass
     # every earlier check and still vanish before THIS write. Never publish
-    # a `yaml file://` line for a path that is not there right now.
-    if [ ! -f "$yaml" ]; then
+    # a `yaml file://` line for a path that is not there right now. The
+    # simulate_vanish_publish check is the test-only hook above — it never
+    # deletes, it only makes this recheck behave as if the file were gone.
+    if [ -n "${simulate_vanish_publish[$yaml]+x}" ] || [ ! -f "$yaml" ]; then
         vanished_count=$((vanished_count + 1))
         echo "Error: '$yaml' vanished before it could be published to" \
              "$LOCAL_LIST — excluded (#659 race)." >&2

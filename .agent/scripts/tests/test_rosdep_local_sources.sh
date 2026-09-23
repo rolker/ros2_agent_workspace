@@ -507,10 +507,12 @@ echo "=== rosdep_local_sources.sh: a file that vanishes during conflict-check is
 # The conflict-detection python subprocess used to swallow a read failure
 # with a bare `except Exception: continue`, treating a vanished file as
 # "declares no keys" — which would let a DIFFERENT file's declaration of the
-# same key win uncontested. ROSDEP_LOCAL_SOURCES_TEST_VANISH deletes the
-# named file right after the shape gate (which the file passed) and before
-# the conflict-check subprocess reads it — deterministically reproducing the
-# race without depending on real wall-clock timing.
+# same key win uncontested. ROSDEP_LOCAL_SOURCES_TEST_VANISH deterministically
+# reproduces the race without depending on real wall-clock timing: it makes
+# the script TREAT the named file as missing right after the shape gate
+# (which the file passed) and before the conflict-check subprocess reads it
+# — simulation only, per #659 round-3 pre-push review: shipped code must
+# never `rm` an env-supplied path, so the hook never deletes the fixture.
 VANWS="$TMP/vanish_ws"
 mkdir -p "$VANWS/layers/main/a_ws/src/repo_survivor" "$VANWS/layers/main/a_ws/src/repo_vanish"
 cat > "$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" <<'EOF'
@@ -533,13 +535,17 @@ check "the other file's key still resolves" \
     grep -qxF "yaml file://$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" "$VANLIST"
 check "the directory is still written (not aborted)" \
     test -f "$VANWS/.rosdep/sources.list.d/20-default.list"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$VAN_TARGET"
 
 echo "=== rosdep_local_sources.sh: a file that vanishes between conflict-check and publish is excluded (#659 round-2) ==="
 # The second half of the race window: a file can pass the shape gate AND the
 # conflict-check subprocess's read, then vanish before the bash publish loop
-# writes its line. ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT deletes
-# the file right after conflict-detection completes, before the publish loop
-# starts — the loop's own re-check must catch it.
+# writes its line. ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT makes the
+# script TREAT the file as missing right after conflict-detection completes,
+# before the publish loop starts — the loop's own re-check must catch it.
+# Simulation only (#659 round-3 pre-push review) — the fixture is never
+# actually deleted.
 VANWS2="$TMP/vanish_ws2"
 mkdir -p "$VANWS2/layers/main/a_ws/src/repo_survivor2" "$VANWS2/layers/main/a_ws/src/repo_vanish2"
 cat > "$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" <<'EOF'
@@ -559,6 +565,8 @@ check "it says the file vanished before publish" \
     contains "$out" "vanished before it could be published"
 check "the other file's key still resolves" \
     grep -qxF "yaml file://$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" "$VANLIST2"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$VAN_TARGET2"
 
 echo "=== rosdep_local_sources.sh: exit-code precedence with a vanish (#659 round-2) ==="
 # 4 (shape rejection) and 6 (conflict) are the pre-existing, stricter gates;
@@ -574,6 +582,8 @@ okkey2:
 EOF
 out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$PREC2_TARGET" "$AGG" "$PRECWS2" 2>&1)"; rc=$?
 check "shape rejection (4) wins over a simultaneous vanish (7)" eq "$rc" 4
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$PREC2_TARGET"
 
 # A THIRD, unrelated file (survives conflict-check, then vanishes before
 # publish) is needed alongside the conflicting pair — a file already excluded
@@ -599,6 +609,35 @@ out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT="$PREC3_TARGET" "$AGG" "$
 check "a conflict (6) wins over a simultaneous vanish (7)" eq "$rc" 6
 check "both conditions were genuinely hit this run" \
     bash -c "grep -q 'conflicting package lists' <<< '$out' && grep -q 'vanished before it could be published' <<< '$out'"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$PREC3_TARGET"
+
+echo "=== rosdep_local_sources.sh: the test-vanish hooks only simulate a run's own discovered files (#659 round-3 must-fix) ==="
+# Round 3 flagged the original hooks as an unconfined `rm -f` of an
+# env-supplied path — a real, if low-probability, arbitrary-file-deletion
+# risk if either var were ever set in a non-test invocation (e.g. left
+# exported in a dev shell). The fix: never delete, and only SIMULATE a
+# vanish, and only for a path that is genuinely one of this run's own
+# discovered rosdep.yaml files. A path outside that set — like a file this
+# run never touched — must be ignored, with a note, and must not itself be
+# touched or deleted.
+IGNWS="$TMP/ignore_ws"
+mkdir -p "$IGNWS/layers/main/a_ws/src/repo_ign"
+cat > "$IGNWS/layers/main/a_ws/src/repo_ign/rosdep.yaml" <<'EOF'
+ignkey:
+  ubuntu: [ignpkg]
+EOF
+IGN_OUTSIDE="$TMP/not_a_discovered_file.yaml"
+printf 'unrelated: true\n' > "$IGN_OUTSIDE"
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$IGN_OUTSIDE" "$AGG" "$IGNWS" 2>&1)"; rc=$?
+IGNLIST="$IGNWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0 — the hook target isn't this run's own file, so nothing vanishes" \
+    eq "$rc" 0
+check "it notes the ignored hook value" \
+    contains "$out" "is not one of this run's own discovered files"
+check "the real file still resolves" \
+    grep -qxF "yaml file://$IGNWS/layers/main/a_ws/src/repo_ign/rosdep.yaml" "$IGNLIST"
+check "the out-of-scope path is untouched" test -f "$IGN_OUTSIDE"
 
 echo "=== rosdep_local_sources.sh: bootstrap.sh handles exit 7 (#659 round-2) ==="
 # bootstrap.sh's own exit-code switch on this script's return value must not
@@ -861,6 +900,16 @@ check "uninitialized rosdep says how to fix it" \
 got="$(run_stamp 4)"
 check "a rejected rosdep.yaml (4) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
 check "a rejected rosdep.yaml leaves no stamp" contains "$got" "no-stamp"
+got="$(run_stamp 7)"
+check "a vanished-file race (7) does not fail make build" contains "$got" "0 "
+check "a vanished-file race leaves no stamp, so the next build retries" \
+    contains "$got" "no-stamp"
+check "a vanished-file race skips the cache refresh" contains "$got" "no-update"
+check "a vanished-file race explains it's transient" \
+    grep -q "worktree removal" "$TMP/mk.out"
+got="$(run_stamp 6)"
+check "a genuine key conflict (6) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
+check "a genuine key conflict leaves no stamp" contains "$got" "no-stamp"
 
 echo "=== Makefile \$(STAMP)/rosdep-local.done: a DELETED rosdep.yaml invalidates it ==="
 # Deleting the file is the DOCUMENTED end of a local key's lifecycle. A
