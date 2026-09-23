@@ -251,3 +251,98 @@ named in the issue (`unh_marine_autonomy#397`'s rosdep.yaml).
 Round 1's must-fix (`wt_is_registered` fail-open on a rogue standalone repo) is CONFIRMED FIXED — both fresh-context adversarial passes independently re-derived and empirically re-tested the two-check identity mechanism (git-common-dir match + main repo's own worktree registry) against the same adversarial scenarios and found it sound, with no way to make it wrongly admit an untrusted directory. The two round-1 deferred suggestions (YAML alias-bomb DoS, `--porcelain` embedded-newline misparse) were not re-raised and remain accepted low-priority limitations per round 1's own assessment.
 
 The new must-fix is a distinct issue from round 1's, surfaced only by Lens B's focus on concurrency under the widened discovery set: #659 turns worktree churn (routine create/remove by concurrent agent sessions) into content feeding a directory every build on the host consults, which makes a shape-gate-to-publish TOCTOU gap a realistic failure mode rather than a theoretical one.
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-23 13:35 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Branch**: feature/issue-659 at `874f1b4`
+**Addressed**: the owner's binding "Pre-push round 2 decision" comment on issue #659 (2026-09-23 13:23 -04:00), which itself resolved Local Review (Pre-Push) round 2's two open findings (When 2026-09-23 13:40 -04:00, SHA `86d779c`)
+**Commits**: 1ee8ffe, b963204, 874f1b4
+
+### Changes
+- `.agent/scripts/rosdep_local_sources.sh`: the conflict-detection Python
+  subprocess now reports `UNREADABLE\t<path>` instead of silently treating a
+  read failure as "declares no keys"; the bash side excludes and names the
+  file. The final publish loop re-checks `[ -f "$yaml" ]` immediately before
+  writing each line, closing the remaining race window between
+  conflict-check and publish. New exit code **7** (a file vanished mid-run),
+  distinct from and outranked by 4 (shape rejection) and 6 (conflict) —
+  precedence 4 > 6 > 7, documented in the script header and the AGENTS.md
+  row. Package-list canonicalization now dedupes (`sorted(set(pkgs))`)
+  before sorting, per the folded-in suggestion. Two test-only env hooks
+  (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `...TEST_VANISH_AFTER_CONFLICT`) let
+  the regression suite reproduce the race deterministically.
+- `.agent/scripts/bootstrap.sh`: new `elif -eq 7` branch mirroring the
+  existing exit-4/exit-6 branches — exports `ROSDEP_SOURCE_PATH` with a
+  note rather than falling into the generic "not generated" branch, which
+  would have discarded the whole valid directory over one raced file.
+- `.agent/scripts/worktree_remove.sh`: Phase 1's existing per-package walk
+  (layer worktrees) now also checks each non-symlinked package for a root
+  `rosdep.yaml`, before the destructive cleanup. After a successful
+  removal, if any was found, regenerates the workspace-local rosdep
+  sources dir via `rosdep_local_sources.sh <MAIN root>` — never runs
+  `rosdep update` (network, slow; noted in-line). A regeneration failure
+  is reported loudly with the exact re-run command but does not fail the
+  script — the removal itself already succeeded. Confirmed `merge_pr.sh`
+  removes worktrees by calling this script directly, so the merge path is
+  covered with no separate change.
+- `AGENTS.md`: both Script Reference rows updated — `rosdep_local_sources.sh`
+  gains exit 7 and the test hooks; `worktree_remove.sh` gains the
+  regen-on-removal contract.
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: new cases for the
+  in-file-duplicate dedupe, a conflict-check-time vanish, a publish-time
+  vanish, exit-code precedence (4 over a simultaneous 7, 6 over a
+  simultaneous 7 — using a third unrelated file so both conditions
+  genuinely fire in one run, since a file already excluded by a conflict
+  never reaches the publish-time existence check), and that `bootstrap.sh`
+  has an explicit exit-7 branch that still exports `ROSDEP_SOURCE_PATH`.
+- `.agent/scripts/tests/test_worktree_remove.sh`: new `setup_with_layer_worktree`
+  fixture (a genuine linked layer worktree of a `layers/main/<ws>/src/<pkg>`
+  repo, mirroring `test_rosdep_local_sources.sh`'s `add_layer_worktree`) and
+  three cases: regen on removal-with-rosdep-yaml, no regen without one, and
+  a stubbed regeneration failure that is reported loudly while the removal
+  itself still reports success.
+- `.agent/work-plans/issue-659/plan.md`: r4 revision section recording the
+  round-2 decision, the implementation, and test counts; Files-to-Change
+  rows updated for the four touched scripts plus both test files and
+  AGENTS.md.
+
+### Decision: exit code 7
+
+A file that vanishes mid-run is neither a shape rejection (4 — a policy
+violation, the file's *content* is wrong) nor a conflict (6 — two files
+genuinely disagree about a key's value). It is a transient, single-file
+race whose remedy is "re-run; the file may still be there" — a different
+condition deserving its own code so a caller (a human, `bootstrap.sh`, the
+Makefile stamp) can tell them apart. Precedence 4 > 6 > 7: each is a
+stricter, earlier-established gate than the one after it, so a run that
+hits more than one still reports the strictest, preserving `make build`'s
+and `bootstrap.sh`'s existing failure semantics for the already-shipped
+cases (4, 6). Like 4 and 6, the directory is still written minus the
+excluded file(s) — a raced file costs only itself, not every other key on
+the host. `bootstrap.sh` and the Makefile stamp both needed to (Makefile)
+or already did (Makefile's recipe treats any non-zero, non-3 exit
+identically) handle it; `bootstrap.sh` needed an explicit new branch, added
+here, following the exact pattern the plan-review had already flagged as
+missing for exit 6's own bootstrap.sh gap in an earlier round.
+
+### Test results
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: **171 passed, 0
+  failed** (was 154; +17 across the new race/precedence/dedupe cases).
+- `.agent/scripts/tests/test_worktree_remove.sh`: **5 passed, 0 failed**
+  (was 2; +3 new).
+- `.agent/scripts/tests/test_worktree_create.sh`: **33 passed, 0 failed**
+  (unchanged — no target file touched, re-run to confirm no regression).
+- All 4 commits' pre-commit hooks (including shellcheck) passed at commit
+  time.
+
+### Deviations from the decision
+None — implemented as decided: race fix (both checkpoints), regenerate on
+layer-worktree removal (checked before removal, regenerated after, failure
+reported loudly and non-fatally, merge path confirmed covered via
+`merge_pr.sh` → `worktree_remove.sh`), and the dedupe suggestion folded in.
+Tests remained hermetic throughout — no test wrote to the real
+`$HOME/project11/.rosdep`; both new suites use `ROSDEP_SYSTEM_SOURCES_DIR`
+fixtures and mock workspace trees under `mktemp -d`.
