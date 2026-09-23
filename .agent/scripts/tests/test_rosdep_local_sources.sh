@@ -483,6 +483,134 @@ out="$("$AGG" "$DEDUPWS" 2>&1)"; rc=$?
 check "identical declarations exit 0, no false conflict" eq "$rc" 0
 check "no conflict reported"           lacks "$out" "conflict"
 
+echo "=== rosdep_local_sources.sh: an in-file duplicate package dedupes before comparison (#659 round-2 suggestion) ==="
+# `ubuntu: [foo, foo]` and `ubuntu: [foo]` are semantically identical —
+# canonicalization must dedupe each OS's package list before sorting, or an
+# accidental in-file duplicate would spuriously conflict against a clean
+# declaration of the same key elsewhere.
+DUPPKGWS="$TMP/duppkg_ws"
+mkdir -p "$DUPPKGWS/layers/main/a_ws/src/repo_clean"
+cat > "$DUPPKGWS/layers/main/a_ws/src/repo_clean/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [foo]
+EOF
+DUPPKG_WT="$(add_layer_worktree "$DUPPKGWS" a_ws repo_dup issue-912 wt-912)"
+cat > "$DUPPKG_WT/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [foo, foo]
+EOF
+out="$("$AGG" "$DUPPKGWS" 2>&1)"; rc=$?
+check "an in-file duplicate does not manufacture a false conflict" eq "$rc" 0
+check "no conflict reported"           lacks "$out" "conflict"
+
+echo "=== rosdep_local_sources.sh: a file that vanishes during conflict-check is excluded, not silently blank (#659 round-2 must-fix) ==="
+# The conflict-detection python subprocess used to swallow a read failure
+# with a bare `except Exception: continue`, treating a vanished file as
+# "declares no keys" — which would let a DIFFERENT file's declaration of the
+# same key win uncontested. ROSDEP_LOCAL_SOURCES_TEST_VANISH deletes the
+# named file right after the shape gate (which the file passed) and before
+# the conflict-check subprocess reads it — deterministically reproducing the
+# race without depending on real wall-clock timing.
+VANWS="$TMP/vanish_ws"
+mkdir -p "$VANWS/layers/main/a_ws/src/repo_survivor" "$VANWS/layers/main/a_ws/src/repo_vanish"
+cat > "$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" <<'EOF'
+survivorkey:
+  ubuntu: [survivorpkg]
+EOF
+VAN_TARGET="$VANWS/layers/main/a_ws/src/repo_vanish/rosdep.yaml"
+cat > "$VAN_TARGET" <<'EOF'
+vanishkey:
+  ubuntu: [vanishpkg]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$VAN_TARGET" "$AGG" "$VANWS" 2>&1)"; rc=$?
+VANLIST="$VANWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 7 on a conflict-check-time vanish"  eq "$rc" 7
+check "the vanished file is excluded"  bash -c "! grep -q repo_vanish '$VANLIST'"
+check "it says the file became unreadable" \
+    contains "$out" "became unreadable during conflict"
+check "it names the vanished file"     contains "$out" "repo_vanish/rosdep.yaml"
+check "the other file's key still resolves" \
+    grep -qxF "yaml file://$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" "$VANLIST"
+check "the directory is still written (not aborted)" \
+    test -f "$VANWS/.rosdep/sources.list.d/20-default.list"
+
+echo "=== rosdep_local_sources.sh: a file that vanishes between conflict-check and publish is excluded (#659 round-2) ==="
+# The second half of the race window: a file can pass the shape gate AND the
+# conflict-check subprocess's read, then vanish before the bash publish loop
+# writes its line. ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT deletes
+# the file right after conflict-detection completes, before the publish loop
+# starts — the loop's own re-check must catch it.
+VANWS2="$TMP/vanish_ws2"
+mkdir -p "$VANWS2/layers/main/a_ws/src/repo_survivor2" "$VANWS2/layers/main/a_ws/src/repo_vanish2"
+cat > "$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" <<'EOF'
+survivorkey2:
+  ubuntu: [survivorpkg2]
+EOF
+VAN_TARGET2="$VANWS2/layers/main/a_ws/src/repo_vanish2/rosdep.yaml"
+cat > "$VAN_TARGET2" <<'EOF'
+vanishkey2:
+  ubuntu: [vanishpkg2]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT="$VAN_TARGET2" "$AGG" "$VANWS2" 2>&1)"; rc=$?
+VANLIST2="$VANWS2/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 7 on a publish-time vanish"   eq "$rc" 7
+check "the vanished file is excluded"      bash -c "! grep -q repo_vanish2 '$VANLIST2'"
+check "it says the file vanished before publish" \
+    contains "$out" "vanished before it could be published"
+check "the other file's key still resolves" \
+    grep -qxF "yaml file://$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" "$VANLIST2"
+
+echo "=== rosdep_local_sources.sh: exit-code precedence with a vanish (#659 round-2) ==="
+# 4 (shape rejection) and 6 (conflict) are the pre-existing, stricter gates;
+# 7 (vanish) must never outrank either.
+PRECWS2="$TMP/prec_ws2"
+mkdir -p "$PRECWS2/layers/main/a_ws/src/repo_bad2" "$PRECWS2/layers/main/a_ws/src/repo_ok2"
+printf 'k:\n  ubuntu:\n    pip:\n      packages: [x]\n' \
+    > "$PRECWS2/layers/main/a_ws/src/repo_bad2/rosdep.yaml"
+PREC2_TARGET="$PRECWS2/layers/main/a_ws/src/repo_ok2/rosdep.yaml"
+cat > "$PREC2_TARGET" <<'EOF'
+okkey2:
+  ubuntu: [okpkg2]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$PREC2_TARGET" "$AGG" "$PRECWS2" 2>&1)"; rc=$?
+check "shape rejection (4) wins over a simultaneous vanish (7)" eq "$rc" 4
+
+# A THIRD, unrelated file (survives conflict-check, then vanishes before
+# publish) is needed alongside the conflicting pair — a file already excluded
+# BY the conflict check never reaches the publish-time existence check, so
+# it alone would not actually exercise "both codes fire in one run".
+PRECWS3="$TMP/prec_ws3"
+mkdir -p "$PRECWS3/layers/main/a_ws/src/repo_confa" "$PRECWS3/layers/main/a_ws/src/repo_confb" \
+         "$PRECWS3/layers/main/a_ws/src/repo_okvan3"
+cat > "$PRECWS3/layers/main/a_ws/src/repo_confa/rosdep.yaml" <<'EOF'
+confkey3:
+  ubuntu: [a]
+EOF
+cat > "$PRECWS3/layers/main/a_ws/src/repo_confb/rosdep.yaml" <<'EOF'
+confkey3:
+  ubuntu: [b]
+EOF
+PREC3_TARGET="$PRECWS3/layers/main/a_ws/src/repo_okvan3/rosdep.yaml"
+cat > "$PREC3_TARGET" <<'EOF'
+okkey3:
+  ubuntu: [okpkg3]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT="$PREC3_TARGET" "$AGG" "$PRECWS3" 2>&1)"; rc=$?
+check "a conflict (6) wins over a simultaneous vanish (7)" eq "$rc" 6
+check "both conditions were genuinely hit this run" \
+    bash -c "grep -q 'conflicting package lists' <<< '$out' && grep -q 'vanished before it could be published' <<< '$out'"
+
+echo "=== rosdep_local_sources.sh: bootstrap.sh handles exit 7 (#659 round-2) ==="
+# bootstrap.sh's own exit-code switch on this script's return value must not
+# fall through to the generic "not generated" branch for exit 7 — that would
+# discard the whole directory (every OTHER valid key too) for a transient,
+# single-file race.
+BSFILE="$(cd "$SCRIPTS_DIR/../.." && pwd)/.agent/scripts/bootstrap.sh"
+check "bootstrap.sh has an explicit exit-7 branch" \
+    grep -q 'BOOTSTRAP_GEN_RC" -eq 7' "$BSFILE"
+check "bootstrap.sh still exports ROSDEP_SOURCE_PATH on exit 7" bash -c "
+    grep -A 8 'BOOTSTRAP_GEN_RC\" -eq 7' '$BSFILE' | grep -q 'export ROSDEP_SOURCE_PATH'"
+
 echo "=== rosdep_local_sources.sh: a shape rejection (4) wins over a simultaneous conflict (6) ==="
 PRECWS="$TMP/prec_ws"
 mkdir -p "$PRECWS/layers/main/a_ws/src/repo_bad" "$PRECWS/layers/main/a_ws/src/repo_main2"

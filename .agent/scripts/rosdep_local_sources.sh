@@ -95,6 +95,29 @@
 #      both occur in the same run: 4 wins — it is the stricter, pre-existing
 #      gate, and keeping it load-bearing preserves today's `make build` /
 #      bootstrap.sh failure semantics for the already-shipped case.
+#   7  one or more discovered rosdep.yaml files that PASSED the shape gate
+#      became unreadable (typically: deleted) before this run finished with
+#      them (#659 round-2 pre-push review). Worktree teardown racing this
+#      generator is the routine trigger, not a theoretical layers/main race:
+#      a `worktree_remove.sh` can delete a package directory while a
+#      concurrent `make build` in another shell is midway through generating
+#      this host-shared directory. Two points are checked and both exclude
+#      the file rather than default it in as "declares no keys" or publish a
+#      dangling `yaml file://` line: (a) the conflict-detection subprocess
+#      reports a read failure explicitly instead of silently skipping the
+#      file (a silent skip would let a stale key from a DIFFERENT file in
+#      the same conflict group win uncontested, which is the same
+#      first-loaded-wins hazard exit 6 exists to prevent); (b) the publish
+#      loop re-checks the file's existence immediately before writing its
+#      line, closing the remaining window between conflict-check and
+#      publish. Exit-code precedence: 4 (shape) wins over 6 (conflict) wins
+#      over 7 (vanished) — each is a stricter, earlier-established gate than
+#      the one after it, and a run that hit more than one still reports the
+#      strictest so `make build` / bootstrap.sh keep today's failure
+#      semantics for the already-shipped cases (4, 6). Like 4 and 6, the
+#      directory is still written, minus the excluded file(s), so a
+#      transient worktree-removal race never costs every OTHER key on the
+#      host — only the raced one, until the next regeneration.
 
 set -euo pipefail
 
@@ -246,6 +269,15 @@ for yaml in "${local_yamls[@]}"; do
     passed_yamls+=("$yaml")
 done
 
+# Test-only hook (#659): lets the regression suite deterministically
+# reproduce "a shape-gate-passed file vanishes before the conflict-check
+# subprocess reads it" without racing a real background deletion against
+# this script's own execution speed. Unset in every real run; harmless
+# no-op then. Mirrors the ROSDEP_SOURCES_FORCE_FALLBACK precedent above.
+if [ -n "${ROSDEP_LOCAL_SOURCES_TEST_VANISH:-}" ]; then
+    rm -f "${ROSDEP_LOCAL_SOURCES_TEST_VANISH:-}"
+fi
+
 # Conflict detection (#659): rosdep's own root-level merge across multiple
 # sources is first-loaded-wins and does NOT error on a duplicate key (checked
 # against the installed rosdep2 source — RosdepDefinition.reverse_merge). A
@@ -264,20 +296,32 @@ done
 # it dedupes cleanly (e.g. an in-progress merge: a worktree's copy and the
 # already-merged layers/main copy are the same content).
 conflict_key_count=0
+vanished_count=0
 declare -A excluded_by_conflict=()
+declare -A vanished_files=()
 if [ "${#passed_yamls[@]}" -gt 0 ]; then
     conflict_report="$(python3 - "${passed_yamls[@]}" <<'PY'
 import sys, yaml, json
 from collections import defaultdict
 
 key_entries = defaultdict(list)
+unreadable = []
 for path in sys.argv[1:]:
     try:
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
     except Exception:
-        # The shape gate already accepted this file; a parse failure here
-        # would be surprising. Skip rather than crash the whole run over it.
+        # #659: the shape gate accepted this file, but it can still vanish
+        # (or become otherwise unreadable — permissions, a worktree teardown
+        # racing this run) before THIS read. That is a real, routine race now
+        # that worktree churn feeds this generator, not just a theoretical
+        # layers/main one. Report it explicitly and let the bash side
+        # exclude it — silently treating a read failure as "declares no
+        # keys" would let a DIFFERENT file's declaration of the same key win
+        # uncontested, the same first-loaded-wins hazard the conflict check
+        # exists to prevent, and would never surface the file's own
+        # (unread) declaration as a name to investigate.
+        unreadable.append(path)
         continue
     if not isinstance(data, dict):
         continue
@@ -285,7 +329,12 @@ for path in sys.argv[1:]:
         canon = {}
         if isinstance(val, dict):
             for os_name, pkgs in val.items():
-                canon[os_name] = sorted(pkgs) if isinstance(pkgs, list) else pkgs
+                # Dedupe before sorting: two semantically-identical
+                # declarations (`[foo]` vs. `[foo, foo]`) must canonicalize
+                # to the same value, or an accidental in-file duplicate could
+                # spuriously read as a conflict against a clean declaration
+                # elsewhere.
+                canon[os_name] = sorted(set(pkgs)) if isinstance(pkgs, list) else pkgs
         key_entries[key].append((path, json.dumps(canon, sort_keys=True)))
 
 excluded = set()
@@ -302,6 +351,8 @@ for line in lines:
     print(line)
 for f in sorted(excluded):
     print("EXCLUDE\t%s" % f)
+for f in sorted(unreadable):
+    print("UNREADABLE\t%s" % f)
 PY
 )"
     if [ -n "$conflict_report" ]; then
@@ -316,6 +367,21 @@ PY
                 EXCLUDE)
                     excluded_by_conflict["$a"]=1
                     ;;
+                UNREADABLE)
+                    # #659 round-2: this file passed the shape gate but the
+                    # conflict-detection subprocess could not read it a
+                    # moment later (deleted — routinely a worktree teardown
+                    # racing this generator, not just a theoretical race).
+                    # Exclude it and say so, rather than defaulting it in as
+                    # "declares no keys": a silent skip here would let a
+                    # DIFFERENT file's declaration of the same key win
+                    # uncontested, undermining the conflict check itself.
+                    vanished_files["$a"]=1
+                    vanished_count=$((vanished_count + 1))
+                    echo "Error: '$a' became unreadable during conflict" \
+                         "detection (likely deleted) — excluded from" \
+                         "$LOCAL_LIST (#659 race)." >&2
+                    ;;
             esac
         done <<< "$conflict_report"
         for f in "${!excluded_by_conflict[@]}"; do
@@ -324,9 +390,30 @@ PY
     fi
 fi
 
+# Test-only hook (#659): lets the regression suite deterministically
+# reproduce "a file survives conflict-check but vanishes before publish" —
+# the second half of the race window this exit code closes. Unset in every
+# real run; harmless no-op then.
+if [ -n "${ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT:-}" ]; then
+    rm -f "${ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT:-}"
+fi
+
 yaml_count=0
 for yaml in "${passed_yamls[@]}"; do
     if [ -n "${excluded_by_conflict[$yaml]+x}" ]; then
+        continue
+    fi
+    if [ -n "${vanished_files[$yaml]+x}" ]; then
+        continue
+    fi
+    # Re-check existence immediately before writing the publish line — the
+    # remaining half of the race window (#659 round-2): a file can pass
+    # every earlier check and still vanish before THIS write. Never publish
+    # a `yaml file://` line for a path that is not there right now.
+    if [ ! -f "$yaml" ]; then
+        vanished_count=$((vanished_count + 1))
+        echo "Error: '$yaml' vanished before it could be published to" \
+             "$LOCAL_LIST — excluded (#659 race)." >&2
         continue
     fi
     echo "yaml file://$yaml" >> "$LOCAL_LIST"
@@ -413,4 +500,9 @@ fi
 if [ "$conflict_key_count" -gt 0 ]; then
     echo "Error: $conflict_key_count rosdep key(s) conflict across files (see above)." >&2
     exit 6
+fi
+if [ "$vanished_count" -gt 0 ]; then
+    echo "Error: $vanished_count project rosdep.yaml file(s) vanished mid-run" \
+         "and were excluded (see above, #659)." >&2
+    exit 7
 fi
