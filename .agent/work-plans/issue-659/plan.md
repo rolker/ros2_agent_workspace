@@ -38,13 +38,93 @@ to a specific checkout (a project's own root `rosdep.yaml`), not a host-wide
 glob over `layers/main` — there is no "which worktree's copy" ambiguity for
 either of them to begin with.
 
+## Revision (r2) — plan-checkpoint decisions (owner, 2026-09-23 12:37 -04:00)
+
+After Plan Review r1 (needs-work, 3 findings), the owner decided all three
+fold into this plan directly, implemented without a second plan-review round
+(the pre-push code review is the next independent read):
+
+1. **Leftover worktree directories.** A worktree's `rosdep.yaml` is included
+   only when git still registers that worktree — a directory whose
+   registration is gone (e.g. after a `merge_pr.sh` exit-3 worktree-removal
+   failure, or a hand-interrupted removal) drops out automatically, with a
+   named reason on stderr. **Mechanism chosen**: run
+   `git -C <pkg_dir> worktree list --porcelain` **from the discovered
+   directory itself** and check whether `<pkg_dir>`'s realpath appears in its
+   `worktree <path>` lines. This is preferred over comparing
+   `rev-parse --git-common-dir` against a separately-obtained
+   `worktree list`, or reading the `.git` gitdir pointer and checking the
+   admin dir exists, because `git worktree list` already enumerates every
+   worktree of the repository (main and linked alike) regardless of which one
+   it is invoked from — so validity ("is this a git checkout at all") and
+   registration ("is it still known to git") collapse into one command: a
+   worktree whose admin directory was removed can't resolve its own `.git`
+   pointer, so the command itself fails rather than merely omitting the path
+   from its output. One command, fails closed either way. A file whose
+   checkout cannot be checked (git failure of any kind) is excluded, never
+   included by default. Test required (both the registered and the
+   deregistered-but-present-on-disk case).
+2. **`bootstrap.sh` gets an exit-6 branch.** `bootstrap.sh` (lines ~169-179)
+   has its own switch on the generator's exit code that the original plan
+   missed. Add `elif [ "$BOOTSTRAP_GEN_RC" -eq 6 ]`, mirroring the existing
+   `-eq 4` branch: the directory is still written and valid (conflicting
+   files are excluded, not the whole tree), so export `ROSDEP_SOURCE_PATH`
+   and print a note naming the conflict, rather than falling into the
+   generic `else` (which today discards the entire generated directory,
+   including every non-conflicting key). Grepped the repo for every other
+   caller of `rosdep_local_sources.sh` (`grep -rn rosdep_local_sources.sh`):
+   the Makefile's `$(STAMP)/rosdep-local.done` recipe already treats any
+   non-zero, non-3 exit as fatal (`exit $$rc`), so 6 fails the build exactly
+   like 4 does — no gap there. No other caller exists.
+3. **Discovery skips symlinked `*_ws` and symlinked package entries** inside
+   `layers/worktrees/*`, following the `wt_layer_*` convention already in
+   `.agent/scripts/_worktree_helpers.sh` (`[ -L "$ws_dir" ] && continue` /
+   `[ -L "$pkg_dir" ] && continue`): `worktree_create.sh` symlinks every
+   sibling package not in `--packages` and every non-target layer straight
+   back to `layers/main`, and bash's `*` glob traverses those symlinks
+   transparently — without the skip, the generated list and the
+   conflict-detection pass would scale with (repos × active worktrees)
+   instead of (repos), re-discovering `layers/main` content a second time
+   under a different path for every active worktree that happens to include
+   that layer/package. Test required (a worktree with an untouched symlinked
+   sibling package, and one with a whole symlinked non-target layer).
+
+**Makefile wildcard vs. symlink skip (reconciled)**: `$(wildcard ...)` in the
+Makefile follows symlinks the same way the shell glob does, so
+`ROSDEP_LOCAL_YAMLS` picking up a symlinked `layers/main` file a second time
+under `layers/worktrees` is unavoidable at the Makefile-prerequisite level (make
+has no notion of "skip this symlinked path" in `$(wildcard)`). This is
+harmless here: extra prerequisite entries only make
+`$(STAMP)/rosdep-local.list`'s content-diff check re-run slightly more often
+(a symlinked file's mtime moving re-triggers a cmp that then finds the
+recorded path SET unchanged, since the generator's own dedup already
+collapses it to one path) — never a wrong result, only a cheap extra check.
+The generator script itself remains the authoritative discovery + symlink
+skip + registration filter; the Makefile variable exists only to keep
+`make build` re-checking at the right times, per ADR-0007.
+
+**Consequences table addition**: `bootstrap.sh`'s exit-code switch is a
+caller of `rosdep_local_sources.sh` just like the Makefile stamp, and both
+must handle every exit code the generator can return — captured as its own
+Files-to-Change row and Consequences row below (Finding 1 of Plan Review r1).
+Stale/abandoned worktree persistence (Finding 3) is now addressed directly by
+decision 1 above (unregistered ⇒ excluded), so it is no longer an open
+consequence to merely document.
+
 ## Approach
 
 1. **Extend discovery in `rosdep_local_sources.sh`.** Add a second glob,
    `layers/worktrees/*/*_ws/src/*/rosdep.yaml`, alongside the existing
-   `layers/main/*_ws/src/*/rosdep.yaml`, combined before the existing sort.
-   The shape gate (`rosdep_yaml_validate.sh`) runs per file exactly as today,
-   regardless of which glob it came from.
+   `layers/main/*_ws/src/*/rosdep.yaml`. Walk the worktree side directory by
+   directory (not a bare glob) so each `*_ws` and each `src/*` package entry
+   can be skipped when it is a symlink (revision r2, decision 3), and so each
+   surviving package directory can be checked for live git-worktree
+   registration before its `rosdep.yaml` is admitted (revision r2, decision
+   1) — a file whose checkout fails that check is dropped with a named
+   reason on stderr, not silently included. Both globs' surviving files are
+   combined and sorted before the existing shape gate. The shape gate
+   (`rosdep_yaml_validate.sh`) runs per file exactly as today, regardless of
+   which glob or check it came from.
 
 2. **Add a conflict-detection pass, after the shape gate, before writing
    `30-workspace-local.list`.** For every file that passed the shape gate,
@@ -120,19 +200,34 @@ either of them to begin with.
    `make build`).
 
 6. **Tests** — extend `.agent/scripts/tests/test_rosdep_local_sources.sh`
-   (not a new file):
-   - Worktree-only `rosdep.yaml` (no `layers/main` counterpart) is picked up:
-     appears in `30-workspace-local.list` after regeneration.
+   (not a new file). Worktree fixtures use a real throwaway git repo plus
+   `git worktree add` so the registration check (decision 1) has something
+   genuine to inspect — a plain directory can't exercise it:
+   - Worktree-only `rosdep.yaml` (no `layers/main` counterpart), in a
+     directory that IS a registered `git worktree add` checkout, is picked
+     up: appears in `30-workspace-local.list` after regeneration.
+   - A worktree directory that is present on disk with its `rosdep.yaml`
+     still there, but whose git registration has been removed (the fixture
+     deletes the admin dir named by the worktree's own `.git` gitdir
+     pointer, leaving the working directory untouched — the same shape a
+     `merge_pr.sh` exit-3 removal failure leaves): excluded from
+     `30-workspace-local.list`, run still exits 0, stderr names the file and
+     says it is not git-registered.
+   - A worktree with an untouched symlinked sibling **package** (not in the
+     worktree's own `--packages`) is not rediscovered — the generated list's
+     yaml-line count does not grow from the symlinked entry alone.
+   - A worktree with a whole symlinked **non-target layer** (`*_ws` itself a
+     symlink back to `layers/main`) is not rediscovered either — same count
+     assertion.
    - Conflicting pair — same key, different package lists, one declared
-     under `layers/main`, one under `layers/worktrees/*` — is reported
-     (message names the key and both files), excluded from
-     `30-workspace-local.list`, and the run exits **6**.
-   - A second conflicting pair, both sides under `layers/worktrees/*`
-     (worktree vs. worktree, no `layers/main` copy at all), to cover the
-     issue's other named case.
-   - Identical declaration of the same key in `layers/main` and a worktree
-     dedupes cleanly: exits 0, no conflict reported, both files' lines are
-     still written (or at minimum the key is resolvable — assert no
+     under `layers/main`, one under a registered `layers/worktrees/*`
+     checkout — is reported (message names the key and both files), excluded
+     from `30-workspace-local.list`, and the run exits **6**.
+   - A second conflicting pair, both sides under registered
+     `layers/worktrees/*` checkouts (worktree vs. worktree, no `layers/main`
+     copy at all), to cover the issue's other named case.
+   - Identical declaration of the same key in `layers/main` and a registered
+     worktree dedupes cleanly: exits 0, no conflict reported (assert no
      "conflict" text and rc 0, not that both specific lines survive, since
      the dedup contract is "no false conflict," not "both copies present").
    - Shape-rejection (exit 4) still wins over a simultaneous conflict (exit
@@ -141,19 +236,27 @@ either of them to begin with.
      for the `layers/worktrees/*/*_ws/src/*/rosdep.yaml` wildcard pattern in
      `ROSDEP_LOCAL_YAMLS`, so a future edit that drops the worktree glob is
      caught without invoking `make` itself.
-   - `rosdep_local_staleness_check.sh`: a worktree-only `rosdep.yaml` with no
-     upstream-PR marker is reported (same assertions as the existing
-     `layers/main` unmarked-key case, pointed at a worktree-glob fixture).
+   - `rosdep_local_staleness_check.sh`: a worktree-only `rosdep.yaml` (in a
+     registered worktree checkout) with no upstream-PR marker is reported
+     (same assertions as the existing `layers/main` unmarked-key case,
+     pointed at a worktree-glob fixture).
+   - `bootstrap.sh`'s new exit-6 branch is a code-review-level check (read
+     the diff), not a new test harness: no test file for `bootstrap.sh`
+     exists today (it drives real package installs), and building one from
+     scratch to cover one `elif` is disproportionate to this issue's scope —
+     noted explicitly rather than silently skipped.
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `.agent/scripts/rosdep_local_sources.sh` | Second discovery glob (`layers/worktrees/*/*_ws/src/*/rosdep.yaml`); key-conflict detection pass; new exit code 6; header-comment update (discovery + exit codes) |
-| `.agent/scripts/rosdep_local_staleness_check.sh` | Second discovery glob, same pattern; header-comment note |
-| `Makefile` | `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard, feeding both the direct prerequisite and the `FORCE`-diffed `rosdep-local.list` deletion/rename detection |
-| `.agent/scripts/tests/test_rosdep_local_sources.sh` | New cases: worktree-only discovery, main-vs-worktree conflict, worktree-vs-worktree conflict, identical-declaration dedupe, shape-vs-conflict precedence, Makefile wildcard grep guard, staleness-check worktree glob |
-| `AGENTS.md` | `rosdep_local_sources.sh` Script Reference row: document worktree discovery and exit code 6; note the same for `rosdep_local_staleness_check.sh`'s row if its own discovery/exit-code documentation needs it |
+| `.agent/scripts/_worktree_helpers.sh` | New shared helper: `wt_is_registered <dir>` (git-worktree registration check, revision r2 decision 1) and `wt_discover_local_rosdep_yamls <root_dir>` (the two-glob, symlink-skipping, registration-filtering discovery walk, shared verbatim by the generator and the staleness check so their key sets can never drift apart) |
+| `.agent/scripts/rosdep_local_sources.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; key-conflict detection pass; new exit code 6; header-comment update (discovery + exit codes) |
+| `.agent/scripts/rosdep_local_staleness_check.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; header-comment note |
+| `.agent/scripts/bootstrap.sh` | New `elif [ "$BOOTSTRAP_GEN_RC" -eq 6 ]` branch mirroring the existing exit-4 branch (revision r2 decision 2) |
+| `Makefile` | `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard, feeding both the direct prerequisite and the `FORCE`-diffed `rosdep-local.list` deletion/rename detection; comment reconciling symlink-following with decision 3 |
+| `.agent/scripts/tests/test_rosdep_local_sources.sh` | New cases: worktree-only discovery (registered checkout), deregistered/leftover worktree exclusion, symlinked-package skip, symlinked-layer skip, main-vs-worktree conflict, worktree-vs-worktree conflict, identical-declaration dedupe, shape-vs-conflict precedence, Makefile wildcard grep guard, staleness-check worktree glob |
+| `AGENTS.md` | `rosdep_local_sources.sh` Script Reference row: document worktree discovery, the registration/symlink filters, and exit code 6; note the same for `rosdep_local_staleness_check.sh`'s row and `bootstrap.sh`'s Environment Setup mention if their own discovery/exit-code documentation needs it |
 
 ## Principles Self-Check
 
@@ -180,7 +283,8 @@ either of them to begin with.
 | `rosdep_local_sources.sh` discovery + exit codes | `AGENTS.md` Script Reference row | Yes |
 | `rosdep_local_sources.sh` discovery | `rosdep_local_staleness_check.sh` discovery (same key set it must audit) | Yes |
 | `Makefile`'s `ROSDEP_LOCAL_YAMLS` | Nothing further — the `FORCE`/`rosdep-local.list` diff mechanism already generalizes over whatever paths the variable lists | Yes (no extra work needed beyond the variable itself) |
-| New exit code 6 | `.agent/scripts/rosdep_local_sources.sh`'s own header-comment exit-code table | Yes |
+| New exit code 6 | `.agent/scripts/rosdep_local_sources.sh`'s own header-comment exit-code table AND `bootstrap.sh`'s exit-code switch (Plan Review r1 Finding 1) | Yes |
+| Discovery now needs a git-worktree-registration check + symlink skip | New shared helpers in `.agent/scripts/_worktree_helpers.sh`, used identically by both callers (generator and staleness check) so they can't drift | Yes |
 
 ## Documentation & Instruction Impact
 
@@ -196,16 +300,23 @@ either of them to begin with.
 
 ## Open Questions
 
-None — the owner's checkpoint comment resolved reach, conflict semantics, and
-the `AGENTS.md` approval. The one item this plan itself decided (rather than
-being told) is **staleness-check scope** (step 5 above: extend its glob too)
+None. The owner's original checkpoint comment resolved reach, conflict
+semantics, and the `AGENTS.md` approval; Plan Review r1 then found three
+concrete gaps (bootstrap.sh's missing exit-6 branch, symlink-induced
+re-discovery, stale-worktree persistence), and the owner's plan-checkpoint
+comment (revision r2 above) resolved all three directly, explicitly waiving a
+second plan-review round. The two items this plan itself decided (rather
+than being told) — **staleness-check scope** (step 5: extend its glob too)
 and **conflict/shape-rejection exit-code precedence** (step 3: shape (4) wins
-over conflict (6) when both occur) — both are implementation-level calls
-consistent with the owner's stated reasoning, not new policy questions, but
-flagged here so review-plan can confirm the precedence choice explicitly if
-it disagrees.
+over conflict (6) when both occur) — were confirmed, not objected to, by
+Plan Review r1's Finding 5. Nothing remains open; the pre-push code review
+(`/review-code`) is the next independent read, per the owner's own framing.
 
 ## Estimated Scope
 
 Single PR (local-first; no PR opened by this planning step per the issue's
 "Do NOT open a PR" instruction — `review-plan`/`/run-issue` publish later).
+Still a single narrow generator/enforcement fix after the r2 revision — the
+added scope (registration check, symlink skip, `bootstrap.sh` branch) is all
+inside the same one script + its two callers + its test file, not a new
+surface.
