@@ -226,7 +226,19 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # longer exists. The stamp therefore also depends on a file holding the CURRENT
 # set of paths, rewritten (and so made newer than the stamp) only when that set
 # actually changes — added, renamed or removed alike.
-ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+# The second glob covers layer worktrees (#659): a rosdep.yaml added on a
+# feature branch lives under layers/worktrees/<name>/<layer>_ws/src/<repo>/
+# until the PR merges, and the generator now discovers it there too. $(wildcard)
+# follows symlinks the same way the shell glob does, so a worktree's symlinked
+# (untouched) sibling package or non-target layer — worktree_create.sh
+# symlinks those straight back to layers/main — is listed a second time here.
+# That is harmless at the Makefile-prerequisite level: it only makes the
+# content-diff check below re-run slightly more often (the recorded path SET
+# is unchanged, since the generator's own discovery already skips those
+# symlinks and dedupes), never a wrong result. The generator script remains
+# the authoritative discovery + symlink-skip + registration filter.
+ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml) \
+                       $(wildcard $(MAIN_ROOT)/layers/worktrees/*/*_ws/src/*/rosdep.yaml)
 
 # FORCE (an ordinary target with no recipe and no file behind it) makes this
 # rule run every invocation; the cmp keeps the file's MTIME unchanged unless
