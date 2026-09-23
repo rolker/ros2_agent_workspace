@@ -88,3 +88,60 @@ The plan correctly implements the owner's three checkpoint decisions and its con
 - [ ] Either skip symlinked `*_ws`/`src/*` entries when walking `layers/worktrees/*` (matching `_worktree_helpers.sh`'s existing convention) or dedupe discovered paths by realpath before shape/conflict validation; add a test case for a layer worktree with untouched (symlinked) sibling packages.
 - [ ] Add a one-line note (script header and/or AGENTS.md row) documenting that a key from an abandoned/un-removed worktree directory persists on the host-shared source path until the directory is removed.
 - [ ] Optional: one-line PR callout that per-file exclusion can collaterally drop a non-conflicting key sharing a file with a conflicting one (precedent-consistent, not a new defect).
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-23 12:49 -04:00
+**By**: Claude Code Agent (Claude Sonnet)
+**Branch**: feature/issue-659 at `cc10852`
+
+Implemented the r2-revised plan (plan.md commit `13d0776`, folding in all
+three Plan Review r1 findings the owner approved at the plan checkpoint).
+
+### Changes
+- `.agent/scripts/_worktree_helpers.sh`: new `wt_is_registered` (checks git
+  still registers a worktree by running `git worktree list --porcelain`
+  from the worktree's own directory — one command covers both "is this a
+  live checkout" and "is it still registered", fails closed on any git
+  error) and `wt_discover_local_rosdep_yamls` (shared two-glob discovery:
+  `layers/main` + registered `layers/worktrees/*`, skipping symlinked
+  `*_ws`/package entries per the existing `wt_layer_*` convention).
+- `rosdep_local_sources.sh`: uses the shared discovery; new conflict-detection
+  pass (a key declared with different package lists by two or more files is
+  excluded from the generated list, never silently merged) with new exit
+  code 6; header comment updated. Exit 4 (shape rejection) still wins over 6
+  when both occur in one run.
+- `rosdep_local_staleness_check.sh`: uses the same shared discovery function,
+  so its audited key set can't drift from the generator's.
+- `bootstrap.sh`: new `elif -eq 6` branch mirroring the existing exit-4
+  branch (directory still written and valid; export it with a note).
+- `Makefile`: `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard; comment
+  reconciles `$(wildcard)` symlink-following with the generator's symlink
+  skip (harmless — extra prerequisite re-checks only).
+- `AGENTS.md`: both Script Reference rows updated (discovery, conflict
+  detection, exit 6, shared-discovery note).
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: new cases for
+  registered-worktree discovery, leftover/deregistered-worktree exclusion
+  (real `git worktree add` fixtures + admin-dir removal, not a plain
+  directory), symlinked-layer and symlinked-package skip, main-vs-worktree
+  and worktree-vs-worktree conflicts, identical-declaration dedupe,
+  shape-vs-conflict precedence, a Makefile wildcard grep guard, and a
+  worktree-only unmarked key caught by the staleness check.
+
+### Test results
+`.agent/scripts/tests/test_rosdep_local_sources.sh`: **147 passed, 0
+failed** (includes all pre-existing #654 cases, unchanged and still green).
+All 7 commits' pre-commit hooks (including shellcheck) passed at commit
+time; a standalone `pre-commit run` was not separately invocable in this
+worktree's shell (no `pre-commit` on PATH outside the git-hook invocation),
+but every touched file already passed shellcheck via the commit-time hook.
+`make -n -p` confirms the Makefile still parses and the new
+`ROSDEP_LOCAL_YAMLS` wildcard resolves against the real worktree fixture
+named in the issue (`unh_marine_autonomy#397`'s rosdep.yaml).
+
+### Deviations from the plan
+- No new `bootstrap.sh` test harness was built for the exit-6 branch — the
+  plan itself flagged this as a code-review-level check (no bootstrap.sh
+  test file exists today; it drives real package installs) rather than a
+  gap, consistent with the "only what's needed" principle.
+- Everything else matches the r2-revised plan as written.
