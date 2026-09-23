@@ -249,6 +249,95 @@ failed** (was 2; +3 new).
 file touched) — re-run to confirm no regression. **33 passed, 0 failed**
 (unchanged from r3).
 
+## Revision (r5) — pre-push round 3 decision (owner, 2026-09-23 13:52 -04:00)
+
+Round 3's Local Review (Pre-Push) found two new must-fix issues, both
+introduced by round 2's own TOCTOU-handling code and independently
+confirmed by two disjoint-lens adversarial passes:
+
+1. `worktree_remove.sh:442-443` — `if ! "$SCRIPT_DIR/rosdep_local_sources.sh"
+   "$ROOT_DIR"; then REGEN_RC=$?` captured `$?` from the negated `!` test,
+   not the wrapped command's real exit status (`$?` inside that `then`
+   branch is always 0). The operator-facing warning ("exit $REGEN_RC — see
+   messages above") therefore always claimed "exit 0" regardless of the
+   generator's actual failure code.
+2. `rosdep_local_sources.sh:277-279,397-399` — the two test-only hooks
+   (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `..._TEST_VANISH_AFTER_CONFLICT`)
+   ran `rm -f "$path"` unconditionally whenever the env var was non-empty,
+   with no confinement to a test/tmp root and no check that the path was
+   one this run itself discovered — an unconfined delete capability shipped
+   in the production script every real invocation runs (dev shells, `make
+   build`, `bootstrap.sh`, `worktree_remove.sh`, CI, the agent-image bake).
+
+Owner decision (binding, posted as an issue comment, "Pre-push round 3
+decision"):
+1. **Test hooks never delete.** `ROSDEP_LOCAL_SOURCES_TEST_VANISH[_AFTER_CONFLICT]`
+   only make the script *treat* a named file as missing, and only when that
+   file is one of the run's own discovered files. No `rm` in shipped code.
+2. **Soften exit 7 in the Makefile.** Treat it like exit 3: print a note
+   and leave the stamp stale so the next `make build` retries. A transient
+   race no longer fails the build.
+3. One-line fix: `worktree_remove.sh` captures the regen's real exit code
+   (`cmd || rc=$?`), not the `!` test's, with a test that checks the
+   number.
+
+### Implementation
+
+**Test hooks (simulation, never deletion)** (`rosdep_local_sources.sh`):
+both hooks now compute whether their named path is one of `passed_yamls`
+(this run's own shape-gate-passed discovered files) — if not, the hook is a
+no-op with a stderr note ("is not one of this run's own discovered
+files"), and the named path is never touched. If it is, the hook records
+the path in a `simulate_vanish_*` associative array rather than deleting
+anything: `ROSDEP_LOCAL_SOURCES_TEST_VANISH`'s target is passed to the
+conflict-detection Python subprocess via a
+`ROSDEP_LOCAL_SOURCES_SIMULATE_VANISH` env var (newline-separated paths),
+and the subprocess treats any path in that set as unreadable without
+opening it — so a real read failure and a simulated one report identically
+as `UNREADABLE`. `ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT`'s target
+is checked directly in the bash publish loop's existing `[ -f "$yaml" ]`
+re-check (`[ -n "${simulate_vanish_publish[$yaml]+x}" ] || [ ! -f "$yaml" ]`)
+— same observable behavior (exit 7, the file excluded, named on stderr),
+with the underlying filesystem entry untouched throughout.
+
+**Makefile: soften exit 7** — the `rosdep-local.done` stamp recipe gained
+an `elif "$$rc" -eq 7` branch, ordered before the general `-ne 0` fail
+branch and mirroring the existing exit-3 handling: prints a note naming the
+cause (a worktree removal racing the build) and leaves the stamp untouched
+so the next `make build` retries. Exits 4 and 6 are unaffected — they still
+fail the recipe, per the owner's decision to keep them as policy-violation
+gates.
+
+**`worktree_remove.sh` exit-code capture** — `REGEN_RC=0; "$SCRIPT_DIR/rosdep_local_sources.sh"
+"$ROOT_DIR" || REGEN_RC=$?` replaces the `if !`/`$?` pattern. `set -e` is
+active in this script, so the `||` form (the same pattern `bootstrap.sh`
+already used correctly) is required to both capture the real code and
+avoid the command's own `set -e` propagation.
+
+### Tests
+
+`test_rosdep_local_sources.sh`: the two existing vanish sections (round-2)
+gained a "the hook never deletes — the fixture file still exists" assertion
+each (four call sites total, including both precedence tests). A new
+section ("the test-vanish hooks only simulate a run's own discovered
+files") exercises the ignored-path case: `ROSDEP_LOCAL_SOURCES_TEST_VANISH`
+pointed at a file outside this run's discovery set exits 0, prints the
+ignore note, resolves the real file normally, and leaves the out-of-scope
+path untouched. The Makefile section gained exit-7 and exit-6 cases
+alongside the existing exit-3/exit-4 ones (soft-note-and-retry for 7, same
+as 3; hard-fail for 6, same as 4). Full suite: **185 passed, 0 failed**
+(was 171; +14 across the new race-hook-simulation and Makefile-exit-7
+cases).
+
+`test_worktree_remove.sh`: `test_layer_removal_regen_failure_does_not_fail_removal`
+gained an assertion that the warning names the stub's actual exit code
+(`exit 5 — see messages above`), which the pre-fix `$?`-after-`!` bug would
+have failed (it always printed "exit 0"). Full suite: **5 passed, 0
+failed** (unchanged count — same 3 round-2 cases, one strengthened).
+
+`test_worktree_create.sh`: unaffected by this round's changes — re-run to
+confirm no regression. **33 passed, 0 failed** (unchanged).
+
 ## Approach
 
 1. **Extend discovery in `rosdep_local_sources.sh`.** Add a second glob,
