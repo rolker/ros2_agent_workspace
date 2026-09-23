@@ -277,6 +277,14 @@ fi
 # only after every check has passed.  This avoids leaving the worktree in a
 # partially-destroyed state if a check causes an early exit.
 INNER_WORKTREE_REPOS=()  # Parent repos of inner worktrees (for pruning later)
+# Whether this worktree carries at least one project repo's root rosdep.yaml
+# (#659). Checked BEFORE removal — once the directory is gone there is
+# nothing left to check. Drives the post-removal regeneration below: without
+# it, a removed worktree's key keeps resolving via the host-shared
+# ROSDEP_SOURCE_PATH (setup.bash exports ONE directory for every shell on
+# the host) until whatever next runs `make build`/bootstrap.sh happens to
+# regenerate it.
+HAD_ROSDEP_YAML=false
 
 if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
     HAS_ISSUES=false
@@ -302,6 +310,14 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
             if [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
                 # Known inner git worktree — check for uncommitted changes
                 PKG_NAME=$(basename "$pkg_dir")
+
+                # #659: does this package carry a root rosdep.yaml that
+                # rosdep_local_sources.sh's discovery would have picked up
+                # (layers/worktrees/*/*_ws/src/*/rosdep.yaml, non-symlinked
+                # entries only — exactly this loop's own filter)?
+                if [ -f "$pkg_dir/rosdep.yaml" ]; then
+                    HAD_ROSDEP_YAML=true
+                fi
                 PKG_STATUS=$(git -C "$pkg_dir" status --porcelain 2>/dev/null)
                 if [ -n "$PKG_STATUS" ] && [ "$FORCE" != true ]; then
                     echo "⚠️  Warning: Package '$PKG_NAME' has uncommitted changes:"
@@ -407,6 +423,33 @@ git worktree prune
 
 echo ""
 echo "✅ Worktree removed successfully"
+
+# #659: regenerate the host-shared workspace-local rosdep sources dir when
+# the removed worktree carried a project repo's rosdep.yaml — otherwise its
+# `yaml file://` line keeps resolving via ROSDEP_SOURCE_PATH (one directory,
+# exported by setup.bash for every shell on the host) until something else
+# happens to regenerate it next. A regeneration failure must never turn a
+# successful removal into a script failure — the worktree IS gone — so it is
+# reported loudly, with the exact command to re-run, rather than propagated
+# as this script's exit status. Deliberately does NOT run `rosdep update`
+# (network, slow) — regeneration alone is enough to drop the dangling line;
+# the cache refreshes on its own schedule (bootstrap.sh, `make build`, or by
+# hand).
+if [ "$WORKTREE_TYPE" == "layer" ] && [ "$HAD_ROSDEP_YAML" = true ]; then
+    echo ""
+    echo "Regenerating workspace-local rosdep sources (removed worktree" \
+         "carried a rosdep.yaml, #659)..."
+    if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then
+        REGEN_RC=$?
+        echo ""
+        echo "⚠️  Warning: rosdep sources regeneration exited non-zero (exit" \
+             "$REGEN_RC — see messages above)." >&2
+        echo "   The worktree removal itself succeeded — this does NOT undo it." >&2
+        echo "   Until it's re-run successfully, the generated sources may not" >&2
+        echo "   reflect this removal. Re-run:" >&2
+        echo "     $SCRIPT_DIR/rosdep_local_sources.sh $ROOT_DIR" >&2
+    fi
+fi
 
 # Offer to delete the branch
 if [ -n "$BRANCH_NAME" ] && [ "$WORKTREE_TYPE" == "workspace" ]; then
