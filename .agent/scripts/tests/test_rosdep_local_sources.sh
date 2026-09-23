@@ -30,20 +30,33 @@ eq() { [ "$1" = "$2" ]; }
 
 # ---- worktree fixture helpers (#659) ----------------------------------------
 # The registration check (wt_is_registered) needs a GENUINE git worktree to
-# inspect — a plain directory can't exercise it. These build a throwaway
-# "project repo" and register/deregister linked worktrees against it, the
-# same shape layers/worktrees/<name>/<layer>_ws/src/<repo>/ has in the real
-# workspace.
+# inspect — a plain directory can't exercise it, and (since #659's must-fix)
+# it must be a genuine LINKED WORKTREE OF THE CORRESPONDING layers/main repo
+# specifically, not just some standalone git repo. These helpers build that
+# shape for real: a git repo at the expected layers/main/<ws>/src/<pkg>
+# location, and a linked worktree of THAT SAME repo at
+# layers/worktrees/<name>/<ws>/src/<pkg> — mirroring what
+# worktree_create.sh's `git worktree add` (run from the layers/main package
+# directory) actually produces.
 new_git_repo() {
     local dir="$1"
     mkdir -p "$dir"
     git -C "$dir" init -q -b main
     git -C "$dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 }
-add_git_worktree() {
-    local repo_dir="$1" wt_path="$2" branch="$3"
-    mkdir -p "$(dirname "$wt_path")"
-    git -C "$repo_dir" worktree add -q -b "$branch" "$wt_path" >/dev/null
+# Creates (if not already present) the git repo anchoring pkg_name in
+# ws_name at its expected layers/main location, and a linked worktree of
+# THAT repo under layers/worktrees/<worktree_name>. Prints the worktree
+# package dir on stdout.
+# Usage: wt_pkg=$(add_layer_worktree "$root_ws" a_ws repo_wt issue-900 wt-900)
+add_layer_worktree() {
+    local root_ws="$1" ws_name="$2" pkg_name="$3" worktree_name="$4" branch="$5"
+    local main_pkg_dir="$root_ws/layers/main/$ws_name/src/$pkg_name"
+    [ -d "$main_pkg_dir/.git" ] || new_git_repo "$main_pkg_dir"
+    local wt_pkg_dir="$root_ws/layers/worktrees/$worktree_name/$ws_name/src/$pkg_name"
+    mkdir -p "$(dirname "$wt_pkg_dir")"
+    git -C "$main_pkg_dir" worktree add -q -b "$branch" "$wt_pkg_dir" >/dev/null
+    echo "$wt_pkg_dir"
 }
 # Deregisters a linked worktree WITHOUT touching its working directory or
 # files — the same shape a merge_pr.sh exit-3 worktree-removal failure (or an
@@ -310,10 +323,8 @@ echo "=== rosdep_local_sources.sh: worktree discovery (#659) ==="
 # layers/worktrees/<name>/<layer>_ws/src/<repo>/ until the PR merges — the
 # generator must discover it there too, but ONLY while git still registers
 # the worktree.
-WTREPO="$TMP/wt_repo"; new_git_repo "$WTREPO"
 WTWS="$TMP/wt_ws"; mkdir -p "$WTWS/layers/main"
-WT_PKG="$WTWS/layers/worktrees/issue-900/a_ws/src/repo_wt"
-add_git_worktree "$WTREPO" "$WT_PKG" wt-900
+WT_PKG="$(add_layer_worktree "$WTWS" a_ws repo_wt issue-900 wt-900)"
 cat > "$WT_PKG/rosdep.yaml" <<'EOF'
 # upstream PR owed: https://github.com/ros/rosdistro/pull/00002
 snakemake:
@@ -326,8 +337,7 @@ check "a registered worktree yaml is picked up" \
     grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
 
 echo "=== rosdep_local_sources.sh: a leftover/deregistered worktree is excluded ==="
-WT_PKG2="$WTWS/layers/worktrees/issue-901/a_ws/src/repo_wt2"
-add_git_worktree "$WTREPO" "$WT_PKG2" wt-901
+WT_PKG2="$(add_layer_worktree "$WTWS" a_ws repo_wt2 issue-901 wt-901)"
 cat > "$WT_PKG2/rosdep.yaml" <<'EOF'
 mystery-wt-key:
   ubuntu: [mystery]
@@ -338,9 +348,61 @@ check "exits 0 despite the leftover directory" eq "$rc" 0
 check "the leftover/deregistered worktree yaml is skipped" \
     bash -c "! grep -q repo_wt2 '$WT_LOCAL'"
 check "it says the directory is not git-registered" \
-    contains "$out" "not a git-registered worktree"
+    contains "$out" "not a git-registered linked worktree"
 check "the still-registered worktree yaml survives the same run" \
     grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a rogue standalone repo at the worktree path is excluded (#659 must-fix) ==="
+# wt_is_registered previously only checked whether `dir` was SOME live git
+# repo whose own `worktree list` trivially includes itself (true for ANY
+# standalone git repo, worktree or not) — it never verified the checkout
+# belongs to the corresponding layers/main repo. A rogue/coincidental
+# standalone repo dropped at the worktree path shape would have been
+# silently trusted and its key merged into the host-shared source path.
+ROGUEWS="$TMP/rogue_ws"
+mkdir -p "$ROGUEWS/layers/main/a_ws/src/repo_rogue"
+new_git_repo "$ROGUEWS/layers/main/a_ws/src/repo_rogue"
+cat > "$ROGUEWS/layers/main/a_ws/src/repo_rogue/rosdep.yaml" <<'EOF'
+mainkey:
+  ubuntu: [mainpkg]
+EOF
+ROGUE_WT="$ROGUEWS/layers/worktrees/issue-910/a_ws/src/repo_rogue"
+new_git_repo "$ROGUE_WT"   # standalone repo — NOT a worktree of the repo above
+cat > "$ROGUE_WT/rosdep.yaml" <<'EOF'
+roguekey:
+  ubuntu: [roguepkg]
+EOF
+out="$("$AGG" "$ROGUEWS" 2>&1)"; rc=$?
+ROGUE_LOCAL="$ROGUEWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "the rogue standalone repo's yaml is excluded" \
+    bash -c "! grep -q roguekey '$ROGUE_LOCAL'"
+check "it says the rogue repo is not a registered linked worktree" \
+    contains "$out" "not a git-registered linked worktree"
+check "the genuine layers/main yaml still survives" \
+    grep -qxF "yaml file://$ROGUEWS/layers/main/a_ws/src/repo_rogue/rosdep.yaml" "$ROGUE_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a worktree with no corresponding layers/main repo is excluded (#659) ==="
+# The #659 checkpoint asked for this to be decided explicitly: a stale
+# worktree path can outlive a rename or removal of its layers/main repo
+# (`git worktree remove` updates the main repo's registry, but a bare
+# `rm -rf` of the layers/main checkout alone does not touch a linked
+# worktree at all). Fail closed, named reason, rather than trusting an
+# orphaned worktree's key.
+NOMAINWS="$TMP/nomain_ws"; mkdir -p "$NOMAINWS/layers/main"
+NOMAIN_WT="$(add_layer_worktree "$NOMAINWS" a_ws repo_orphan issue-911 wt-911)"
+cat > "$NOMAIN_WT/rosdep.yaml" <<'EOF'
+orphankey:
+  ubuntu: [orphanpkg]
+EOF
+rm -rf "$NOMAINWS/layers/main/a_ws/src/repo_orphan"
+out="$("$AGG" "$NOMAINWS" 2>&1)"; rc=$?
+NOMAIN_LOCAL="$NOMAINWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "the orphaned worktree yaml is excluded" \
+    bash -c "! grep -q orphankey '$NOMAIN_LOCAL'"
+check "it says no corresponding layers/main repo exists" \
+    contains "$out" "no corresponding"
 
 echo "=== rosdep_local_sources.sh: worktree discovery skips symlinked entries ==="
 # worktree_create.sh symlinks untouched siblings/non-target layers straight
@@ -369,15 +431,13 @@ check "a symlinked package entry is not rediscovered" \
     eq "$(grep -c '^yaml ' "$SYMLIST")" 1
 
 echo "=== rosdep_local_sources.sh: conflicting keys across layers/main and a worktree ==="
-CONFREPO="$TMP/conf_repo"; new_git_repo "$CONFREPO"
 CONFWS="$TMP/conf_ws"
 mkdir -p "$CONFWS/layers/main/a_ws/src/repo_main"
 cat > "$CONFWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
 sharedkey:
   ubuntu: [pkg-a]
 EOF
-CONF_WT="$CONFWS/layers/worktrees/issue-904/a_ws/src/repo_wt"
-add_git_worktree "$CONFREPO" "$CONF_WT" wt-904
+CONF_WT="$(add_layer_worktree "$CONFWS" a_ws repo_wt issue-904 wt-904)"
 cat > "$CONF_WT/rosdep.yaml" <<'EOF'
 sharedkey:
   ubuntu: [pkg-b]
@@ -392,12 +452,9 @@ check "excludes the layers/main file"  bash -c "! grep -q repo_main '$CONFLIST'"
 check "excludes the worktree file"     bash -c "! grep -q repo_wt '$CONFLIST'"
 
 echo "=== rosdep_local_sources.sh: conflicting keys worktree-vs-worktree ==="
-CONF2REPO="$TMP/conf2_repo"; new_git_repo "$CONF2REPO"
 CONFWS2="$TMP/conf_ws2"; mkdir -p "$CONFWS2/layers/main"
-CONF2_A="$CONFWS2/layers/worktrees/issue-905/a_ws/src/repo_a"
-CONF2_B="$CONFWS2/layers/worktrees/issue-906/a_ws/src/repo_b"
-add_git_worktree "$CONF2REPO" "$CONF2_A" wt-905
-add_git_worktree "$CONF2REPO" "$CONF2_B" wt-906
+CONF2_A="$(add_layer_worktree "$CONFWS2" a_ws repo_a issue-905 wt-905)"
+CONF2_B="$(add_layer_worktree "$CONFWS2" a_ws repo_b issue-906 wt-906)"
 cat > "$CONF2_A/rosdep.yaml" <<'EOF'
 wtkey:
   ubuntu: [x]
@@ -411,15 +468,13 @@ check "exits 6 on a worktree-vs-worktree conflict" eq "$rc" 6
 check "names the key"                  contains "$out" "wtkey"
 
 echo "=== rosdep_local_sources.sh: an identical declaration in main and a worktree dedupes cleanly ==="
-DEDUPREPO="$TMP/dedup_repo"; new_git_repo "$DEDUPREPO"
 DEDUPWS="$TMP/dedup_ws"
 mkdir -p "$DEDUPWS/layers/main/a_ws/src/repo_main"
 cat > "$DEDUPWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
 dupkey:
   ubuntu: [same-pkg]
 EOF
-DEDUP_WT="$DEDUPWS/layers/worktrees/issue-907/a_ws/src/repo_wt"
-add_git_worktree "$DEDUPREPO" "$DEDUP_WT" wt-907
+DEDUP_WT="$(add_layer_worktree "$DEDUPWS" a_ws repo_wt issue-907 wt-907)"
 cat > "$DEDUP_WT/rosdep.yaml" <<'EOF'
 dupkey:
   ubuntu: [same-pkg]
@@ -429,7 +484,6 @@ check "identical declarations exit 0, no false conflict" eq "$rc" 0
 check "no conflict reported"           lacks "$out" "conflict"
 
 echo "=== rosdep_local_sources.sh: a shape rejection (4) wins over a simultaneous conflict (6) ==="
-PRECREPO="$TMP/prec_repo"; new_git_repo "$PRECREPO"
 PRECWS="$TMP/prec_ws"
 mkdir -p "$PRECWS/layers/main/a_ws/src/repo_bad" "$PRECWS/layers/main/a_ws/src/repo_main2"
 printf 'k:\n  ubuntu:\n    pip:\n      packages: [x]\n' \
@@ -438,8 +492,7 @@ cat > "$PRECWS/layers/main/a_ws/src/repo_main2/rosdep.yaml" <<'EOF'
 otherkey:
   ubuntu: [b]
 EOF
-PREC_WT="$PRECWS/layers/worktrees/issue-908/a_ws/src/repo_wt"
-add_git_worktree "$PRECREPO" "$PREC_WT" wt-908
+PREC_WT="$(add_layer_worktree "$PRECWS" a_ws repo_wt issue-908 wt-908)"
 cat > "$PREC_WT/rosdep.yaml" <<'EOF'
 otherkey:
   ubuntu: [a]
@@ -524,10 +577,8 @@ check "key with no upstream-PR marker fails (1)" eq "$rc" 1
 check "names the unmarked key"         contains "$out" "'mystery-key' has no upstream-PR marker"
 
 echo "=== rosdep_local_staleness_check.sh: a worktree-only rosdep.yaml is audited too (#659) ==="
-STALEREPO="$TMP/stale_repo"; new_git_repo "$STALEREPO"
 STALEWS="$TMP/stale_ws"; mkdir -p "$STALEWS/layers/main"
-STALE_WT="$STALEWS/layers/worktrees/issue-909/a_ws/src/repo_wt"
-add_git_worktree "$STALEREPO" "$STALE_WT" wt-909
+STALE_WT="$(add_layer_worktree "$STALEWS" a_ws repo_wt issue-909 wt-909)"
 cat > "$STALE_WT/rosdep.yaml" <<'EOF'
 mystery-wt-key:
   ubuntu: [mystery]
