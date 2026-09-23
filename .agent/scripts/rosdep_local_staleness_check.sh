@@ -47,6 +47,14 @@
 #   rosdep_local_staleness_check.sh [<workspace_root>]
 #     workspace_root  optional — default: workspace_root.sh (the MAIN checkout)
 #
+# DISCOVERY (#659): audits layers/main AND registered layer worktrees, via
+# _worktree_helpers.sh's wt_discover_local_rosdep_yamls — the SAME function
+# rosdep_local_sources.sh uses, so this check's key set can never drift from
+# the generator's: a worktree-declared key resolves for every rosdep install
+# on the host (ROSDEP_SOURCE_PATH is one host-shared directory), so leaving
+# it off this audit would let it evade the "still needed / marked" bookkeeping
+# entirely.
+#
 # Exit codes (distinct on purpose — `make validate` treats 3 as a notice):
 #   0  clean, INCLUDING "no rosdep.yaml files found". A workspace where no
 #      project repo has opted in must never fail this check.
@@ -63,6 +71,8 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_worktree_helpers.sh
+source "$SCRIPT_DIR/_worktree_helpers.sh"   # wt_discover_local_rosdep_yamls
 
 if [ "$#" -gt 1 ]; then
     echo "Usage: rosdep_local_staleness_check.sh [<workspace_root>]" >&2
@@ -84,7 +94,7 @@ if [ ! -d "$ROOT_DIR" ]; then
 fi
 
 shopt -s nullglob
-yamls=("$ROOT_DIR"/layers/main/*_ws/src/*/rosdep.yaml)
+mapfile -t yamls < <(wt_discover_local_rosdep_yamls "$ROOT_DIR" | LC_ALL=C sort)
 if [ "${#yamls[@]}" -eq 0 ]; then
     echo "rosdep-local: no rosdep.yaml files found — nothing to check."
     exit 0
