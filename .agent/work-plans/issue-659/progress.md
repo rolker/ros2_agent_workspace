@@ -145,3 +145,21 @@ named in the issue (`unh_marine_autonomy#397`'s rosdep.yaml).
   test file exists today; it drives real package installs) rather than a
   gap, consistent with the "only what's needed" principle.
 - Everything else matches the r2-revised plan as written.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-23 13:40 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-659 at `7fddd92`
+**Mode**: pre-push
+**Depth**: Deep (reason: ~490 changed lines across the script/test set, plus override-trigger files Makefile and AGENTS.md, plus command-injection-surface scripts shelling out to python3/git)
+**Must-fix**: 1 | **Suggestions**: 3
+**Round**: 1 | **Ship**: continue — one real fail-open gap in the exact function the checkpoint decisions rely on for safety; cheap to fix, worth a second pass rather than shipping past it
+
+### Findings
+- [ ] (must-fix) `wt_is_registered` only proves `dir` is *some* live git repo whose own `worktree list` includes itself (trivially true for any standalone git repo, worktree or not) — it does not verify the checkout belongs to the expected project repo, so a stray/rogue git repo placed under `layers/worktrees/*/*_ws/src/*/` would be silently trusted and its rosdep.yaml merged into the host-shared `ROSDEP_SOURCE_PATH` — `.agent/scripts/_worktree_helpers.sh:157-178`
+- [ ] (suggestion) PyYAML `safe_load` in the conflict-detection heredoc is alias/anchor-amplification DoS-susceptible in principle — low priority, files are local/workspace-controlled — `.agent/scripts/rosdep_local_sources.sh:269-306`
+- [ ] (suggestion) `git worktree list --porcelain` parsing via line-by-line `read` would misparse a worktree/branch path containing an embedded newline — fail-closed direction only (false-exclude, never false-include) — `.agent/scripts/_worktree_helpers.sh:163-176`
+- [ ] (suggestion) `wt_is_registered`'s header comment (lines 139-156) implies exclusion always comes from the git command itself failing; in practice a plain non-git leftover directory instead succeeds via upward discovery into the outer workspace repo and is excluded by the path-mismatch instead — behavior is still correctly fail-closed, doc-precision only — `.agent/scripts/_worktree_helpers.sh:139-156`
