@@ -346,3 +346,86 @@ reported loudly and non-fatally, merge path confirmed covered via
 Tests remained hermetic throughout — no test wrote to the real
 `$HOME/project11/.rosdep`; both new suites use `ROSDEP_SYSTEM_SOURCES_DIR`
 fixtures and mock workspace trees under `mktemp -d`.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-23 13:43 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+**Verdict**: changes-requested
+
+**Branch**: feature/issue-659 at `efd2ade`
+**Mode**: pre-push
+**Depth**: Deep (reason: ~1800 changed lines across the script/test set, override-trigger files Makefile and AGENTS.md, and a security-relevant concurrency/race-fix touching a host-shared rosdep source path)
+**Must-fix**: 2 | **Suggestions**: 1
+**Round**: 3 | **Ship**: continue — two must-fix findings, both new to this round's TOCTOU-handling work and cross-pass confirmed by two independent fresh-context reads; one is a precise mechanical one-line fix, the other is a real security-relevant design question (which mitigation to gate the delete-capable test hook with) that warrants a decision, not an obvious-correction patch
+
+### Round 3 verification of round 2's must-fix
+Independently re-verified: the round-2 TOCTOU race fix (a shape-gate-passed
+`rosdep.yaml` deleted before conflict-check/publish) is genuinely fixed.
+Re-read `.agent/scripts/rosdep_local_sources.sh` end to end — the conflict
+Python subprocess now reports `UNREADABLE` explicitly instead of treating a
+read failure as "declares no keys", and the publish loop re-checks `[ -f
+"$yaml" ]` immediately before writing each line, closing both halves of the
+race window. Ran both regression suites locally and confirmed green:
+`test_rosdep_local_sources.sh` 171/171, `test_worktree_remove.sh` 5/5 (plus
+`test_worktree_create.sh` 33/33 as an unrelated-regression check).
+
+### Findings
+- [ ] (must-fix) `worktree_remove.sh:442-443` — `if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then REGEN_RC=$?` captures `$?` from the negated `!` test, not the wrapped command's real exit status — `$?` is always 0 inside that `then` branch (empirically verified: `f(){ return 4;}; if ! f; then echo $?; fi` prints `0`). The operator-facing warning "exit $REGEN_RC — see messages above" therefore always claims "exit 0" regardless of whether the generator actually hit a lock timeout (5), shape rejection (4), conflict (6), or vanished file (7) — misleading for exactly the person the message is written to help triage. The existing test (`test_layer_removal_regen_failure_does_not_fail_removal`) only asserts the substring "regeneration exited non-zero", never the printed number, so it doesn't catch this. Fix: `"$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?` (the form `bootstrap.sh` already uses correctly) or an un-negated `if`. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
+- [ ] (must-fix) `rosdep_local_sources.sh:277-279,397-399` — the two test-only hooks (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `..._AFTER_CONFLICT`) run `rm -f "$path"` unconditionally whenever the env var is non-empty, with no confinement to a test/tmp root, no second "under test" sentinel, and no check that the path is one this run itself discovered. This script runs at root/build scope in dev shells, `make build`, `bootstrap.sh`, `worktree_remove.sh` (a new caller added by this PR), CI, and the agent-image bake — several of which can inherit env from a longer-lived parent process. An accidentally-set env var (e.g. left exported in a dev shell after running the test suite by hand) turns a normal production run into an arbitrary `rm -f` of whatever path the var holds — not scoped to rosdep.yaml files. AGENTS.md's Never section treats unapproved deletion as a hard stop; this is the same risk class in a code path, not an operator action. The code's own comment ("mirrors the ROSDEP_SOURCES_FORCE_FALLBACK precedent") doesn't hold — that existing hook only forces a non-destructive fallback branch, never deletes anything. Recommend either (a) a second gate var (e.g. also require `ROSDEP_LOCAL_SOURCES_TEST_MODE=1`), (b) restricting the deletable path to ones already in this run's own `passed_yamls`/`local_yamls` set, or (c) moving both hooks out of the production script into a thin test-only wrapper/stub instead of shipping delete capability in the file every real invocation runs. — Claude Adversarial / Lens A + Lens B (independently, cross-pass confirmed)
+- [ ] (suggestion) Exit 7 ("file vanished mid-run", described in the script's own header as a routine, transient worktree-teardown race) is treated as a hard build failure by the Makefile's `rosdep-local.done` stamp recipe (any non-zero, non-3 exit fails the recipe) but as a soft, still-usable note by `bootstrap.sh`. A `make build` racing a concurrent `worktree_remove.sh` can fail outright on something self-describedly transient/benign, even though the directory was still written correctly minus the one raced file. Not a new inconsistency — it exactly mirrors the already-shipped exit-4 precedent (same asymmetry exists today) — so not blocking this PR, but worth a follow-up issue if the transient-race framing is meant to be acted on (e.g. retry the Makefile recipe, or special-case 7 the way exit 3 already is). — Claude Adversarial / Lens A
+
+### Round 3 context
+Two fresh-context adversarial passes (Lens A: logic/correctness; Lens B:
+systemic/safety) independently converged on the same two must-fix findings —
+a genuine `$?`-after-`!` exit-code bug and a delete-capable env-var test hook
+with no confinement — despite different prompts and no shared context,
+which is a strong signal both are real. Both also independently re-verified
+`wt_is_registered` (round 1's must-fix subject) remains sound after rounds
+2-3's additions, and independently re-derived the exit-code precedence
+(4 > 6 > 7) as correctly enforced with no double-reporting. The round-2
+must-fix (shape-gate-to-publish TOCTOU race) is confirmed fixed by both
+passes and by this reviewer's own re-read and test run.
+
+## Decision summary
+
+Issue [#659](https://github.com/rolker/ros2_agent_workspace/issues/659)
+widens `rosdep_local_sources.sh`'s discovery of project-repo `rosdep.yaml`
+files from `layers/main` only to also cover registered layer worktrees, so
+a `rosdep.yaml` added on a feature branch resolves on the same host before
+merge. It adds conflict detection (a key declared with different package
+lists by two discovered files excludes both, rather than rosdep's own
+silent first-loaded-wins), a new exit code 6 for that case, and — after two
+rounds of pre-push review — a fix for a TOCTOU race where a discovered file
+can be deleted mid-run (new exit code 7) plus logic in `worktree_remove.sh`
+to regenerate the host-shared sources directory when a removed layer
+worktree carried a `rosdep.yaml`, so a removal never leaves a dangling
+source line. `bootstrap.sh`, the Makefile stamp, `rosdep_local_staleness_check.sh`,
+and `AGENTS.md`'s Script Reference table were all updated to match. The
+scope for this final round was explicitly widened by the owner (issue
+comment, "Pre-push round 2 decision") to: fix the race, regenerate on
+worktree removal, and dedupe package lists — all three are implemented and
+covered by new regression tests (171/171 and 5/5 passing, both verified
+green independently by this review).
+
+Round 3 verified round 2's must-fix is genuinely fixed, then found two new
+must-fix issues introduced by this round's own TOCTOU-handling code,
+independently confirmed by two disjoint-lens adversarial passes: (1) a
+`$?`-after-`!` bug in `worktree_remove.sh` that makes the regeneration-failure
+warning always claim "exit 0" regardless of the real failure code, silently
+defeating the diagnostic the warning exists to provide; and (2) two
+test-only env-var hooks in the production `rosdep_local_sources.sh` script
+that run an unconfined `rm -f` on an env-supplied path, a real (if
+low-probability) arbitrary-file-deletion risk if either var were ever set
+in a non-test invocation. Both are precisely located and each has 2-3
+concrete fix options named above. One suggestion (exit-7-vs-Makefile
+hard-fail asymmetry) is a pre-existing pattern this PR doesn't newly
+introduce and can ride a follow-up issue rather than block this PR.
+
+**Recommendation**: address both must-fix findings (the exit-code capture
+is a one-line mechanical fix; the delete-hook gating needs a short decision
+among the three named options, then a small patch) and re-run this review
+before pushing. Not ready to ship as-is — not because the feature work is
+wrong, but because the two new findings are in the exact class of thing
+(misleading failure diagnostics, unconfined delete capability) this
+workspace's own Quality Standard calls out as not-a-nit.
