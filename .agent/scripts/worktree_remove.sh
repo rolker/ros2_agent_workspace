@@ -439,8 +439,9 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ "$HAD_ROSDEP_YAML" = true ]; then
     echo ""
     echo "Regenerating workspace-local rosdep sources (removed worktree" \
          "carried a rosdep.yaml, #659)..."
-    if ! "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR"; then
-        REGEN_RC=$?
+    REGEN_RC=0
+    "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?
+    if [ "$REGEN_RC" -ne 0 ]; then
         echo ""
         echo "⚠️  Warning: rosdep sources regeneration exited non-zero (exit" \
              "$REGEN_RC — see messages above)." >&2

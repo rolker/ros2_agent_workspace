@@ -276,6 +276,16 @@ EOF
     if [[ "$output" != *"Warning"*"regeneration exited non-zero"* ]]; then
         echo "    did not warn loudly about the regen failure: $output"; layer_cleanup; return 1
     fi
+    # #659 round-3 must-fix: the warning used to report `$?` from the negated
+    # `!` test (always 0), not the wrapped command's real exit status, so it
+    # always claimed "exit 0" no matter what the generator actually returned.
+    # The stub above exits 5 — assert that number, not just the substring the
+    # old test settled for, so a regression back to the `$?`-after-`!` bug is
+    # caught (it would print "exit 0" instead).
+    if [[ "$output" != *"exit 5 — see messages above"* ]]; then
+        echo "    did not report the real regeneration exit code (expected 5): $output"
+        layer_cleanup; return 1
+    fi
     if [[ "$output" != *"rosdep_local_sources.sh $LWORKSPACE_DIR"* ]]; then
         echo "    did not name the exact re-run command: $output"; layer_cleanup; return 1
     fi
