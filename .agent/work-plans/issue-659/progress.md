@@ -159,7 +159,73 @@ named in the issue (`unh_marine_autonomy#397`'s rosdep.yaml).
 **Round**: 1 | **Ship**: continue — one real fail-open gap in the exact function the checkpoint decisions rely on for safety; cheap to fix, worth a second pass rather than shipping past it
 
 ### Findings
-- [ ] (must-fix) `wt_is_registered` only proves `dir` is *some* live git repo whose own `worktree list` includes itself (trivially true for any standalone git repo, worktree or not) — it does not verify the checkout belongs to the expected project repo, so a stray/rogue git repo placed under `layers/worktrees/*/*_ws/src/*/` would be silently trusted and its rosdep.yaml merged into the host-shared `ROSDEP_SOURCE_PATH` — `.agent/scripts/_worktree_helpers.sh:157-178`
-- [ ] (suggestion) PyYAML `safe_load` in the conflict-detection heredoc is alias/anchor-amplification DoS-susceptible in principle — low priority, files are local/workspace-controlled — `.agent/scripts/rosdep_local_sources.sh:269-306`
-- [ ] (suggestion) `git worktree list --porcelain` parsing via line-by-line `read` would misparse a worktree/branch path containing an embedded newline — fail-closed direction only (false-exclude, never false-include) — `.agent/scripts/_worktree_helpers.sh:163-176`
-- [ ] (suggestion) `wt_is_registered`'s header comment (lines 139-156) implies exclusion always comes from the git command itself failing; in practice a plain non-git leftover directory instead succeeds via upward discovery into the outer workspace repo and is excluded by the path-mismatch instead — behavior is still correctly fail-closed, doc-precision only — `.agent/scripts/_worktree_helpers.sh:139-156`
+- [x] (must-fix) `wt_is_registered` only proves `dir` is *some* live git repo whose own `worktree list` includes itself (trivially true for any standalone git repo, worktree or not) — it does not verify the checkout belongs to the expected project repo, so a stray/rogue git repo placed under `layers/worktrees/*/*_ws/src/*/` would be silently trusted and its rosdep.yaml merged into the host-shared `ROSDEP_SOURCE_PATH` — `.agent/scripts/_worktree_helpers.sh:157-178`
+- [x] (suggestion) PyYAML `safe_load` in the conflict-detection heredoc is alias/anchor-amplification DoS-susceptible in principle — low priority, files are local/workspace-controlled — `.agent/scripts/rosdep_local_sources.sh:269-306` (deferred: review's own assessment — low priority in principle, and every input file is workspace-controlled/local, never attacker-supplied; not trivially fixable without hand-rolling a restricted YAML loader, so left as a known, accepted limitation rather than addressed here)
+- [x] (suggestion) `git worktree list --porcelain` parsing via line-by-line `read` would misparse a worktree/branch path containing an embedded newline — fail-closed direction only (false-exclude, never false-include) — `.agent/scripts/_worktree_helpers.sh:163-176` (deferred: review's own assessment confirms the only failure direction is false-exclude — a spurious "not registered" skip, never a false-include — so it cannot reopen the security gap this round exists to close; not trivially fixable within `--porcelain`'s newline-delimited format, so left as a known, accepted limitation)
+- [x] (suggestion) `wt_is_registered`'s header comment (lines 139-156) implies exclusion always comes from the git command itself failing; in practice a plain non-git leftover directory instead succeeds via upward discovery into the outer workspace repo and is excluded by the path-mismatch instead — behavior is still correctly fail-closed, doc-precision only — `.agent/scripts/_worktree_helpers.sh:139-156` (superseded: the must-fix's rewrite replaced this header comment entirely with one that names both exclusion paths — main repo missing vs. main repo exists but doesn't register the checkout — precisely, so the imprecision no longer exists to fix separately)
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-23 13:07 -04:00
+**By**: Claude Code Agent (Claude Sonnet 5)
+
+**Branch**: feature/issue-659 at `97c3943`
+**Addressed**: Local Review (Pre-Push), When 2026-09-23 13:40 -04:00, SHA `7fddd92`
+**Commits**: 1bb5c84, 8ad4df6, 97c3943
+
+### Changes
+- `.agent/scripts/_worktree_helpers.sh`: `wt_is_registered` now takes a
+  second argument, `main_repo_dir` — the expected
+  `layers/main/<ws>/src/<pkg>` repo — and requires BOTH that the discovered
+  checkout shares that repo's `git rev-parse --path-format=absolute
+  --git-common-dir` (the identity anchor: an independent standalone repo
+  never shares a commondir, even though its own `worktree list` trivially
+  lists itself) and that the main repo's OWN `worktree list --porcelain`
+  (queried from the main repo, not from the discovered dir) still names it.
+  `wt_discover_local_rosdep_yamls` computes the expected main-repo path from
+  each worktree entry's layer/package basenames and fails closed with a
+  named reason distinct from "not registered" when that repo doesn't exist
+  at all (a stale worktree path outliving a rename/removal of the main
+  repo — the case the issue's checkpoint asked to be decided explicitly).
+  Header comment for `wt_is_registered` rewritten to describe both
+  exclusion paths precisely (suggestion 3).
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: reworked the
+  worktree fixture helpers (`add_layer_worktree` replaces `add_git_worktree`)
+  so every worktree fixture in the file is a genuine linked worktree of its
+  corresponding `layers/main/<ws>/src/<pkg>` repo, matching what
+  `worktree_create.sh` actually produces — the old fixtures built worktrees
+  from disconnected throwaway repos with no `layers/main` counterpart at
+  all, which is exactly what let the must-fix gap go uncaught. Added two
+  regression cases: a rogue standalone repo at the worktree path shape
+  (excluded, even though its own `worktree list` trivially lists itself),
+  and a worktree with no corresponding `layers/main` repo (excluded, "no
+  corresponding ... repo exists").
+- `.agent/work-plans/issue-659/plan.md`: added an r3 revision section
+  recording why the r2 "mechanism chosen" note was incomplete and what
+  replaced it, plus updated the Files-to-Change rows for
+  `_worktree_helpers.sh` and the test file.
+
+### Test results
+- `.agent/scripts/tests/test_rosdep_local_sources.sh`: **154 passed, 0
+  failed** (was 147; +7 checks across the two new sections).
+- `.agent/scripts/tests/test_worktree_create.sh`: **33 passed, 0 failed**.
+- `.agent/scripts/tests/test_worktree_remove.sh`: **2 passed, 0 failed**.
+- All 3 commits' pre-commit hooks (including shellcheck) passed at commit
+  time.
+
+### Actions
+- [x] must-fix: `wt_is_registered` now verifies the discovered checkout is
+      a linked worktree of the corresponding `layers/main/<ws>/src/<pkg>`
+      repo specifically, via git-common-dir identity plus that repo's own
+      `worktree list --porcelain`; a missing corresponding main repo fails
+      closed with its own named reason — `.agent/scripts/_worktree_helpers.sh`
+- [x] suggestion 3: header comment now describes both exclusion paths
+      (main repo missing vs. main repo exists but doesn't register the
+      checkout) — `.agent/scripts/_worktree_helpers.sh`
+- [x] suggestion 1 (deferred: low priority, workspace-controlled/local
+      files only, not trivially fixable without a restricted YAML loader)
+      — `.agent/scripts/rosdep_local_sources.sh:269-306`
+- [x] suggestion 2 (deferred: fail-closed direction only — false-exclude,
+      never false-include — so it cannot reopen the security gap this
+      round exists to close; not trivially fixable within `--porcelain`'s
+      newline-delimited format) — `.agent/scripts/_worktree_helpers.sh:163-176`
