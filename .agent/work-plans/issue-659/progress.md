@@ -593,3 +593,87 @@ race + an exit-code bug, all previously found and now fixed). No
 must-fix or suggestion-level findings survived three independent fresh
 reads (two adversarial sub-agents plus this lead pass) against the same
 code. Shippable as-is.
+
+## Decision summary
+
+Issue [#659](https://github.com/rolker/ros2_agent_workspace/issues/659)
+widens `rosdep_local_sources.sh`'s discovery of project-repo `rosdep.yaml`
+files from `layers/main` only to also cover registered layer worktrees, so a
+`rosdep.yaml` added on a feature branch resolves on the same host before
+merge — all workspace-wide `rosdep install -y` calls (dev shells, `make
+build`, `ci_local.sh`, the agent-image bake) consult one host-shared
+`ROSDEP_SOURCE_PATH` directory (`setup.bash` exports it once for every
+shell), so this closes a first-use gap left by
+[#654](https://github.com/rolker/ros2_agent_workspace/issues/654).
+
+**What it does**: a new shared helper, `_worktree_helpers.sh`'s
+`wt_discover_local_rosdep_yamls`, walks both `layers/main/*_ws/src/*/` and
+`layers/worktrees/*/*_ws/src/*/`, skipping symlinked layer/package entries
+(worktree_create.sh's back-symlinks to layers/main) and admitting a worktree
+package only when `wt_is_registered` confirms — via matching
+`--git-common-dir` identity plus the main repo's own `worktree list
+--porcelain` — that it is a genuine linked worktree of the corresponding
+`layers/main` repo, never a rogue/coincidental standalone repo or a
+leftover/deregistered directory. `rosdep_local_sources.sh` and
+`rosdep_local_staleness_check.sh` both use this one function, so their key
+sets can never drift apart. A key declared with different package lists by
+two or more discovered files is a **conflict** (new exit code **6**) — every
+file touched by a conflicting key is excluded, never silently resolved by
+rosdep's own first-loaded-wins; an identical declaration in two places
+dedupes cleanly.
+
+**Owner decisions** (three binding comments on the issue, all implemented
+and verified): (1) host-wide union, not per-worktree source directories; (2)
+a branch changing a key `layers/main` already declares is a conflict, not a
+silent override, with an identical-declaration case deduping cleanly; a
+worktree admitted only while git still registers it; (3) after round-2 found
+a TOCTOU race and round-3 found two further must-fixes, the owner chose:
+race-fix + regenerate-on-worktree-removal (round 2), and simulate-only test
+hooks + Makefile exit-7 softening + a mechanical exit-code-capture fix
+(round 3).
+
+**Exit codes 6 and 7**: 6 = a genuine cross-file key conflict (the directory
+is still written minus the conflicting files). 7 = one or more
+shape-gate-passed files vanished mid-run (typically `worktree_remove.sh`
+racing this generator) — closed at two checkpoints (the conflict-detection
+subprocess reports `UNREADABLE` instead of swallowing the read failure as
+"no keys"; the publish loop re-checks `[ -f ]` immediately before writing).
+Precedence 4 (shape rejection) > 6 (conflict) > 7 (vanished) when more than
+one applies in a single run. `bootstrap.sh` and the Makefile's
+`rosdep-local.done` stamp both handle all three; the Makefile treats 7 like
+3 (note, stamp left stale, build not failed — a self-describedly transient
+race) while 4 and 6 still fail the build.
+
+**Regen-on-removal**: `worktree_remove.sh` checks each non-symlinked package
+for a root `rosdep.yaml` before removal and, if any was found, regenerates
+the host-shared rosdep sources directory after a successful removal —
+otherwise a removed worktree's key would keep resolving via
+`ROSDEP_SOURCE_PATH` until something else happened to regenerate it. Never
+runs `rosdep update` (network, slow). A regeneration failure is reported
+loudly with the exact re-run command but never fails the (already-successful)
+removal. `merge_pr.sh` removes worktrees through this same script, so the
+merge path is covered with no separate change.
+
+**Out of scope, explicitly** (per the Issue Review entry, confirmed still
+correct): `stage_rosdep_manifests.sh` (agent-image bake) and `ci_local.sh`
+use their own narrower rosdep.yaml discovery, scoped to a repo already
+resolved to a specific checkout rather than a dev-host-wide glob — neither
+needed the worktree-discovery widening this issue is about.
+
+**Test coverage**: `.agent/scripts/tests/test_rosdep_local_sources.sh`
+(185/185) and `.agent/scripts/tests/test_worktree_remove.sh` (5/5), both
+re-run and green as of this final round, using genuine `git worktree add`
+fixtures (not disconnected throwaway repos) so the registration-trust tests
+actually exercise what production code produces. `test_worktree_create.sh`
+(33/33) re-run as an unrelated-regression check (untouched by this PR).
+
+**Review history**: four pre-push rounds. Round 1 found and fixed a
+fail-open gap in the worktree-trust check. Round 2 found and fixed a TOCTOU
+race where a shape-gate-passed file could vanish before conflict-check or
+publish. Round 3 found and fixed a `$?`-after-`!` exit-code-capture bug and
+an unconfined `rm -f` in two test-only hooks (now simulate-only, scoped to
+the run's own discovered files). Round 4 (this review, Deep tier: two
+disjoint-lens fresh-context adversarial passes plus this reviewer's own
+independent read) verified all three rounds' fixes hold under skeptical
+re-examination and found nothing new — 0 must-fix, 0 suggestions. **Ship:
+recommended.**
