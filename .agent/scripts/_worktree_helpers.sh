@@ -136,33 +136,67 @@ extract_gh_slug() {
     fi
 }
 
-# Check whether `dir` is still a git worktree that git's OWN worktree
-# registry recognizes for its repo (main checkout or any linked worktree)
-# (#659). Fails closed: any git failure — not a git checkout at all, a
-# deregistered admin dir behind a dangling `.git` gitdir pointer (the shape a
-# merge_pr.sh exit-3 worktree-removal failure or an interrupted removal
-# leaves), an unreadable `worktree list` — counts as "not registered", and
-# the caller should EXCLUDE the directory rather than include it.
+# Check whether `dir` is a git worktree that belongs to `main_repo_dir` —
+# i.e. is `main_repo_dir` itself, or a LINKED worktree of that SAME repo,
+# per `main_repo_dir`'s own worktree registry (#659). This is an identity
+# check, not just an "is dir some live git checkout" check: a standalone git
+# repo (rogue or coincidental) placed at the worktree path shape, or a
+# worktree of a DIFFERENT repo, satisfies neither test below and is
+# excluded, even though `git -C dir worktree list --porcelain` on its own
+# would trivially list `dir` itself (any git repo is a trivial "worktree" of
+# itself). Two independent checks, both required:
 #
-# `git worktree list` enumerates every worktree of the repository (main +
-# linked) regardless of which one it is invoked FROM, so running it from
-# `dir` itself is sufficient — there is no need to separately locate the
-# repo's main checkout. This also collapses two checks into one command: if
-# `dir`'s `.git` gitdir pointer can't be resolved (its admin directory under
-# the main checkout's `.git/worktrees/<name>` was removed), the command
-# itself fails rather than merely omitting `dir` from its output — "is this a
-# live git checkout at all" and "is it still registered" fail the same way.
+#   1. `dir` and `main_repo_dir` share the same `--git-common-dir` — the one
+#      admin directory a main checkout and its linked worktrees all point
+#      into. A standalone repo (rogue or otherwise) has its OWN commondir
+#      and never matches this, regardless of what its own `worktree list`
+#      says about itself.
+#   2. `main_repo_dir`'s OWN `worktree list --porcelain` — queried from
+#      `main_repo_dir`, never from `dir` — still names `dir`. This is the
+#      authoritative registry: querying it from `main_repo_dir` rather than
+#      `dir` matters only defensively (both should agree, since they share
+#      a commondir per check 1), but anchoring the query at the trusted side
+#      keeps the check meaningful even if check 1's comparison were ever
+#      weakened.
 #
-# Usage: if wt_is_registered "$dir"; then ... fi
+# Fails closed on every other condition too: `main_repo_dir` missing or not
+# a readable git checkout — including the case #659's checkpoint asked to
+# be decided explicitly: the corresponding `layers/main/*_ws/src/<repo>`
+# repo does not exist at all, e.g. a stale worktree path outliving a rename
+# or removal of the main repo — a deregistered admin dir behind a dangling
+# `.git` gitdir pointer on either side (the shape a `merge_pr.sh` exit-3
+# worktree-removal failure or an interrupted removal leaves), or an
+# unreadable `worktree list`. Any of these counts as "not registered to
+# this repo", and the caller should EXCLUDE the directory rather than
+# include it.
+#
+# Usage: if wt_is_registered "$dir" "$main_repo_dir"; then ... fi
 wt_is_registered() {
     local dir="$1"
+    local main_repo_dir="$2"
+
     local real_dir
     real_dir="$(CDPATH='' cd -- "$dir" 2>/dev/null && pwd -P)" || return 1
 
-    local list
-    list="$(git -C "$dir" worktree list --porcelain 2>/dev/null)" || return 1
+    local main_real
+    main_real="$(CDPATH='' cd -- "$main_repo_dir" 2>/dev/null && pwd -P)" || return 1
+    git -C "$main_real" rev-parse --git-dir &>/dev/null || return 1
 
-    local line path
+    # Check 1: same git-common-dir. `--path-format=absolute` makes the
+    # comparison well-defined regardless of which directory git would
+    # otherwise print the path relative to (established pattern in this
+    # workspace: dashboard.sh, resolve_repo_checkout.sh, workspace_root.sh).
+    local main_common dir_common
+    main_common="$(git -C "$main_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+    dir_common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+    [ -n "$main_common" ] && [ -n "$dir_common" ] || return 1
+    main_common="$(CDPATH='' cd -- "$main_common" 2>/dev/null && pwd -P)" || return 1
+    dir_common="$(CDPATH='' cd -- "$dir_common" 2>/dev/null && pwd -P)" || return 1
+    [ "$dir_common" = "$main_common" ] || return 1
+
+    # Check 2: main_repo_dir's own registry still names dir.
+    local list line path
+    list="$(git -C "$main_real" worktree list --porcelain 2>/dev/null)" || return 1
     while IFS= read -r line; do
         case "$line" in
             "worktree "*)
@@ -193,9 +227,16 @@ wt_is_registered() {
 # to include that layer/package.
 #
 # A surviving package directory's rosdep.yaml is admitted only when
-# wt_is_registered confirms git still knows about that worktree; otherwise
-# it is skipped with a named reason (never silently included — see
-# wt_is_registered above).
+# wt_is_registered confirms it is a linked worktree of the CORRESPONDING
+# `layers/main/<ws>/src/<pkg>` repo — same layer-workspace name and package
+# name, exactly the checkout worktree_create.sh's `git worktree add` (run
+# from that same `layers/main` package directory) would have produced.
+# Otherwise it is skipped with a named reason (never silently included —
+# see wt_is_registered above), covering two distinct cases: the
+# corresponding `layers/main` repo doesn't exist at all, or it exists but
+# does not register `pkg_dir` as one of its own worktrees (a rogue/coincidental
+# standalone git repo at the worktree path shape, a worktree of some OTHER
+# repo, or a genuinely leftover/deregistered directory).
 #
 # Requires `shopt -s nullglob` to already be set in the calling shell (every
 # caller sets it before its own glob use; this function relies on that
@@ -229,12 +270,20 @@ wt_discover_local_rosdep_yamls() {
                 yaml="$pkg_dir/rosdep.yaml"
                 [ -f "$yaml" ] || continue
 
-                if wt_is_registered "$pkg_dir"; then
+                local main_pkg_dir
+                main_pkg_dir="$root_dir/layers/main/$(basename "$ws_dir")/src/$(basename "$pkg_dir")"
+
+                if [ ! -d "$main_pkg_dir" ]; then
+                    echo "Note: '$yaml' skipped — no corresponding" \
+                         "'$main_pkg_dir' repo exists (stale worktree path" \
+                         "outliving a rename/removal of the main repo)." >&2
+                elif wt_is_registered "$pkg_dir" "$main_pkg_dir"; then
                     echo "$yaml"
                 else
                     echo "Note: '$yaml' skipped — '$pkg_dir' is not a" \
-                         "git-registered worktree (leftover or deregistered" \
-                         "directory)." >&2
+                         "git-registered linked worktree of" \
+                         "'$main_pkg_dir' (leftover/deregistered directory," \
+                         "or a standalone/unrelated git repo at this path)." >&2
                 fi
             done
         done
