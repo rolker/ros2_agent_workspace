@@ -247,11 +247,29 @@ DENIED=$(jq -r '(.denied_actions // []) | map(.display_name // .action) | join("
 DENIED_COUNT=$(jq -r '(.denied_actions // []) | length' <<< "$RESULT_JSON")
 
 if [[ "$STATUS" != "SUCCESS" ]]; then
+    # Output-token cutoff (#336): name it precisely. Matched against agy's
+    # own error text and stderr only, never RESPONSE — the response is the
+    # model's text and can legitimately quote the phrase (a review of a
+    # diff that mentions it), which must not relabel an unrelated error.
+    # Captured live (#336 round 2): status non-SUCCESS with `.error` a
+    # plain string, verbatim:
+    #   Your previous response was cut off because it exceeded the output token limit
+    #   Please continue from where you left off, keeping your response shorter
+    #   Retries remaining: 3
+    # So `.error` is the observed channel; the stderr tail stays checked
+    # as a cheap second channel in case a CLI version moves it. Both
+    # halves must sit on the SAME line: across the whole blob, an unrelated
+    # "connection was cut off" plus a separate banner naming the token
+    # limit would mislabel an ordinary failure as a cutoff.
+    cutoff_source="${ERROR_MSG}"$'\n'"$(tail -n 20 "$STDERR_FILE" 2>/dev/null || true)"
+    if grep -qiE 'cut off.*output token limit|output token limit.*cut off' <<< "$cutoff_source"; then
+        fail "response was cut off because it exceeded the output token limit (status ${STATUS}); the prompt or response was too large for this turn${ERROR_MSG:+: ${ERROR_MSG}}$(stderr_excerpt)"
+    fi
     fail "result status ${STATUS}${ERROR_MSG:+: ${ERROR_MSG}}$(stderr_excerpt)"
 fi
 if [[ -z "${RESPONSE//[[:space:]]/}" ]]; then
     if [[ "$DENIED_COUNT" -gt 0 ]]; then
-        fail "empty response; ${DENIED_COUNT} tool action(s) were auto-denied in headless mode (${DENIED}). The reviewer needs the diff only; it must not run shell commands.$(stderr_excerpt)"
+        fail "empty response; ${DENIED_COUNT} tool action(s) were auto-denied in headless mode (${DENIED}). The reviewer works from the embedded diff only; it must not call any tools (file reads and shell commands are both denied headlessly).$(stderr_excerpt)"
     fi
     fail "empty response${ERROR_MSG:+: ${ERROR_MSG}}$(stderr_excerpt)"
 fi

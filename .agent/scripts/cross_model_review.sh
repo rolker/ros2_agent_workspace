@@ -1094,10 +1094,14 @@ Write a 1-3 sentence overall assessment after the findings table.
 PROMPT_FOOTER
 
 # --- Per-agent prompt files ---
-# Gemini only: headless agy auto-denies shell commands and then returns
-# an empty response (#288). Reading files is permitted, so the
-# reviewer keeps that. Not added for codex/claude/copilot — codex reads
-# files through the shell, so the line would cost it context.
+# Gemini only: headless agy auto-denies tool calls it cannot prompt for
+# (shell commands, and on real branches file reads too) and then returns
+# an empty response (#288, #336). So the reviewer is told to call no tools
+# at all and to work from the embedded diff and Plan Context alone, and to
+# keep its answer short: large Deep-tier prompts otherwise draw a reply
+# that hits agy's output-token limit (#336). Not added for
+# codex/claude/copilot — codex reads files through the shell, so the
+# restriction would cost it context.
 for agent in "${AGENTS_TO_RUN[@]}"; do
     prompt_file=$(prompt_file_for "$agent")
     cp "$SHARED_PROMPT" "$prompt_file"
@@ -1110,10 +1114,17 @@ The diff above is the complete set of code changes under review; files
 under `.agent/work-plans/` (plan and progress bookkeeping) are deliberately
 excluded **from the diff**. Where a `## Plan Context` section appears above,
 it is the plan's Approach quoted as context only — not part of the change
-under review. You may read files in the repository for surrounding context.
-Do NOT run shell commands: this is a headless session,
-command execution is denied without a prompt, and a denied command can end
-the review with no output.
+under review. The diff and the Plan Context are the only material available
+to you: there is no file-reading tool in this session. Do not call any
+tools — file reads and shell commands are both denied in this headless
+session, and a denied call ends the review with no output.
+Do NOT run shell commands. If you need context the diff does not show, say
+so in a `suggestion`-severity finding or in the `### Summary`; never invent
+that context, and never write as if you had read a file.
+
+Keep the answer concise: the findings table and a short summary only.
+Report every finding you have; keep each row short. Do not restate the
+diff, and do not quote large spans of it back; cite file:line instead.
 PROMPT_TOOL_USE
     fi
 done

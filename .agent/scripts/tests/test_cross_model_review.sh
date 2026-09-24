@@ -45,10 +45,19 @@ setup() {
     #     whose `response` echoes the prompt content back.
     # Knobs (env):
     #   MOCK_AGY_DENY=1     empty response + denied_actions, exit 0 (#288)
+    #   MOCK_AGY_DENY_ACTION=<n>  display_name of that denied action
+    #                       (default RunCommand; #336 saw ViewFile)
     #   MOCK_AGY_TIMEOUT=1  SUCCESS result + the print-timeout stderr marker
     #   MOCK_AGY_EXIT=<n>   exit <n> after printing "boom" on stderr
     #   MOCK_AGY_ERROR=<m>  status ERROR with an object-valued `error`
     #                       whose message is <m>, exit 0 (API failure)
+    #   MOCK_AGY_ERROR_RESPONSE=<r>  with MOCK_AGY_ERROR: the partial
+    #                       `response` text sent alongside it (default "")
+    #   MOCK_AGY_ERROR_STDERR=<l>    with MOCK_AGY_ERROR: also print <l>
+    #                       on stderr before the result event
+    #   MOCK_AGY_ERROR_STRING=1      with MOCK_AGY_ERROR: send `error` as
+    #                       the plain string <m> (the live cutoff shape)
+    #                       instead of the {code,message} object
     #   MOCK_AGY_DENY_PARTIAL=1  normal response PLUS one denied action
     #   MOCK_AGY_SLEEP=<s>  sleep <s> before answering normally
     #   MOCK_AGY_STALL=1    read the prompt, then never answer (sleep 60):
@@ -98,11 +107,18 @@ echo 'agy: a newer version is available (mock banner, not JSON)'
 echo '{"event":"init","init":{"tools":[]}}'
 if [[ -n "${MOCK_AGY_DENY:-}" ]]; then
     echo 'jetski: no output produced — a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.' >&2
-    echo '{"event":"result","result":{"status":"SUCCESS","response":"","denied_actions":[{"action":"command","display_name":"RunCommand"}]}}'
+    jq -cn --arg a "${MOCK_AGY_DENY_ACTION:-RunCommand}" '{event:"result",result:{status:"SUCCESS",response:"",denied_actions:[{action:"command",display_name:$a}]}}'
     exit 0
 fi
 if [[ -n "${MOCK_AGY_ERROR:-}" ]]; then
-    jq -cn --arg m "$MOCK_AGY_ERROR" '{event:"result",result:{status:"ERROR",response:"",error:{code:429,message:$m}}}'
+    [[ -n "${MOCK_AGY_ERROR_STDERR:-}" ]] && echo "${MOCK_AGY_ERROR_STDERR}" >&2
+    if [[ -n "${MOCK_AGY_ERROR_STRING:-}" ]]; then
+        jq -cn --arg m "$MOCK_AGY_ERROR" --arg r "${MOCK_AGY_ERROR_RESPONSE:-}" \
+            '{event:"result",result:{status:"ERROR",response:$r,error:$m}}'
+    else
+        jq -cn --arg m "$MOCK_AGY_ERROR" --arg r "${MOCK_AGY_ERROR_RESPONSE:-}" \
+            '{event:"result",result:{status:"ERROR",response:$r,error:{code:429,message:$m}}}'
+    fi
     exit 0
 fi
 if [[ -n "${MOCK_AGY_TIMEOUT:-}" ]]; then
@@ -1083,6 +1099,118 @@ test_agy_api_error_message_kept() {
     teardown
 }
 
+test_agy_viewfile_denial_is_failure() {
+    echo "TEST: a denied ViewFile read (#336's live signature) fails with the no-tools reason"
+    setup
+
+    local exit_code
+    exit_code=$(MOCK_AGY_DENY=1 MOCK_AGY_DENY_ACTION=ViewFile run_gemini_sync)
+
+    assert_exit_code "ViewFile-denied review exits 3" "3" "$exit_code"
+    local content
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "findings file has failed marker" "Review failed" "$content"
+    assert_contains "findings file names the denied ViewFile action" "\(ViewFile\)" "$content"
+    assert_contains "reason states the no-tools policy" \
+        "must not call any tools \(file reads and shell commands are both denied headlessly\)" "$content"
+    assert_not_contains "reason no longer blames shell commands alone" \
+        "it must not run shell commands" "$content"
+
+    teardown
+}
+
+# The live cutoff (captured in #336 round 2) puts the text in `.error` as
+# a plain string; test_agy_live_cutoff_fixture replays it verbatim. The
+# tests here keep exercising the object-valued `.error` and the stderr
+# channel, which the helper also checks.
+test_agy_output_token_cutoff_is_named() {
+    echo "TEST: agy's output-token cutoff is a failure with a precise reason; the partial response is dropped (#336)"
+    setup
+
+    local phrase="response was cut off because it exceeded the output token limit"
+    local exit_code content
+    exit_code=$(MOCK_AGY_ERROR="The ${phrase}." MOCK_AGY_ERROR_RESPONSE="PARTIAL REVIEW TEXT" run_gemini_sync)
+    assert_exit_code "cut-off review exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "reason names the cutoff precisely" \
+        "response was cut off because it exceeded the output token limit \(status ERROR\); the prompt or response was too large" "$content"
+    assert_not_contains "partial response is not recorded as a review" "PARTIAL REVIEW TEXT" "$content"
+    assert_contains "findings file has failed marker" "Review failed" "$content"
+
+    # Same condition reported on stderr instead, with an unrelated .error.
+    exit_code=$(MOCK_AGY_ERROR="internal error" MOCK_AGY_ERROR_STDERR="[agy] Response was cut off: it exceeded the output token limit" \
+        MOCK_AGY_ERROR_RESPONSE="PARTIAL REVIEW TEXT" run_gemini_sync)
+    assert_exit_code "stderr-reported cutoff exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "stderr-reported cutoff is named" "exceeded the output token limit \(status ERROR\)" "$content"
+    assert_not_contains "partial response is not recorded (stderr case)" "PARTIAL REVIEW TEXT" "$content"
+
+    teardown
+}
+
+# Verbatim live capture from #336 round 2: `.error` is a plain string
+# carrying agy's three-line cutoff message.
+test_agy_live_cutoff_fixture() {
+    echo "TEST: agy's live cutoff shape (string .error, verbatim) is named as a cutoff (#336)"
+    setup
+
+    local live_error=$'Your previous response was cut off because it exceeded the output token limit\nPlease continue from where you left off, keeping your response shorter\nRetries remaining: 3'
+    local exit_code content
+    exit_code=$(MOCK_AGY_ERROR="$live_error" MOCK_AGY_ERROR_STRING=1 \
+        MOCK_AGY_ERROR_RESPONSE="PARTIAL REVIEW TEXT" run_gemini_sync)
+    assert_exit_code "live cutoff exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "live cutoff reason is named" \
+        "response was cut off because it exceeded the output token limit \(status ERROR\); the prompt or response was too large" "$content"
+    assert_contains "agy's own error text is kept" "Retries remaining: 3" "$content"
+    assert_not_contains "partial response is not recorded" "PARTIAL REVIEW TEXT" "$content"
+    assert_contains "findings file has failed marker" "Review failed" "$content"
+
+    teardown
+}
+
+test_agy_cutoff_phrase_in_response_not_misread() {
+    echo "TEST: the cutoff phrase in the model's own response never relabels an unrelated error (#336)"
+    setup
+
+    # Status ERROR with an unrelated message, and a partial response that
+    # quotes the cutoff phrase (as a review of a diff mentioning it would).
+    # Only ERROR_MSG / stderr may drive the cutoff reason.
+    local exit_code content
+    exit_code=$(MOCK_AGY_ERROR="quota exceeded for model" \
+        MOCK_AGY_ERROR_RESPONSE="| 1 | major | x.sh:3 | response was cut off because it exceeded the output token limit |" \
+        run_gemini_sync)
+    assert_exit_code "unrelated ERROR exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "reason is the generic status line with the real error" \
+        "result status ERROR: .*quota exceeded for model" "$content"
+    assert_not_contains "no cutoff reason line" "\(status ERROR\); the prompt or response was too large" "$content"
+    assert_not_contains "the partial response is not recorded" "x.sh:3" "$content"
+
+    teardown
+}
+
+test_agy_cutoff_halves_on_separate_lines_not_misread() {
+    echo "TEST: 'cut off' and 'output token limit' on separate lines is not a cutoff (#336)"
+    setup
+
+    # An unrelated "connection was cut off" error plus a separate stderr
+    # line naming the token limit: still a failure, but the generic one.
+    local exit_code content
+    exit_code=$(MOCK_AGY_ERROR="connection was cut off by the server" \
+        MOCK_AGY_ERROR_STDERR="[agy] model output token limit: 8192" \
+        MOCK_AGY_ERROR_RESPONSE="PARTIAL REVIEW TEXT" run_gemini_sync)
+    assert_exit_code "split-phrase failure still exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "reason is the generic status line with the real error" \
+        "result status ERROR: .*connection was cut off by the server" "$content"
+    assert_not_contains "no cutoff reason line" "\(status ERROR\); the prompt or response was too large" "$content"
+    assert_not_contains "the partial response is not recorded" "PARTIAL REVIEW TEXT" "$content"
+    assert_contains "findings file has failed marker" "Review failed" "$content"
+
+    teardown
+}
+
 test_agy_findings_truncated() {
     echo "TEST: a failed run never leaves the previous run's findings in place (#288)"
     setup
@@ -1181,7 +1309,7 @@ MKTEMP_EOF
 }
 
 test_prompt_tool_use_guidance() {
-    echo "TEST: tool-use paragraph is present for gemini and absent for codex (#288)"
+    echo "TEST: no-tools + concise-output guidance is gemini-only (#288, #336)"
     setup
 
     run_gemini_sync >/dev/null
@@ -1189,6 +1317,22 @@ test_prompt_tool_use_guidance() {
     gemini_prompt=$(cat "${MOCK_REPO}/${PROMPT_REL}")
     assert_contains "gemini prompt tells the model not to run commands" \
         "Do NOT run shell commands" "$gemini_prompt"
+    assert_contains "gemini prompt tells the model to call no tools" \
+        "Do not call any" "$gemini_prompt"
+    assert_contains "gemini prompt says there is no file-reading tool" \
+        "there is no file-reading tool in this session" "$gemini_prompt"
+    assert_contains "gemini prompt asks for a concise answer" \
+        "Keep the answer concise" "$gemini_prompt"
+    assert_contains "gemini prompt keeps every finding, brevity per row" \
+        "Report every finding you have; keep each row short" "$gemini_prompt"
+    assert_contains "gemini prompt says not to restate the diff" \
+        "Do not restate the" "$gemini_prompt"
+    assert_contains "gemini prompt asks for file:line citations" \
+        "cite file:line instead" "$gemini_prompt"
+    assert_not_contains "gemini prompt drops the lost-review threat" \
+        "whole review is lost" "$gemini_prompt"
+    assert_not_contains "gemini prompt no longer invites file reads" \
+        "You may read files" "$gemini_prompt"
 
     # codex: a mock that consumes stdin and prints something.
     cat > "${MOCK_BIN}/codex" << 'CODEX_EOF'
@@ -1204,6 +1348,23 @@ CODEX_EOF
     codex_prompt=$(cat "${MOCK_REPO}/.agent/work-plans/issue-42/review-codex-prompt.md")
     assert_not_contains "codex prompt has no tool-use paragraph" \
         "Do NOT run shell commands" "$codex_prompt"
+    assert_not_contains "codex prompt has no no-tools instruction" \
+        "Do not call any|no file-reading tool" "$codex_prompt"
+    assert_not_contains "codex prompt has no concise-output instruction" \
+        "Keep the answer concise" "$codex_prompt"
+
+    make_mock_agent claude
+    local out="${TMPDIR_BASE}/out.txt"
+    run_agents "$out" "claude" >/dev/null
+    local claude_prompt
+    claude_prompt=$(cat "${MOCK_REPO}/.agent/work-plans/issue-42/review-claude-prompt.md")
+    assert_contains "claude prompt was generated" "### Findings" "$claude_prompt"
+    assert_not_contains "claude prompt has no tool-use paragraph" \
+        "Do NOT run shell commands" "$claude_prompt"
+    assert_not_contains "claude prompt has no no-tools instruction" \
+        "Do not call any|no file-reading tool" "$claude_prompt"
+    assert_not_contains "claude prompt has no concise-output instruction" \
+        "Keep the answer concise" "$claude_prompt"
 
     teardown
 }
@@ -3273,18 +3434,132 @@ test_cli_claude_error_payload_in_reason() {
     make_mock_agent claude
     local out="${TMPDIR_BASE}/out.txt" ec
 
+    # Synthetic fallback coverage for the `.error` branch — not observed
+    # CLI output. The live captures in test_cli_claude_live_failure_shapes
+    # show claude 2.1.281 uses `.errors` (an array), not `.error`, for
+    # max-turns; these two keep the `.error` reader covered for shapes
+    # that were not captured live (e.g. error_during_execution).
     # is_error with an EMPTY .result: the payload is the only cause there is.
     ec=$(MOCK_CLAUDE_RAW='{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","error":{"message":"upstream connect error: 503"}}' \
         run_agents "$out" "claude")
     assert_exit_code "is_error with an object payload exits 3" "3" "$ec"
     assert_contains "reason carries .error.message" "upstream connect error: 503" "$(findings_of claude)"
 
-    # A string-valued .error on a bad subtype.
+    # A string-valued .error on a bad subtype (synthetic, as above).
     ec=$(MOCK_CLAUDE_RAW='{"type":"result","subtype":"error_max_turns","is_error":false,"result":"","error":"max turns exceeded"}' \
         run_agents "$out" "claude")
     assert_exit_code "bad subtype with a string payload exits 3" "3" "$ec"
     assert_contains "reason names the subtype" "error_max_turns" "$(findings_of claude)"
     assert_contains "reason carries the string .error" "max turns exceeded" "$(findings_of claude)"
+    teardown
+}
+
+# Full result objects captured live from claude 2.1.281 (#336) with
+# `--output-format json --permission-prompts none`, from a scratch
+# directory. Scrubbed: session_id / uuid, and the max-turns shape's
+# permission_denials tool_input values and tool_use_id (fields kept,
+# values replaced). Every failure shape exited 1 — the reason is in the
+# JSON only, which is why the helper must read it before the exit code.
+CLAUDE_LIVE_BAD_MODEL=$(cat << 'JSON_EOF'
+{"api_error_status":404,"duration_api_ms":0,"duration_ms":611,"fast_mode_disabled_reason":"sdk_opt_in_required","fast_mode_state":"off","is_error":true,"modelUsage":{},"num_turns":1,"permission_denials":[],"queued_turn_count":0,"result":"There's an issue with the selected model (bogus-model-xyz). It may not exist or you may not have access to it. Run --model to pick a different model.","result_index":0,"session_id":"<scrubbed>","stop_reason":"stop_sequence","subagent_stats":{"by_type":{},"completed":0,"failed":0,"killed":{"parent":0,"system":0,"user":0},"max_depth":0,"refused":{"budget":0,"concurrency_limit":0,"depth_limit":0},"requested":{"background":0,"foreground":0,"unset":0},"spawned":0,"spawned_by_subagents":0,"started_in_background":0},"subtype":"success","terminal_reason":"api_error","total_cost_usd":0,"type":"result","usage":{"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"inference_geo":"","input_tokens":0,"iterations":[],"output_tokens":0,"output_tokens_details":{"thinking_tokens":0},"server_tool_use":{"web_fetch_requests":0,"web_search_requests":0},"service_tier":"standard","speed":"standard"},"uuid":"<scrubbed>"}
+JSON_EOF
+)
+CLAUDE_LIVE_MAX_TURNS=$(cat << 'JSON_EOF'
+{"duration_api_ms":2561,"duration_ms":2707,"errors":["Reached maximum number of turns (1)"],"fast_mode_disabled_reason":"sdk_opt_in_required","fast_mode_state":"off","is_error":true,"modelUsage":{"claude-opus-5-5":{"cacheCreationInputTokens":0,"cacheReadInputTokens":19247,"canonicalModel":"claude-opus-5-5","contextWindow":1000000,"costBasis":"list","costUSD":0.0071774000000000004,"inputTokens":2,"maxOutputTokens":128000,"outputTokens":166,"provider":"firstParty","thinkingTokens":50,"webSearchRequests":0}},"num_turns":2,"permission_denials":[{"tool_input":{"command":"<scrubbed>","description":"<scrubbed>"},"tool_name":"Bash","tool_use_id":"<scrubbed>"}],"queued_turn_count":0,"result_index":0,"session_id":"<scrubbed>","stop_reason":"tool_use","subagent_stats":{"by_type":{},"completed":0,"failed":0,"killed":{"parent":0,"system":0,"user":0},"max_depth":0,"refused":{"budget":0,"concurrency_limit":0,"depth_limit":0},"requested":{"background":0,"foreground":0,"unset":0},"spawned":0,"spawned_by_subagents":0,"started_in_background":0},"subtype":"error_max_turns","terminal_reason":"max_turns","total_cost_usd":0.0071774000000000004,"type":"result","usage":{"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":0,"cache_read_input_tokens":19247,"inference_geo":"not_available","input_tokens":2,"iterations":[{"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":0,"cache_read_input_tokens":19247,"input_tokens":2,"output_tokens":166,"type":"message"}],"output_tokens":166,"output_tokens_details":{"thinking_tokens":50},"server_tool_use":{"web_fetch_requests":0,"web_search_requests":0},"service_tier":"standard","speed":"standard"},"uuid":"<scrubbed>"}
+JSON_EOF
+)
+CLAUDE_LIVE_MAX_BUDGET=$(cat << 'JSON_EOF'
+{"duration_api_ms":0,"duration_ms":3429,"errors":["Reached maximum budget ($0.0001)"],"fast_mode_disabled_reason":"sdk_opt_in_required","fast_mode_state":"off","is_error":true,"modelUsage":{"claude-opus-5-5":{"cacheCreationInputTokens":0,"cacheReadInputTokens":19261,"canonicalModel":"claude-opus-5-5","contextWindow":1000000,"costBasis":"list","costUSD":0.0080202,"inputTokens":2,"maxOutputTokens":128000,"outputTokens":208,"provider":"firstParty","thinkingTokens":170,"webSearchRequests":0}},"num_turns":1,"permission_denials":[],"queued_turn_count":0,"result_index":0,"session_id":"<scrubbed>","stop_reason":"end_turn","subagent_stats":{"by_type":{},"completed":0,"failed":0,"killed":{"parent":0,"system":0,"user":0},"max_depth":0,"refused":{"budget":0,"concurrency_limit":0,"depth_limit":0},"requested":{"background":0,"foreground":0,"unset":0},"spawned":0,"spawned_by_subagents":0,"started_in_background":0},"subtype":"error_max_budget_usd","terminal_reason":"budget_exhausted","total_cost_usd":0.0080202,"type":"result","usage":{"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"inference_geo":"","input_tokens":0,"iterations":[],"output_tokens":0,"output_tokens_details":{"thinking_tokens":0},"server_tool_use":{"web_fetch_requests":0,"web_search_requests":0},"service_tier":"standard","speed":"standard"},"uuid":"<scrubbed>"}
+JSON_EOF
+)
+CLAUDE_LIVE_SUCCESS=$(cat << 'JSON_EOF'
+{"api_error_status":null,"duration_api_ms":2254,"duration_ms":2369,"fast_mode_disabled_reason":"sdk_opt_in_required","fast_mode_state":"off","first_content_frame_ms":834,"is_error":false,"modelUsage":{"claude-opus-5-5":{"cacheCreationInputTokens":7291,"cacheReadInputTokens":11945,"canonicalModel":"claude-opus-5-5","contextWindow":1000000,"costBasis":"list","costUSD":0.062805,"inputTokens":2,"maxOutputTokens":128000,"outputTokens":104,"provider":"firstParty","thinkingTokens":100,"webSearchRequests":0}},"num_turns":1,"permission_denials":[],"queued_turn_count":0,"result":"OK","result_index":0,"session_id":"<scrubbed>","stop_reason":"end_turn","subagent_stats":{"by_type":{},"completed":0,"failed":0,"killed":{"parent":0,"system":0,"user":0},"max_depth":0,"refused":{"budget":0,"concurrency_limit":0,"depth_limit":0},"requested":{"background":0,"foreground":0,"unset":0},"spawned":0,"spawned_by_subagents":0,"started_in_background":0},"subtype":"success","terminal_reason":"completed","time_to_request_ms":115,"total_cost_usd":0.062805,"ttft_ms":1835,"ttft_stream_ms":834,"type":"result","usage":{"cache_creation":{"ephemeral_1h_input_tokens":7291,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":7291,"cache_read_input_tokens":11945,"inference_geo":"not_available","input_tokens":2,"iterations":[{"cache_creation":{"ephemeral_1h_input_tokens":7291,"ephemeral_5m_input_tokens":0},"cache_creation_input_tokens":7291,"cache_read_input_tokens":11945,"input_tokens":2,"output_tokens":104,"type":"message"}],"output_tokens":104,"output_tokens_details":{"thinking_tokens":100},"server_tool_use":{"web_fetch_requests":0,"web_search_requests":0},"service_tier":"standard","speed":"standard"},"uuid":"<scrubbed>"}
+JSON_EOF
+)
+
+test_cli_claude_live_failure_shapes() {
+    echo "TEST: claude 2.1.281's live failure shapes (exit 1) report the JSON reason, not just the exit code (#336)"
+    setup
+    make_mock_agent claude
+    local out="${TMPDIR_BASE}/out.txt" ec content
+
+    # Unknown --model: no `.errors`, reason in `.result`, subtype success.
+    ec=$(MOCK_CLAUDE_RAW="$CLAUDE_LIVE_BAD_MODEL" MOCK_CLAUDE_EXIT=1 run_agents "$out" "claude")
+    assert_exit_code "bad model exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_contains "bad model: reason carries .result" "issue with the selected model \(bogus-model-xyz\)" "$content"
+    assert_contains "bad model: reason carries api_error_status 404" "api_error_status: 404" "$content"
+    assert_contains "bad model: reason carries terminal_reason" "terminal_reason: api_error" "$content"
+    assert_contains "bad model: exit code kept" "claude also exited 1" "$content"
+    assert_not_contains "bad model: not the bare exit-code reason" "^claude exited 1" "$content"
+
+    # --max-turns: `.errors` array, `.result` null.
+    ec=$(MOCK_CLAUDE_RAW="$CLAUDE_LIVE_MAX_TURNS" MOCK_CLAUDE_EXIT=1 run_agents "$out" "claude")
+    assert_exit_code "max turns exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_contains "max turns: reason carries .errors" "Reached maximum number of turns \(1\)" "$content"
+    assert_contains "max turns: reason carries terminal_reason" "terminal_reason: max_turns" "$content"
+    assert_contains "max turns: exit code kept" "claude also exited 1" "$content"
+
+    # --max-budget-usd: `.errors` array, `.result` null.
+    ec=$(MOCK_CLAUDE_RAW="$CLAUDE_LIVE_MAX_BUDGET" MOCK_CLAUDE_EXIT=1 run_agents "$out" "claude")
+    assert_exit_code "max budget exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_contains "max budget: reason carries .errors" "Reached maximum budget \(\\\$0.0001\)" "$content"
+    assert_contains "max budget: reason carries terminal_reason" "terminal_reason: budget_exhausted" "$content"
+
+    # Control: the live success shape at exit 0 is still accepted.
+    ec=$(MOCK_CLAUDE_RAW="$CLAUDE_LIVE_SUCCESS" MOCK_CLAUDE_EXIT=0 run_agents "$out" "claude")
+    assert_exit_code "live success shape exits 0" "0" "$ec"
+    content=$(findings_of claude)
+    assert_contains "live success: the result is the review" "^OK$" "$content"
+    assert_contains "live success: completion marker" "Review complete" "$content"
+    teardown
+}
+
+test_cli_claude_exit_code_never_lost() {
+    echo "TEST: reading claude's JSON first never loses a non-zero exit (#336)"
+    setup
+    make_mock_agent claude
+    local out="${TMPDIR_BASE}/out.txt" ec content
+
+    # No JSON at all + a kill-style exit: the exit code is the reason.
+    ec=$(MOCK_CLAUDE_RAW='not json' MOCK_CLAUDE_EXIT=137 run_agents "$out" "claude")
+    assert_exit_code "no JSON + exit 137 exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_contains "reason is the exit code" "claude exited 137" "$content"
+    assert_not_contains "not the no-JSON reason" "did not emit a JSON result object" "$content"
+
+    # A success-looking result with a non-zero exit is not trusted.
+    ec=$(MOCK_CLAUDE_RAW="$CLAUDE_LIVE_SUCCESS" MOCK_CLAUDE_EXIT=4 run_agents "$out" "claude")
+    assert_exit_code "success JSON + exit 4 exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_contains "reason names the exit despite the JSON" \
+        "claude exited 4 despite a successful-looking JSON result" "$content"
+    assert_not_contains "the result is not kept as a review" "^OK$" "$content"
+    teardown
+}
+
+test_cli_claude_errors_field_type_safe() {
+    echo "TEST: a non-string .errors element is reported, not a jq crash (#336)"
+    setup
+    make_mock_agent claude
+    local out="${TMPDIR_BASE}/out.txt" ec content
+
+    ec=$(MOCK_CLAUDE_RAW='{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","errors":[{"code":1,"message":"boom"},"plain"]}' \
+        run_agents "$out" "claude")
+    assert_exit_code "object-element .errors exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_not_contains "the read did not fail" "could not be read" "$content"
+    assert_contains "object element is kept as JSON" '\{"code":1,"message":"boom"\}; plain' "$content"
+
+    # A non-array .errors falls back to tostring.
+    ec=$(MOCK_CLAUDE_RAW='{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","errors":"just a string"}' \
+        run_agents "$out" "claude")
+    assert_exit_code "string .errors exits 3" "3" "$ec"
+    content=$(findings_of claude)
+    assert_not_contains "string .errors: the read did not fail" "could not be read" "$content"
+    assert_contains "string .errors is kept" "just a string" "$content"
     teardown
 }
 
@@ -3884,6 +4159,11 @@ test_agy_timeout_is_failure
 test_agy_partial_denial_is_noted
 test_diff_fetch_failure_is_marked
 test_agy_api_error_message_kept
+test_agy_viewfile_denial_is_failure
+test_agy_output_token_cutoff_is_named
+test_agy_live_cutoff_fixture
+test_agy_cutoff_phrase_in_response_not_misread
+test_agy_cutoff_halves_on_separate_lines_not_misread
 test_agy_findings_truncated
 test_agy_no_temp_leak
 test_shared_temp_no_leak_on_early_abort
@@ -3942,6 +4222,9 @@ test_cli_error_text_explains_never_causes
 test_cli_codex_transcript_marker_does_not_fail_the_review
 test_cli_review_text_is_never_reclassified
 test_cli_claude_error_payload_in_reason
+test_cli_claude_live_failure_shapes
+test_cli_claude_exit_code_never_lost
+test_cli_claude_errors_field_type_safe
 test_cli_claude_non_object_json_is_a_reported_failure
 test_cli_helper_returns_promptly_on_term
 test_claude_unavailable_without_jq

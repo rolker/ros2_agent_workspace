@@ -337,9 +337,14 @@ case "$AGENT" in
         DIAG_FILE="$STDERR_FILE"
         run_cli "$STDOUT_FILE" "$STDERR_FILE" \
             "$CLI_BIN_RESOLVED" -p --output-format json --permission-prompts none
-        if [[ "$CLI_EXIT" -ne 0 ]]; then
-            fail "claude exited ${CLI_EXIT}$(bound_note)$(marker_note "$STDERR_FILE")$(log_excerpt 'claude stderr' "$STDERR_FILE")"
-        fi
+        # JSON before exit status (#336): claude 2.1.281 exits 1 for every
+        # captured failure — unknown --model (404), --max-turns and
+        # --max-budget-usd hit — and puts the reason only in its JSON
+        # result. Failing on the exit code first discarded that reason.
+        # The exit code still fails the run in every case: it is the
+        # reason when there is no JSON, it is appended to a JSON-reported
+        # failure, and a success-looking JSON with a non-zero exit fails
+        # on the exit code at the end of this arm.
         # `jq -e .` alone accepts ANY truthy JSON value — a bare string,
         # a number, an array — and the field reads below then abort jq
         # with "Cannot index string with string". This helper runs
@@ -350,6 +355,11 @@ case "$AGENT" in
         # keep every extraction inside a guarded block so a jq failure
         # still lands in fail().
         if ! jq -e 'type == "object"' "$STDOUT_FILE" >/dev/null 2>&1; then
+            # No JSON to read: a non-zero exit (crash, SIGKILL → 137) is
+            # then the only reason there is, so keep it and its notes.
+            if [[ "$CLI_EXIT" -ne 0 ]]; then
+                fail "claude exited ${CLI_EXIT}$(bound_note)$(marker_note "$STDERR_FILE")$(log_excerpt 'claude stderr' "$STDERR_FILE")"
+            fi
             fail "claude did not emit a JSON result object$(log_excerpt 'claude stdout' "$STDOUT_FILE")$(log_excerpt 'claude stderr' "$STDERR_FILE")"
         fi
         # `.error` may be a string or an object; take .message when it is
@@ -368,24 +378,45 @@ case "$AGENT" in
             printf -v "$name" '%s' "$value"
         }
         IS_ERROR="false"; SUBTYPE="missing"; RESULT=""; ERROR_MSG=""
+        ERRORS_ARR=""; API_ERROR_STATUS=""; TERMINAL_REASON=""
         CLAUDE_READ_FAILED=""
         read_claude_field IS_ERROR '(.is_error // false) | tostring' || CLAUDE_READ_FAILED=".is_error"
         read_claude_field SUBTYPE '.subtype // "missing"' || CLAUDE_READ_FAILED=".subtype"
         read_claude_field RESULT '.result // "" | tostring' || CLAUDE_READ_FAILED=".result"
         read_claude_field ERROR_MSG '(.error // "") | if type == "object" then (.message // tostring) else tostring end' || CLAUDE_READ_FAILED=".error"
+        # `.errors` is where claude 2.1.281 puts the max-turns and
+        # max-budget reasons (with `.result` null). Type-safe: string
+        # elements join as-is, any other element is tojson'd (jq's join
+        # rejects non-strings), and a non-array value is tostring'd.
+        read_claude_field ERRORS_ARR '(.errors // []) | if type == "array" then (map(if type == "string" then . else tojson end) | join("; ")) else tostring end' || CLAUDE_READ_FAILED=".errors"
+        read_claude_field API_ERROR_STATUS '(.api_error_status // empty) | tostring' || CLAUDE_READ_FAILED=".api_error_status"
+        read_claude_field TERMINAL_REASON '(.terminal_reason // empty) | tostring' || CLAUDE_READ_FAILED=".terminal_reason"
         if [[ -n "$CLAUDE_READ_FAILED" ]]; then
             fail "claude's JSON result could not be read (${CLAUDE_READ_FAILED})$(log_excerpt 'jq error' "${TMP_DIR}/jq-error.txt")$(log_excerpt 'claude stdout' "$STDOUT_FILE")"
         fi
+        # Preference: `.errors`, then `.error`, then `.result` (an unknown
+        # --model has no `.errors`; its reason is in `.result`).
         CLAUDE_DETAIL="${RESULT:-}"
         [[ -n "$ERROR_MSG" ]] && CLAUDE_DETAIL="${ERROR_MSG}${RESULT:+ | result: ${RESULT}}"
-        # Structured fields are the ONLY thing that fails claude here
-        # (the header rule): `.is_error`, a non-success `.subtype`, or an
-        # empty `.result` — never the text of a successful result.
+        [[ -n "$ERRORS_ARR" ]] && CLAUDE_DETAIL="${ERRORS_ARR}${RESULT:+ | result: ${RESULT}}"
+        [[ -n "$API_ERROR_STATUS" ]] && CLAUDE_DETAIL="${CLAUDE_DETAIL} (api_error_status: ${API_ERROR_STATUS})"
+        [[ -n "$TERMINAL_REASON" ]] && CLAUDE_DETAIL="${CLAUDE_DETAIL} (terminal_reason: ${TERMINAL_REASON})"
+        CLAUDE_EXIT_NOTE=""
+        [[ "$CLI_EXIT" -ne 0 ]] && CLAUDE_EXIT_NOTE=" (claude also exited ${CLI_EXIT})"
+        # Structured fields and the exit status are the ONLY things that
+        # fail claude here (the header rule): `.is_error`, a non-success
+        # `.subtype`, a non-zero exit, or an empty `.result` — never the
+        # text of a successful result.
         if [[ "$IS_ERROR" == "true" ]]; then
-            fail "claude returned is_error=true (subtype ${SUBTYPE})${CLAUDE_DETAIL:+: ${CLAUDE_DETAIL}}$(log_excerpt 'claude stderr' "$STDERR_FILE")"
+            fail "claude returned is_error=true (subtype ${SUBTYPE})${CLAUDE_DETAIL:+: ${CLAUDE_DETAIL}}${CLAUDE_EXIT_NOTE}$(log_excerpt 'claude stderr' "$STDERR_FILE")"
         fi
         if [[ "$SUBTYPE" != "success" ]]; then
-            fail "claude result subtype is '${SUBTYPE}', not 'success'${CLAUDE_DETAIL:+: ${CLAUDE_DETAIL}}$(log_excerpt 'claude stderr' "$STDERR_FILE")"
+            fail "claude result subtype is '${SUBTYPE}', not 'success'${CLAUDE_DETAIL:+: ${CLAUDE_DETAIL}}${CLAUDE_EXIT_NOTE}$(log_excerpt 'claude stderr' "$STDERR_FILE")"
+        fi
+        # A clean-looking result from a CLI that still exited non-zero is
+        # not trustworthy: fail on the exit code.
+        if [[ "$CLI_EXIT" -ne 0 ]]; then
+            fail "claude exited ${CLI_EXIT} despite a successful-looking JSON result$(bound_note)$(marker_note "$STDERR_FILE")$(log_excerpt 'claude stderr' "$STDERR_FILE")"
         fi
         ;;
     copilot)
