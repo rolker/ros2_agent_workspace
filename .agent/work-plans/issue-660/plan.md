@@ -280,7 +280,9 @@ table) surfaced one dependency the issue didn't name:
   this one is the ported script's own job).
   **Explicit Bash-tool-safe timeout** (Plan checkpoint decision 3): the
   invocation sets `AGENT_TIMEOUT` and `AGY_PRINT_TIMEOUT` below the Bash
-  tool's 600s hard cap (e.g. `AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=480`)
+  tool's 600s hard cap (`AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=420s
+  GEMINI_BACKSTOP_MARGIN=60` — see Implementation Notes for why the
+  margin and the unit are both required)
   so the script's own internal per-agent timeout fires and emits its
   `EXIT=` marker *before* the harness kills the whole invocation —
   otherwise a wedged CLI produces a hard-killed call with no
@@ -328,8 +330,8 @@ against a real diff **on this host**, where `agy` (1.2.9) and `codex`
 ```bash
 make lint
 cd .workspace-worktrees/issue-workspace-660   # this worktree, once the port is committed
-AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=480 \
-  .agent/scripts/cross_model_review.sh --branch --agents gemini,codex --no-progress
+AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=420s GEMINI_BACKSTOP_MARGIN=60 \
+  .agent/scripts/cross_model_review.sh --branch origin/main --agents gemini,codex --no-progress
 ```
 
 - `--branch --no-progress` avoids needing an open PR and avoids writing
@@ -352,6 +354,48 @@ AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=480 \
   satisfy the helpers' contracts.
 - Record the outcome (pass/fail, findings summary, any version-specific
   surprises) in this plan's Implementation Notes during implementation.
+
+## Implementation Notes
+
+**Live verification (2026-09-24)**, codex-cli 0.156.1, agy 1.2.10, run as
+`--branch --issue 660` (artifacts in the gitignored work-plans dir, not
+`--no-progress`), in the background rather than under the 600s bound:
+
+- **Run 1, port at upstream `48b0d82`**: codex completed in about a
+  minute with three real findings (below). Gemini **failed**: agy tried
+  a tool call, headless mode denied it, and the response was empty. The
+  script reported that as a failed review (EXIT=1), not as a clean one.
+- **Upstream had fixed that failure after the snapshot**
+  (rolker/agent_workspace#336, "Gemini reviews fail on real branches").
+  The port was re-synced to upstream `main` @ `97a87fa`: the
+  `48b0d82..97a87fa` delta for `cross_model_review.sh`, `_agy_review.sh`,
+  `_cli_review.sh` and the test suite applied cleanly over the local
+  adaptations (codex pin, header, Rule 3 text), and the suite went from
+  594 to 662 assertions, all passing. `_plan_approach.py` and the two
+  resolvers had no upstream changes.
+- **Run 2, gemini only, after the re-sync**: completed in about 5
+  minutes on a ~350 KB prompt, with a full review.
+
+**Defects the reviews found and this PR fixes:**
+
+1. The skill's `AGY_PRINT_TIMEOUT=480` was rejected by the script (it is
+   a Go duration and needs a unit), so every 5e run would have exited 2
+   before any agent started. With the unit added, gemini's outer bound
+   is still `AGY_PRINT_TIMEOUT + GEMINI_BACKSTOP_MARGIN` (default 300s),
+   above the 600s cap, so the margin is set explicitly too.
+2. The untrusted-PR gate asked `gh pr view --json` for
+   `authorAssociation` and `baseRepository`, fields gh does not expose,
+   so the gate errored on every PR. It now reads the REST pull object
+   and fails closed when the lookup fails.
+3. The helpers' escalation watchdog is forked while the terminate
+   handler has INT/TERM/HUP ignored and inherited that, so cancelling it
+   was a no-op: it outlived every clean shutdown by the escalation window
+   and then `kill -9`ed whatever process held the dead CLI's PID. It now
+   resets the dispositions first, and a new test assertion covers it.
+   Upstream has the same bug.
+4. 5e's pre-push call passes `--branch "origin/$BASE"`: without a base
+   the script prefers the local default branch, which in this workspace
+   moves only on `make sync`.
 
 ## Principles Self-Check
 
