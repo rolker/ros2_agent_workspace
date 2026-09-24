@@ -81,14 +81,17 @@ of the surrounding tooling.
   `cross_model_review.sh` and its helpers (`_agy_review.sh`,
   `_cli_review.sh`, `_resolve_work_plans_dir.sh`,
   `_resolve_default_branch.sh`, `_plan_approach.py`) and test suite are
-  ported from upstream `main` @ `48b0d82`, using upstream's parallel-sync
+  ported from upstream `main` @ `48b0d82` and re-synced to `97a87fa`
+  (upstream's fix for Gemini's headless tool denial, #336), using upstream's parallel-sync
   execution model (upstream ADR-0015 — the tmux mode that kept this
   unadopted is gone upstream). Default on at Standard + Deep with
   `--agents gemini,codex`, `--no-cross-model` to opt out. Local
   adaptations: codex pinned `-s read-only -a never` (upstream relies on
   CLI defaults — reported upstream), the work-plans resolver's remediation
-  text matches this workspace's `worktree_enter.sh`, and the header
-  comments drop upstream's user-tier promotion notes.
+  text matches this workspace's `worktree_enter.sh`, the header
+  comments drop upstream's user-tier promotion notes, and both helpers'
+  escalation watchdog resets its inherited ignored signals so it can be
+  cancelled (same bug upstream).
   - **Copilot Adversarial Specialist removed** in the same change. It was
     ported in PR #464 (issue #461) as a synchronous `copilot -p ""
     --allow-all-tools` dispatch, default on, then made opt-in via

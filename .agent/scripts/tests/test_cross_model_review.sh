@@ -3623,6 +3623,28 @@ test_cli_claude_non_object_json_is_a_reported_failure() {
     teardown
 }
 
+# The escalation watchdog is a subshell forked while the helper's
+# terminate handler has INT/TERM/HUP ignored; an ignored disposition is
+# inherited, so without a reset the `kill "$watchdog"` that cancels it
+# after a clean CLI exit is a no-op and the watchdog outlives the helper
+# by the whole escalation window, then `kill -9`s whatever process holds
+# the dead CLI's PID by then (rolker/ros2_agent_workspace #660). The
+# forked subshell keeps the helper's argv, so the per-test findings path
+# identifies it.
+assert_watchdog_cancelled() {
+    local label="$1" findings="$2" i
+    for ((i = 0; i < 10; i++)); do
+        pgrep -f -- "$findings" >/dev/null || break
+        sleep 0.1
+    done
+    if pgrep -f -- "$findings" >/dev/null; then
+        echo "  FAIL: ${label}: escalation watchdog still running after a clean CLI exit"; FAIL=$((FAIL + 1))
+        pkill -f -- "$findings" 2>/dev/null || true
+    else
+        echo "  PASS: ${label}: escalation watchdog cancelled with the helper"; PASS=$((PASS + 1))
+    fi
+}
+
 test_cli_helper_returns_promptly_on_term() {
     echo "TEST: TERM to the helper returns at once when the CLI exits cleanly (#313 round 2, gemini 4)"
     setup
@@ -3652,6 +3674,7 @@ test_cli_helper_returns_promptly_on_term() {
     else
         echo "  FAIL: helper waited out the escalation window after a clean CLI exit"; FAIL=$((FAIL + 1))
     fi
+    assert_watchdog_cancelled "cli helper" "$findings"
     teardown
 }
 

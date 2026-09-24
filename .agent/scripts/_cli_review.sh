@@ -233,10 +233,16 @@ terminate_child() {
         # only matters for a CLI that ignores SIGTERM. It is NOT waited
         # on: a subshell sleeping in `sleep` defers the TERM we send it
         # until that sleep ends, so waiting would reintroduce the full
-        # window on every clean exit. Unwaited, it exits on its own
-        # (and re-checks liveness before any kill, so it cannot hit a
-        # recycled PID).
-        ( sleep "$REVIEW_KILL_ESCALATION"
+        # window on every clean exit.
+        # The watchdog resets INT/TERM/HUP first: it is forked while this
+        # handler has them ignored, an ignored disposition is inherited,
+        # and without the reset the `kill "$watchdog"` below is a no-op —
+        # the watchdog would outlive every clean shutdown by the whole
+        # escalation window and then `kill -9` whatever process had been
+        # given the dead CLI's PID (`kill -0` checks a PID, not identity).
+        # rolker/ros2_agent_workspace #660.
+        ( trap - INT TERM HUP
+          sleep "$REVIEW_KILL_ESCALATION"
           kill -0 "$CLI_PID" 2>/dev/null && kill -9 "$CLI_PID" 2>/dev/null ) &
         watchdog=$!
         wait "$CLI_PID" 2>/dev/null
