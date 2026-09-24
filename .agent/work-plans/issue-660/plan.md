@@ -397,6 +397,22 @@ AGENT_TIMEOUT=480 AGY_PRINT_TIMEOUT=420s GEMINI_BACKSTOP_MARGIN=60 \
    the script prefers the local default branch, which in this workspace
    moves only on `make sync`.
 
+**Gemini's findings on the upstream code (owner decision 2026-09-24: fix
+all of them here):** `--branch` no longer takes a short flag (`-R`) as
+its base ref; an unset `HOME` no longer aborts CLI discovery;
+`--work-dir` with `--no-progress` is rejected instead of writing
+`issue-noprogress/` into a repo; `job_finished` reads an exited job as
+finished when there is neither a running-job list nor `/proc`; cleanup's
+hard kill takes the job's whole process tree; the plan-context lookup no
+longer needs git 2.31's `--path-format`; a slug-less `issue-<N>`
+worktree resolves; the default-branch resolver skips a local branch
+strictly behind `origin/<branch>`; a text line before claude's JSON
+result no longer fails the review; codex runs under an environment
+allowlist; the watchdog is cancelled with SIGKILL (a TERM could land
+before any reset and be lost) and takes its `sleep` with it. Each has a
+test (689 assertions). Owner decision on the second question: the
+untrusted-PR gate stays in the skill text only.
+
 ## Principles Self-Check
 
 | Principle | Consideration |
