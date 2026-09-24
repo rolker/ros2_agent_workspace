@@ -54,3 +54,27 @@ issue: 660
 - `markdown-it-py`/`.venv` resolution mechanism (`git -C "$SCRIPT_SELF_DIR" rev-parse --git-common-dir`) verified correct for this workspace's worktree layout: from this worktree, `--git-common-dir` resolves to the MAIN root's `.git`, matching `Makefile`'s `VENV_DIR := $(MAIN_ROOT)/.venv` — a worktree session finds the shared `.venv` correctly. Confirmed `.venv/bin/python3` exists on this host but does not yet have `markdown_it` importable (pre-port state, as expected).
 - `.gitignore` rows (plan step 4) land before the live-verification run (plan step 8) that would create `review-*-prompt.md`/`review-*-findings.md` under `.agent/work-plans/issue-<N>/` — no risk of accidental commit. Both `progress_append.sh` and `address-findings`'s `git add` are scoped to `progress.md` only, confirmed by reading both — neither could sweep in a findings/prompt file even without the gitignore rows.
 - Hosted CI test-suite execution (mocks-only) confirmed accurate as far as it goes: `test_cross_model_review.sh` builds mock `agy`/codex/claude/copilot binaries under a `mktemp` dir prepended to `PATH` — no real CLI or network calls, so the suite is legitimately hermetic. The break flagged above (must-fix #2) is a *dependency* gap (markdown-it-py), not a mocking gap.
+
+## Local Review (Pre-Push)
+**Status**: complete
+**When**: 2026-09-24 15:05 -04:00
+**By**: Claude Code Agent (Claude Opus 5.5 (1M context))
+
+**Branch**: `feature/issue-660` at `ee6094d`
+**Depth**: Deep (6,000+ lines; CI workflow and instruction-file changes)
+**Round**: 1 — **Ship: recommended** (every Must-fix fixed and tested; no design question left open)
+**Specialists**: static (shellcheck, flake8), governance + plan drift, Claude Adversarial Lens A + Lens B, Cross-Model (codex; gemini after the upstream re-sync)
+
+### Findings (all addressed on this branch)
+- [x] (cross-confirmed: codex, Lens A, Lens B, governance) 5e's `AGY_PRINT_TIMEOUT=480` rejected by the script; gemini backstop above the 600s cap — `.claude/skills/review-code/SKILL.md`
+- [x] (cross-confirmed: codex, governance) untrusted-PR gate used `gh pr view` fields gh does not expose — `.claude/skills/review-code/SKILL.md`
+- [x] (codex) escalation watchdog could not be cancelled; could `kill -9` a recycled PID — `_cli_review.sh`, `_agy_review.sh`
+- [x] (gemini) pre-push base could be a stale local main — SKILL.md 5e + `_resolve_default_branch.sh`
+- [x] (gemini) nine defects in the upstream-verbatim code, fixed here per owner decision — see plan.md Implementation Notes
+- [x] (governance) live verification unrecorded — plan.md Implementation Notes
+- [x] (Lens A) codex self-review exclusion is inert without `$AGENT_FRAMEWORK` — documented in SKILL.md 5e
+
+### Not changed
+- (Lens B) untrusted-PR gate enforced in the script as well — owner decision: stays in the skill text only
+- (Lens B) claude arm lacks tool lockdown — not used by 5e; kept for upstream reconcilability
+- (governance) instruction-file edits go slightly past the flag-naming lines — noted in the PR description
