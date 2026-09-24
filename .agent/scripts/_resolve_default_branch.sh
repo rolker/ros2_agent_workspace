@@ -21,7 +21,8 @@
 #   3. Literal `main` as last-ditch fallback.
 #
 # After picking a name, the helper verifies the ref is reachable locally
-# or on `origin/`. Callers receive a ref that is safe to feed straight
+# or on `origin/`, preferring the local branch unless it is strictly
+# behind `origin/<name>`. Callers receive a ref that is safe to feed straight
 # into `git diff <ref>...HEAD`.
 #
 # Rationale: workspace and project repos default to `main` today, but
@@ -80,7 +81,18 @@ resolve_default_branch() {
     fi
 
     # --- Verify the chosen ref is reachable ---
+    # Local wins, EXCEPT when it is strictly behind origin/<branch>: a
+    # worktree-based workflow rarely updates the local default branch, and
+    # diffing against a stale one puts already-merged commits in the diff
+    # (#660). Only strictly behind: a local branch that is ahead or has
+    # diverged (field-mode commits not yet pushed) is kept.
     if git -C "$repo_root" rev-parse --verify --quiet "$branch" >/dev/null 2>&1; then
+        if git -C "$repo_root" rev-parse --verify --quiet "origin/$branch" >/dev/null 2>&1 \
+            && [ "$(git -C "$repo_root" rev-parse "$branch")" != "$(git -C "$repo_root" rev-parse "origin/$branch")" ] \
+            && git -C "$repo_root" merge-base --is-ancestor "$branch" "origin/$branch" 2>/dev/null; then
+            echo "origin/$branch"
+            return 0
+        fi
         echo "$branch"
         return 0
     fi

@@ -274,12 +274,17 @@ resolve_agent_bin() {
         command -v "$name"
         return 0
     fi
-    local candidate
-    for candidate in \
-        "${HOME}/.nvm/versions/node"/*/bin/"${name}" \
-        "${HOME}/.local/bin/${name}" \
-        "${HOME}/.npm-global/bin/${name}" \
-        /usr/local/bin/"${name}"; do
+    local candidate candidates=()
+    # HOME may be unset (a stripped CI or service environment); under
+    # `set -u` expanding it would abort the whole run, so the per-user
+    # locations are only searched when it is set (#660).
+    if [[ -n "${HOME:-}" ]]; then
+        candidates+=("${HOME}/.nvm/versions/node"/*/bin/"${name}"
+                     "${HOME}/.local/bin/${name}"
+                     "${HOME}/.npm-global/bin/${name}")
+    fi
+    candidates+=(/usr/local/bin/"${name}")
+    for candidate in "${candidates[@]}"; do
         if [[ -x "$candidate" ]]; then
             echo "INFO: ${name} not in PATH, found at: ${candidate}" >&2
             echo "$candidate"
@@ -329,8 +334,10 @@ while [[ $# -gt 0 ]]; do
             # --branch takes an optional value. Treat the next token as
             # the base ref only if it doesn't look like another flag and
             # isn't empty. Otherwise leave BRANCH_BASE empty so the
-            # default-branch resolver runs.
-            if [[ -n "${2:-}" && "${2}" != --* ]]; then
+            # default-branch resolver runs. `-*`, not `--*`: short flags
+            # such as `-R` are flags too, and git refuses a ref name that
+            # begins with `-`, so none is lost (#660).
+            if [[ -n "${2:-}" && "${2}" != -* ]]; then
                 BRANCH_BASE="$2"
                 shift 2
             else
@@ -627,6 +634,14 @@ source "${SCRIPT_DIR}/_resolve_work_plans_dir.sh"
 source "${SCRIPT_DIR}/_resolve_default_branch.sh"
 
 
+# --work-dir builds a per-issue dir inside a repo, the one thing
+# --no-progress promises not to create: without an issue it would write
+# `.agent/work-plans/issue-noprogress/` into that repo (#660). An exact
+# --work-plans-dir stays allowed with --no-progress.
+if [[ -n "$EXPLICIT_WORK_DIR" && "$NO_PROGRESS" == true && -z "$CLI_WORK_PLANS_DIR" ]]; then
+    echo "ERROR: --work-dir and --no-progress conflict: --work-dir writes into <dir>/.agent/work-plans/issue-<N>/. Pass --work-plans-dir <exact-dir> to keep --no-progress artifacts somewhere specific." >&2
+    exit 2
+fi
 if [[ -n "$CLI_WORK_PLANS_DIR" ]]; then
     export WORK_PLANS_DIR_OVERRIDE="$CLI_WORK_PLANS_DIR"
 elif [[ -n "$EXPLICIT_WORK_DIR" ]]; then
@@ -761,10 +776,39 @@ job_finished() {
         grep -qx -- "$jpid" <<< "$running" || return 0
     elif state=$(proc_state "$jpid"); then
         [[ "$state" == "Z" ]] && return 0
+    else
+        # Empty job list AND no /proc (macOS/BSD, stripped containers):
+        # no job of ours is running, so this one has exited. Reporting it
+        # alive here spent the whole reap budget on every final reap and
+        # then SIGKILLed a job that had already finished (#660).
+        return 0
     fi
     return 1
 }
 
+# SIGKILL a job AND everything under it. A job is `timeout` → helper →
+# CLI; SIGKILL cannot be trapped, so killing only the job shell orphans
+# that chain, which then keeps running (and writing into AGENT_TMP_ROOT,
+# removed right after) until its own timeout (#660). The tree is
+# collected before anything is killed, since a killed parent's children
+# are re-parented and no longer found under it. Needs `pgrep`; without
+# it only the job itself can be killed.
+kill_tree() {
+    local root="$1" pids=() i=0 child
+    pids=("$root")
+    if command -v pgrep >/dev/null 2>&1; then
+        while (( i < ${#pids[@]} )); do
+            while read -r child; do
+                [[ -n "$child" ]] && pids+=("$child")
+            done < <(pgrep -P "${pids[i]}" 2>/dev/null || true)
+            i=$((i + 1))
+        done
+    fi
+    # Deepest first, so nothing is re-parented out from under the kill.
+    for (( i = ${#pids[@]} - 1; i >= 0; i-- )); do
+        kill -9 "${pids[i]}" 2>/dev/null || true
+    done
+}
 cleanup_jobs() {
     local pid waited=0 finished
     for pid in "${AGENT_PID[@]}"; do
@@ -797,7 +841,7 @@ cleanup_jobs() {
             # NOT wait: cleaning up beats blocking, and the job's CLI was
             # already signalled twice over by this point.
             echo "WARNING: agent job ${pid} did not finish within CLEANUP_REAP_TIMEOUT=${CLEANUP_REAP_TIMEOUT}s; killing it and removing the shared temp root anyway" >&2
-            kill -9 "$pid" 2>/dev/null || true
+            kill_tree "$pid"
         fi
     done
     # Any of these may still be empty: an early exit or signal can land
@@ -1000,7 +1044,13 @@ if [[ "$NO_PROGRESS" != true && -f "$PLAN_CONTEXT_FILE" ]]; then
     PLAN_APPROACH_RC=4
     PLAN_APPROACH_ERR="${AGENT_TMP_ROOT}/plan-approach.err"
     PLAN_APPROACH_PYTHONS=()
-    PLAN_APPROACH_COMMON=$(git -C "$SCRIPT_SELF_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+    # No `--path-format=absolute` (git >= 2.31 only; older git fails the
+    # call and the .venv python was silently skipped, #660): resolve the
+    # possibly-relative answer against the directory git answered for.
+    PLAN_APPROACH_COMMON=$(git -C "$SCRIPT_SELF_DIR" rev-parse --git-common-dir 2>/dev/null || true)
+    if [[ -n "$PLAN_APPROACH_COMMON" && "$PLAN_APPROACH_COMMON" != /* ]]; then
+        PLAN_APPROACH_COMMON=$(cd "$SCRIPT_SELF_DIR" && cd "$PLAN_APPROACH_COMMON" 2>/dev/null && pwd -P) || PLAN_APPROACH_COMMON=""
+    fi
     if [[ -n "$PLAN_APPROACH_COMMON" && -x "${PLAN_APPROACH_COMMON%/.git}/.venv/bin/python3" ]]; then
         PLAN_APPROACH_PYTHONS+=("${PLAN_APPROACH_COMMON%/.git}/.venv/bin/python3")
     fi

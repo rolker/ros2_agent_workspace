@@ -234,19 +234,21 @@ terminate_child() {
         # on: a subshell sleeping in `sleep` defers the TERM we send it
         # until that sleep ends, so waiting would reintroduce the full
         # window on every clean exit.
-        # The watchdog resets INT/TERM/HUP first: it is forked while this
-        # handler has them ignored, an ignored disposition is inherited,
-        # and without the reset the `kill "$watchdog"` below is a no-op —
-        # the watchdog would outlive every clean shutdown by the whole
-        # escalation window and then `kill -9` whatever process had been
-        # given the dead CLI's PID (`kill -0` checks a PID, not identity).
-        # rolker/ros2_agent_workspace #660.
-        ( trap - INT TERM HUP
-          sleep "$REVIEW_KILL_ESCALATION"
+        # The watchdog is cancelled with SIGKILL, never TERM: it is forked
+        # while this handler has INT/TERM/HUP ignored, an ignored
+        # disposition is inherited (by its `sleep` too), and a TERM that
+        # lands before any reset inside it is lost. A lost cancel let it
+        # outlive every clean shutdown by the whole escalation window and
+        # then `kill -9` whatever process had been given the dead CLI's
+        # PID (`kill -0` checks a PID, not identity). Its `sleep` is
+        # killed first, while still findable under it, so no orphan
+        # `sleep` is left either. rolker/ros2_agent_workspace #660.
+        ( sleep "$REVIEW_KILL_ESCALATION"
           kill -0 "$CLI_PID" 2>/dev/null && kill -9 "$CLI_PID" 2>/dev/null ) &
         watchdog=$!
         wait "$CLI_PID" 2>/dev/null
-        kill "$watchdog" 2>/dev/null
+        pkill -KILL -P "$watchdog" 2>/dev/null
+        kill -KILL "$watchdog" 2>/dev/null
         CLI_PID=""
     fi
     exit "$code"
@@ -322,7 +324,30 @@ case "$AGENT" in
         # `codex` options, not `exec`-subcommand options (confirmed via
         # `codex exec --help` vs `codex --help` on codex-cli 0.156.1) —
         # they must precede `exec`, not follow it alongside `-o`.
-        run_cli "$STDOUT_FILE" "$STDERR_FILE" "$CLI_BIN_RESOLVED" -s read-only -a never exec -o "$CODEX_OUT_FILE"
+        #
+        # Environment allowlist (#660): codex can read files and run
+        # read-only commands, so a prompt-injected diff could have it
+        # print `env` into the review, which is persisted and may be
+        # pushed. Only what codex needs is passed: locale, paths, its own
+        # config/auth (CODEX_*, OPENAI_*), proxies and CA bundles. Other
+        # tokens (GH_TOKEN, cloud keys, SSH_AUTH_SOCK) stay out.
+        # CROSS_MODEL_ENV_PASSTHROUGH adds names (space-separated) for a
+        # host that needs more. This limits the environment only; the
+        # read-only sandbox still lets codex read files.
+        CODEX_ENV=()
+        while IFS= read -r env_name; do
+            case "$env_name" in
+                HOME|PATH|USER|LOGNAME|SHELL|TERM|TMPDIR|TZ|LANG|LANGUAGE|LC_*|XDG_*|CODEX_*|OPENAI_*|\
+                HTTP_PROXY|HTTPS_PROXY|NO_PROXY|ALL_PROXY|http_proxy|https_proxy|no_proxy|all_proxy|\
+                SSL_CERT_FILE|SSL_CERT_DIR|REQUESTS_CA_BUNDLE|NODE_EXTRA_CA_CERTS)
+                    CODEX_ENV+=("${env_name}=${!env_name}") ;;
+            esac
+        done < <(compgen -e)
+        for env_name in ${CROSS_MODEL_ENV_PASSTHROUGH:-}; do
+            [[ "$env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && -n "${!env_name+x}" ]] \
+                && CODEX_ENV+=("${env_name}=${!env_name}")
+        done
+        run_cli "$STDOUT_FILE" "$STDERR_FILE" env -i "${CODEX_ENV[@]}" "$CLI_BIN_RESOLVED" -s read-only -a never exec -o "$CODEX_OUT_FILE"
         if [[ "$CLI_EXIT" -ne 0 ]]; then
             fail "codex exited ${CLI_EXIT}$(bound_note)$(marker_note "$STDERR_FILE")$(log_excerpt 'codex transcript' "$STDOUT_FILE")$(log_excerpt 'codex stderr' "$STDERR_FILE")"
         fi
@@ -360,7 +385,16 @@ case "$AGENT" in
         # codex must-fix 1). Require an object before indexing it, and
         # keep every extraction inside a guarded block so a jq failure
         # still lands in fail().
+        # The result object is read from CLAUDE_JSON: stdout itself when
+        # it parses as one object, else the LAST line that parses as an
+        # object, so an update notice or deprecation line printed before
+        # the result does not fail a good review (#660).
+        CLAUDE_JSON="$STDOUT_FILE"
         if ! jq -e 'type == "object"' "$STDOUT_FILE" >/dev/null 2>&1; then
+            CLAUDE_JSON="${TMP_DIR}/claude-result.json"
+            jq -R -c 'fromjson? | objects' "$STDOUT_FILE" 2>/dev/null | tail -n 1 > "$CLAUDE_JSON"
+        fi
+        if ! jq -e 'type == "object"' "$CLAUDE_JSON" >/dev/null 2>&1; then
             # No JSON to read: a non-zero exit (crash, SIGKILL → 137) is
             # then the only reason there is, so keep it and its notes.
             if [[ "$CLI_EXIT" -ne 0 ]]; then
@@ -380,7 +414,7 @@ case "$AGENT" in
         # the helper running with an empty value and no reason recorded.
         read_claude_field() {
             local name="$1" expr="$2" value
-            value=$(jq -r "$expr" "$STDOUT_FILE" 2>>"${TMP_DIR}/jq-error.txt") || return 1
+            value=$(jq -r "$expr" "$CLAUDE_JSON" 2>>"${TMP_DIR}/jq-error.txt") || return 1
             printf -v "$name" '%s' "$value"
         }
         IS_ERROR="false"; SUBTYPE="missing"; RESULT=""; ERROR_MSG=""

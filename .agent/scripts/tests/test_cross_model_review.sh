@@ -23,6 +23,12 @@ TMPDIR_BASE=""
 SANDBOX="$(mktemp -d)"
 trap 'rm -rf "$SANDBOX"' EXIT
 
+# The codex arm runs under an environment allowlist (#660), which would
+# strip the mocks' MOCK_* controls. Pass exactly those through the knob
+# the helper provides for this, rather than widening the allowlist.
+CROSS_MODEL_ENV_PASSTHROUGH="MOCK_ARGV_DIR MOCK_STDIN_DIR MOCK_TIMES_DIR MOCK_PREAMBLE MOCK_CODEX_ECHO_FULL MOCK_CODEX_EMPTY MOCK_CODEX_ERRMARK MOCK_CODEX_EXIT MOCK_CODEX_IGNORE_TERM MOCK_CODEX_SLEEP MOCK_CODEX_STDERR MOCK_CODEX_ENV_DUMP"
+export CROSS_MODEL_ENV_PASSTHROUGH
+
 setup() {
     TMPDIR_BASE=$(mktemp -d -p "$SANDBOX")
 
@@ -2716,6 +2722,7 @@ done
 # MOCK_CODEX_IGNORE_TERM=1: a CLI that ignores SIGTERM, so only an
 # escalation to SIGKILL can end it. Armed before the sleep.
 [[ -n "${MOCK_CODEX_IGNORE_TERM:-}" ]] && trap '' TERM HUP
+[[ -n "${MOCK_CODEX_ENV_DUMP:-}" ]] && env > "${MOCK_CODEX_ENV_DUMP}"
 [[ -n "${MOCK_CODEX_SLEEP:-}" ]] && mock_sleep "${MOCK_CODEX_SLEEP}"
 echo "codex-cli 0.155.1 (mock banner)"
 echo "MOCK TRANSCRIPT: prompt was ${#prompt} bytes"
@@ -3654,7 +3661,7 @@ test_cli_helper_returns_promptly_on_term() {
     echo "review this" > "$prompt"
     # A fast-exiting mock (no TERM trap): the escalation window is 5s, so
     # anything close to that means the handler waited on its watchdog.
-    MOCK_CODEX_SLEEP=30 MOCK_TIMES_DIR="$times" REVIEW_KILL_ESCALATION=5 \
+    MOCK_CODEX_SLEEP=30 MOCK_TIMES_DIR="$times" REVIEW_KILL_ESCALATION=5s \
         TMPDIR="${TMPDIR_BASE}/helper-tmp" PATH="${MOCK_BIN}:${PATH}" \
         bash "$CLI_HELPER_UNDER_TEST" codex "${MOCK_BIN}/codex" "$prompt" "$findings" 1800 \
         >/dev/null 2>&1 &
@@ -3675,6 +3682,11 @@ test_cli_helper_returns_promptly_on_term() {
         echo "  FAIL: helper waited out the escalation window after a clean CLI exit"; FAIL=$((FAIL + 1))
     fi
     assert_watchdog_cancelled "cli helper" "$findings"
+    if pgrep -fx 'sleep 5s' >/dev/null; then
+        echo "  FAIL: cli helper: the watchdog's sleep was left running"; FAIL=$((FAIL + 1))
+    else
+        echo "  PASS: cli helper: no orphan watchdog sleep"; PASS=$((PASS + 1))
+    fi
     teardown
 }
 
@@ -3779,9 +3791,15 @@ WEDGED_EOF
         echo "  FAIL: exit path took ${elapsed}s — the wedged job blocked it"; FAIL=$((FAIL + 1))
     fi
     assert_eq "the shared temp root was removed anyway" "0" "$(ls -A "$scratch" | wc -l)"
-    # Tidy up the deliberately unkillable stub (SIGKILL is not trappable).
+    # The stub ignores TERM; cleanup's kill_tree (#660) now SIGKILLs it
+    # with its job, so it should already be gone.
     local pid; pid=$(cat "${times}/wedge.pid" 2>/dev/null || echo "")
-    [[ -n "$pid" ]] && kill -9 "$pid" 2>/dev/null
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        echo "  FAIL: the wedged job's CLI outlived cleanup"; FAIL=$((FAIL + 1))
+        kill -9 "$pid" 2>/dev/null || true
+    else
+        echo "  PASS: the wedged job's CLI was killed with its job"; PASS=$((PASS + 1))
+    fi
     teardown
 }
 
@@ -4267,6 +4285,179 @@ test_cli_helper_forwards_term
 test_cli_findings_truncated_and_usage_errors
 test_cli_no_temp_leak
 test_cli_helper_missing_is_unavailable
+
+# --- Local fixes to the port (rolker/ros2_agent_workspace #660) ---
+
+extract_fn() { sed -n "/^$1()/,/^}/p" "$2"; }
+
+test_local_branch_short_flag_not_swallowed() {
+    echo "TEST: --branch does not take a following short flag as its base ref (#660)"
+    setup
+    cd "${MOCK_REPO}"
+    local ec=0 err
+    err=$(PATH="${MOCK_BIN}:${PATH}" bash "${SCRIPT_UNDER_TEST}" --branch -R owner/repo --agents nosuch 2>&1 >/dev/null) || ec=$?
+    assert_exit_code "exits 2 on the unknown agent" "2" "$ec"
+    assert_not_contains "-R owner/repo parsed as --repo" "Unknown argument" "$err"
+    assert_contains "reaches agent validation" "Unknown agent 'nosuch'" "$err"
+    teardown
+}
+
+test_local_home_unset() {
+    echo "TEST: an unset HOME does not abort CLI discovery (#660)"
+    setup
+    cd "${MOCK_REPO}"
+    local ec=0 err
+    err=$(env -u HOME PATH="$(HIDDEN_CLI_PATH)" WORKTREE_ISSUE=42 bash "${SCRIPT_UNDER_TEST}" \
+        --pr 99 --agents gemini 2>&1 >/dev/null) || ec=$?
+    [[ "$ec" == 0 || "$ec" == 1 ]] \
+        && { echo "  PASS: ran to a normal outcome (exit ${ec})"; PASS=$((PASS + 1)); } \
+        || { echo "  FAIL: exit ${ec} with HOME unset: ${err}"; FAIL=$((FAIL + 1)); }
+    assert_not_contains "no unbound-variable abort" "unbound variable" "$err"
+    teardown
+}
+
+test_local_work_dir_conflicts_with_no_progress() {
+    echo "TEST: --work-dir with --no-progress is rejected (#660)"
+    setup
+    cd "${MOCK_REPO}"
+    local ec=0 err
+    err=$(PATH="${MOCK_BIN}:${PATH}" bash "${SCRIPT_UNDER_TEST}" --pr 99 --no-progress \
+        --work-dir "${MOCK_REPO}" --agents codex 2>&1 >/dev/null) || ec=$?
+    assert_exit_code "exits 2" "2" "$ec"
+    assert_contains "names the conflict" "conflict" "$err"
+    [[ ! -e "${MOCK_REPO}/.agent/work-plans/issue-noprogress" ]] \
+        && { echo "  PASS: no issue-noprogress dir written"; PASS=$((PASS + 1)); } \
+        || { echo "  FAIL: issue-noprogress dir written"; FAIL=$((FAIL + 1)); }
+    teardown
+}
+
+test_local_job_finished_without_proc() {
+    echo "TEST: job_finished reads an exited job as finished without /proc (#660)"
+    local rc=0
+    bash -c "$(extract_fn job_finished "${SCRIPT_UNDER_TEST}")"'
+        proc_state() { return 1; }
+        true & p=$!
+        sleep 0.3
+        job_finished "$p"' || rc=$?
+    assert_exit_code "exited, unreaped job is finished" "0" "$rc"
+    rc=0
+    bash -c "$(extract_fn job_finished "${SCRIPT_UNDER_TEST}")"'
+        proc_state() { return 1; }
+        sleep 5 & p=$!
+        job_finished "$p"; r=$?; kill "$p"; exit "$r"' || rc=$?
+    assert_exit_code "running job is not finished" "1" "$rc"
+}
+
+test_local_kill_tree() {
+    echo "TEST: kill_tree kills a job's descendants, not just the job (#660)"
+    setup
+    local marker="${TMPDIR_BASE}/kt-marker"
+    bash -c "$(extract_fn kill_tree "${SCRIPT_UNDER_TEST}")"'
+        bash -c "bash -c \"trap \\\"\\\" TERM; exec -a '"${marker}"' sleep 30\" & wait" &
+        job=$!
+        sleep 0.5
+        kill_tree "$job"' >/dev/null 2>&1
+    sleep 0.3
+    if pgrep -f -- "$marker" >/dev/null; then
+        echo "  FAIL: a descendant survived kill_tree"; FAIL=$((FAIL + 1))
+        pkill -9 -f -- "$marker" || true
+    else
+        echo "  PASS: no descendant survived kill_tree"; PASS=$((PASS + 1))
+    fi
+    teardown
+}
+
+test_local_no_path_format() {
+    echo "TEST: the plan-context lookup works on git without --path-format (#660)"
+    setup
+    make_mock_agent codex
+    local shim="${TMPDIR_BASE}/gitshim" log="${TMPDIR_BASE}/pathformat.log" realgit
+    realgit=$(command -v git)
+    mkdir -p "$shim"
+    cat > "${shim}/git" <<SHIM
+#!/usr/bin/env bash
+for a in "\$@"; do [[ "\$a" == --path-format* ]] && { echo "\$*" >> "${log}"; echo "unknown option" >&2; exit 129; }; done
+exec "${realgit}" "\$@"
+SHIM
+    chmod +x "${shim}/git"
+    mkdir -p "${MOCK_REPO}/.agent/work-plans/issue-42"
+    printf '# Plan\n\n## Approach\n\nDo the thing.\n' > "${MOCK_REPO}/.agent/work-plans/issue-42/plan.md"
+    local out="${TMPDIR_BASE}/out.txt"
+    RUN_AGENTS_PATH="${shim}:${MOCK_BIN}:${PATH}" run_agents "$out" codex >/dev/null
+    [[ ! -s "$log" ]] \
+        && { echo "  PASS: git --path-format never called"; PASS=$((PASS + 1)); } \
+        || { echo "  FAIL: git --path-format still called: $(cat "$log")"; FAIL=$((FAIL + 1)); }
+    teardown
+}
+
+test_local_slugless_worktree_name() {
+    echo "TEST: a worktree named issue-<N> (no slug) resolves its work-plans dir (#660)"
+    setup
+    local wt="${TMPDIR_BASE}/issue-42" out rc=0
+    mkdir -p "$wt"; git -C "$wt" init -q -b scratch
+    out=$(cd "$wt" && unset WORKTREE_ISSUE && source "${SCRIPT_DIR}/../_resolve_work_plans_dir.sh" \
+        && resolve_work_plans_dir 42 2>/dev/null) || rc=$?
+    assert_exit_code "resolves" "0" "$rc"
+    assert_contains "points into the worktree" "issue-42/.agent/work-plans/issue-42" "$out"
+    teardown
+}
+
+test_local_default_branch_prefers_fresher_origin() {
+    echo "TEST: the default-branch resolver skips a local branch strictly behind origin (#660)"
+    setup
+    local bare="${TMPDIR_BASE}/remote.git" wc="${TMPDIR_BASE}/wc" up="${TMPDIR_BASE}/up"
+    cd "$TMPDIR_BASE"
+    g() { git -c user.name=t -c user.email=t@t "$@"; }
+    git init -q --bare -b main "$bare"
+    g clone -q "$bare" "$up" 2>/dev/null; g -C "$up" commit -q --allow-empty -m a; g -C "$up" push -q origin HEAD:main
+    g clone -q "$bare" "$wc"; git -C "$wc" remote set-head origin main
+    resolve() { (source "${SCRIPT_DIR}/../_resolve_default_branch.sh" && resolve_default_branch "$wc"); }
+    assert_eq "equal: local" "main" "$(resolve)"
+    g -C "$up" commit -q --allow-empty -m b; g -C "$up" push -q origin HEAD:main; git -C "$wc" fetch -q
+    assert_eq "behind: origin" "origin/main" "$(resolve)"
+    g -C "$wc" commit -q --allow-empty -m local
+    assert_eq "diverged: local" "main" "$(resolve)"
+    teardown
+}
+
+test_local_claude_preamble() {
+    echo "TEST: a text line before claude's JSON result does not fail the review (#660)"
+    setup
+    make_mock_agent claude; make_mock_agent codex
+    local out="${TMPDIR_BASE}/out.txt" ec
+    ec=$(MOCK_CLAUDE_RAW=$'Update available: 9.9.9\n{"type":"result","subtype":"success","is_error":false,"result":"### Findings\\nok"}' \
+        run_agents "$out" claude)
+    assert_exit_code "claude with a preamble line succeeds" "0" "$ec"
+    assert_contains "result kept" "Findings" "$(findings_of claude)"
+    teardown
+}
+
+test_local_codex_env_allowlist() {
+    echo "TEST: codex runs with an environment allowlist (#660)"
+    setup
+    make_mock_agent codex
+    local out="${TMPDIR_BASE}/out.txt" dump="${TMPDIR_BASE}/codex.env" ec
+    ec=$(GH_TOKEN=secret-gh AWS_SECRET_ACCESS_KEY=secret-aws OPENAI_API_KEY=k MOCK_CODEX_ENV_DUMP="$dump" \
+        run_agents "$out" codex)
+    assert_exit_code "codex succeeds" "0" "$ec"
+    local envs; envs=$(cat "$dump" 2>/dev/null)
+    assert_not_contains "GH_TOKEN stripped" "secret-gh" "$envs"
+    assert_not_contains "AWS secret stripped" "secret-aws" "$envs"
+    assert_contains "OPENAI_API_KEY kept" "OPENAI_API_KEY=k" "$envs"
+    assert_contains "HOME kept" "HOME=" "$envs"
+    teardown
+}
+
+test_local_branch_short_flag_not_swallowed
+test_local_home_unset
+test_local_work_dir_conflicts_with_no_progress
+test_local_job_finished_without_proc
+test_local_kill_tree
+test_local_no_path_format
+test_local_slugless_worktree_name
+test_local_default_branch_prefers_fresher_origin
+test_local_claude_preamble
+test_local_codex_env_allowlist
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

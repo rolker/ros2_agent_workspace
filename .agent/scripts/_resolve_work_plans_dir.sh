@@ -86,7 +86,7 @@ resolve_work_plans_dir() {
             # The trailing -<N> match is exact, so issue-x-2244 can't satisfy
             # a request for 224.
             case "$base" in
-                issue-*-"$issue")
+                issue-*-"$issue"|issue-"$issue")
                     echo "${toplevel}/.agent/work-plans/issue-${issue}"
                     return 0
                     ;;
