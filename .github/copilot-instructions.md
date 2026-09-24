@@ -28,14 +28,13 @@ prefer a pre-push pass to catch findings locally rather than in PR
 review rounds. The specialists that actually run depend on the
 auto-classified tier: Light tier dispatches Static Analysis + one
 Claude Adversarial pass, while Standard and Deep also dispatch
-Governance, Plan Drift, and a second disjoint-lens Claude Adversarial
-pass. The Copilot Adversarial Specialist is **opt-in** at every tier
-via `--copilot` (off by default to conserve the Premium quota — see
-[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)). (The
+Governance, Plan Drift, a second disjoint-lens Claude Adversarial
+pass, and the Cross-Model Adversarial Specialist (Gemini + Codex),
+**default on** at Standard/Deep via `--no-cross-model` to opt out. (The
 Claude Adversarial Specialist is Claude-only — see caveat below — so a
 Copilot-only pre-push pass cannot catch Claude-side adversarial
-findings; the Copilot Adversarial Specialist runs natively when opted
-in.) See
+findings; the Cross-Model Adversarial Specialist runs natively when the
+`agy`/`codex` CLIs are available.) See
 [`.claude/skills/review-code/SKILL.md`](../.claude/skills/review-code/SKILL.md).
 
 **Limitation**: when Copilot runs as a **PR reviewer** (the GitHub
@@ -46,12 +45,11 @@ The Copilot review surface remains complementary, not a substitute.
 **Claude Adversarial Specialist is Claude-only** — it dispatches a
 fresh subagent via Claude Code's `Agent` tool, which Copilot doesn't
 expose. The other specialists (Static Analysis, Governance, Plan
-Drift, **Copilot Adversarial**) are framework-agnostic and run
+Drift, **Cross-Model Adversarial**) are framework-agnostic and run
 regardless of host runtime, provided the relevant CLI tools are
-installed and authenticated where applicable (Copilot Adversarial is
-opt-in via `--copilot` and additionally requires `copilot` CLI
-authentication — opted-in but unauthenticated hosts route to the
-skipped-with-notice path automatically).
+installed and authenticated where applicable (Cross-Model Adversarial
+requires the `agy`/`codex` CLIs — a host with neither reports both
+agents unavailable and the review continues without that specialist).
 
 **Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
 step` blocks dispatch the next phase via

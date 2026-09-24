@@ -51,10 +51,11 @@ pass at Light; two disjoint-lens passes at Standard + Deep). Gemini
 doesn't expose an equivalent, so run the other specialists (Static
 Analysis, Governance, Plan Drift) and note in the report header that
 **both** Claude Adversarial passes were skipped because the runtime is
-Gemini — the run has no in-house adversarial coverage. Copilot
-Adversarial is **opt-in** via `--copilot` (off by default to conserve
-the Premium quota); when opted in with the `copilot` CLI installed and
-authenticated, it gives a cross-model read that partly compensates.
+Gemini — the run has no in-house adversarial coverage. Cross-Model
+Adversarial (Gemini + Codex) is **default on** at Standard/Deep
+(`--no-cross-model` to opt out); as the calling agent, drop `gemini`
+from its own `--agents` list (it would otherwise review itself) — the
+`codex` arm still runs and gives a partial cross-model read.
 
 **Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
 step` blocks dispatch the next phase via

@@ -1,6 +1,6 @@
 ---
 name: review-code
-description: Lead reviewer that orchestrates specialist sub-reviews (static analysis, governance, plan drift, adversarial, local cross-model) to evaluate a PR or pre-push diff. Scales review depth to change risk. Produces a unified structured report and persists findings to progress.md.
+description: Lead reviewer that orchestrates specialist sub-reviews (static analysis, governance, plan drift, adversarial, cross-model, local cross-model) to evaluate a PR or pre-push diff. Scales review depth to change risk. Produces a unified structured report and persists findings to progress.md.
 ---
 
 # Review Code
@@ -8,9 +8,9 @@ description: Lead reviewer that orchestrates specialist sub-reviews (static anal
 ## Usage
 
 ```
-/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--copilot] [--local] [light|standard|deep]
+/review-code [--base <branch>] [--skip-static] [--no-progress] [--issue <N>] [--no-cross-model] [--local] [light|standard|deep]
                                             # pre-push: diff vs default branch
-/review-code <pr-number-or-url> [--skip-static] [--copilot] [--allow-untrusted-copilot] [--local] [light|standard|deep]
+/review-code <pr-number-or-url> [--skip-static] [--no-cross-model] [--allow-untrusted-cross-model] [--local] [light|standard|deep]
                                             # post-PR: diff vs PR base
 ```
 
@@ -32,16 +32,13 @@ Flags:
   branches). When passed, the branch-name extraction at step 1 is
   skipped. Mutually compatible with `--no-progress` — `--no-progress`
   wins (no persistence regardless of issue number).
-- **`--copilot`** (both modes) **opts in** to the Copilot Adversarial
-  Specialist (5e) for this invocation. Copilot is **off by default** —
-  each run consumes one Premium Copilot request (~25.5k-token floor),
-  and that cost is no longer carried on every review (see
-  [#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
-  Pass `--copilot` when a true second-vendor cross-model read is worth
-  the Premium request on a specific PR. Without it, two independent
-  in-house Claude adversarial passes (5d) provide the adversarial
-  coverage. (`--no-copilot` is accepted as a deprecated no-op, since
-  Copilot is already off by default.)
+- **`--no-cross-model`** (both modes) **opts out** of the Cross-Model
+  Adversarial Specialist (5e) at Standard/Deep, where it is
+  **default on** ([#660](https://github.com/rolker/ros2_agent_workspace/issues/660)).
+  Pass it to skip the Gemini/Codex dispatch for this invocation — e.g. a
+  field-mode host with neither CLI installed, or a quick re-review where
+  the cross-model read isn't needed again. Light never dispatches 5e
+  regardless of this flag.
 - **`--local`** (both modes) opts in to the Local Model Adversarial
   Specialist (5f). Local review is **off by default**: it costs no API
   quota (local Ollama inference), but on current hardware it is by far
@@ -56,16 +53,15 @@ Flags:
   specialist skips itself with a one-line notice. (`--no-local` is
   accepted as a deprecated no-op, since local review is already off by
   default.)
-- **`--allow-untrusted-copilot`** (post-PR only) overrides the
-  external-PR safety gate that suppresses Copilot Adversarial when the
-  PR head is from a fork or a non-collaborator author. Only meaningful
-  alongside `--copilot` (the gate only matters when Copilot is opted
-  in). Without this flag, the specialist routes to the
-  skipped-with-notice path on such PRs because `--allow-all-tools`
-  grants Copilot file/shell access to the local worktree; running it
+- **`--allow-untrusted-cross-model`** (post-PR only) overrides the
+  external-PR safety gate that suppresses Cross-Model Adversarial when
+  the PR head is from a fork or a non-collaborator author. Without this
+  flag, 5e routes to the skipped-with-notice path on such PRs because
+  the codex arm runs with local filesystem read access; running it
   against an untrusted contributor's diff exposes that capability to
   attacker-controlled prompt content. Pass only when you have read the
-  diff and accept the risk.
+  diff and accept the risk. Meaningless (and a no-op) alongside
+  `--no-cross-model`.
 
 ## Overview
 
@@ -92,15 +88,18 @@ post comments or modify the PR unless the user asks.
 - **Light** — Static Analysis + one Claude Adversarial pass (small,
   low-risk changes)
 - **Standard** — Static Analysis + Governance + Plan Drift + two
-  disjoint-lens Claude Adversarial passes (medium changes or
-  governance-touching files)
+  disjoint-lens Claude Adversarial passes + Cross-Model Adversarial
+  (Gemini + Codex, default on) (medium changes or governance-touching
+  files)
 - **Deep** — Same as Standard with the two Claude Adversarial passes
   primed for security / concurrency / lifecycle (large changes,
   security, or cross-layer)
 
-Copilot Adversarial is **opt-in at every tier** via `--copilot` — when
-passed, it runs as an additional cross-model read on top of the
-in-house Claude passes. Local Model Adversarial is likewise
+Cross-Model Adversarial is **default on at Standard + Deep**, opt-out
+via `--no-cross-model`
+([#660](https://github.com/rolker/ros2_agent_workspace/issues/660)) — it
+runs as an additional cross-model read (Gemini + Codex, in parallel) on
+top of the in-house Claude passes. Local Model Adversarial is
 **opt-in at every tier** via `--local` — quota-free local inference,
 but the wall-clock long pole on current hardware
 ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)).
@@ -117,11 +116,12 @@ but the wall-clock long pole on current hardware
   at Standard + Deep (Lens A: logic / edge cases / assumptions; Lens B:
   security / concurrency / lifecycle / cross-cutting). Two independent
   in-house reads are the default adversarial signal.
-- **Copilot Adversarial** — **opt-in** (`--copilot`) synchronous Copilot
-  CLI dispatch that re-reads the diff cold, adding a cross-model
-  second-vendor read. Off by default to avoid the per-run Premium
-  request; skipped with a one-line notice when `copilot` is unavailable
-  even if opted in.
+- **Cross-Model Adversarial** — **default on at Standard + Deep**
+  (`--no-cross-model` to opt out) synchronous Gemini + Codex dispatch
+  via `.agent/scripts/cross_model_review.sh` that re-reads the diff
+  cold, adding a true second/third-vendor read. A per-agent failure
+  (CLI unavailable, timeout, auth error) is noted in the report without
+  failing the review.
 - **Local Model Adversarial** — **opt-in** (`--local`) cross-model
   read by a locally served Ollama model (default `qwen3.5:35b`) via
   `.agent/scripts/local_review.sh`. Quota-free but low-trust:
@@ -140,17 +140,14 @@ Parse the arguments in this order: extract `--skip-static` (sets
 `SKIP_STATIC=true`), `--no-progress` (sets `NO_PROGRESS=true`, pre-push
 only — emit an error if passed in post-PR mode), `--issue <N>` (sets
 `USER_ISSUE=<N>`, pre-push only — emit an error if passed in post-PR
-mode, where `closingIssuesReferences` is authoritative), `--copilot`
-(sets `COPILOT=1`, opts in to the Copilot Adversarial Specialist in
-step 5e — off by default), `--no-copilot` (**recognized and
-discarded**: a deprecated no-op since Copilot is already off by
-default — consume the token here so it never falls through to the
-classification step below as a stray argument),
-`--allow-untrusted-copilot` (sets `ALLOW_UNTRUSTED_COPILOT=1`,
-post-PR only — emit an error if passed in pre-push mode, where the
-gate doesn't apply; with `COPILOT` unset it has no effect, so emit a
-one-line note "`--allow-untrusted-copilot` ignored: no effect without
-`--copilot`" rather than silently dropping it), `--local` (sets
+mode, where `closingIssuesReferences` is authoritative),
+`--no-cross-model` (sets `NO_CROSS_MODEL=1`, opts out of the Cross-Model
+Adversarial Specialist in step 5e — default on at Standard/Deep),
+`--allow-untrusted-cross-model` (sets `ALLOW_UNTRUSTED_CROSS_MODEL=1`,
+post-PR only — emit an error if passed in pre-push mode, where the gate
+doesn't apply; with `NO_CROSS_MODEL=1` it has no effect, so emit a
+one-line note "`--allow-untrusted-cross-model` ignored: no effect with
+`--no-cross-model`" rather than silently dropping it), `--local` (sets
 `LOCAL=1`, opts in to the Local Model Adversarial Specialist in
 step 5f — off by default), `--no-local` (**recognized and
 discarded**: a deprecated no-op since local review is already off by
@@ -162,8 +159,8 @@ classification step below as a stray argument), `--base <branch>`
 - Empty → **pre-push mode**
 - A number or `https://github.com/.../pull/<N>` → **post-PR mode**
 
-The depth keyword, `--skip-static`, and `--copilot` may appear in
-any order around the PR number / URL or `--base <branch>`. The same
+The depth keyword, `--skip-static`, and `--no-cross-model` may appear
+in any order around the PR number / URL or `--base <branch>`. The same
 syntax applies in both modes. Examples:
 
 ```
@@ -175,12 +172,12 @@ syntax applies in both modes. Examples:
 /review-code --skip-static light            # pre-push, light + skip static
 /review-code --no-progress                  # pre-push, don't write progress.md
 /review-code --issue 460                    # pre-push, override branch-name issue extraction
-/review-code --copilot                      # pre-push, opt in to Copilot Adversarial
+/review-code --no-cross-model               # pre-push, opt out of Cross-Model Adversarial
 /review-code --local                        # pre-push, opt in to Local Model Adversarial
 /review-code 42                             # post-PR, auto-classify
 /review-code 42 standard                    # post-PR, force Standard
 /review-code 42 --skip-static               # post-PR, skip static analysis
-/review-code 42 --copilot                   # post-PR, opt in to Copilot Adversarial
+/review-code 42 --allow-untrusted-cross-model  # post-PR, bypass the fork/non-collaborator gate
 ```
 
 #### Pre-push mode
@@ -350,10 +347,11 @@ sequentially.
 Run:
 - **5a. Static Analysis Specialist**
 - **5d. Claude Adversarial Specialist** — **one pass** (Lens A only)
-- **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
-  (`--copilot`); skipped with notice if `copilot` unavailable
 - **5f. Local Model Adversarial Specialist** — only if `LOCAL=1`
   (`--local`); skipped with notice if Ollama/model unavailable
+
+5e (Cross-Model Adversarial) never runs at Light, regardless of
+`--no-cross-model` — it is a Standard/Deep specialist.
 
 #### Standard tier
 
@@ -363,8 +361,10 @@ Run all of:
 - **5c. Plan Drift Specialist** (if a plan exists)
 - **5d. Claude Adversarial Specialist** — **two passes** with disjoint
   lenses (Lens A + Lens B; Standard prompt)
-- **5e. Copilot Adversarial Specialist** — only if `COPILOT=1`
-  (`--copilot`); skipped with notice if `copilot` unavailable
+- **5e. Cross-Model Adversarial Specialist** — **default on**, unless
+  `NO_CROSS_MODEL=1` (`--no-cross-model`); a per-agent failure (CLI
+  unavailable, timeout, gated on an untrusted PR) is noted with a
+  one-line notice per agent, not a whole-specialist skip
 - **5f. Local Model Adversarial Specialist** — only if `LOCAL=1`
   (`--local`); skipped with notice if Ollama/model unavailable
 
@@ -372,10 +372,10 @@ Run all of:
 
 Same as Standard, but the two **5d. Claude Adversarial** passes run with
 the Deep prompt (broader file horizon plus an explicit security /
-concurrency / lifecycle checklist). If opted in with `--copilot`,
-**5e. Copilot Adversarial** also runs with the Deep prompt as a third,
-cross-model read. If opted in with `--local`, **5f. Local Model
-Adversarial** runs as at other tiers (its prompt is not
+concurrency / lifecycle checklist). **5e. Cross-Model Adversarial** runs
+as at Standard (its prompt is not tier-differentiated the way 5d's is —
+see 5e's "Prompt body" note). If opted in with `--local`, **5f. Local
+Model Adversarial** runs as at other tiers (its prompt is not
 tier-differentiated — the diff is the whole horizon a local model can
 reliably handle).
 
@@ -484,12 +484,13 @@ is the whole point. An independent reviewer that agrees with the
 governance specialist is a stronger signal than one told what to look
 for.
 
-**Two disjoint-lens passes at Standard + Deep.** With Copilot now
-opt-in (5e), the default cross-read signal — two *independent* readers,
-not one model agreeing with itself — comes from running **two separate
-fresh subagents with non-overlapping focus areas**. Each pass is its
-own `Agent` dispatch; they do not share context with each other or with
-the other specialists. Dispatch them in parallel.
+**Two disjoint-lens passes at Standard + Deep.** Independent of 5e's
+Gemini/Codex cross-model read, the in-house cross-read signal — two
+*independent* readers, not one model agreeing with itself — comes from
+running **two separate fresh subagents with non-overlapping focus
+areas**. Each pass is its own `Agent` dispatch; they do not share
+context with each other or with the other specialists. Dispatch them in
+parallel.
 
 - **Lens A — logic & correctness**:
   - Missed edge cases and boundary conditions
@@ -530,218 +531,131 @@ severity, description). Label each finding's source with its lens
 (`Claude Adversarial / Lens A`, `Claude Adversarial / Lens B`) so the
 report shows which read caught it.
 
-> **Cross-model adversarial** is available as the opt-in Copilot
-> Adversarial Specialist (step 5e below), adding a true second-vendor
-> read on top of the two in-house Claude lenses. The tmux-orchestrated
-> Gemini/Codex dispatch from upstream `cross_model_review.sh` remains
-> unadopted — see `inspiration_agent_workspace_digest.md`
-> "Partially adopted".
+**Cross-model adversarial** coverage comes from step 5e below — an
+independent second-vendor read (Gemini + Codex) on top of the two
+in-house Claude lenses, dispatched via `cross_model_review.sh`
+(ported from `rolker/agent_workspace`, ADR-0015).
 
-#### 5e. Copilot Adversarial Specialist
+#### 5e. Cross-Model Adversarial Specialist (Gemini + Codex)
 
-**Activates only when opted in** with `--copilot` (`COPILOT=1`), at any
-tier. **Off by default** — skip this entire specialist when `COPILOT`
-is unset (no "skipped" notice needed; it's the default state).
+**Activates at**: Standard + Deep, **default on**. `--no-cross-model`
+opts out for this invocation (both pre-push and post-PR modes). Light
+never dispatches it (matches 5b/5c's Light exclusion).
 
-An opt-in cross-model pass that uses the GitHub Copilot CLI
-(`@github/copilot` ≥ v1.0.48) as a synchronous reader of the same diff.
-Same fresh-context principle as 5d — Copilot sees only the diff prompt,
-no other specialists' findings. The cross-model signal value (a second
-*vendor* flagging an issue independently, beyond the two in-house Claude
-lenses) is what `--copilot` buys; it costs one Premium Copilot request
-per run, which is why it is opt-in rather than default-on (see
-[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)).
+An independent cross-model pass dispatched by
+`.agent/scripts/cross_model_review.sh` (ported from
+`rolker/agent_workspace`'s ADR-0015 parallel-sync dispatch design,
+issue #660) — Gemini via the `agy` CLI and Codex via `codex exec`, both
+run in parallel, blocking until the slower finishes. Same fresh-context
+principle as 5d — each CLI sees only the diff prompt, no other
+specialists' findings. The value this buys over the two in-house Claude
+lenses is a genuine second (and third) *vendor* independently reading
+the same diff.
 
-**Availability probe**. Skip with a one-line notice (not a failure)
-when the CLI is missing, so field-mode hosts (gabby, salmon — no
-GitHub credentials) don't block the rest of the review:
+**Agent selection**: always `gemini,codex` — there is no Copilot arm in
+this specialist (the Copilot CLI runs Claude or GPT models under the
+hood, so it added no new vendor next to Codex, and cost Premium quota;
+removed entirely — see this issue's plan). If the calling agent *is*
+Gemini CLI or Codex CLI, drop that one agent from the `--agents` list
+rather than having it review itself: determine the caller's framework
+from `$AGENT_FRAMEWORK` if set, else `source
+.agent/scripts/detect_cli_env.sh || true`; normalize (lowercase,
+`gemini-cli`→`gemini`, `codex-cli`→`codex`) and remove a matching entry.
 
-```bash
-# Resolve copilot to an absolute path so invocation survives subshells
-# that didn't load the user's shell init. nvm-managed copilot binaries
-# (~/.nvm/versions/node/*/bin/copilot) are PATH-injected by ~/.bashrc,
-# but ~/.bashrc early-returns for non-interactive shells — so Agent-tool
-# sub-shells (and non-interactive `bash -l`) never load nvm even though
-# the binary is installed. Probe in order: current PATH, then explicit
-# nvm sourcing, then a glob for nvm-managed installs.
-COPILOT_BIN=""
-if [[ "$COPILOT" != "1" ]]; then
-    # Not opted in (Copilot is off by default); skip the whole specialist.
-    # No "skipped" notice needed — absence is the default state.
-    SKIP_COPILOT=1
-elif COPILOT_BIN=$(command -v copilot 2>/dev/null) && [ -x "$COPILOT_BIN" ]; then
-    : # Found on current PATH. `[ -x ]` filters out alias/function
-      # returns from `command -v` (e.g., "alias copilot='...'" or a
-      # shell function name) — only an actual executable path passes.
-elif [ -s "$HOME/.nvm/nvm.sh" ] && \
-     COPILOT_BIN=$(bash -c '. "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; command -v copilot' 2>/dev/null) && \
-     [ -x "$COPILOT_BIN" ]; then
-    : # Found via nvm — use the absolute path so subsequent invocations don't need nvm.
-else
-    # Glob fallback for nvm installs where nvm.sh sourcing didn't help
-    # (e.g., multiple node versions, default-alias misconfigured). Loop
-    # over the glob and keep the last executable match. We deliberately
-    # avoid `sort -V` here: it's a GNU coreutils extension absent on
-    # BSD/macOS `sort` and some BusyBox builds, where it would error to
-    # empty output and wrongly skip Copilot with a "not installed"
-    # reason even though the binary exists. Exact-version selection
-    # isn't needed anyway — all same-platform copilot shims symlink to
-    # the same npm-loader.js, so any executable match is equivalent;
-    # bash expands the glob in lexical order and we take the last.
-    # When the glob matches nothing, bash leaves the literal pattern and
-    # `[ -x ]` filters it out, leaving candidate empty (else branch).
-    candidate=""
-    for c in "$HOME"/.nvm/versions/node/*/bin/copilot; do
-        [ -x "$c" ] && candidate="$c"
-    done
-    if [ -n "$candidate" ]; then
-        COPILOT_BIN="$candidate"
-    else
-        COPILOT_SKIP_REASON="copilot CLI not installed (probed PATH, nvm.sh, and ~/.nvm glob)"
-        SKIP_COPILOT=1
-    fi
-fi
-if [[ "$SKIP_COPILOT" != "1" ]] && ! "$COPILOT_BIN" --version >/dev/null 2>&1; then
-    # `copilot --version` is a presence check, not an auth check —
-    # `--version` typically prints without contacting the API. We keep
-    # it as a "binary at least runs" sanity guard. Real auth failures
-    # are detected after the invocation below.
-    COPILOT_SKIP_REASON="copilot --version failed (binary broken or missing dependencies)"
-    SKIP_COPILOT=1
-fi
-```
-
-**Untrusted-PR safety gate** (post-PR mode only). Because
-`--allow-all-tools` grants Copilot file/shell access to the local
-worktree, do not invoke it against attacker-controlled prompt content.
-Before dispatch, check whether the PR head is from a fork or a
-non-collaborator author and gate accordingly:
+**Untrusted-PR safety gate** (post-PR mode only). Even though neither
+`_agy_review.sh` nor claude/gemini's arms of `_cli_review.sh` grant tool
+access, the codex arm runs with `-s read-only -a never` pinned but still
+has local filesystem *read* access — it could read and quote local
+files (env, other repos, credentials) into review text under a
+prompt-injected diff. Before dispatch, check whether the PR head is
+from a fork or a non-collaborator author:
 
 ```bash
-if [[ "$MODE" == "post-PR" && "$SKIP_COPILOT" != "1" ]]; then
+if [[ "$MODE" == "post-PR" ]]; then
     PR_AUTHOR_ASSOC=$(gh pr view "$PR" --json authorAssociation --jq '.authorAssociation')
     PR_HEAD_REPO=$(gh pr view "$PR" --json headRepository,baseRepository \
         --jq 'if .headRepository.nameWithOwner == .baseRepository.nameWithOwner then "owner" else "fork" end')
     # Trusted: PR head is the base repo AND author is OWNER/MEMBER/COLLABORATOR.
-    # Anything else (fork, contributor, first-time contributor, none) is gated.
     if [[ "$PR_HEAD_REPO" == "fork" ]] || \
        [[ "$PR_AUTHOR_ASSOC" != "OWNER" && "$PR_AUTHOR_ASSOC" != "MEMBER" && "$PR_AUTHOR_ASSOC" != "COLLABORATOR" ]]; then
-        if [[ "$ALLOW_UNTRUSTED_COPILOT" == "1" ]]; then
+        if [[ "$ALLOW_UNTRUSTED_CROSS_MODEL" == "1" ]]; then
             : # User explicitly bypassed the gate. Proceed.
         else
-            COPILOT_SKIP_REASON="external PR (head=$PR_HEAD_REPO, author=$PR_AUTHOR_ASSOC); pass --allow-untrusted-copilot after reviewing the diff to bypass"
-            SKIP_COPILOT=1
+            SKIP_CROSS_MODEL=1
+            CROSS_MODEL_SKIP_REASON="external PR (head=$PR_HEAD_REPO, author=$PR_AUTHOR_ASSOC); pass --allow-untrusted-cross-model after reviewing the diff to bypass"
         fi
     fi
 fi
 ```
 
-When the specialist was opted in (`COPILOT=1`) but `SKIP_COPILOT=1`
-was set by the probes above, the report includes:
-`Copilot Adversarial skipped: <COPILOT_SKIP_REASON>` (e.g. opted in on
-a field-mode host where the CLI is unavailable). When `COPILOT` is
-unset — the default — the specialist is omitted from the report
-entirely (it was never requested). Post-call empty findings or
-auth-error output also route to the skipped-notice path (see the
-post-invocation guard below) so an opted-in but unauthenticated host
-doesn't surface as a silent zero-finding review.
+When skipped by this gate, the report includes:
+`Cross-Model Adversarial skipped: <CROSS_MODEL_SKIP_REASON>`. Pre-push
+mode never gates — the diff is the user's own authored work in their
+own worktree, same threat model as 5d.
 
-**Prompt body**. Copilot runs as a **single** invocation at every tier
-(unlike 5d, which splits into two passes), so it always receives the
-**combined Lens A + Lens B focus areas** (missed edge cases, assumption
-violations, subtle bugs, logic errors, plus security /
-concurrency-lifecycle / cross-cutting) — there is no per-lens split for
-the cross-model read. Deep uses the same combined brief at the broader
-Deep file horizon. Reusing the lens focus areas keeps the cross-model
-signal meaningful — "another vendor reading the same brief", not "a
-different prompt on the same diff". (Note: at **Light**, the in-house
-5d pass deliberately covers Lens A only, so an opted-in Copilot read at
-Light is intentionally *broader* than the single Claude pass — that is
-expected, and the dedup in step 6 reconciles any overlap.)
-
-**Invocation** (only when `SKIP_COPILOT` is unset after both probes
-above).
+**Invocation**. `cross_model_review.sh` resolves each agent's binary
+itself and marks an unavailable one as a per-agent failure without
+aborting the run, so no separate availability-probe block is needed the
+way the deleted Copilot specialist needed one.
 
 ```bash
-PROMPT_FILE=$(mktemp /tmp/copilot_adv_prompt.XXXXXX)
-FINDINGS_FILE=$(mktemp /tmp/copilot_adv_findings.XXXXXX)
-trap 'rm -f "$PROMPT_FILE" "$FINDINGS_FILE"' EXIT  # tempfile cleanup
-# Build $PROMPT_FILE from the diff + the tier-appropriate prompt body above.
+PROMPT_PLAN_CONTEXT=""  # cross_model_review.sh reads the plan itself if one exists
 
-# Bound the call so a hung Copilot CLI (network drop, model overload,
-# stuck stdin negotiation) doesn't block the entire review. 300 s is
-# generous for a single-diff prompt; tune if Deep-tier prompts on
-# large diffs need more.
-timeout 300 "$COPILOT_BIN" -p "" --allow-all-tools < "$PROMPT_FILE" > "$FINDINGS_FILE" 2>&1
-COPILOT_EXIT=$?
+# Explicit, Bash-tool-safe timeout: the Bash tool's hard cap is 600s.
+# Setting these below it means the script's own per-agent timeout fires
+# and emits its EXIT= marker BEFORE the harness kills the whole
+# invocation on a wedged CLI — a hard kill with no EXIT=/FINDINGS_FILE=
+# output at all is a different failure shape than "a failed agent
+# doesn't fail the review." Typical runs are 140-200s.
+export AGENT_TIMEOUT=480
+export AGY_PRINT_TIMEOUT=480
 
-# Strip the trailing `Changes / Requests / Tokens` metadata block. The
-# block starts with a "Changes" line and runs to EOF; cut from there.
-# If a future Copilot CLI version changes the footer format, this is
-# a no-op (no `^Changes$` line to match) and the metadata will leak
-# into the report — visible enough to prompt a regex update.
-sed -i '/^Changes$/,$d' "$FINDINGS_FILE"
+# Post-PR mode
+.agent/scripts/cross_model_review.sh --pr <N> --agents gemini,codex --repo owner/repo
 
-# Post-invocation guard: route timeout / non-zero exit / empty output /
-# auth-error text to the skipped-notice path rather than surfacing the
-# stderr (captured via 2>&1) verbatim as findings.
-if [[ "$COPILOT_EXIT" == "124" ]]; then
-    SKIP_COPILOT=1
-    COPILOT_SKIP_REASON="copilot CLI timed out after 300s"
-elif [[ "$COPILOT_EXIT" != "0" ]]; then
-    SKIP_COPILOT=1
-    # Capture findings-file contents in the reason itself — the EXIT
-    # trap will delete the tempfile before the user can inspect it.
-    COPILOT_SKIP_REASON="copilot CLI exited $COPILOT_EXIT: $(head -c 200 "$FINDINGS_FILE")"
-elif [[ ! -s "$FINDINGS_FILE" ]]; then
-    SKIP_COPILOT=1
-    COPILOT_SKIP_REASON="copilot produced no output (likely not authenticated)"
-elif grep -qiE 'please run .copilot. to authenticate|not authenticated|sign in to GitHub' "$FINDINGS_FILE"; then
-    SKIP_COPILOT=1
-    COPILOT_SKIP_REASON="copilot CLI not authenticated"
-fi
-# Read $FINDINGS_FILE before the EXIT trap fires.
+# Pre-push mode
+.agent/scripts/cross_model_review.sh --branch [<base>] --agents gemini,codex [--no-progress]
 ```
 
-The empty-value form `-p ""` plus stdin is what activates Copilot's
-headless mode; `--allow-all-tools` is required so the CLI doesn't
-prompt for permission (which would hang on stdin). Smoke-tested
-locally on `@github/copilot` v1.0.48.
+Pass `--repo <owner/repo>` (post-PR mode) when the PR lives in a
+different repo than the current working directory. Pass `--no-progress`
+in pre-push mode for skill worktrees / one-off branches (mirrors the
+top-level `--no-progress` flag's own reason for existing).
 
-**Security note on `--allow-all-tools`**. The flag grants Copilot
-permission to execute any tool the CLI exposes (file reads, shell
-commands, etc.) on this host. The two main use cases have different
-threat models:
+**Reading results**: stdout carries `MODE=parallel-sync` and then one
+`AGENT=`/`FINDINGS_FILE=`/`EXIT=` triplet per agent. Key on each agent's
+`EXIT=` line, not the script's overall exit status — the script exits 3
+whenever *any* agent failed, but a failed agent (CLI not installed,
+timeout, non-zero exit, empty response, or a structured error) is noted
+in the report while the other's findings are used as normal; one
+agent's failure never blocks the other and never fails the review. Exit
+3 with **no** `AGENT=` triplets means the shared prompt could not be
+built (diff fetch failed or empty) — nothing ran. Exit 1 means no listed
+agent had a usable CLI, or (post-PR only) `gh` itself is missing.
+Either way, report the specialist as unavailable rather than silently
+omitting it. A findings file never holds a half-review — each agent's
+helper (`_agy_review.sh` for gemini, `_cli_review.sh` for codex)
+truncates it first and writes either the review text or the failure
+reason, so a completed-but-empty or auth-error response is distinguished
+from a genuine zero-finding review.
 
-- **Pre-push mode** — the diff is the user's own authored work in
-  their own worktree. The prompt is constructed locally, the worktree
-  is already under the user's control. Accepted threat model.
-- **Post-PR mode on owner / collaborator PRs** — same threat model as
-  pre-push: the diff was authored by someone whose code we already
-  treat as trusted.
-- **Post-PR mode on external contributor PRs** — diff content is
-  attacker-controlled. `--allow-all-tools` exposes file/shell access
-  to that content's prompt-injection surface. The "untrusted-PR
-  safety gate" above auto-suppresses 5e in this case; the
-  `--allow-untrusted-copilot` flag is the explicit bypass after the
-  reviewer has read the diff and accepted the risk. Don't add the flag
-  to a CI config or a wrapper script that auto-invokes review-code on
-  contributor PRs — that defeats the gate.
+**Trust weighting**: full weight — same standing 5d carries in the
+silence filter (step 6), not 5f's low-trust discount. A finding
+corroborated across gemini/codex/Claude is flagged as cross-model
+confirmed.
 
-Reuse of this invocation pattern outside `review-code` should retain
-the same trusted-input precondition or supply its own gate.
-
-**Context cost**. Copilot autoloads workspace context on launch — a
-trivial prompt floors at ~25.5k tokens and consumes one Premium
-request. Default-on all-tier activation proved unsustainable against
-the team's Premium quota (the trigger that moved this specialist to
-opt-in — see
-[#467](https://github.com/rolker/ros2_agent_workspace/issues/467)), so
-the per-run cost is now paid only when a reviewer explicitly passes
-`--copilot`. To further reduce the per-invocation floor on opted-in
-runs, scope Copilot's context via `--add-dir <worktree>` (worktree
-only) or an isolated `-C /tmp/scratch` invocation (diff + governance
-docs only).
+**Prompt body and `## Plan Context`**. Each agent receives the diff plus
+the combined Lens A + Lens B focus areas (edge cases, assumptions,
+subtle bugs, logic errors, plus security/concurrency/lifecycle/
+cross-cutting) — there is no per-lens split for the cross-model read,
+matching how the deleted Copilot specialist ran. When a work plan exists
+at `.agent/work-plans/issue-<N>/plan.md`, `cross_model_review.sh`
+appends a `## Plan Context` section (the plan's `## Approach`, capped at
+200 lines) via `_plan_approach.py`'s CommonMark parser — framed as
+context ("flag divergences, do not review the plan"), never included
+under `--no-progress`. If `markdown-it-py` isn't installed (`make lint`
+hasn't populated `.venv` yet), the extractor degrades to one `WARNING:`
+line and omits the section rather than failing the run.
 
 Report findings in the same format as other specialists. The silence
 filter (step 6) deduplicates overlap with 5d and with the other
@@ -752,16 +666,16 @@ specialists.
 **Opt-in at every tier** via `--local` (`LOCAL=1`); off by default
 ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590)).
 When `LOCAL` is unset, skip the entire specialist and omit it from the
-report (like un-opted-in Copilot, absence is the default state).
+report — absence is the default state.
 
 A quota-free cross-model pass served by a **local Ollama model**
 (default `qwen3.5:35b`), dispatched through
 `.agent/scripts/local_review.sh`. Same fresh-context principle as
 5d/5e — the model sees only the diff and a one-line task context, no
-other specialists' findings. Unlike Copilot, the local model gets **no
-tool access** (prompt-only HTTP call), so there is no untrusted-PR
-gate: adversarial diff content can at worst skew its findings, which
-the low-trust weighting below already discounts.
+other specialists' findings. Unlike 5e's codex arm, the local model gets
+**no tool access at all** (prompt-only HTTP call), so there is no
+untrusted-PR gate: adversarial diff content can at worst skew its
+findings, which the low-trust weighting below already discounts.
 
 **Invocation** (run in parallel with the other specialists — it is
 typically the wall-clock long pole, ~7 min on the reference
@@ -815,7 +729,7 @@ caught (including one of Copilot's), but ~half its findings were
 speculative. Treat this source accordingly in step 6:
 
 - A local finding **corroborated** by any other specialist is a strong
-  cross-model confirmation — flag it as such (same as a Copilot
+  cross-model confirmation — flag it as such (same as a 5e
   cross-confirmation).
 - An **uncorroborated** local finding enters the report at
   **Suggestion severity at most**, and only after the lead reviewer
@@ -902,7 +816,7 @@ review indefinitely:
 **Round**: <N> (pre-push) — **Ship: <recommended | continue>** (see Convergence)
 **Static analysis**: <run | skipped (--skip-static)>
 **Claude Adversarial**: <1 pass (Lens A) | 2 passes (Lens A + Lens B)>
-**Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
+**Cross-Model Adversarial**: <run (gemini,codex) | run (gemini) — codex unavailable | off (--no-cross-model) | skipped (<reason>, --allow-untrusted-cross-model to bypass)>
 **Local Adversarial**: <off (default) | run (<model>, --local) | skipped (<reason>, --local)>
 **Context**: <status of review-context.yaml — fresh / stale / not found / N/A>
 
@@ -960,7 +874,6 @@ Existing Review Comments sections. Use:
 **Round**: <N> (pre-push) — **Ship: <recommended | continue>**   <!-- pre-push only; see Convergence assessment -->
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
 **Claude Adversarial**: 1 pass (Lens A)
-**Copilot Adversarial**: <off (default) | run (--copilot) | skipped (<reason>, --copilot)>
 **Local Adversarial**: <off (default) | run (<model>, --local) | skipped (<reason>, --local)>
 
 ### Static Analysis
@@ -975,10 +888,7 @@ Existing Review Comments sections. Use:
 |---|------|------|---------|
 | 1 | `path` | 17 | Description |
 
-<!-- Copilot Adversarial section: include only when opted in with --copilot. -->
-<!-- ### Copilot Adversarial  (its findings table, when COPILOT=1 and it ran) -->
-<!-- Copilot Adversarial skipped: <reason>   (when opted in but copilot unavailable) -->
-<!-- Omitted entirely by default, when --copilot was not passed. -->
+<!-- No Cross-Model Adversarial line/section at Light — 5e never dispatches at this tier. -->
 
 ### Local Adversarial (<model>)
 
@@ -1005,7 +915,7 @@ since Claude Adversarial is now unconditional at Light.)
 **PR / Branch**: ...
 **Review depth**: <tier> (reason: <signal>)
 **Static analysis**: skipped (--skip-static)         <!-- include only when SKIP_STATIC=true -->
-**Copilot Adversarial**: <run (--copilot) | skipped (<reason>, --copilot)>  <!-- include only when COPILOT=1; shows that an opted-in cross-model pass ran-clean vs. was skipped -->
+**Cross-Model Adversarial**: <run (gemini,codex) | off (--no-cross-model) | skipped (<reason>)>  <!-- include only at Standard/Deep; shows the default-on pass ran clean vs. was opted out / skipped -->
 **Local Adversarial**: <run (<model>, --local) | skipped (<reason>, --local)>  <!-- include only when LOCAL=1; shows that an opted-in local pass ran-clean vs. was skipped -->
 No issues found. LGTM.
 ```

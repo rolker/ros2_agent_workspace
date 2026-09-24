@@ -27,15 +27,16 @@ pass an expected check before opening a PR (the framework adapters in
 `.github/copilot-instructions.md`, `.agent/instructions/gemini-cli.instructions.md`,
 and `.agent/AGENT_ONBOARDING.md` mirror this for non-Claude runtimes;
 the Claude Adversarial Specialist requires Claude Code's `Agent` tool,
-and the opt-in Copilot Adversarial Specialist runs from any runtime
-that has the `copilot` CLI available when invoked with `--copilot`).
+and the default-on Cross-Model Adversarial Specialist (Gemini + Codex,
+`.agent/scripts/cross_model_review.sh`) runs from any runtime that has
+the `agy`/`codex` CLIs available, opt-out via `--no-cross-model`).
 Pre-push mode (no arguments) catches issues while still cheap to fix
 locally; the specialists that actually run depend on the
 auto-classified depth tier — Light runs Static Analysis + one Claude
 Adversarial pass, while Standard and Deep add Governance, Plan Drift,
-and a second disjoint-lens Claude Adversarial pass. Copilot Adversarial
-is opt-in at every tier via `--copilot` (off by default to conserve the
-Premium quota). Local Model Adversarial (a quota-free Ollama read via
+a second disjoint-lens Claude Adversarial pass, and Cross-Model
+Adversarial (default on, `--no-cross-model` to opt out). Local Model
+Adversarial (a quota-free Ollama read via
 `.agent/scripts/local_review.sh`, runtime-agnostic — needs only
 bash/curl/jq and a local Ollama server) is likewise opt-in at every
 tier via `--local` (off by default — the wall-clock long pole on

@@ -68,17 +68,17 @@ source path differs:
 **Specialists dispatched**:
 - Static Analysis
 - Claude Adversarial — one pass (Lens A: logic & correctness)
-- Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
-  skipped with notice if opted in but the CLI is unavailable
 - Local Model Adversarial — **opt-in only** (`--local`); off by
   default (wall-clock long pole on current hardware, #590), skipped
   with notice if opted in but the Ollama server/model is unavailable
 
+Cross-Model Adversarial never dispatches at Light — it is a
+Standard/Deep specialist regardless of `--no-cross-model`.
+
 **Report format**: Condensed — static analysis findings, Claude
 Adversarial findings, plus a one-line governance note ("No governance
-concerns for a change of this scope"). A Copilot Adversarial section
-appears only when `--copilot` was passed; a Local Adversarial section
-(or its skip notice) appears only when `--local` was passed.
+concerns for a change of this scope"). A Local Adversarial section (or
+its skip notice) appears only when `--local` was passed.
 
 #### Standard
 
@@ -94,8 +94,10 @@ appears only when `--copilot` was passed; a Local Adversarial section
 - Claude Adversarial — **two passes** with disjoint lenses (Lens A:
   logic & correctness; Lens B: security / concurrency-lifecycle /
   cross-cutting), each a separate fresh-context dispatch
-- Copilot Adversarial — **opt-in only** (`--copilot`); off by default,
-  skipped with notice if opted in but the CLI is unavailable
+- Cross-Model Adversarial (Gemini + Codex) — **default on**, opt-out
+  via `--no-cross-model`; a per-agent failure (CLI unavailable,
+  timeout, gated on an untrusted PR) is noted without failing the
+  specialist
 - Local Model Adversarial — **opt-in only** (`--local`); off by
   default (wall-clock long pole on current hardware, #590), skipped
   with notice if opted in but the Ollama server/model is unavailable
@@ -113,25 +115,27 @@ appears only when `--copilot` was passed; a Local Adversarial section
 
 **Specialists dispatched**:
 - Same as Standard (two disjoint-lens Claude Adversarial passes;
-  Copilot opt-in via `--copilot`; Local Model Adversarial opt-in via
-  `--local`, not tier-differentiated). Deep runs both Claude passes at a
+  Cross-Model Adversarial default on via `--no-cross-model` to opt
+  out; Local Model Adversarial opt-in via `--local`, not
+  tier-differentiated). Deep runs both Claude passes at a
   longer file horizon with an explicit security/concurrency/lifecycle
   checklist, using the same fresh-context dispatch mechanism. The
   Standard→Deep difference is horizon and rigor, not which lenses run.
 
 **Report format**: Full report with all sections.
 
-> **Note on cross-model adversarial**: The Copilot-only slice of
-> upstream's Cross-Model Adversarial Specialist is wired in as
-> `review-code` step 5e (synchronous Copilot CLI, no tmux,
-> **opt-in via `--copilot`** — off by default to conserve the Premium
-> quota; see [#467](https://github.com/rolker/ros2_agent_workspace/issues/467))
-> — see the
-> "Partially adopted" entry in `inspiration_agent_workspace_digest.md`.
-> The Gemini/Codex tmux dispatch from upstream `cross_model_review.sh`
-> remains unadopted. When you want a third or fourth model's read on a
-> Deep PR, run that agent's review-code skill manually. A quota-free
-> local-model read (Ollama, default `qwen3.5:35b`) is wired in as
+> **Note on cross-model adversarial**: `rolker/agent_workspace`'s
+> parallel-sync Gemini + Codex dispatch (`cross_model_review.sh`,
+> ADR-0015) is wired in as `review-code` step 5e, **default on at
+> Standard/Deep** (`--no-cross-model` to opt out —
+> [#660](https://github.com/rolker/ros2_agent_workspace/issues/660)).
+> The Copilot arm of the source's own unified specialist is not
+> ported — the Copilot CLI runs Claude or GPT models, so next to the
+> in-house Claude lenses and Codex it added no new vendor, and it cost
+> Premium quota (issue #660's scope-change decision). When you want a
+> third or fourth model's read on a Deep PR, run that agent's
+> review-code skill manually. A quota-free local-model read (Ollama,
+> default `qwen3.5:35b`) is wired in as
 > step 5f (`.agent/scripts/local_review.sh`, **opt-in via `--local`**
 > — off by default since local inference is the wall-clock long pole
 > on current hardware; see
@@ -237,8 +241,9 @@ header additions).
   PR gets at least the two-pass fresh-context read even if it's small.
   This is the intended behaviour: governance edits have
   out-of-proportion blast radius and benefit from a re-read cold. The
-  two in-house passes are the default adversarial signal now that the
-  cross-model Copilot pass is opt-in (`--copilot`).
+  two in-house passes plus the default-on Gemini/Codex Cross-Model
+  Adversarial pass (Standard/Deep) together are the adversarial signal
+  at these tiers.
 - **Trigger lists are workspace-specific.** Adding a new file pattern
   (e.g., a new `.claude/` directory, a new ADR-equivalent doc) means
   updating the trigger lists here so the depth classifier sees it.

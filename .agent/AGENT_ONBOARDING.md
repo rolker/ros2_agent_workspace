@@ -80,10 +80,10 @@ Standard + Deep). Other frameworks can't dispatch it, so they should
 run the remaining specialists (Static Analysis, Governance, Plan
 Drift) and note that **both** Claude Adversarial passes were skipped
 due to the runtime — i.e. the run has no in-house adversarial coverage.
-Copilot Adversarial is **opt-in** via `--copilot` (off by default to
-conserve the Premium quota); when opted in and the `copilot` CLI is
-installed and authenticated, it provides a cross-model read that
-non-Claude runtimes can use to partly compensate.
+Cross-Model Adversarial (Gemini + Codex) is **default on** at
+Standard/Deep (`--no-cross-model` to opt out); when the `agy`/`codex`
+CLIs are installed and authenticated, it provides a cross-model read
+that non-Claude runtimes can use to partly compensate.
 
 **Lifecycle handoff is Claude-specific** — the workflow skills' `### Next
 step` blocks dispatch the next phase via
