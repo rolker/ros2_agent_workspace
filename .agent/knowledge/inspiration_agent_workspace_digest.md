@@ -59,8 +59,8 @@ of the surrounding tooling.
   thresholds are validated against real PR data.
 - **Claude Adversarial Specialist** in `review-code`. Fresh-context
   subagent dispatched at Standard and Deep tiers via `Agent`, with no
-  context from other specialists. A Copilot-only slice of the upstream
-  cross-model variant is also ported — see "Partially adopted" below.
+  context from other specialists. The upstream cross-model variant (Gemini +
+  Codex) is ported as step 5e — see "Partially adopted" below.
 - **`review-code` dual-mode + depth dispatch.** Pre-push mode (no arg)
   diffs against the current repo's default branch; post-PR mode
   (`<N>` or URL) diffs against the PR base. Specialists dispatched per
@@ -75,44 +75,38 @@ of the surrounding tooling.
 
 ## Partially adopted
 
-- **Copilot Adversarial Specialist** (`review-code` step 5e). Ported in
-  PR #464 (issue #461). Synchronous Copilot CLI dispatch (`copilot -p ""
-  --allow-all-tools < prompt`), no tmux, graceful skip when the CLI is
-  missing or unauthenticated (covers field hosts gabby/salmon).
-  Originally default-on at Light + Standard + Deep (opt-out via
-  `--no-copilot`), but **now opt-in via `--copilot`, off by default**
-  ([#467](https://github.com/rolker/ros2_agent_workspace/issues/467)
-  resolved): a GitHub Copilot Premium-request billing change exhausted
-  the team's monthly quota, so the per-run cost (~25.5k token floor, one
-  Premium request) is no longer paid on every review. The cross-model
-  second-read signal it used to provide by default is now covered by two
-  in-house disjoint-lens Claude Adversarial passes (5d); `--copilot`
-  adds a true second-vendor read on top when a reviewer judges it worth
-  the Premium request. The old Light-tier "resource inversion" no longer
-  applies, since Light no longer auto-runs Copilot. The in-house Local
-  Model Adversarial pass (step 5f, Ollama via
-  `.agent/scripts/local_review.sh`,
-  [#570](https://github.com/rolker/ros2_agent_workspace/issues/570))
-  followed the same trajectory: originally default-on (quota-free
-  local inference), **now opt-in via `--local`**
-  ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590))
-  — the run is the review's wall-clock long pole on current hardware.
-- **What remains unadopted**: the tmux-orchestrated multi-CLI dispatch
-  in `cross_model_review.sh` and the Gemini/Codex specialists. The
-  tmux session machinery adds complexity beyond the highest-leverage
-  subset and the workspace doesn't standardize on Gemini or Codex.
-  Revisit if multi-CLI parallel review (beyond Claude + Copilot)
-  becomes a workflow we actually exercise.
-  - **Update 2026-05-15**: upstream extended the script with `--branch`
-    mode and a `_resolve_default_branch.sh` helper (PR #185). Still not
-    applicable to the unadopted slice — the script itself isn't ported,
-    only the Copilot single-CLI invocation pattern was lifted.
-  - **Upstream invocation report**:
-    [rolker/agent_workspace#212](https://github.com/rolker/agent_workspace/issues/212)
-    flags that upstream's `copilot -p < prompt` likely misses
-    `-p ""` and `--allow-all-tools`; the Copilot dispatch may be
-    silently broken or version-dependent. Decoupled from this
-    workspace's adoption.
+- **Cross-model adversarial review** (`review-code` step 5e) —
+  **Gemini + Codex adopted 2026-09-24**
+  ([#660](https://github.com/rolker/ros2_agent_workspace/issues/660)).
+  `cross_model_review.sh` and its helpers (`_agy_review.sh`,
+  `_cli_review.sh`, `_resolve_work_plans_dir.sh`,
+  `_resolve_default_branch.sh`, `_plan_approach.py`) and test suite are
+  ported from upstream `main` @ `48b0d82`, using upstream's parallel-sync
+  execution model (upstream ADR-0015 — the tmux mode that kept this
+  unadopted is gone upstream). Default on at Standard + Deep with
+  `--agents gemini,codex`, `--no-cross-model` to opt out. Local
+  adaptations: codex pinned `-s read-only -a never` (upstream relies on
+  CLI defaults — reported upstream), the work-plans resolver's remediation
+  text matches this workspace's `worktree_enter.sh`, and the header
+  comments drop upstream's user-tier promotion notes.
+  - **Copilot Adversarial Specialist removed** in the same change. It was
+    ported in PR #464 (issue #461) as a synchronous `copilot -p ""
+    --allow-all-tools` dispatch, default on, then made opt-in via
+    `--copilot` ([#467](https://github.com/rolker/ros2_agent_workspace/issues/467))
+    after a Premium-request billing change exhausted the monthly quota.
+    Copilot CLI runs Claude/GPT models, so it added no vendor the other
+    passes lack; Gemini + Codex replace it. The GitHub-side Copilot PR
+    reviewer (`gh pr review --copilot`) is unaffected.
+  - **Local Model Adversarial** (step 5f, Ollama via
+    `.agent/scripts/local_review.sh`,
+    [#570](https://github.com/rolker/ros2_agent_workspace/issues/570))
+    is this workspace's own addition, originally default on, now opt-in
+    via `--local`
+    ([#590](https://github.com/rolker/ros2_agent_workspace/issues/590))
+    — the run is the review's wall-clock long pole on current hardware.
+- **What remains unadopted**: upstream's `copilot` and `claude` agents
+  in `cross_model_review.sh`. The `_cli_review.sh` arms are ported
+  verbatim but 5e never selects them.
 
 ## Not adopted
 
