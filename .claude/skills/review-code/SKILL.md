@@ -559,7 +559,9 @@ removed entirely — see this issue's plan). If the calling agent *is*
 Gemini CLI or Codex CLI, drop that one agent from the `--agents` list
 rather than having it review itself: determine the caller's framework
 from `$AGENT_FRAMEWORK` if set, else `source
-.agent/scripts/detect_cli_env.sh || true`; normalize (lowercase,
+.agent/scripts/detect_cli_env.sh || true` (it has no Codex CLI
+detection, so a Codex caller is recognised only through
+`$AGENT_FRAMEWORK`); normalize (lowercase,
 `gemini-cli`→`gemini`, `codex-cli`→`codex`) and remove a matching entry.
 
 **Untrusted-PR safety gate** (post-PR mode only). Even though neither
@@ -572,11 +574,24 @@ from a fork or a non-collaborator author:
 
 ```bash
 if [[ "$MODE" == "post-PR" ]]; then
-    PR_AUTHOR_ASSOC=$(gh pr view "$PR" --json authorAssociation --jq '.authorAssociation')
-    PR_HEAD_REPO=$(gh pr view "$PR" --json headRepository,baseRepository \
-        --jq 'if .headRepository.nameWithOwner == .baseRepository.nameWithOwner then "owner" else "fork" end')
+    # The repo passed as --repo below, else the current checkout's.
+    REPO_SLUG="${REPO_SLUG:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+    # `gh pr view --json` exposes neither the author's association nor the
+    # base repo, so both come from the REST pull object. A failed lookup
+    # (gh prints the error body on stdout, so test its status) skips the
+    # specialist with a reason: it fails closed, never reads as trusted.
+    if PR_TRUST=$(gh api "repos/${REPO_SLUG}/pulls/${PR}" \
+            --jq '[.author_association, (if .head.repo.full_name == .base.repo.full_name then "owner" else "fork" end)] | @tsv' 2>/dev/null); then
+        IFS=$'\t' read -r PR_AUTHOR_ASSOC PR_HEAD_REPO <<< "$PR_TRUST"
+    else
+        PR_AUTHOR_ASSOC="" PR_HEAD_REPO=""
+    fi
     # Trusted: PR head is the base repo AND author is OWNER/MEMBER/COLLABORATOR.
-    if [[ "$PR_HEAD_REPO" == "fork" ]] || \
+    if [[ -z "$PR_HEAD_REPO" ]]; then
+        SKIP_CROSS_MODEL=1
+        CROSS_MODEL_SKIP_REASON="could not look up PR #${PR}'s author and head repo in ${REPO_SLUG}; pass --allow-untrusted-cross-model after reviewing the diff to bypass"
+        [[ "$ALLOW_UNTRUSTED_CROSS_MODEL" == "1" ]] && SKIP_CROSS_MODEL=0
+    elif [[ "$PR_HEAD_REPO" != "owner" ]] || \
        [[ "$PR_AUTHOR_ASSOC" != "OWNER" && "$PR_AUTHOR_ASSOC" != "MEMBER" && "$PR_AUTHOR_ASSOC" != "COLLABORATOR" ]]; then
         if [[ "$ALLOW_UNTRUSTED_CROSS_MODEL" == "1" ]]; then
             : # User explicitly bypassed the gate. Proceed.
@@ -601,20 +616,30 @@ way the deleted Copilot specialist needed one.
 ```bash
 PROMPT_PLAN_CONTEXT=""  # cross_model_review.sh reads the plan itself if one exists
 
-# Explicit, Bash-tool-safe timeout: the Bash tool's hard cap is 600s.
-# Setting these below it means the script's own per-agent timeout fires
-# and emits its EXIT= marker BEFORE the harness kills the whole
-# invocation on a wedged CLI — a hard kill with no EXIT=/FINDINGS_FILE=
-# output at all is a different failure shape than "a failed agent
-# doesn't fail the review." Typical runs are 140-200s.
+# Bash-tool-safe bounds: the Bash tool's hard cap is 600s. Keeping every
+# agent's OUTER bound below it means the script's own timeout fires and
+# emits its EXIT= marker BEFORE the harness kills the whole invocation on
+# a wedged CLI — a hard kill prints no triplet for ANY agent, since the
+# triplets follow the last one. Outer bounds: codex = AGENT_TIMEOUT +
+# AGENT_KILL_AFTER (10s default) = 490s; gemini = AGY_PRINT_TIMEOUT +
+# GEMINI_BACKSTOP_MARGIN + AGENT_KILL_AFTER = 490s. The margin must be set
+# too: its 300s default alone would put gemini at 730s. AGY_PRINT_TIMEOUT
+# is a Go duration and NEEDS its unit — a bare `420` exits 2 before any
+# agent runs. Observed on this workspace: codex ~1 min, gemini ~5 min on
+# a ~350 KB Deep prompt. Where the runtime can background a command (no
+# cap), leave all four unset and use the script's defaults instead.
 export AGENT_TIMEOUT=480
-export AGY_PRINT_TIMEOUT=480
+export AGY_PRINT_TIMEOUT=420s
+export GEMINI_BACKSTOP_MARGIN=60
 
 # Post-PR mode
 .agent/scripts/cross_model_review.sh --pr <N> --agents gemini,codex --repo owner/repo
 
-# Pre-push mode
-.agent/scripts/cross_model_review.sh --branch [<base>] --agents gemini,codex [--no-progress]
+# Pre-push mode — pass the origin/$BASE ref step 1 just fetched. Without
+# a base the script diffs against the LOCAL default branch when one
+# exists, and in this workspace the main tree's local branch moves only
+# on `make sync`, so a stale one puts already-merged commits in the prompt.
+.agent/scripts/cross_model_review.sh --branch "origin/$BASE" --agents gemini,codex [--no-progress]
 ```
 
 Pass `--repo <owner/repo>` (post-PR mode) when the PR lives in a
