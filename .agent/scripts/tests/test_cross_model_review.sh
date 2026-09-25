@@ -3049,14 +3049,15 @@ test_duration_knobs_validated() {
     assert_exit_code "AGY_PRINT_TIMEOUT=0s exits 2" "2" "${result%%|*}"
     assert_contains "AGY_PRINT_TIMEOUT=0s message demands a positive value" \
         "AGY_PRINT_TIMEOUT value '0s' must be greater than zero" "${result#*|}"
-    # AGENT_KILL_AFTER=0 is legitimate: SIGKILL immediately after
-    # SIGTERM. Since #313 round 2 it must be paired with
-    # REVIEW_KILL_ESCALATION=0 — the helpers refuse a grace they cannot
-    # fit their own escalation inside (both zero = no grace anywhere).
+    # AGENT_KILL_AFTER=0 is refused too: `timeout -k 0` DISABLES the
+    # SIGKILL escalation rather than sending it at once (#660), so zero
+    # would remove the backstop for a CLI that ignores SIGTERM.
+    result=$(run_with_knob "AGENT_KILL_AFTER=0")
+    assert_exit_code "AGENT_KILL_AFTER=0 exits 2" "2" "${result%%|*}"
+    assert_contains "AGENT_KILL_AFTER=0 names the disabled escalation" \
+        "DISABLES the SIGKILL escalation" "${result#*|}"
     local out="${TMPDIR_BASE}/out.txt"
     make_mock_agent codex
-    ec=$(AGENT_KILL_AFTER=0 REVIEW_KILL_ESCALATION=0 run_agents "$out" "codex")
-    assert_exit_code "AGENT_KILL_AFTER=0 with a matching escalation is accepted" "0" "$ec"
     # A grace the helper cannot fit its escalation inside is refused by
     # the helper (exit 2) rather than silently orphaning the CLI.
     ec=$(AGENT_KILL_AFTER=1 REVIEW_KILL_ESCALATION=5 run_agents "$out" "codex")

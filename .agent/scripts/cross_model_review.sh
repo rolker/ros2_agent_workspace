@@ -163,8 +163,9 @@ duration_to_seconds() {
 # rejects surfaces as a bare exit 125 from every agent job (reads as "the
 # CLI failed"), and a zero silently removes a bound rather than setting a
 # short one.
-#   $3 allow_zero  — true only for AGENT_KILL_AFTER, where 0 legitimately
-#                    means "send SIGKILL immediately after the SIGTERM"
+#   $3 allow_zero  — true to accept 0; no knob does today (for
+#                    `timeout -k`, 0 disables the SIGKILL rather than
+#                    sending it at once)
 #   $4 go_shape    — true for a value handed to agy's --print-timeout
 #   $5 zero_reason — why zero is wrong for this particular knob
 validate_duration_knob() {
@@ -189,7 +190,8 @@ validate_duration_knob() {
 
 validate_duration_knob AGENT_TIMEOUT "$AGENT_TIMEOUT" false false \
     "coreutils 'timeout 0' imposes no limit at all, which would leave the agent unbounded — the opposite of what ADR-0015 §3 guarantees."
-validate_duration_knob AGENT_KILL_AFTER "$AGENT_KILL_AFTER" true false ""
+validate_duration_knob AGENT_KILL_AFTER "$AGENT_KILL_AFTER" false false \
+    "coreutils 'timeout -k 0' does not kill at once — a zero duration DISABLES the SIGKILL escalation, so a CLI that ignores SIGTERM would outlive its bound."
 validate_duration_knob AGY_PRINT_TIMEOUT "$AGY_PRINT_TIMEOUT" false true \
     "agy reads 0 as 'wait until the turn completes', which is the unbounded review this cap exists to prevent."
 validate_duration_knob GEMINI_BACKSTOP_MARGIN "$GEMINI_BACKSTOP_MARGIN" false false \

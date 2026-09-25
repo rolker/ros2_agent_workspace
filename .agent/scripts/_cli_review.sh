@@ -174,11 +174,10 @@ if [[ -n "${AGENT_KILL_AFTER:-}" ]]; then
     if ! KILL_AFTER_SECONDS=$(to_seconds "$AGENT_KILL_AFTER"); then
         usage_fail "AGENT_KILL_AFTER value '${AGENT_KILL_AFTER}' is not a duration"
     fi
-    # Both zero is the one legal equal case: the caller wants no grace at
-    # all, and this helper escalates immediately to match.
-    if [[ "$KILL_AFTER_SECONDS" -le "$ESCALATION_SECONDS" ]] \
-        && ! [[ "$KILL_AFTER_SECONDS" -eq 0 && "$ESCALATION_SECONDS" -eq 0 ]]; then
-        usage_fail "AGENT_KILL_AFTER (${AGENT_KILL_AFTER}) must be greater than REVIEW_KILL_ESCALATION (${REVIEW_KILL_ESCALATION}): the caller's SIGKILL would land on this helper before it could SIGKILL a CLI that ignored SIGTERM, orphaning that CLI. Raise AGENT_KILL_AFTER or lower REVIEW_KILL_ESCALATION (set both to 0 for no grace at all)."
+    # Strictly greater, which also rules out 0: `timeout -k 0` disables
+    # the caller's SIGKILL instead of sending it at once.
+    if [[ "$KILL_AFTER_SECONDS" -le "$ESCALATION_SECONDS" ]]; then
+        usage_fail "AGENT_KILL_AFTER (${AGENT_KILL_AFTER}) must be greater than REVIEW_KILL_ESCALATION (${REVIEW_KILL_ESCALATION}): the caller's SIGKILL would land on this helper before it could SIGKILL a CLI that ignored SIGTERM, orphaning that CLI. Raise AGENT_KILL_AFTER or lower REVIEW_KILL_ESCALATION."
     fi
 fi
 
