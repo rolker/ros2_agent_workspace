@@ -4384,6 +4384,35 @@ test_local_helpers_kill_the_cli_process_group() {
     teardown
 }
 
+test_local_concurrent_runs_refused() {
+    echo "TEST: a second run into the same artifact dir is refused before it writes (#660)"
+    if ! command -v flock >/dev/null 2>&1; then
+        echo "  SKIP: no flock on this host"; return
+    fi
+    setup
+    make_mock_agent codex
+    local dir="${MOCK_REPO}/.agent/work-plans/issue-42" ec=0 err
+    mkdir -p "$dir"
+    echo "first run's findings" > "${dir}/review-codex-findings.md"
+    # Stand in for a first run holding the lock for 5s.
+    flock "${dir}/.cross-model-review.lock" sleep 5 &
+    local holder=$! i
+    for ((i = 0; i < 20; i++)); do
+        flock -n "${dir}/.cross-model-review.lock" true 2>/dev/null || break
+        sleep 0.1
+    done
+    cd "${MOCK_REPO}"
+    err=$(PATH="${MOCK_BIN}:${PATH}" WORKTREE_ISSUE=42 bash "${SCRIPT_UNDER_TEST}" \
+        --pr 99 --agents codex 2>&1 >/dev/null) || ec=$?
+    kill "$holder" 2>/dev/null || true
+    wait "$holder" 2>/dev/null || true
+    assert_exit_code "second run exits 5" "5" "$ec"
+    assert_contains "names the other run" "already reviewing into" "$err"
+    assert_eq "first run's findings untouched" "first run's findings" \
+        "$(cat "${dir}/review-codex-findings.md")"
+    teardown
+}
+
 test_local_branch_short_flag_not_swallowed() {
     echo "TEST: --branch does not take a following short flag as its base ref (#660)"
     setup
@@ -4555,6 +4584,7 @@ test_local_default_branch_prefers_fresher_origin
 test_local_claude_preamble
 test_local_codex_env_allowlist
 test_local_helpers_kill_the_cli_process_group
+test_local_concurrent_runs_refused
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

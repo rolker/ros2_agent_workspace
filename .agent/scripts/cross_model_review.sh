@@ -110,6 +110,8 @@
 #       marker), OR at least one agent failed (triplets printed — read
 #       EXIT= per agent). The presence of triplets is the disambiguator.
 #   4 — wrong worktree / invalid environment (see _resolve_work_plans_dir.sh)
+#   5 — another run is already reviewing into the same artifact dir;
+#       nothing was written (retry once it finishes)
 
 set -euo pipefail
 
@@ -682,6 +684,26 @@ fi
 
 WORK_PLANS_DIR=$(resolve_work_plans_dir "$ISSUE_NUMBER") || exit 4
 mkdir -p "$WORK_PLANS_DIR"
+
+# One run per artifact dir at a time (#660). The prompt and findings
+# filenames are fixed per agent, so a second run into the same dir
+# would overwrite the first's prompt, truncate its findings, or append
+# its success marker to the other's failure. The second run is refused
+# before it writes anything; the lock is held on fd 9 until exit.
+# --no-progress runs get a fresh temp dir each and never contend.
+REVIEW_LOCK_FILE="${WORK_PLANS_DIR}/.cross-model-review.lock"
+if command -v flock >/dev/null 2>&1; then
+    exec 9>> "$REVIEW_LOCK_FILE" || {
+        echo "ERROR: cannot open the review lock ${REVIEW_LOCK_FILE}" >&2
+        exit 4
+    }
+    if ! flock -n 9; then
+        echo "ERROR: another cross_model_review.sh run is already reviewing into ${WORK_PLANS_DIR}; retry once it finishes (its findings files would otherwise be overwritten)" >&2
+        exit 5
+    fi
+else
+    echo "WARNING: flock is not installed; concurrent reviews into ${WORK_PLANS_DIR} are not serialized" >&2
+fi
 
 prompt_file_for()   { echo "${WORK_PLANS_DIR}/review-$1-prompt.md"; }
 findings_file_for() { echo "${WORK_PLANS_DIR}/review-$1-findings.md"; }

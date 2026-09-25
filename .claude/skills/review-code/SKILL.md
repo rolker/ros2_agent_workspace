@@ -666,7 +666,9 @@ in the report while the other's findings are used as normal; one
 agent's failure never blocks the other and never fails the review. Exit
 3 with **no** `AGENT=` triplets means the shared prompt could not be
 built (diff fetch failed or empty) — nothing ran. Exit 1 means no listed
-agent had a usable CLI, or (post-PR only) `gh` itself is missing.
+agent had a usable CLI, or (post-PR only) `gh` itself is missing. Exit 5
+means another run is already reviewing into the same issue directory
+(nothing was written) — wait for it rather than starting a second one.
 Either way, report the specialist as unavailable rather than silently
 omitting it. A findings file never holds a half-review — each agent's
 helper (`_agy_review.sh` for gemini, `_cli_review.sh` for codex)
