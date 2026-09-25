@@ -65,6 +65,9 @@ setup() {
     #                       the plain string <m> (the live cutoff shape)
     #                       instead of the {code,message} object
     #   MOCK_AGY_DENY_PARTIAL=1  normal response PLUS one denied action
+    #   MOCK_AGY_DENY_FIRST=1    deny (as MOCK_AGY_DENY) only on a turn
+    #                       WITHOUT --conversation; a resumed turn answers
+    #   MOCK_AGY_CID=<id>   put conversation_id <id> in every result (#660)
     #   MOCK_AGY_SLEEP=<s>  sleep <s> before answering normally
     #   MOCK_AGY_STALL=1    read the prompt, then never answer (sleep 60):
     #                       agy wedged past its own --print-timeout, which
@@ -119,9 +122,13 @@ fi
 [[ -n "${MOCK_AGY_SLEEP:-}" ]] && mock_sleep "${MOCK_AGY_SLEEP}"
 echo 'agy: a newer version is available (mock banner, not JSON)'
 echo '{"event":"init","init":{"tools":[]}}'
-if [[ -n "${MOCK_AGY_DENY:-}" ]]; then
+CID_JQ='(if $cid == "" then {} else {conversation_id: $cid} end)'
+resumed=false
+for a in "$@"; do [[ "$a" == "--conversation" ]] && resumed=true; done
+if [[ -n "${MOCK_AGY_DENY:-}" ]] || [[ -n "${MOCK_AGY_DENY_FIRST:-}" && "$resumed" == false ]]; then
     echo 'jetski: no output produced — a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.' >&2
-    jq -cn --arg a "${MOCK_AGY_DENY_ACTION:-RunCommand}" '{event:"result",result:{status:"SUCCESS",response:"",denied_actions:[{action:"command",display_name:$a}]}}'
+    jq -cn --arg a "${MOCK_AGY_DENY_ACTION:-RunCommand}" --arg cid "${MOCK_AGY_CID:-}" \
+        '{event:"result",result:({status:"SUCCESS",response:"",denied_actions:[{action:"command",display_name:$a}]} + '"$CID_JQ"')}'
     exit 0
 fi
 if [[ -n "${MOCK_AGY_ERROR:-}" ]]; then
@@ -149,7 +156,7 @@ if [[ -n "${MOCK_AGY_DENY_PARTIAL:-}" ]]; then
     exit 0
 fi
 printf '%s\n' "$input" | jq -r 'select(.event == "user") | .message.content' \
-    | jq -c -Rs '{event:"result",result:{status:"SUCCESS",response:.}}'
+    | jq -c -Rs --arg cid "${MOCK_AGY_CID:-}" '{event:"result",result:({status:"SUCCESS",response:.} + '"$CID_JQ"')}'
 MOCK_EOF
     chmod +x "${MOCK_BIN}/agy"
 
@@ -1028,6 +1035,35 @@ test_agy_denial_is_failure() {
     assert_contains "findings file names the denied action" "RunCommand" "$content"
     assert_contains "findings file explains the denial" "auto-denied in headless mode" "$content"
 
+    teardown
+}
+
+test_agy_denial_retried_in_the_same_conversation() {
+    echo "TEST: an empty, tool-denied gemini turn is retried once in the same conversation (#660)"
+    setup
+    local log="${TMPDIR_BASE}/agy-args.log" exit_code content
+    exit_code=$(MOCK_AGY_DENY_FIRST=1 MOCK_AGY_CID=cid-123 MOCK_AGY_LOG="$log" run_gemini_sync)
+    assert_exit_code "retried review completes" "0" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "the retry resumed the first turn's conversation" "cid-123" "$(cat "$log")"
+    assert_contains "the retry told the model its call was denied" "Your tool call \(RunCommand\) was denied" "$content"
+    assert_contains "the retry is noted in the findings" "answer to one follow-up turn" "$content"
+    assert_contains "completion marker" "Review complete" "$content"
+
+    # Denied again on the retry: still a failed review, and it says so.
+    exit_code=$(MOCK_AGY_DENY=1 MOCK_AGY_CID=cid-123 run_gemini_sync)
+    assert_exit_code "denied twice exits 3" "3" "$exit_code"
+    content=$(cat "${MOCK_REPO}/${FINDINGS_REL}")
+    assert_contains "names the retry" "after one retry in the same conversation" "$content"
+    assert_contains "failed marker" "Review failed" "$content"
+
+    # No conversation id: no retry to attempt, and the reason says why.
+    : > "$log"
+    exit_code=$(MOCK_AGY_DENY=1 MOCK_AGY_LOG="$log" run_gemini_sync)
+    assert_exit_code "no conversation id exits 3" "3" "$exit_code"
+    assert_contains "says why there was no retry" "No retry: the result named no conversation" \
+        "$(cat "${MOCK_REPO}/${FINDINGS_REL}")"
+    assert_not_contains "agy ran once" "[-]-conversation" "$(cat "$log")"
     teardown
 }
 
@@ -4227,6 +4263,7 @@ test_gh_pr_view_failure_distinct_error
 test_agy_stdin_invocation
 test_agy_large_prompt
 test_agy_denial_is_failure
+test_agy_denial_retried_in_the_same_conversation
 test_agy_timeout_is_failure
 test_agy_partial_denial_is_noted
 test_diff_fetch_failure_is_marked

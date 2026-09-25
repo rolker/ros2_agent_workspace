@@ -17,6 +17,9 @@
 #     shell command), agy auto-denies it, prints a notice on stderr, and
 #     exits 0 with an EMPTY response. The exit code is therefore not a
 #     usable failure signal; the terminal `result` event is.
+#     When that happens this helper resumes the same conversation ONCE
+#     (--conversation <id>) with a "that was denied, answer in text only"
+#     message, inside the same print-timeout budget (#660).
 #   * When --print-timeout expires mid-turn agy also exits 0 with
 #     status SUCCESS and a partial (possibly empty) response; the only
 #     signal is a stderr line containing "print timeout after".
@@ -230,6 +233,9 @@ if ! jq -c -Rs '{event: "user", message: {role: "user", content: .}}' "$PROMPT_F
     fail "could not encode the prompt as a stream-json message"
 fi
 
+# One agy turn. Args: <ndjson-input> <stream-out> <stderr-out>
+# <print-timeout> [extra agy args, e.g. --conversation <id>]. Sets AGY_EXIT.
+#
 # No pipeline here: the exit status is agy's own, not jq's. `-p=` is the
 # verified spelling for "print mode, prompt comes from stdin" on agy 1.2.8:
 # a bare -p swallows the next flag as its prompt and `-p ""` is rejected
@@ -237,18 +243,30 @@ fi
 # agy runs as a background child and is waited on, so a TERM/INT sent
 # to this helper (cross_model_review.sh's cleanup on interrupt) reaches
 # agy at once instead of being deferred until the turn ends on its own.
-"${AGY_SETSID[@]}" "$AGY_BIN_RESOLVED" \
-    --input-format=stream-json \
-    --output-format=stream-json \
-    --print-timeout "$PRINT_TIMEOUT" \
-    --disable-slash-commands \
-    -p= < "$INPUT_FILE" > "$STREAM_FILE" 2> "$STDERR_FILE" &
-AGY_PID=$!
-AGY_EXIT=0
-wait "$AGY_PID" || AGY_EXIT=$?
-# The review is over: nothing agy started may outlive it.
-signal_agy KILL "$AGY_PID"
-AGY_PID=""
+agy_turn() {
+    local input="$1" out="$2" err="$3" timeout="$4"
+    shift 4
+    "${AGY_SETSID[@]}" "$AGY_BIN_RESOLVED" "$@" \
+        --input-format=stream-json \
+        --output-format=stream-json \
+        --print-timeout "$timeout" \
+        --disable-slash-commands \
+        -p= < "$input" > "$out" 2> "$err" &
+    AGY_PID=$!
+    AGY_EXIT=0
+    wait "$AGY_PID" || AGY_EXIT=$?
+    # The turn is over: nothing agy started may outlive it.
+    signal_agy KILL "$AGY_PID"
+    AGY_PID=""
+}
+
+# The print timeout is this helper's TOTAL budget, retry included, so the
+# caller's backstop (set above it) still never races a live turn.
+if ! PRINT_TIMEOUT_SECONDS=$(to_seconds "$PRINT_TIMEOUT"); then
+    config_fail "print timeout '${PRINT_TIMEOUT}' is not a duration"
+fi
+TURN_STARTED=$(date +%s)
+agy_turn "$INPUT_FILE" "$STREAM_FILE" "$STDERR_FILE" "$PRINT_TIMEOUT"
 
 # Last 20 lines of stderr, for failure reports: a fatal error lands at
 # the end, after any startup chatter.
@@ -262,7 +280,46 @@ stderr_excerpt() {
 # The last result event wins (stream-json emits exactly one per turn).
 # Read line-wise with fromjson? so a stray non-JSON stdout line (update
 # banner, notice) is skipped instead of aborting the whole parse.
-RESULT_JSON=$(jq -R -c 'fromjson? | select(.event == "result") | .result' "$STREAM_FILE" 2>/dev/null | tail -n 1 || true)
+last_result() { jq -R -c 'fromjson? | select(.event == "result") | .result' "$1" 2>/dev/null | tail -n 1 || true; }
+RESULT_JSON=$(last_result "$STREAM_FILE")
+
+# One retry for the denied-tool case. The "no tools" footer is only a
+# request: agy has no switch that removes its built-in tools, so the model
+# still sometimes calls one (RunCommand), headless mode denies it, and
+# the turn ends with an EMPTY response — three live reviews in a row
+# (#660). Resuming the SAME conversation (--conversation <id>, verified
+# on agy 1.2.11) with a plain "that was denied, answer in text" costs one
+# short turn, not a second full review. Only when the first turn is
+# otherwise clean, names its conversation, and there is at least
+# RETRY_MIN_SECONDS of the budget left.
+RETRY_MIN_SECONDS=30
+RETRY_NOTE=""
+if [[ "$AGY_EXIT" -eq 0 && -n "$RESULT_JSON" ]] \
+    && ! grep -q 'print timeout after' "$STDERR_FILE" 2>/dev/null \
+    && jq -e '.status == "SUCCESS"
+              and ((.response // "") | test("^[[:space:]]*$"))
+              and ((.denied_actions // []) | length > 0)' <<< "$RESULT_JSON" >/dev/null 2>&1; then
+    CONVERSATION_ID=$(jq -r '.conversation_id // empty' <<< "$RESULT_JSON")
+    FIRST_DENIED=$(jq -r '(.denied_actions // []) | map(.display_name // .action) | join(", ")' <<< "$RESULT_JSON")
+    REMAINING=$(( PRINT_TIMEOUT_SECONDS - ($(date +%s) - TURN_STARTED) ))
+    if [[ -z "$CONVERSATION_ID" ]]; then
+        RETRY_NOTE=" No retry: the result named no conversation to resume."
+    elif [[ "$REMAINING" -lt "$RETRY_MIN_SECONDS" ]]; then
+        RETRY_NOTE=" No retry: only ${REMAINING}s of the ${PRINT_TIMEOUT} budget was left."
+    else
+        RETRY_INPUT="${TMP_DIR}/retry.ndjson"
+        RETRY_TEXT="Your tool call (${FIRST_DENIED}) was denied: this is a headless session that cannot run or approve ANY tool. Do not call any tools. Write the complete review now, as text only, from the diff and context already in this conversation, in the output format the first message asked for."
+        if ! jq -c -n --arg c "$RETRY_TEXT" '{event: "user", message: {role: "user", content: $c}}' > "$RETRY_INPUT"; then
+            fail "could not encode the retry message as a stream-json message"
+        fi
+        STREAM_FILE="${TMP_DIR}/stream-retry.ndjson"
+        STDERR_FILE="${TMP_DIR}/stderr-retry.txt"
+        agy_turn "$RETRY_INPUT" "$STREAM_FILE" "$STDERR_FILE" "${REMAINING}s" --conversation "$CONVERSATION_ID"
+        RESULT_JSON=$(last_result "$STREAM_FILE")
+        RETRY_NOTE=" This was after one retry in the same conversation (the first turn's ${FIRST_DENIED} call was denied)."
+        RETRIED=true
+    fi
+fi
 
 if [[ "$AGY_EXIT" -ne 0 ]]; then
     fail "agy exited ${AGY_EXIT}$(stderr_excerpt)"
@@ -309,7 +366,7 @@ if [[ "$STATUS" != "SUCCESS" ]]; then
 fi
 if [[ -z "${RESPONSE//[[:space:]]/}" ]]; then
     if [[ "$DENIED_COUNT" -gt 0 ]]; then
-        fail "empty response; ${DENIED_COUNT} tool action(s) were auto-denied in headless mode (${DENIED}). The reviewer works from the embedded diff only; it must not call any tools (file reads and shell commands are both denied headlessly).$(stderr_excerpt)"
+        fail "empty response; ${DENIED_COUNT} tool action(s) were auto-denied in headless mode (${DENIED}). The reviewer works from the embedded diff only; it must not call any tools (file reads and shell commands are both denied headlessly).${RETRY_NOTE}$(stderr_excerpt)"
     fi
     fail "empty response${ERROR_MSG:+: ${ERROR_MSG}}$(stderr_excerpt)"
 fi
@@ -322,6 +379,12 @@ fi
 if [[ "$DENIED_COUNT" -gt 0 ]]; then
     if ! printf '\n> Note: %s tool action(s) were denied in headless mode (%s); the review ran with less context than the model asked for.\n' \
         "$DENIED_COUNT" "$DENIED" >> "$FINDINGS_FILE"; then
+        fail "could not write the findings file: ${FINDINGS_FILE}"
+    fi
+fi
+if [[ "${RETRIED:-false}" == true ]]; then
+    if ! printf '\n> Note: the first turn ended empty after a denied %s call; this review is the answer to one follow-up turn in the same conversation.\n' \
+        "$FIRST_DENIED" >> "$FINDINGS_FILE"; then
         fail "could not write the findings file: ${FINDINGS_FILE}"
     fi
 fi
