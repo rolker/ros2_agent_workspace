@@ -324,16 +324,12 @@ GH_EOF
 }
 
 # ---- Test: issue extraction from PR body ----
-# Helper: mirrors the extraction logic from cross_model_review.sh.
+# Runs the script's own extract_closing_issue, not a copy of its regex
+# (a copy drifted from the script it was meant to test, #660).
 # Post-#149: keyword-only — no loose "#N anywhere" fallback.
 extract_issue() {
-    local body="$1"
-    local ref num
-    ref=$(printf '%s\n' "$body" \
-        | grep -ioE '(^|[^[:alnum:]_])(closes|fixes|resolves)[[:space:]]+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[0-9]+' \
-        | head -n1 || true)
-    num=$(printf '%s\n' "$ref" | grep -oE '[0-9]+$' || true)
-    printf '%s' "${num:-}"
+    bash -c "$(sed -n '/^extract_closing_issue()/,/^}/p' "$SCRIPT_UNDER_TEST")"'
+        extract_closing_issue "$1"' _ "$1"
 }
 
 test_issue_extraction() {
@@ -344,6 +340,15 @@ test_issue_extraction() {
     assert_eq "fixes #123 -> 123" "123" "$(extract_issue 'fixes #123')"
     assert_eq "Resolves owner/repo#77 -> 77" "77" "$(extract_issue 'Resolves owner/repo#77')"
     assert_eq "CLOSES #5 -> 5" "5" "$(extract_issue 'CLOSES #5')"
+    # GitHub's full keyword set, and the colon form (#660)
+    assert_eq "Close #6 -> 6" "6" "$(extract_issue 'Close #6')"
+    assert_eq "Closed #7 -> 7" "7" "$(extract_issue 'Closed #7')"
+    assert_eq "Fix #8 -> 8" "8" "$(extract_issue 'Fix #8')"
+    assert_eq "Fixed #9 -> 9" "9" "$(extract_issue 'Fixed #9')"
+    assert_eq "Resolve #10 -> 10" "10" "$(extract_issue 'Resolve #10')"
+    assert_eq "Resolved #11 -> 11" "11" "$(extract_issue 'Resolved #11')"
+    assert_eq "Closes: #12 -> 12" "12" "$(extract_issue 'Closes: #12')"
+    assert_eq "unrelated 'fixer #13' -> empty" "" "$(extract_issue 'the fixer #13')"
     # A real keyword later in the body wins over substring false positives
     assert_eq "encloses #42, Closes #99 -> 99" "99" "$(extract_issue 'encloses #42 but Closes #99')"
 

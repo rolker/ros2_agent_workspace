@@ -558,6 +558,21 @@ if [[ "$USABLE_AGENTS" -eq 0 ]]; then
     exit 1
 fi
 
+# Print the first issue a PR body closes, by GitHub's own keyword set
+# (case-insensitive): close/closes/closed, fix/fixes/fixed,
+# resolve/resolves/resolved, optionally followed by a colon
+# ("Closes: #12"). Missing the past-tense and colon forms refused real
+# PRs GitHub itself links (#660). A word boundary before the keyword
+# keeps "encloses" / "prefixes" out. The cross-repo form
+# "Closes owner/repo#N" yields N. Prints nothing when there is none.
+extract_closing_issue() {
+    local ref
+    ref=$(printf '%s\n' "$1" \
+        | grep -ioE '(^|[^[:alnum:]_])(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[0-9]+' \
+        | head -n1 || true)
+    printf '%s\n' "$ref" | grep -oE '[0-9]+$' || true
+}
+
 # --- Resolve issue number ---
 # Order: explicit --issue flag wins; otherwise mode-specific resolution.
 # PR mode: require a GitHub closure keyword in the PR body, unless
@@ -613,14 +628,7 @@ else
         exit 2
     fi
 
-    # Match GitHub closure keywords (case-insensitive): Closes #N,
-    # Fixes #N, Resolves #N. Requires a word boundary before the keyword
-    # to avoid matching "encloses", "prefixes", etc. Also accepts the
-    # cross-repo form "Closes owner/repo#N" (just extracts N).
-    ISSUE_REF=$(printf '%s\n' "$PR_BODY" \
-        | grep -ioE '(^|[^[:alnum:]_])(closes|fixes|resolves)[[:space:]]+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[0-9]+' \
-        | head -n1 || true)
-    ISSUE_NUMBER=$(printf '%s\n' "$ISSUE_REF" | grep -oE '[0-9]+$' || true)
+    ISSUE_NUMBER=$(extract_closing_issue "$PR_BODY")
 
     if [[ -z "$ISSUE_NUMBER" && "$NO_PROGRESS" == true ]]; then
         # Same sentinel as branch mode: with no issue to file under,
