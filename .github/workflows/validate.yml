@@ -63,8 +63,11 @@ jobs:
 
       - name: Install pytest
         # pyyaml: ci_local.sh's upstream.repos parser imports the yaml module
-        # (present on ROS dev hosts via rosdep/vcstool, absent in setup-python)
-        run: python3 -m pip install --upgrade pip pytest pyyaml
+        # (present on ROS dev hosts via rosdep/vcstool, absent in setup-python).
+        # markdown-it-py: _plan_approach.py's CommonMark parser, exercised by
+        # test_cross_model_review.sh's require_plan_parser-gated assertions,
+        # which FAIL (not skip) under CI=true if the library is missing (#660).
+        run: python3 -m pip install --upgrade pip pytest pyyaml markdown-it-py
 
       # Runs .agent/scripts/tests/ (shell via bash, python via pytest). These are
       # hermetic (temp git sandboxes, stubbed gh, no network/ROS), so no build or

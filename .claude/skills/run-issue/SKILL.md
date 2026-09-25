@@ -570,16 +570,14 @@ gh pr list --head "$(git branch --show-current)" --state open \
 - **GitHub-origin (dev mode)**: `git push`, then `gh pr create` (drop any
   `[PLAN]` framing — this is the real PR). After the PR accrues review comments,
   resume at the `triage-reviews` row.
-  - **Copilot opt-in scope**: `--copilot` is a **`review-code` flag** governing
-    its Copilot Adversarial specialist — it is *not* consumed by `git push` or
-    `gh pr create`. **Off by default** (the standing quota decision — see
-    review-code). The publish checkpoint surfaces it as a per-run choice because
-    that is where the user decides whether to spend Premium quota on cross-model
-    coverage for this PR; if opted in, pass `--copilot` to the `review-code`
-    re-runs (pre-push and any post-triage re-review), not to the publish
-    commands.
+  - **Cross-model opt-out scope**: `--no-cross-model` is a **`review-code`
+    flag** governing its Gemini+Codex Cross-Model Adversarial specialist
+    (default on at Standard/Deep) — it is *not* consumed by `git push` or
+    `gh pr create`. Pass it to the `review-code` re-runs (pre-push and any
+    post-triage re-review), not to the publish commands, when a run should
+    skip that pass (e.g. neither CLI available on this host).
 - **Field mode (gitcloud / non-GitHub origin)**: push to the field remote with
-  **no PR and no Copilot** (the field workflow — see AGENTS.md § Field Mode).
+  **no PR** (the field workflow — see AGENTS.md § Field Mode).
   The lifecycle ends at the push; reconciliation to GitHub is a later dev-side
   `/import-field-changes`. **Hook caveat**: if the field repo lists its default
   branch in a `no-commit-to-branch` pre-commit hook, commits fail there — fix the

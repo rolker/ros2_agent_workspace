@@ -72,3 +72,9 @@ _codeql_detected_source_root
 # Claude Code per-machine permission overrides — layers on top of the tracked
 # .claude/settings.json baseline (#594); never commit machine-specific config
 .claude/settings.local.json
+
+# cross_model_review.sh (#660) regenerated prompt/findings files — review
+# bookkeeping, not durable findings (those live in progress.md)
+.agent/work-plans/*/review-*-prompt.md
+.agent/work-plans/*/review-*-findings.md
+.agent/work-plans/*/.cross-model-review.lock
