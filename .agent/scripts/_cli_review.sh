@@ -239,12 +239,21 @@ signal_cli() {
     fi
 }
 CLI_PID=""
+CLI_LAUNCHING=false
+CLI_LAUNCH_PREV=""
 terminate_child() {
     local code="$1" watchdog i
     # Re-entrancy: a second signal (repeated Ctrl-C, TERM then HUP) would
     # otherwise start a second watchdog and clobber $watchdog, leaking
     # the first one.
     trap '' INT TERM HUP
+    # A signal can land between the `&` that starts the CLI and the
+    # `CLI_PID=$!` that records it: the CLI then exists but is unrecorded,
+    # and would outlive this helper. `$!` names it iff it moved since the
+    # launch began (#660).
+    if [[ -z "$CLI_PID" && "$CLI_LAUNCHING" == true && "${!:-}" != "$CLI_LAUNCH_PREV" ]]; then
+        CLI_PID=$!
+    fi
     if [[ -n "$CLI_PID" ]]; then
         signal_cli TERM "$CLI_PID"
         # `wait` returns the moment the CLI dies, so a clean shutdown
@@ -268,11 +277,15 @@ terminate_child() {
         wait "$CLI_PID" 2>/dev/null
         # The CLI is gone, but a child of it that ignored the TERM may
         # not be: give the group the rest of the window, then SIGKILL it.
-        for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
-            signal_cli 0 "$CLI_PID" || break
-            sleep 0.1
-        done
-        signal_cli KILL "$CLI_PID"
+        # Group mode only — without setsid this would signal a bare PID
+        # that was just reaped and may already be reused.
+        if [[ ${#CLI_SETSID[@]} -gt 0 ]]; then
+            for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
+                signal_cli 0 "$CLI_PID" || break
+                sleep 0.1
+            done
+            signal_cli KILL "$CLI_PID"
+        fi
         pkill -KILL -P "$watchdog" 2>/dev/null
         kill -KILL "$watchdog" 2>/dev/null
         CLI_PID=""
@@ -312,16 +325,20 @@ bound_note() {
 run_cli() {
     local out="$1" err="$2"
     shift 2
+    CLI_LAUNCH_PREV="${!:-}"
+    CLI_LAUNCHING=true
     if [[ "$err" == "-" ]]; then
         "${CLI_SETSID[@]}" "$@" < "$PROMPT_FILE" > "$out" 2>&1 &
     else
         "${CLI_SETSID[@]}" "$@" < "$PROMPT_FILE" > "$out" 2> "$err" &
     fi
     CLI_PID=$!
+    CLI_LAUNCHING=false
     CLI_EXIT=0
     wait "$CLI_PID" || CLI_EXIT=$?
-    # The review is over: nothing the CLI started may outlive it.
-    signal_cli KILL "$CLI_PID"
+    # The review is over: nothing the CLI started may outlive it. Group
+    # mode only: a bare PID was just reaped and may already be reused.
+    [[ ${#CLI_SETSID[@]} -gt 0 ]] && signal_cli KILL "$CLI_PID"
     CLI_PID=""
 }
 

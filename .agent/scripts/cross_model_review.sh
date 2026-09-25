@@ -787,6 +787,8 @@ AGENT_TMP_ROOT=""
 # — otherwise an interrupted run would leave the CLIs running for up to
 # AGENT_TIMEOUT, burning quota on an abandoned review.
 declare -A AGENT_PID=()
+LAUNCHING_AGENT=""
+LAUNCH_PREV=""
 
 # Is this job over? A dead-but-unreaped child still answers `kill -0`,
 # so that alone would report every finished job as alive and burn the
@@ -852,6 +854,13 @@ kill_tree() {
 }
 cleanup_jobs() {
     local pid waited=0 finished
+    # A job launched but not yet recorded (a signal between its `&` and
+    # the AGENT_PID assignment) is still ours to stop: `$!` names it iff
+    # it moved since that launch began.
+    if [[ -n "$LAUNCHING_AGENT" && "${!:-}" != "$LAUNCH_PREV" \
+          && -z "${AGENT_PID[$LAUNCHING_AGENT]+x}" ]]; then
+        AGENT_PID["$LAUNCHING_AGENT"]=$!
+    fi
     for pid in "${AGENT_PID[@]}"; do
         kill "$pid" 2>/dev/null || true
     done
@@ -1259,8 +1268,12 @@ run_agent_job() {
     # the parent's cleanup that this job is finished, and the temp root
     # would be removed under a live CLI. The parent's reap is bounded, so
     # a helper that never returns still cannot hang the exit path.
+    # A TERM between the `&` and `child=$!` would find `child` empty and
+    # leave the job running unrecorded; `$!` names it iff it moved since
+    # the launch began (#660).
     child=""
-    trap 'if [[ -n "$child" ]]; then kill "$child" 2>/dev/null; wait "$child" 2>/dev/null; fi; exit 143' TERM
+    local launch_prev="${!:-}"
+    trap 'if [[ -z "$child" && "${!:-}" != "$launch_prev" ]]; then child=$!; fi; if [[ -n "$child" ]]; then kill "$child" 2>/dev/null; wait "$child" 2>/dev/null; fi; exit 143' TERM
     run_agent_sync "$agent" "${AGENT_BIN_FOR[$agent]}" "$prompt_file" "$findings_file" &
     child=$!
     rc=0
@@ -1306,9 +1319,16 @@ else
     echo "  Results: $(findings_file_for "${AGENTS_TO_RUN[0]}")"
 fi
 
+# `9>&-`: the jobs do not inherit the review lock, so nothing they leave
+# behind can hold it and refuse later runs (exit 5) after this one exits.
+# LAUNCH_* let cleanup_jobs find a job whose TERM landed between its `&`
+# and the AGENT_PID assignment (#660).
 for agent in "${AGENTS_TO_RUN[@]}"; do
-    run_agent_job "$agent" &
+    LAUNCH_PREV="${!:-}"
+    LAUNCHING_AGENT="$agent"
+    run_agent_job "$agent" 9>&- &
     AGENT_PID["$agent"]=$!
+    LAUNCHING_AGENT=""
 done
 
 # Collect in selection order. `wait` returns the job's own status; the

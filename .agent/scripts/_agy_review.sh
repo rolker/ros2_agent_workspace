@@ -181,11 +181,20 @@ signal_agy() {
     fi
 }
 AGY_PID=""
+AGY_LAUNCHING=false
+AGY_LAUNCH_PREV=""
 terminate_child() {
     local code="$1" watchdog i
     # Re-entrancy: a second signal would otherwise start a second
     # watchdog and clobber $watchdog, leaking the first one.
     trap '' INT TERM HUP
+    # A signal can land between the `&` that starts the agy and the
+    # `AGY_PID=$!` that records it: the agy then exists but is unrecorded,
+    # and would outlive this helper. `$!` names it iff it moved since the
+    # launch began (#660).
+    if [[ -z "$AGY_PID" && "$AGY_LAUNCHING" == true && "${!:-}" != "$AGY_LAUNCH_PREV" ]]; then
+        AGY_PID=$!
+    fi
     if [[ -n "$AGY_PID" ]]; then
         signal_agy TERM "$AGY_PID"
         # `wait` returns the moment the agy dies, so a clean shutdown
@@ -209,11 +218,15 @@ terminate_child() {
         wait "$AGY_PID" 2>/dev/null
         # The agy is gone, but a child of it that ignored the TERM may
         # not be: give the group the rest of the window, then SIGKILL it.
-        for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
-            signal_agy 0 "$AGY_PID" || break
-            sleep 0.1
-        done
-        signal_agy KILL "$AGY_PID"
+        # Group mode only — without setsid this would signal a bare PID
+        # that was just reaped and may already be reused.
+        if [[ ${#AGY_SETSID[@]} -gt 0 ]]; then
+            for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
+                signal_agy 0 "$AGY_PID" || break
+                sleep 0.1
+            done
+            signal_agy KILL "$AGY_PID"
+        fi
         pkill -KILL -P "$watchdog" 2>/dev/null
         kill -KILL "$watchdog" 2>/dev/null
         AGY_PID=""
@@ -246,6 +259,8 @@ fi
 agy_turn() {
     local input="$1" out="$2" err="$3" timeout="$4"
     shift 4
+    AGY_LAUNCH_PREV="${!:-}"
+    AGY_LAUNCHING=true
     "${AGY_SETSID[@]}" "$AGY_BIN_RESOLVED" "$@" \
         --input-format=stream-json \
         --output-format=stream-json \
@@ -253,10 +268,12 @@ agy_turn() {
         --disable-slash-commands \
         -p= < "$input" > "$out" 2> "$err" &
     AGY_PID=$!
+    AGY_LAUNCHING=false
     AGY_EXIT=0
     wait "$AGY_PID" || AGY_EXIT=$?
-    # The turn is over: nothing agy started may outlive it.
-    signal_agy KILL "$AGY_PID"
+    # The turn is over: nothing agy started may outlive it. Group mode
+    # only: a bare PID was just reaped and may already be reused.
+    [[ ${#AGY_SETSID[@]} -gt 0 ]] && signal_agy KILL "$AGY_PID"
     AGY_PID=""
 }
 

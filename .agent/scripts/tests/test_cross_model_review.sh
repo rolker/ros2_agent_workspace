@@ -26,7 +26,7 @@ trap 'rm -rf "$SANDBOX"' EXIT
 # The codex arm runs under an environment allowlist (#660), which would
 # strip the mocks' MOCK_* controls. Pass exactly those through the knob
 # the helper provides for this, rather than widening the allowlist.
-CROSS_MODEL_ENV_PASSTHROUGH="MOCK_ARGV_DIR MOCK_STDIN_DIR MOCK_TIMES_DIR MOCK_PREAMBLE MOCK_CODEX_ECHO_FULL MOCK_CODEX_EMPTY MOCK_CODEX_ERRMARK MOCK_CODEX_EXIT MOCK_CODEX_IGNORE_TERM MOCK_CODEX_ORPHAN_PIDFILE MOCK_CODEX_SLEEP MOCK_CODEX_STDERR MOCK_CODEX_ENV_DUMP"
+CROSS_MODEL_ENV_PASSTHROUGH="MOCK_ARGV_DIR MOCK_STDIN_DIR MOCK_TIMES_DIR MOCK_PREAMBLE MOCK_CODEX_ECHO_FULL MOCK_CODEX_EMPTY MOCK_CODEX_ERRMARK MOCK_CODEX_EXIT MOCK_CODEX_IGNORE_TERM MOCK_CODEX_ORPHAN_PIDFILE MOCK_CODEX_FD9_PROBE MOCK_CODEX_SLEEP MOCK_CODEX_STDERR MOCK_CODEX_ENV_DUMP"
 export CROSS_MODEL_ENV_PASSTHROUGH
 
 setup() {
@@ -2798,6 +2798,10 @@ if [[ -n "${MOCK_CODEX_ORPHAN_PIDFILE:-}" ]]; then
     for ((j = 0; j < 50; j++)); do [[ -s "${MOCK_CODEX_ORPHAN_PIDFILE}" ]] && break; sleep 0.05; done
 fi
 [[ -n "${MOCK_CODEX_ENV_DUMP:-}" ]] && env > "${MOCK_CODEX_ENV_DUMP}"
+# MOCK_CODEX_FD9_PROBE=<f>: record whether fd 9 (the review lock) is open here
+if [[ -n "${MOCK_CODEX_FD9_PROBE:-}" ]]; then
+    { true >&9; } 2>/dev/null && echo open > "${MOCK_CODEX_FD9_PROBE}" || echo closed > "${MOCK_CODEX_FD9_PROBE}"
+fi
 [[ -n "${MOCK_CODEX_SLEEP:-}" ]] && mock_sleep "${MOCK_CODEX_SLEEP}"
 echo "codex-cli 0.155.1 (mock banner)"
 echo "MOCK TRANSCRIPT: prompt was ${#prompt} bytes"
@@ -4450,12 +4454,22 @@ test_local_concurrent_runs_refused() {
     cd "${MOCK_REPO}"
     err=$(PATH="${MOCK_BIN}:${PATH}" WORKTREE_ISSUE=42 bash "${SCRIPT_UNDER_TEST}" \
         --pr 99 --agents codex 2>&1 >/dev/null) || ec=$?
+    # Its `sleep` child inherited the lock: kill it first, or the lock
+    # outlives the holder.
+    pkill -KILL -P "$holder" 2>/dev/null || true
     kill "$holder" 2>/dev/null || true
     wait "$holder" 2>/dev/null || true
     assert_exit_code "second run exits 5" "5" "$ec"
     assert_contains "names the other run" "already reviewing into" "$err"
     assert_eq "first run's findings untouched" "first run's findings" \
         "$(cat "${dir}/review-codex-findings.md")"
+
+    # The agent jobs must not inherit the lock: anything they left behind
+    # would otherwise hold it and refuse every later run.
+    local probe="${TMPDIR_BASE}/fd9"
+    ec=$(MOCK_CODEX_FD9_PROBE="$probe" run_agents "${TMPDIR_BASE}/out.txt" "codex")
+    assert_exit_code "a normal run completes" "0" "$ec"
+    assert_eq "the CLI does not hold the review lock" "closed" "$(cat "$probe" 2>/dev/null)"
     teardown
 }
 
