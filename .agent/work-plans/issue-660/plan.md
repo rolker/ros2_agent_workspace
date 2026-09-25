@@ -413,6 +413,44 @@ before any reset and be lost) and takes its `sleep` with it. Each has a
 test (689 assertions). Owner decision on the second question: the
 untrusted-PR gate stays in the skill text only.
 
+**Hosted-CI-only failure (2026-09-25):** `--work-dir` + `--no-progress` was
+checked after CLI discovery, so on a runner without codex the run exited
+1 "unavailable" instead of the exit-2 usage error. The check moved up
+with the other flag checks; its test now hides the CLIs.
+
+**Cross-model review of PR #662 in place of an owner read (2026-09-25).** The
+owner asked for Gemini and Codex to review the PR instead of reading it
+("have gemini and codex review it").
+
+- **Round 1** (`--pr 662`): Codex found 4 must-fix defects, all
+  confirmed; Gemini failed again on a denied RunCommand. Owner decision:
+  fix all four and chase the Gemini failure. Fixed: `AGENT_KILL_AFTER=0`
+  is refused (`timeout -k 0` disables the SIGKILL rather than sending it
+  at once); each CLI runs as its own process-group leader (setsid) and
+  every signal goes to the group, so a TERM-ignoring child cannot outlive
+  the review; review-code forwards the issue step 1 resolved (or
+  `--no-progress`), and PR mode accepts a keyword-less PR under
+  `--no-progress`; a second run into the same issue dir is refused with
+  exit 5 under a `flock`.
+- **Gemini root cause:** the "no tools" footer is only a request — agy
+  has no switch that removes its built-in tools, so the model sometimes
+  calls RunCommand, headless mode denies it, and the turn ends empty.
+  Fix: `_agy_review.sh` resumes the same conversation once
+  (`--conversation <id>`, verified live on agy 1.2.11) with "that was
+  denied, answer in text only", inside the same print-timeout budget.
+- **Round 2** (`--branch origin/main`): both agents completed; Gemini's
+  first turn was denied again and the retry produced its full review.
+  10 findings; owner decision: fix the 5 valid ones, push, no third
+  round. Fixed: the test assert helpers are pipefail-safe; GitHub's full
+  closing-keyword set (`Close`/`Closed`/`Fixed`/`Resolved`, `Closes:`) is
+  accepted, via one tested function; the jobs do not inherit the lock fd;
+  a TERM between a background launch and its `$!` assignment adopts the
+  unrecorded child; no bare-PID sweep without setsid. Not acted on: the
+  shared cleanup reap deadline is intended (every job is TERMed at the
+  same moment); two findings in the claude arm and the `pkill`
+  availability note concern upstream-verbatim code not used here; exact
+  `## Approach` matching follows the plan template. Suite: 722/0.
+
 ## Principles Self-Check
 
 | Principle | Consideration |
