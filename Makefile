@@ -276,6 +276,10 @@ $(STAMP)/rosdep-local.list: FORCE
 # script's own header describes it as a transient, single-file race whose
 # remedy is "re-run; the file may still be there", so it is a note, not a
 # build failure, and the stamp is left stale so the next `make build` retries.
+# Unlike exit 3, a directory WAS published (every surviving file, the
+# vanished ones left out), so the cache is refreshed against it now: skipping
+# `rosdep update` would build this invocation on the previous cache, missing
+# any key another file just added or changed.
 # Any OTHER non-zero status — notably exit 4, a project repo's rosdep.yaml
 # rejected by the shape rules, or exit 6, a genuine cross-file key conflict —
 # fails the build: those are policy violations to fix, not conditions to
@@ -290,6 +294,8 @@ $(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(STAMP)/rosdep-local.list $(
 		echo "  (workspace-local rosdep sources partially generated — one or more"; \
 		echo "   rosdep.yaml files vanished mid-run, typically a worktree removal"; \
 		echo "   racing this build; transient, will retry on the next 'make build'.)"; \
+		ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
+			|| echo "  (rosdep update failed — offline? generated source list is still current)"; \
 	elif [ "$$rc" -ne 0 ]; then \
 		exit $$rc; \
 	else \

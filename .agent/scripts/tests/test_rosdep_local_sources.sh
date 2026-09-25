@@ -904,7 +904,10 @@ got="$(run_stamp 7)"
 check "a vanished-file race (7) does not fail make build" contains "$got" "0 "
 check "a vanished-file race leaves no stamp, so the next build retries" \
     contains "$got" "no-stamp"
-check "a vanished-file race skips the cache refresh" contains "$got" "no-update"
+# A directory WAS published (the surviving files), so the cache is refreshed
+# against it now rather than building this invocation on the old cache
+# (Codex review of PR #661).
+check "a vanished-file race still refreshes the cache" contains "$got" " updated"
 check "a vanished-file race explains it's transient" \
     grep -q "worktree removal" "$TMP/mk.out"
 got="$(run_stamp 6)"
