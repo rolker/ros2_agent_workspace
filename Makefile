@@ -226,7 +226,19 @@ $(STAMP)/manifest.done: $(STAMP)/bootstrap.done
 # longer exists. The stamp therefore also depends on a file holding the CURRENT
 # set of paths, rewritten (and so made newer than the stamp) only when that set
 # actually changes — added, renamed or removed alike.
-ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml)
+# The second glob covers layer worktrees (#659): a rosdep.yaml added on a
+# feature branch lives under layers/worktrees/<name>/<layer>_ws/src/<repo>/
+# until the PR merges, and the generator now discovers it there too. $(wildcard)
+# follows symlinks the same way the shell glob does, so a worktree's symlinked
+# (untouched) sibling package or non-target layer — worktree_create.sh
+# symlinks those straight back to layers/main — is listed a second time here.
+# That is harmless at the Makefile-prerequisite level: it only makes the
+# content-diff check below re-run slightly more often (the recorded path SET
+# is unchanged, since the generator's own discovery already skips those
+# symlinks and dedupes), never a wrong result. The generator script remains
+# the authoritative discovery + symlink-skip + registration filter.
+ROSDEP_LOCAL_YAMLS := $(wildcard $(MAIN_ROOT)/layers/main/*_ws/src/*/rosdep.yaml) \
+                       $(wildcard $(MAIN_ROOT)/layers/worktrees/*/*_ws/src/*/rosdep.yaml)
 
 # FORCE (an ordinary target with no recipe and no file behind it) makes this
 # rule run every invocation; the cmp keeps the file's MTIME unchanged unless
@@ -258,16 +270,32 @@ $(STAMP)/rosdep-local.list: FORCE
 # yet, and the same condition bootstrap.sh treats as a note. The stamp is then
 # deliberately NOT touched, so the next `make build` retries once rosdep is
 # initialized (the prerequisite list would otherwise still be up to date and
-# the generator would never run again). Any OTHER non-zero status — notably
-# exit 4, a project repo's rosdep.yaml rejected by the shape rules — fails the
-# build: those keys feed a root-level `rosdep install`, so a rejected file is a
-# policy violation to fix, not a condition to build past.
+# the generator would never run again). Exit 7 (#659 round-3 pre-push
+# review — one or more discovered rosdep.yaml files vanished mid-run, e.g. a
+# `worktree_remove.sh` racing this generator) is treated the SAME way: the
+# script's own header describes it as a transient, single-file race whose
+# remedy is "re-run; the file may still be there", so it is a note, not a
+# build failure, and the stamp is left stale so the next `make build` retries.
+# Unlike exit 3, a directory WAS published (every surviving file, the
+# vanished ones left out), so the cache is refreshed against it now: skipping
+# `rosdep update` would build this invocation on the previous cache, missing
+# any key another file just added or changed.
+# Any OTHER non-zero status — notably exit 4, a project repo's rosdep.yaml
+# rejected by the shape rules, or exit 6, a genuine cross-file key conflict —
+# fails the build: those are policy violations to fix, not conditions to
+# build past.
 $(STAMP)/rosdep-local.done: $(STAMP)/manifest.done $(STAMP)/rosdep-local.list $(ROSDEP_LOCAL_YAMLS)
 	@mkdir -p $(STAMP)
 	@rc=0; ./.agent/scripts/rosdep_local_sources.sh $(MAIN_ROOT) || rc=$$?; \
 	if [ "$$rc" -eq 3 ]; then \
 		echo "  (workspace-local rosdep sources not generated — rosdep is not"; \
 		echo "   initialized; run .agent/scripts/bootstrap.sh. Using system defaults.)"; \
+	elif [ "$$rc" -eq 7 ]; then \
+		echo "  (workspace-local rosdep sources partially generated — one or more"; \
+		echo "   rosdep.yaml files vanished mid-run, typically a worktree removal"; \
+		echo "   racing this build; transient, will retry on the next 'make build'.)"; \
+		ROSDEP_SOURCE_PATH=$(MAIN_ROOT)/.rosdep/sources.list.d rosdep update \
+			|| echo "  (rosdep update failed — offline? generated source list is still current)"; \
 	elif [ "$$rc" -ne 0 ]; then \
 		exit $$rc; \
 	else \

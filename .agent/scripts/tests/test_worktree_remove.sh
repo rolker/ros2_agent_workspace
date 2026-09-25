@@ -15,6 +15,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CREATE_SCRIPT="$SCRIPT_DIR/../worktree_create.sh"
 REMOVE_SCRIPT="$SCRIPT_DIR/../worktree_remove.sh"
 HELPERS="$SCRIPT_DIR/../_worktree_helpers.sh"
+AGG_SCRIPT="$SCRIPT_DIR/../rosdep_local_sources.sh"
+VALIDATE_SCRIPT="$SCRIPT_DIR/../rosdep_yaml_validate.sh"
 TEST_PASS=0
 TEST_FAIL=0
 
@@ -130,6 +132,244 @@ test_remove_via_main_tree_copy_still_works() {
 }
 run_test "remove via main-tree script copy still works" \
     test_remove_via_main_tree_copy_still_works
+
+# ---- #659 round-2: layer-worktree removal regenerates rosdep sources ------
+# Build a mock MAIN workspace (a plain git repo, no bare origin needed — these
+# tests invoke the main tree's own copy of worktree_remove.sh, never a
+# worktree's copy) with a genuine LAYER worktree: a real `git worktree add`
+# linked worktree of a `layers/main/<ws>/src/<pkg>` repo, mirroring what
+# worktree_create.sh actually produces. Hermetic: ROSDEP_SYSTEM_SOURCES_DIR
+# points at a fixture dir, never the real /etc/ros/rosdep/sources.list.d.
+LAYER_TEST_DIR=""
+setup_with_layer_worktree() {
+    local issue="$1" with_rosdep="$2"
+    LAYER_TEST_DIR=$(mktemp -d)
+    LWORKSPACE_DIR="$LAYER_TEST_DIR/workspace"
+    mkdir -p "$LWORKSPACE_DIR"
+    git -C "$LWORKSPACE_DIR" init -q -b main
+    git -C "$LWORKSPACE_DIR" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+
+    mkdir -p "$LWORKSPACE_DIR/.agent/scripts" "$LWORKSPACE_DIR/layers/worktrees" \
+             "$LWORKSPACE_DIR/layers/main"
+    cp "$REMOVE_SCRIPT"   "$LWORKSPACE_DIR/.agent/scripts/worktree_remove.sh"
+    cp "$HELPERS"         "$LWORKSPACE_DIR/.agent/scripts/_worktree_helpers.sh"
+    cp "$AGG_SCRIPT"      "$LWORKSPACE_DIR/.agent/scripts/rosdep_local_sources.sh"
+    cp "$VALIDATE_SCRIPT" "$LWORKSPACE_DIR/.agent/scripts/rosdep_yaml_validate.sh"
+    chmod +x "$LWORKSPACE_DIR/.agent/scripts/"*.sh
+
+    LSYS_DIR="$LAYER_TEST_DIR/etc_sources"; mkdir -p "$LSYS_DIR"
+    echo "yaml https://example.invalid/base.yaml" > "$LSYS_DIR/20-default.list"
+
+    LMAIN_PKG_DIR="$LWORKSPACE_DIR/layers/main/a_ws/src/repo_wt"
+    mkdir -p "$LMAIN_PKG_DIR"
+    git -C "$LMAIN_PKG_DIR" init -q -b main
+    git -C "$LMAIN_PKG_DIR" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+    if [ "$with_rosdep" = "yes" ]; then
+        cat > "$LMAIN_PKG_DIR/rosdep.yaml" <<'EOF'
+wtkey:
+  ubuntu: [wtpkg]
+EOF
+        git -C "$LMAIN_PKG_DIR" add rosdep.yaml
+        git -C "$LMAIN_PKG_DIR" -c user.email=t@t -c user.name=t commit -q -m "add rosdep.yaml"
+    fi
+
+    LWT_DIR="$LWORKSPACE_DIR/layers/worktrees/issue-origin-$issue"
+    mkdir -p "$LWT_DIR/a_ws/src"
+    git -C "$LMAIN_PKG_DIR" worktree add -q -b "feature/issue-$issue" \
+        "$LWT_DIR/a_ws/src/repo_wt" >/dev/null
+
+    [ -d "$LWT_DIR" ]
+}
+layer_cleanup() {
+    if [ -n "$LAYER_TEST_DIR" ] && [ -d "$LAYER_TEST_DIR" ]; then
+        rm -rf "$LAYER_TEST_DIR"
+    fi
+    LAYER_TEST_DIR=""
+}
+
+test_layer_removal_with_rosdep_regenerates() {
+    setup_with_layer_worktree 940 yes || { echo "    setup failed"; layer_cleanup; return 1; }
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 940 --repo-slug origin --force 2>&1)
+    rc=$?
+    local local_list="$LWORKSPACE_DIR/.rosdep/sources.list.d/30-workspace-local.list"
+
+    if [ $rc -ne 0 ]; then
+        echo "    removal exited non-zero (rc=$rc): $output"; layer_cleanup; return 1
+    fi
+    if [ -d "$LWT_DIR" ]; then
+        echo "    worktree dir still present after removal"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"Regenerating workspace-local rosdep sources"* ]]; then
+        echo "    did not announce regeneration: $output"; layer_cleanup; return 1
+    fi
+    if [ ! -f "$local_list" ]; then
+        echo "    regenerated local list was not written"; layer_cleanup; return 1
+    fi
+    if grep -q "layers/worktrees" "$local_list"; then
+        echo "    removed worktree's rosdep.yaml still referenced: $(cat "$local_list")"
+        layer_cleanup; return 1
+    fi
+    if ! grep -qxF "yaml file://$LMAIN_PKG_DIR/rosdep.yaml" "$local_list"; then
+        echo "    layers/main's own rosdep.yaml dropped out of the regenerated list"
+        layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "layer removal with a rosdep.yaml regenerates workspace-local sources (#659)" \
+    test_layer_removal_with_rosdep_regenerates
+
+test_layer_removal_without_rosdep_skips_regen() {
+    setup_with_layer_worktree 941 no || { echo "    setup failed"; layer_cleanup; return 1; }
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 941 --repo-slug origin --force 2>&1)
+    rc=$?
+
+    if [ $rc -ne 0 ]; then
+        echo "    removal exited non-zero (rc=$rc): $output"; layer_cleanup; return 1
+    fi
+    if [[ "$output" == *"Regenerating workspace-local rosdep sources"* ]]; then
+        echo "    regenerated even though the worktree carried no rosdep.yaml: $output"
+        layer_cleanup; return 1
+    fi
+    if [ -e "$LWORKSPACE_DIR/.rosdep" ]; then
+        echo "    .rosdep was created even though regeneration should have been skipped"
+        layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "layer removal without a rosdep.yaml does not regenerate (#659)" \
+    test_layer_removal_without_rosdep_skips_regen
+
+test_layer_removal_regens_when_published_list_names_it() {
+    # Codex review of PR #661: the rosdep.yaml was published, then deleted
+    # and committed on the branch before removal. No file is left to find,
+    # but the published list still names the worktree — regeneration must
+    # run anyway and drop the dangling line.
+    setup_with_layer_worktree 943 yes || { echo "    setup failed"; layer_cleanup; return 1; }
+    local local_list="$LWORKSPACE_DIR/.rosdep/sources.list.d/30-workspace-local.list"
+    ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        "$LWORKSPACE_DIR/.agent/scripts/rosdep_local_sources.sh" "$LWORKSPACE_DIR" >/dev/null 2>&1
+    if ! grep -q "layers/worktrees/issue-origin-943/" "$local_list" 2>/dev/null; then
+        echo "    precondition: worktree's rosdep.yaml was not published"; layer_cleanup; return 1
+    fi
+    git -C "$LWT_DIR/a_ws/src/repo_wt" rm -q rosdep.yaml
+    git -C "$LWT_DIR/a_ws/src/repo_wt" -c user.email=t@t -c user.name=t commit -q -m "drop rosdep.yaml"
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 943 --repo-slug origin --force 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "    removal exited non-zero (rc=$rc): $output"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"Regenerating workspace-local rosdep sources"* ]]; then
+        echo "    did not regenerate for a published-but-deleted rosdep.yaml: $output"
+        layer_cleanup; return 1
+    fi
+    if grep -q "layers/worktrees" "$local_list"; then
+        echo "    dangling worktree line survived: $(cat "$local_list")"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"until the next"*"rosdep update"* ]]; then
+        echo "    no note that the cache still resolves until rosdep update: $output"
+        layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "layer removal regenerates when the published list still names the worktree (#659)" \
+    test_layer_removal_regens_when_published_list_names_it
+
+test_layer_removal_regens_through_symlinked_root() {
+    # Gemini review of PR #661: the generator writes the root as its caller
+    # spelled it (logical path), the remover resolves symlinks. With the
+    # list generated through a symlink to the workspace and the rosdep.yaml
+    # gone, the published-list check must still recognise the worktree.
+    setup_with_layer_worktree 944 yes || { echo "    setup failed"; layer_cleanup; return 1; }
+    local link="$LAYER_TEST_DIR/ws-link"
+    ln -s "$LWORKSPACE_DIR" "$link"
+    local local_list="$LWORKSPACE_DIR/.rosdep/sources.list.d/30-workspace-local.list"
+    ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        "$link/.agent/scripts/rosdep_local_sources.sh" "$link" >/dev/null 2>&1
+    if ! grep -q "file://$link/layers/worktrees/issue-origin-944/" "$local_list" 2>/dev/null; then
+        echo "    precondition: list not written through the symlinked root: $(cat "$local_list" 2>/dev/null)"
+        layer_cleanup; return 1
+    fi
+    git -C "$LWT_DIR/a_ws/src/repo_wt" rm -q rosdep.yaml
+    git -C "$LWT_DIR/a_ws/src/repo_wt" -c user.email=t@t -c user.name=t commit -q -m "drop rosdep.yaml"
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 944 --repo-slug origin --force 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "    removal exited non-zero (rc=$rc): $output"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"Regenerating workspace-local rosdep sources"* ]]; then
+        echo "    did not regenerate for a list written through a symlinked root: $output"
+        layer_cleanup; return 1
+    fi
+    if grep -q "layers/worktrees" "$local_list"; then
+        echo "    dangling worktree line survived: $(cat "$local_list")"; layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "layer removal regenerates when the list was written through a symlinked root (#659)" \
+    test_layer_removal_regens_through_symlinked_root
+
+test_layer_removal_regen_failure_does_not_fail_removal() {
+    setup_with_layer_worktree 942 yes || { echo "    setup failed"; layer_cleanup; return 1; }
+
+    # Swap in a generator stub that always fails, simulating a regeneration
+    # error (e.g. a lock timeout on a busy host) — the removal must still
+    # report success, loudly warn, and name the exact re-run command.
+    cat > "$LWORKSPACE_DIR/.agent/scripts/rosdep_local_sources.sh" <<'EOF'
+#!/bin/bash
+echo "stub: simulated regeneration failure" >&2
+exit 5
+EOF
+    chmod +x "$LWORKSPACE_DIR/.agent/scripts/rosdep_local_sources.sh"
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 942 --repo-slug origin --force 2>&1)
+    rc=$?
+
+    if [ $rc -ne 0 ]; then
+        echo "    a regen failure must not fail the (already-successful) removal (rc=$rc): $output"
+        layer_cleanup; return 1
+    fi
+    if [ -d "$LWT_DIR" ]; then
+        echo "    worktree dir still present after removal"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"Warning"*"regeneration exited non-zero"* ]]; then
+        echo "    did not warn loudly about the regen failure: $output"; layer_cleanup; return 1
+    fi
+    # #659 round-3 must-fix: the warning used to report `$?` from the negated
+    # `!` test (always 0), not the wrapped command's real exit status, so it
+    # always claimed "exit 0" no matter what the generator actually returned.
+    # The stub above exits 5 — assert that number, not just the substring the
+    # old test settled for, so a regression back to the `$?`-after-`!` bug is
+    # caught (it would print "exit 0" instead).
+    if [[ "$output" != *"exit 5 — see messages above"* ]]; then
+        echo "    did not report the real regeneration exit code (expected 5): $output"
+        layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"rosdep_local_sources.sh $LWORKSPACE_DIR"* ]]; then
+        echo "    did not name the exact re-run command: $output"; layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "a regeneration failure is loud but does not fail the removal (#659)" \
+    test_layer_removal_regen_failure_does_not_fail_removal
 
 echo "========================================"
 echo "TEST RESULTS"

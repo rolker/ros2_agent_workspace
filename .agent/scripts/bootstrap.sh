@@ -177,6 +177,25 @@ if [ "$DRY_RUN" = false ]; then
         export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
         echo "Note: a project rosdep.yaml was REJECTED (see above) and is not in"
         echo "      the generated sources. Fix it, then re-run bootstrap.sh."
+    elif [ "$BOOTSTRAP_GEN_RC" -eq 6 ]; then
+        # The directory WAS written; one or more rosdep keys conflicted across
+        # layers/main and a layer worktree (or two worktrees) and the files
+        # touched by them were excluded (#659). Use it — the rest is valid —
+        # but say what was dropped, same as the exit-4 case above.
+        export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+        echo "Note: a rosdep key CONFLICTED across files (see above) and those"
+        echo "      files are not in the generated sources. Fix it, then re-run"
+        echo "      bootstrap.sh."
+    elif [ "$BOOTSTRAP_GEN_RC" -eq 7 ]; then
+        # The directory WAS written; one or more rosdep.yaml files vanished
+        # mid-run (typically a worktree removal racing this generation) and
+        # were excluded (#659 round-2). Use it — the rest is valid — same as
+        # the exit-4/exit-6 cases above. Usually transient: a re-run once the
+        # race has passed picks the file back up if it still exists.
+        export ROSDEP_SOURCE_PATH="$BOOTSTRAP_ROOT_DIR/.rosdep/sources.list.d"
+        echo "Note: a rosdep.yaml VANISHED mid-run (see above) and is not in the"
+        echo "      generated sources. Likely transient (a worktree removal"
+        echo "      racing this run) — re-run bootstrap.sh if it should be there."
     else
         echo "Note: workspace-local rosdep sources not generated — using system defaults."
     fi

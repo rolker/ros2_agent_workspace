@@ -28,6 +28,48 @@ contains() { case "$1" in *"$2"*) return 0;; *) return 1;; esac; }
 lacks()    { case "$1" in *"$2"*) return 1;; *) return 0;; esac; }
 eq() { [ "$1" = "$2" ]; }
 
+# ---- worktree fixture helpers (#659) ----------------------------------------
+# The registration check (wt_is_registered) needs a GENUINE git worktree to
+# inspect — a plain directory can't exercise it, and (since #659's must-fix)
+# it must be a genuine LINKED WORKTREE OF THE CORRESPONDING layers/main repo
+# specifically, not just some standalone git repo. These helpers build that
+# shape for real: a git repo at the expected layers/main/<ws>/src/<pkg>
+# location, and a linked worktree of THAT SAME repo at
+# layers/worktrees/<name>/<ws>/src/<pkg> — mirroring what
+# worktree_create.sh's `git worktree add` (run from the layers/main package
+# directory) actually produces.
+new_git_repo() {
+    local dir="$1"
+    mkdir -p "$dir"
+    git -C "$dir" init -q -b main
+    git -C "$dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+}
+# Creates (if not already present) the git repo anchoring pkg_name in
+# ws_name at its expected layers/main location, and a linked worktree of
+# THAT repo under layers/worktrees/<worktree_name>. Prints the worktree
+# package dir on stdout.
+# Usage: wt_pkg=$(add_layer_worktree "$root_ws" a_ws repo_wt issue-900 wt-900)
+add_layer_worktree() {
+    local root_ws="$1" ws_name="$2" pkg_name="$3" worktree_name="$4" branch="$5"
+    local main_pkg_dir="$root_ws/layers/main/$ws_name/src/$pkg_name"
+    [ -d "$main_pkg_dir/.git" ] || new_git_repo "$main_pkg_dir"
+    local wt_pkg_dir="$root_ws/layers/worktrees/$worktree_name/$ws_name/src/$pkg_name"
+    mkdir -p "$(dirname "$wt_pkg_dir")"
+    git -C "$main_pkg_dir" worktree add -q -b "$branch" "$wt_pkg_dir" >/dev/null
+    echo "$wt_pkg_dir"
+}
+# Deregisters a linked worktree WITHOUT touching its working directory or
+# files — the same shape a merge_pr.sh exit-3 worktree-removal failure (or an
+# interrupted manual removal) leaves: the directory and its rosdep.yaml are
+# still on disk, but git no longer knows about the worktree.
+deregister_git_worktree() {
+    local wt_path="$1"
+    local gitdir_line admin_dir
+    gitdir_line="$(cat "$wt_path/.git")"
+    admin_dir="${gitdir_line#gitdir: }"
+    rm -rf "$admin_dir"
+}
+
 TMP="$(mktemp -d -t rosdep_local_test.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -276,6 +318,360 @@ check "uninitialized rosdep is 3"      eq "$rc" 3
 check "names bootstrap.sh as the fix"  contains "$out" "bootstrap.sh"
 check "refuses without clobbering"     grep -q '^yaml ' "$LOCAL"
 
+echo "=== rosdep_local_sources.sh: worktree discovery (#659) ==="
+# A rosdep.yaml added on a feature branch lives under
+# layers/worktrees/<name>/<layer>_ws/src/<repo>/ until the PR merges — the
+# generator must discover it there too, but ONLY while git still registers
+# the worktree.
+WTWS="$TMP/wt_ws"; mkdir -p "$WTWS/layers/main"
+WT_PKG="$(add_layer_worktree "$WTWS" a_ws repo_wt issue-900 wt-900)"
+cat > "$WT_PKG/rosdep.yaml" <<'EOF'
+# upstream PR owed: https://github.com/ros/rosdistro/pull/00002
+snakemake:
+  ubuntu: [snakemake]
+EOF
+out="$("$AGG" "$WTWS" 2>&1)"; rc=$?
+WT_LOCAL="$WTWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "a registered worktree yaml is picked up" \
+    grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a leftover/deregistered worktree is excluded ==="
+WT_PKG2="$(add_layer_worktree "$WTWS" a_ws repo_wt2 issue-901 wt-901)"
+cat > "$WT_PKG2/rosdep.yaml" <<'EOF'
+mystery-wt-key:
+  ubuntu: [mystery]
+EOF
+deregister_git_worktree "$WT_PKG2"
+out="$("$AGG" "$WTWS" 2>&1)"; rc=$?
+check "exits 0 despite the leftover directory" eq "$rc" 0
+check "the leftover/deregistered worktree yaml is skipped" \
+    bash -c "! grep -q repo_wt2 '$WT_LOCAL'"
+check "it says the directory is not git-registered" \
+    contains "$out" "not a git-registered linked worktree"
+check "the still-registered worktree yaml survives the same run" \
+    grep -qxF "yaml file://$WT_PKG/rosdep.yaml" "$WT_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a rogue standalone repo at the worktree path is excluded (#659 must-fix) ==="
+# wt_is_registered previously only checked whether `dir` was SOME live git
+# repo whose own `worktree list` trivially includes itself (true for ANY
+# standalone git repo, worktree or not) — it never verified the checkout
+# belongs to the corresponding layers/main repo. A rogue/coincidental
+# standalone repo dropped at the worktree path shape would have been
+# silently trusted and its key merged into the host-shared source path.
+ROGUEWS="$TMP/rogue_ws"
+mkdir -p "$ROGUEWS/layers/main/a_ws/src/repo_rogue"
+new_git_repo "$ROGUEWS/layers/main/a_ws/src/repo_rogue"
+cat > "$ROGUEWS/layers/main/a_ws/src/repo_rogue/rosdep.yaml" <<'EOF'
+mainkey:
+  ubuntu: [mainpkg]
+EOF
+ROGUE_WT="$ROGUEWS/layers/worktrees/issue-910/a_ws/src/repo_rogue"
+new_git_repo "$ROGUE_WT"   # standalone repo — NOT a worktree of the repo above
+cat > "$ROGUE_WT/rosdep.yaml" <<'EOF'
+roguekey:
+  ubuntu: [roguepkg]
+EOF
+out="$("$AGG" "$ROGUEWS" 2>&1)"; rc=$?
+ROGUE_LOCAL="$ROGUEWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "the rogue standalone repo's yaml is excluded" \
+    bash -c "! grep -q roguekey '$ROGUE_LOCAL'"
+check "it says the rogue repo is not a registered linked worktree" \
+    contains "$out" "not a git-registered linked worktree"
+check "the genuine layers/main yaml still survives" \
+    grep -qxF "yaml file://$ROGUEWS/layers/main/a_ws/src/repo_rogue/rosdep.yaml" "$ROGUE_LOCAL"
+
+echo "=== rosdep_local_sources.sh: a worktree with no corresponding layers/main repo is excluded (#659) ==="
+# The #659 checkpoint asked for this to be decided explicitly: a stale
+# worktree path can outlive a rename or removal of its layers/main repo
+# (`git worktree remove` updates the main repo's registry, but a bare
+# `rm -rf` of the layers/main checkout alone does not touch a linked
+# worktree at all). Fail closed, named reason, rather than trusting an
+# orphaned worktree's key.
+NOMAINWS="$TMP/nomain_ws"; mkdir -p "$NOMAINWS/layers/main"
+NOMAIN_WT="$(add_layer_worktree "$NOMAINWS" a_ws repo_orphan issue-911 wt-911)"
+cat > "$NOMAIN_WT/rosdep.yaml" <<'EOF'
+orphankey:
+  ubuntu: [orphanpkg]
+EOF
+rm -rf "$NOMAINWS/layers/main/a_ws/src/repo_orphan"
+out="$("$AGG" "$NOMAINWS" 2>&1)"; rc=$?
+NOMAIN_LOCAL="$NOMAINWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                              eq "$rc" 0
+check "the orphaned worktree yaml is excluded" \
+    bash -c "! grep -q orphankey '$NOMAIN_LOCAL'"
+check "it says no corresponding layers/main repo exists" \
+    contains "$out" "no corresponding"
+
+echo "=== rosdep_local_sources.sh: worktree discovery skips symlinked entries ==="
+# worktree_create.sh symlinks untouched siblings/non-target layers straight
+# back to layers/main; bash's glob follows those transparently, so without
+# the skip they would be rediscovered a second time under layers/worktrees.
+SYMWS="$TMP/sym_ws"
+mkdir -p "$SYMWS/layers/main/a_ws/src/repo_with"
+cat > "$SYMWS/layers/main/a_ws/src/repo_with/rosdep.yaml" <<'EOF'
+snakemake:
+  ubuntu: [snakemake]
+EOF
+mkdir -p "$SYMWS/layers/worktrees/issue-902"
+ln -s "../../main/a_ws" "$SYMWS/layers/worktrees/issue-902/a_ws"
+out="$("$AGG" "$SYMWS" 2>&1)"; rc=$?
+SYMLIST="$SYMWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0"                             eq "$rc" 0
+check "a symlinked non-target layer is not rediscovered" \
+    eq "$(grep -c '^yaml ' "$SYMLIST")" 1
+
+mkdir -p "$SYMWS/layers/worktrees/issue-903/b_ws/src"
+ln -s "$SYMWS/layers/main/a_ws/src/repo_with" \
+      "$SYMWS/layers/worktrees/issue-903/b_ws/src/repo_with"
+out="$("$AGG" "$SYMWS" 2>&1)"; rc=$?
+check "exits 0 with a symlinked package entry too" eq "$rc" 0
+check "a symlinked package entry is not rediscovered" \
+    eq "$(grep -c '^yaml ' "$SYMLIST")" 1
+
+echo "=== rosdep_local_sources.sh: conflicting keys across layers/main and a worktree ==="
+CONFWS="$TMP/conf_ws"
+mkdir -p "$CONFWS/layers/main/a_ws/src/repo_main"
+cat > "$CONFWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
+sharedkey:
+  ubuntu: [pkg-a]
+EOF
+CONF_WT="$(add_layer_worktree "$CONFWS" a_ws repo_wt issue-904 wt-904)"
+cat > "$CONF_WT/rosdep.yaml" <<'EOF'
+sharedkey:
+  ubuntu: [pkg-b]
+EOF
+out="$("$AGG" "$CONFWS" 2>&1)"; rc=$?
+CONFLIST="$CONFWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 6 on a main-vs-worktree conflict" eq "$rc" 6
+check "names the conflicting key"      contains "$out" "sharedkey"
+check "names the layers/main file"     contains "$out" "repo_main"
+check "names the worktree file"        contains "$out" "repo_wt"
+check "excludes the layers/main file"  bash -c "! grep -q repo_main '$CONFLIST'"
+check "excludes the worktree file"     bash -c "! grep -q repo_wt '$CONFLIST'"
+
+echo "=== rosdep_local_sources.sh: conflicting keys worktree-vs-worktree ==="
+CONFWS2="$TMP/conf_ws2"; mkdir -p "$CONFWS2/layers/main"
+CONF2_A="$(add_layer_worktree "$CONFWS2" a_ws repo_a issue-905 wt-905)"
+CONF2_B="$(add_layer_worktree "$CONFWS2" a_ws repo_b issue-906 wt-906)"
+cat > "$CONF2_A/rosdep.yaml" <<'EOF'
+wtkey:
+  ubuntu: [x]
+EOF
+cat > "$CONF2_B/rosdep.yaml" <<'EOF'
+wtkey:
+  ubuntu: [y]
+EOF
+out="$("$AGG" "$CONFWS2" 2>&1)"; rc=$?
+check "exits 6 on a worktree-vs-worktree conflict" eq "$rc" 6
+check "names the key"                  contains "$out" "wtkey"
+
+echo "=== rosdep_local_sources.sh: an identical declaration in main and a worktree dedupes cleanly ==="
+DEDUPWS="$TMP/dedup_ws"
+mkdir -p "$DEDUPWS/layers/main/a_ws/src/repo_main"
+cat > "$DEDUPWS/layers/main/a_ws/src/repo_main/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [same-pkg]
+EOF
+DEDUP_WT="$(add_layer_worktree "$DEDUPWS" a_ws repo_wt issue-907 wt-907)"
+cat > "$DEDUP_WT/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [same-pkg]
+EOF
+out="$("$AGG" "$DEDUPWS" 2>&1)"; rc=$?
+check "identical declarations exit 0, no false conflict" eq "$rc" 0
+check "no conflict reported"           lacks "$out" "conflict"
+
+echo "=== rosdep_local_sources.sh: an in-file duplicate package dedupes before comparison (#659 round-2 suggestion) ==="
+# `ubuntu: [foo, foo]` and `ubuntu: [foo]` are semantically identical —
+# canonicalization must dedupe each OS's package list before sorting, or an
+# accidental in-file duplicate would spuriously conflict against a clean
+# declaration of the same key elsewhere.
+DUPPKGWS="$TMP/duppkg_ws"
+mkdir -p "$DUPPKGWS/layers/main/a_ws/src/repo_clean"
+cat > "$DUPPKGWS/layers/main/a_ws/src/repo_clean/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [foo]
+EOF
+DUPPKG_WT="$(add_layer_worktree "$DUPPKGWS" a_ws repo_dup issue-912 wt-912)"
+cat > "$DUPPKG_WT/rosdep.yaml" <<'EOF'
+dupkey:
+  ubuntu: [foo, foo]
+EOF
+out="$("$AGG" "$DUPPKGWS" 2>&1)"; rc=$?
+check "an in-file duplicate does not manufacture a false conflict" eq "$rc" 0
+check "no conflict reported"           lacks "$out" "conflict"
+
+echo "=== rosdep_local_sources.sh: a file that vanishes during conflict-check is excluded, not silently blank (#659 round-2 must-fix) ==="
+# The conflict-detection python subprocess used to swallow a read failure
+# with a bare `except Exception: continue`, treating a vanished file as
+# "declares no keys" — which would let a DIFFERENT file's declaration of the
+# same key win uncontested. ROSDEP_LOCAL_SOURCES_TEST_VANISH deterministically
+# reproduces the race without depending on real wall-clock timing: it makes
+# the script TREAT the named file as missing right after the shape gate
+# (which the file passed) and before the conflict-check subprocess reads it
+# — simulation only, per #659 round-3 pre-push review: shipped code must
+# never `rm` an env-supplied path, so the hook never deletes the fixture.
+VANWS="$TMP/vanish_ws"
+mkdir -p "$VANWS/layers/main/a_ws/src/repo_survivor" "$VANWS/layers/main/a_ws/src/repo_vanish"
+cat > "$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" <<'EOF'
+survivorkey:
+  ubuntu: [survivorpkg]
+EOF
+VAN_TARGET="$VANWS/layers/main/a_ws/src/repo_vanish/rosdep.yaml"
+cat > "$VAN_TARGET" <<'EOF'
+vanishkey:
+  ubuntu: [vanishpkg]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$VAN_TARGET" "$AGG" "$VANWS" 2>&1)"; rc=$?
+VANLIST="$VANWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 7 on a conflict-check-time vanish"  eq "$rc" 7
+check "the vanished file is excluded"  bash -c "! grep -q repo_vanish '$VANLIST'"
+check "it says the file became unreadable" \
+    contains "$out" "became unreadable during conflict"
+check "it names the vanished file"     contains "$out" "repo_vanish/rosdep.yaml"
+check "the other file's key still resolves" \
+    grep -qxF "yaml file://$VANWS/layers/main/a_ws/src/repo_survivor/rosdep.yaml" "$VANLIST"
+check "the directory is still written (not aborted)" \
+    test -f "$VANWS/.rosdep/sources.list.d/20-default.list"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$VAN_TARGET"
+
+echo "=== rosdep_local_sources.sh: a file that vanishes between conflict-check and publish is excluded (#659 round-2) ==="
+# The second half of the race window: a file can pass the shape gate AND the
+# conflict-check subprocess's read, then vanish before the bash publish loop
+# writes its line. ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT makes the
+# script TREAT the file as missing right after conflict-detection completes,
+# before the publish loop starts — the loop's own re-check must catch it.
+# Simulation only (#659 round-3 pre-push review) — the fixture is never
+# actually deleted.
+VANWS2="$TMP/vanish_ws2"
+mkdir -p "$VANWS2/layers/main/a_ws/src/repo_survivor2" "$VANWS2/layers/main/a_ws/src/repo_vanish2"
+cat > "$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" <<'EOF'
+survivorkey2:
+  ubuntu: [survivorpkg2]
+EOF
+VAN_TARGET2="$VANWS2/layers/main/a_ws/src/repo_vanish2/rosdep.yaml"
+cat > "$VAN_TARGET2" <<'EOF'
+vanishkey2:
+  ubuntu: [vanishpkg2]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT="$VAN_TARGET2" "$AGG" "$VANWS2" 2>&1)"; rc=$?
+VANLIST2="$VANWS2/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 7 on a publish-time vanish"   eq "$rc" 7
+check "the vanished file is excluded"      bash -c "! grep -q repo_vanish2 '$VANLIST2'"
+check "it says the file vanished before publish" \
+    contains "$out" "vanished before it could be published"
+check "the other file's key still resolves" \
+    grep -qxF "yaml file://$VANWS2/layers/main/a_ws/src/repo_survivor2/rosdep.yaml" "$VANLIST2"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$VAN_TARGET2"
+
+echo "=== rosdep_local_sources.sh: exit-code precedence with a vanish (#659 round-2) ==="
+# 4 (shape rejection) and 6 (conflict) are the pre-existing, stricter gates;
+# 7 (vanish) must never outrank either.
+PRECWS2="$TMP/prec_ws2"
+mkdir -p "$PRECWS2/layers/main/a_ws/src/repo_bad2" "$PRECWS2/layers/main/a_ws/src/repo_ok2"
+printf 'k:\n  ubuntu:\n    pip:\n      packages: [x]\n' \
+    > "$PRECWS2/layers/main/a_ws/src/repo_bad2/rosdep.yaml"
+PREC2_TARGET="$PRECWS2/layers/main/a_ws/src/repo_ok2/rosdep.yaml"
+cat > "$PREC2_TARGET" <<'EOF'
+okkey2:
+  ubuntu: [okpkg2]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$PREC2_TARGET" "$AGG" "$PRECWS2" 2>&1)"; rc=$?
+check "shape rejection (4) wins over a simultaneous vanish (7)" eq "$rc" 4
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$PREC2_TARGET"
+
+# A THIRD, unrelated file (survives conflict-check, then vanishes before
+# publish) is needed alongside the conflicting pair — a file already excluded
+# BY the conflict check never reaches the publish-time existence check, so
+# it alone would not actually exercise "both codes fire in one run".
+PRECWS3="$TMP/prec_ws3"
+mkdir -p "$PRECWS3/layers/main/a_ws/src/repo_confa" "$PRECWS3/layers/main/a_ws/src/repo_confb" \
+         "$PRECWS3/layers/main/a_ws/src/repo_okvan3"
+cat > "$PRECWS3/layers/main/a_ws/src/repo_confa/rosdep.yaml" <<'EOF'
+confkey3:
+  ubuntu: [a]
+EOF
+cat > "$PRECWS3/layers/main/a_ws/src/repo_confb/rosdep.yaml" <<'EOF'
+confkey3:
+  ubuntu: [b]
+EOF
+PREC3_TARGET="$PRECWS3/layers/main/a_ws/src/repo_okvan3/rosdep.yaml"
+cat > "$PREC3_TARGET" <<'EOF'
+okkey3:
+  ubuntu: [okpkg3]
+EOF
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH_AFTER_CONFLICT="$PREC3_TARGET" "$AGG" "$PRECWS3" 2>&1)"; rc=$?
+check "a conflict (6) wins over a simultaneous vanish (7)" eq "$rc" 6
+check "both conditions were genuinely hit this run" \
+    bash -c "grep -q 'conflicting package lists' <<< '$out' && grep -q 'vanished before it could be published' <<< '$out'"
+check "the hook never deletes — the fixture file still exists" \
+    test -f "$PREC3_TARGET"
+
+echo "=== rosdep_local_sources.sh: the test-vanish hooks only simulate a run's own discovered files (#659 round-3 must-fix) ==="
+# Round 3 flagged the original hooks as an unconfined `rm -f` of an
+# env-supplied path — a real, if low-probability, arbitrary-file-deletion
+# risk if either var were ever set in a non-test invocation (e.g. left
+# exported in a dev shell). The fix: never delete, and only SIMULATE a
+# vanish, and only for a path that is genuinely one of this run's own
+# discovered rosdep.yaml files. A path outside that set — like a file this
+# run never touched — must be ignored, with a note, and must not itself be
+# touched or deleted.
+IGNWS="$TMP/ignore_ws"
+mkdir -p "$IGNWS/layers/main/a_ws/src/repo_ign"
+cat > "$IGNWS/layers/main/a_ws/src/repo_ign/rosdep.yaml" <<'EOF'
+ignkey:
+  ubuntu: [ignpkg]
+EOF
+IGN_OUTSIDE="$TMP/not_a_discovered_file.yaml"
+printf 'unrelated: true\n' > "$IGN_OUTSIDE"
+out="$(ROSDEP_LOCAL_SOURCES_TEST_VANISH="$IGN_OUTSIDE" "$AGG" "$IGNWS" 2>&1)"; rc=$?
+IGNLIST="$IGNWS/.rosdep/sources.list.d/30-workspace-local.list"
+check "exits 0 — the hook target isn't this run's own file, so nothing vanishes" \
+    eq "$rc" 0
+check "it notes the ignored hook value" \
+    contains "$out" "is not one of this run's own discovered files"
+check "the real file still resolves" \
+    grep -qxF "yaml file://$IGNWS/layers/main/a_ws/src/repo_ign/rosdep.yaml" "$IGNLIST"
+check "the out-of-scope path is untouched" test -f "$IGN_OUTSIDE"
+
+echo "=== rosdep_local_sources.sh: bootstrap.sh handles exit 7 (#659 round-2) ==="
+# bootstrap.sh's own exit-code switch on this script's return value must not
+# fall through to the generic "not generated" branch for exit 7 — that would
+# discard the whole directory (every OTHER valid key too) for a transient,
+# single-file race.
+BSFILE="$(cd "$SCRIPTS_DIR/../.." && pwd)/.agent/scripts/bootstrap.sh"
+check "bootstrap.sh has an explicit exit-7 branch" \
+    grep -q 'BOOTSTRAP_GEN_RC" -eq 7' "$BSFILE"
+check "bootstrap.sh still exports ROSDEP_SOURCE_PATH on exit 7" bash -c "
+    grep -A 8 'BOOTSTRAP_GEN_RC\" -eq 7' '$BSFILE' | grep -q 'export ROSDEP_SOURCE_PATH'"
+
+echo "=== rosdep_local_sources.sh: a shape rejection (4) wins over a simultaneous conflict (6) ==="
+PRECWS="$TMP/prec_ws"
+mkdir -p "$PRECWS/layers/main/a_ws/src/repo_bad" "$PRECWS/layers/main/a_ws/src/repo_main2"
+printf 'k:\n  ubuntu:\n    pip:\n      packages: [x]\n' \
+    > "$PRECWS/layers/main/a_ws/src/repo_bad/rosdep.yaml"
+cat > "$PRECWS/layers/main/a_ws/src/repo_main2/rosdep.yaml" <<'EOF'
+otherkey:
+  ubuntu: [b]
+EOF
+PREC_WT="$(add_layer_worktree "$PRECWS" a_ws repo_wt issue-908 wt-908)"
+cat > "$PREC_WT/rosdep.yaml" <<'EOF'
+otherkey:
+  ubuntu: [a]
+EOF
+out="$("$AGG" "$PRECWS" 2>&1)"; rc=$?
+check "shape rejection (4) wins over the simultaneous conflict (6)" eq "$rc" 4
+
+echo "=== Makefile: ROSDEP_LOCAL_YAMLS includes the worktree glob (#659) ==="
+MFILE="$(cd "$SCRIPTS_DIR/../.." && pwd)/Makefile"
+check "the worktree wildcard is present in the Makefile" \
+    grep -q 'layers/worktrees/\*/\*_ws/src/\*/rosdep.yaml' "$MFILE"
+
 echo "=== stage_rosdep_manifests.sh: stages rosdep.yaml for the image bake ==="
 "$STAGE" "$WS" "$TMP/stage" >/dev/null 2>&1
 check "staged under rosdep-local/"     test -f "$TMP/stage/rosdep-local/a_ws__repo_with.yaml"
@@ -346,6 +742,17 @@ EOF
 out="$(PATH="$STUB:$PATH" "$CHECK" "$WS" 2>&1)"; rc=$?
 check "key with no upstream-PR marker fails (1)" eq "$rc" 1
 check "names the unmarked key"         contains "$out" "'mystery-key' has no upstream-PR marker"
+
+echo "=== rosdep_local_staleness_check.sh: a worktree-only rosdep.yaml is audited too (#659) ==="
+STALEWS="$TMP/stale_ws"; mkdir -p "$STALEWS/layers/main"
+STALE_WT="$(add_layer_worktree "$STALEWS" a_ws repo_wt issue-909 wt-909)"
+cat > "$STALE_WT/rosdep.yaml" <<'EOF'
+mystery-wt-key:
+  ubuntu: [mystery]
+EOF
+out="$(PATH="$STUB:$PATH" "$CHECK" "$STALEWS" 2>&1)"; rc=$?
+check "a worktree-only unmarked key fails (1)" eq "$rc" 1
+check "names the unmarked worktree key" contains "$out" "'mystery-wt-key' has no upstream-PR marker"
 
 echo "=== rosdep_local_staleness_check.sh: offline is SKIPPED, never a verdict ==="
 rm "$WS/layers/main/b_ws/src/repo_other/rosdep.yaml"
@@ -493,6 +900,19 @@ check "uninitialized rosdep says how to fix it" \
 got="$(run_stamp 4)"
 check "a rejected rosdep.yaml (4) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
 check "a rejected rosdep.yaml leaves no stamp" contains "$got" "no-stamp"
+got="$(run_stamp 7)"
+check "a vanished-file race (7) does not fail make build" contains "$got" "0 "
+check "a vanished-file race leaves no stamp, so the next build retries" \
+    contains "$got" "no-stamp"
+# A directory WAS published (the surviving files), so the cache is refreshed
+# against it now rather than building this invocation on the old cache
+# (Codex review of PR #661).
+check "a vanished-file race still refreshes the cache" contains "$got" " updated"
+check "a vanished-file race explains it's transient" \
+    grep -q "worktree removal" "$TMP/mk.out"
+got="$(run_stamp 6)"
+check "a genuine key conflict (6) fails the build" bash -c "[ \"${got%% *}\" != 0 ]"
+check "a genuine key conflict leaves no stamp" contains "$got" "no-stamp"
 
 echo "=== Makefile \$(STAMP)/rosdep-local.done: a DELETED rosdep.yaml invalidates it ==="
 # Deleting the file is the DOCUMENTED end of a local key's lifecycle. A

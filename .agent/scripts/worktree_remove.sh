@@ -277,6 +277,17 @@ fi
 # only after every check has passed.  This avoids leaving the worktree in a
 # partially-destroyed state if a check causes an early exit.
 INNER_WORKTREE_REPOS=()  # Parent repos of inner worktrees (for pruning later)
+# Whether the workspace-local rosdep sources must be regenerated after this
+# removal (#659): set when the worktree carries a project repo's root
+# rosdep.yaml (checked BEFORE removal — once the directory is gone there is
+# nothing left to check), OR when the published list still names this
+# worktree (below) — a rosdep.yaml that was deleted and committed after the
+# list was last generated leaves no file to find, but its `yaml file://`
+# line is still there. Without the regeneration that line stays in the
+# host-shared ROSDEP_SOURCE_PATH (setup.bash exports ONE directory for every
+# shell on the host) until the next `make build`/bootstrap.sh, and a
+# `rosdep update` in between trips over a source that no longer exists.
+NEEDS_ROSDEP_REGEN=false
 
 if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
     HAS_ISSUES=false
@@ -302,6 +313,14 @@ if [ "$WORKTREE_TYPE" == "layer" ] && [ -d "$WORKTREE_DIR" ]; then
             if [ -d "$pkg_dir" ] && git -C "$pkg_dir" rev-parse --git-dir &>/dev/null; then
                 # Known inner git worktree — check for uncommitted changes
                 PKG_NAME=$(basename "$pkg_dir")
+
+                # #659: does this package carry a root rosdep.yaml that
+                # rosdep_local_sources.sh's discovery would have picked up
+                # (layers/worktrees/*/*_ws/src/*/rosdep.yaml, non-symlinked
+                # entries only — exactly this loop's own filter)?
+                if [ -f "$pkg_dir/rosdep.yaml" ]; then
+                    NEEDS_ROSDEP_REGEN=true
+                fi
                 PKG_STATUS=$(git -C "$pkg_dir" status --porcelain 2>/dev/null)
                 if [ -n "$PKG_STATUS" ] && [ "$FORCE" != true ]; then
                     echo "⚠️  Warning: Package '$PKG_NAME' has uncommitted changes:"
@@ -407,6 +426,54 @@ git worktree prune
 
 echo ""
 echo "✅ Worktree removed successfully"
+
+# The published list may still name this worktree even though no rosdep.yaml
+# was found in it (deleted and committed after the last generation). Match
+# on the `/layers/worktrees/<name>/` segment, not the absolute path: the
+# generator writes the root as its caller spelled it (logical `pwd`), while
+# WORKTREE_DIR was resolved with `pwd -P`, so a workspace reached through a
+# symlink would never match a full-path prefix. The name is unique under
+# this root, and the list only holds this root's paths.
+PUBLISHED_LOCAL_LIST="$ROOT_DIR/.rosdep/sources.list.d/30-workspace-local.list"
+if [ "$WORKTREE_TYPE" == "layer" ] && [ -n "$WORKTREE_DIR" ] \
+    && [ -f "$PUBLISHED_LOCAL_LIST" ] \
+    && grep -qF "/layers/worktrees/$(basename "$WORKTREE_DIR")/" "$PUBLISHED_LOCAL_LIST"; then
+    NEEDS_ROSDEP_REGEN=true
+fi
+
+# #659: regenerate the host-shared workspace-local rosdep sources dir when
+# the removed worktree carried a rosdep.yaml or is still named in the
+# published list — otherwise its `yaml file://` line stays in
+# ROSDEP_SOURCE_PATH (one directory, exported by setup.bash for every shell
+# on the host) until something else regenerates it. A regeneration failure
+# must never turn a successful removal into a script failure — the worktree
+# IS gone — so it is reported loudly, with the exact command to re-run,
+# rather than propagated as this script's exit status.
+#
+# Deliberately does NOT run `rosdep update` (network, slow). That has a
+# consequence worth stating plainly: regeneration drops the LINE, but rosdep
+# resolves from its cache, so a key defined only in this worktree keeps
+# resolving until the next `rosdep update` (`make build` runs one). The
+# message below says so.
+if [ "$WORKTREE_TYPE" == "layer" ] && [ "$NEEDS_ROSDEP_REGEN" = true ]; then
+    echo ""
+    echo "Regenerating workspace-local rosdep sources (removed worktree" \
+         "carried a rosdep.yaml, #659)..."
+    REGEN_RC=0
+    "$SCRIPT_DIR/rosdep_local_sources.sh" "$ROOT_DIR" || REGEN_RC=$?
+    if [ "$REGEN_RC" -ne 0 ]; then
+        echo ""
+        echo "⚠️  Warning: rosdep sources regeneration exited non-zero (exit" \
+             "$REGEN_RC — see messages above)." >&2
+        echo "   The worktree removal itself succeeded — this does NOT undo it." >&2
+        echo "   Until it's re-run successfully, the generated sources may not" >&2
+        echo "   reflect this removal. Re-run:" >&2
+        echo "     $SCRIPT_DIR/rosdep_local_sources.sh $ROOT_DIR" >&2
+    else
+        echo "   Note: rosdep's cache still resolves keys defined only in this" \
+             "worktree until the next \`rosdep update\` (\`make build\` runs one)."
+    fi
+fi
 
 # Offer to delete the branch
 if [ -n "$BRANCH_NAME" ] && [ "$WORKTREE_TYPE" == "workspace" ]; then
