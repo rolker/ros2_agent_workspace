@@ -247,6 +247,45 @@ test_layer_removal_without_rosdep_skips_regen() {
 run_test "layer removal without a rosdep.yaml does not regenerate (#659)" \
     test_layer_removal_without_rosdep_skips_regen
 
+test_layer_removal_regens_when_published_list_names_it() {
+    # Codex review of PR #661: the rosdep.yaml was published, then deleted
+    # and committed on the branch before removal. No file is left to find,
+    # but the published list still names the worktree — regeneration must
+    # run anyway and drop the dangling line.
+    setup_with_layer_worktree 943 yes || { echo "    setup failed"; layer_cleanup; return 1; }
+    local local_list="$LWORKSPACE_DIR/.rosdep/sources.list.d/30-workspace-local.list"
+    ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        "$LWORKSPACE_DIR/.agent/scripts/rosdep_local_sources.sh" "$LWORKSPACE_DIR" >/dev/null 2>&1
+    if ! grep -q "layers/worktrees/issue-origin-943/" "$local_list" 2>/dev/null; then
+        echo "    precondition: worktree's rosdep.yaml was not published"; layer_cleanup; return 1
+    fi
+    git -C "$LWT_DIR/a_ws/src/repo_wt" rm -q rosdep.yaml
+    git -C "$LWT_DIR/a_ws/src/repo_wt" -c user.email=t@t -c user.name=t commit -q -m "drop rosdep.yaml"
+
+    local output rc
+    output=$(cd "$LWORKSPACE_DIR" && \
+        ROSDEP_SYSTEM_SOURCES_DIR="$LSYS_DIR" \
+        .agent/scripts/worktree_remove.sh --issue 943 --repo-slug origin --force 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "    removal exited non-zero (rc=$rc): $output"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"Regenerating workspace-local rosdep sources"* ]]; then
+        echo "    did not regenerate for a published-but-deleted rosdep.yaml: $output"
+        layer_cleanup; return 1
+    fi
+    if grep -q "layers/worktrees" "$local_list"; then
+        echo "    dangling worktree line survived: $(cat "$local_list")"; layer_cleanup; return 1
+    fi
+    if [[ "$output" != *"until the next"*"rosdep update"* ]]; then
+        echo "    no note that the cache still resolves until rosdep update: $output"
+        layer_cleanup; return 1
+    fi
+    layer_cleanup; return 0
+}
+run_test "layer removal regenerates when the published list still names the worktree (#659)" \
+    test_layer_removal_regens_when_published_list_names_it
+
 test_layer_removal_regen_failure_does_not_fail_removal() {
     setup_with_layer_worktree 942 yes || { echo "    setup failed"; layer_cleanup; return 1; }
 
