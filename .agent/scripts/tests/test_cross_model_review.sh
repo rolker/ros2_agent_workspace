@@ -836,6 +836,20 @@ GH_EOF
         PASS=$((PASS + 1))
     fi
 
+
+    # With --no-progress there is nothing to file under, so a keyword-less
+    # PR is reviewed into a temp dir instead of refused — what review-code
+    # passes when its own step 1 found no closing issue (#660).
+    exit_code=0
+    stderr=$(PATH="${MOCK_BIN}:${PATH}" WORKTREE_ISSUE=42 bash "${SCRIPT_UNDER_TEST}" \
+        --pr 99 --no-progress 2>&1) || exit_code=$?
+    assert_not_contains "--no-progress: no missing-keyword refusal" "body has no 'Closes" "$stderr"
+    if [[ -e "${MOCK_REPO}/.agent/work-plans/issue-noprogress" ]]; then
+        echo "  FAIL: --no-progress wrote an issue-noprogress dir"; FAIL=$((FAIL + 1))
+    else
+        echo "  PASS: --no-progress wrote nothing into the repo"; PASS=$((PASS + 1))
+    fi
+
     teardown
 }
 

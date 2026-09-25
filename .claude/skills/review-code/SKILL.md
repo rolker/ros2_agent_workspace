@@ -632,20 +632,30 @@ export AGENT_TIMEOUT=480
 export AGY_PRINT_TIMEOUT=420s
 export GEMINI_BACKSTOP_MARGIN=60
 
+# Forward the issue step 1 resolved, so the script never re-derives it
+# on its own: its branch-name / PR-body parse would drop an --issue
+# override and fail outright on a PR with no closing keyword, which
+# step 1 accepts. No issue (or NO_PROGRESS=true) => --no-progress, so the
+# findings go to a temp dir instead of a guessed issue directory.
+XMR_ISSUE_ARGS=()
+[[ -n "$ISSUE_NUM" ]] && XMR_ISSUE_ARGS+=(--issue "$ISSUE_NUM")
+[[ -z "$ISSUE_NUM" || "$NO_PROGRESS" == true ]] && XMR_ISSUE_ARGS+=(--no-progress)
+
 # Post-PR mode
-.agent/scripts/cross_model_review.sh --pr <N> --agents gemini,codex --repo owner/repo
+.agent/scripts/cross_model_review.sh --pr <N> --agents gemini,codex --repo owner/repo "${XMR_ISSUE_ARGS[@]}"
 
 # Pre-push mode — pass the origin/$BASE ref step 1 just fetched. Without
 # a base the script diffs against the LOCAL default branch when one
 # exists, and in this workspace the main tree's local branch moves only
 # on `make sync`, so a stale one puts already-merged commits in the prompt.
-.agent/scripts/cross_model_review.sh --branch "origin/$BASE" --agents gemini,codex [--no-progress]
+.agent/scripts/cross_model_review.sh --branch "origin/$BASE" --agents gemini,codex "${XMR_ISSUE_ARGS[@]}"
 ```
 
 Pass `--repo <owner/repo>` (post-PR mode) when the PR lives in a
-different repo than the current working directory. Pass `--no-progress`
-in pre-push mode for skill worktrees / one-off branches (mirrors the
-top-level `--no-progress` flag's own reason for existing).
+different repo than the current working directory. `XMR_ISSUE_ARGS`
+carries `--no-progress` in either mode whenever step 1 resolved no issue
+or the top-level `--no-progress` flag was given (skill worktrees,
+one-off branches, PRs without a closing keyword).
 
 **Reading results**: stdout carries `MODE=parallel-sync` and then one
 `AGENT=`/`FINDINGS_FILE=`/`EXIT=` triplet per agent. Key on each agent's

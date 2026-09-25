@@ -558,7 +558,8 @@ fi
 
 # --- Resolve issue number ---
 # Order: explicit --issue flag wins; otherwise mode-specific resolution.
-# PR mode: require a GitHub closure keyword in the PR body. The loose
+# PR mode: require a GitHub closure keyword in the PR body, unless
+# --no-progress was passed (then there is nothing to file under). The loose
 # "first standalone #N" fallback was removed in #149 — it silently
 # routed artifacts to unrelated issues and, post-#147, caused the
 # work-plans resolver to abort with a confusing wrong-issue message.
@@ -619,14 +620,19 @@ else
         | head -n1 || true)
     ISSUE_NUMBER=$(printf '%s\n' "$ISSUE_REF" | grep -oE '[0-9]+$' || true)
 
-    if [[ -z "$ISSUE_NUMBER" ]]; then
+    if [[ -z "$ISSUE_NUMBER" && "$NO_PROGRESS" == true ]]; then
+        # Same sentinel as branch mode: with no issue to file under,
+        # --no-progress sends the artifacts to a temp dir below (#660).
+        ISSUE_NUMBER="noprogress"
+    elif [[ -z "$ISSUE_NUMBER" ]]; then
         {
             echo "ERROR: PR #${PR_NUMBER} body has no 'Closes|Fixes|Resolves #N' keyword."
             echo ""
             echo "  The loose '#N' fallback was removed in #149 because it routed"
             echo "  artifacts to unrelated issues. Two ways to proceed:"
-            echo "    1. Pass --issue <N> to set the issue number explicitly, or"
-            echo "    2. Edit the PR body to include a closure keyword"
+            echo "    1. Pass --issue <N> to set the issue number explicitly,"
+            echo "    2. Pass --no-progress to keep the findings in a temp dir, or"
+            echo "    3. Edit the PR body to include a closure keyword"
             echo "       (e.g. 'Closes #123')."
         } >&2
         exit 2
