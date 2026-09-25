@@ -218,21 +218,41 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # that ignored SIGTERM would keep running, burning quota on an abandoned
 # review. The escalation is validated above to fit inside the caller's
 # grace (AGENT_KILL_AFTER).
+# The CLI runs as the leader of its own process group (setsid), and every
+# signal below goes to that whole group. Signalling only its PID missed a
+# child it had started that ignored SIGTERM: the CLI died, this helper
+# exited, the caller then saw a finished job and never reached its
+# kill_tree, and the child ran on (#660). In a non-interactive shell a
+# background job is not a group leader, so setsid execs in place and the
+# PID from `$!` is the group id. Where setsid is missing (macOS) the
+# signals fall back to the PID alone.
+if command -v setsid >/dev/null 2>&1; then
+    CLI_SETSID=(setsid)
+else
+    CLI_SETSID=()
+fi
+signal_cli() {
+    if [[ ${#CLI_SETSID[@]} -gt 0 ]]; then
+        kill -"$1" -- -"$2" 2>/dev/null
+    else
+        kill -"$1" "$2" 2>/dev/null
+    fi
+}
 CLI_PID=""
 terminate_child() {
-    local code="$1" watchdog
+    local code="$1" watchdog i
     # Re-entrancy: a second signal (repeated Ctrl-C, TERM then HUP) would
     # otherwise start a second watchdog and clobber $watchdog, leaking
     # the first one.
     trap '' INT TERM HUP
     if [[ -n "$CLI_PID" ]]; then
-        kill "$CLI_PID" 2>/dev/null
+        signal_cli TERM "$CLI_PID"
         # `wait` returns the moment the CLI dies, so a clean shutdown
         # costs milliseconds, not the escalation window. The watchdog
-        # only matters for a CLI that ignores SIGTERM. It is NOT waited
-        # on: a subshell sleeping in `sleep` defers the TERM we send it
-        # until that sleep ends, so waiting would reintroduce the full
-        # window on every clean exit.
+        # only matters for a group member that ignores SIGTERM. It is NOT
+        # waited on: a subshell sleeping in `sleep` defers the TERM we
+        # send it until that sleep ends, so waiting would reintroduce the
+        # full window on every clean exit.
         # The watchdog is cancelled with SIGKILL, never TERM: it is forked
         # while this handler has INT/TERM/HUP ignored, an ignored
         # disposition is inherited (by its `sleep` too), and a TERM that
@@ -243,9 +263,16 @@ terminate_child() {
         # killed first, while still findable under it, so no orphan
         # `sleep` is left either. rolker/ros2_agent_workspace #660.
         ( sleep "$REVIEW_KILL_ESCALATION"
-          kill -0 "$CLI_PID" 2>/dev/null && kill -9 "$CLI_PID" 2>/dev/null ) &
+          signal_cli 0 "$CLI_PID" && signal_cli KILL "$CLI_PID" ) &
         watchdog=$!
         wait "$CLI_PID" 2>/dev/null
+        # The CLI is gone, but a child of it that ignored the TERM may
+        # not be: give the group the rest of the window, then SIGKILL it.
+        for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
+            signal_cli 0 "$CLI_PID" || break
+            sleep 0.1
+        done
+        signal_cli KILL "$CLI_PID"
         pkill -KILL -P "$watchdog" 2>/dev/null
         kill -KILL "$watchdog" 2>/dev/null
         CLI_PID=""
@@ -286,13 +313,15 @@ run_cli() {
     local out="$1" err="$2"
     shift 2
     if [[ "$err" == "-" ]]; then
-        "$@" < "$PROMPT_FILE" > "$out" 2>&1 &
+        "${CLI_SETSID[@]}" "$@" < "$PROMPT_FILE" > "$out" 2>&1 &
     else
-        "$@" < "$PROMPT_FILE" > "$out" 2> "$err" &
+        "${CLI_SETSID[@]}" "$@" < "$PROMPT_FILE" > "$out" 2> "$err" &
     fi
     CLI_PID=$!
     CLI_EXIT=0
     wait "$CLI_PID" || CLI_EXIT=$?
+    # The review is over: nothing the CLI started may outlive it.
+    signal_cli KILL "$CLI_PID"
     CLI_PID=""
 }
 

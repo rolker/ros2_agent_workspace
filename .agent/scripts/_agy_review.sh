@@ -157,19 +157,40 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # that SIGKILL is aimed at this helper, so once we are gone an agy that
 # ignored SIGTERM keeps running. The escalation is validated above to fit
 # inside the caller's grace (AGENT_KILL_AFTER).
+# The agy runs as the leader of its own process group (setsid), and every
+# signal below goes to that whole group. Signalling only its PID missed a
+# child it had started that ignored SIGTERM: the agy died, this helper
+# exited, the caller then saw a finished job and never reached its
+# kill_tree, and the child ran on (#660). In a non-interactive shell a
+# background job is not a group leader, so setsid execs in place and the
+# PID from `$!` is the group id. Where setsid is missing (macOS) the
+# signals fall back to the PID alone.
+if command -v setsid >/dev/null 2>&1; then
+    AGY_SETSID=(setsid)
+else
+    AGY_SETSID=()
+fi
+signal_agy() {
+    if [[ ${#AGY_SETSID[@]} -gt 0 ]]; then
+        kill -"$1" -- -"$2" 2>/dev/null
+    else
+        kill -"$1" "$2" 2>/dev/null
+    fi
+}
 AGY_PID=""
 terminate_child() {
-    local code="$1" watchdog
+    local code="$1" watchdog i
     # Re-entrancy: a second signal would otherwise start a second
     # watchdog and clobber $watchdog, leaking the first one.
     trap '' INT TERM HUP
     if [[ -n "$AGY_PID" ]]; then
-        kill "$AGY_PID" 2>/dev/null
-        # `wait` returns the moment agy dies, so a clean shutdown costs
-        # milliseconds. The watchdog only matters for an agy that ignores
-        # SIGTERM, and is NOT waited on: a subshell sleeping in `sleep`
-        # defers the TERM we send it until that sleep ends, so waiting
-        # would reintroduce the full window on every clean exit.
+        signal_agy TERM "$AGY_PID"
+        # `wait` returns the moment the agy dies, so a clean shutdown
+        # costs milliseconds, not the escalation window. The watchdog
+        # only matters for a group member that ignores SIGTERM. It is NOT
+        # waited on: a subshell sleeping in `sleep` defers the TERM we
+        # send it until that sleep ends, so waiting would reintroduce the
+        # full window on every clean exit.
         # The watchdog is cancelled with SIGKILL, never TERM: it is forked
         # while this handler has INT/TERM/HUP ignored, an ignored
         # disposition is inherited (by its `sleep` too), and a TERM that
@@ -180,9 +201,16 @@ terminate_child() {
         # killed first, while still findable under it, so no orphan
         # `sleep` is left either. rolker/ros2_agent_workspace #660.
         ( sleep "$REVIEW_KILL_ESCALATION"
-          kill -0 "$AGY_PID" 2>/dev/null && kill -9 "$AGY_PID" 2>/dev/null ) &
+          signal_agy 0 "$AGY_PID" && signal_agy KILL "$AGY_PID" ) &
         watchdog=$!
         wait "$AGY_PID" 2>/dev/null
+        # The agy is gone, but a child of it that ignored the TERM may
+        # not be: give the group the rest of the window, then SIGKILL it.
+        for ((i = 0; i < ESCALATION_SECONDS * 10; i++)); do
+            signal_agy 0 "$AGY_PID" || break
+            sleep 0.1
+        done
+        signal_agy KILL "$AGY_PID"
         pkill -KILL -P "$watchdog" 2>/dev/null
         kill -KILL "$watchdog" 2>/dev/null
         AGY_PID=""
@@ -209,7 +237,7 @@ fi
 # agy runs as a background child and is waited on, so a TERM/INT sent
 # to this helper (cross_model_review.sh's cleanup on interrupt) reaches
 # agy at once instead of being deferred until the turn ends on its own.
-"$AGY_BIN_RESOLVED" \
+"${AGY_SETSID[@]}" "$AGY_BIN_RESOLVED" \
     --input-format=stream-json \
     --output-format=stream-json \
     --print-timeout "$PRINT_TIMEOUT" \
@@ -218,6 +246,8 @@ fi
 AGY_PID=$!
 AGY_EXIT=0
 wait "$AGY_PID" || AGY_EXIT=$?
+# The review is over: nothing agy started may outlive it.
+signal_agy KILL "$AGY_PID"
 AGY_PID=""
 
 # Last 20 lines of stderr, for failure reports: a fatal error lands at

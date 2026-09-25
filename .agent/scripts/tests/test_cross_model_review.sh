@@ -26,7 +26,7 @@ trap 'rm -rf "$SANDBOX"' EXIT
 # The codex arm runs under an environment allowlist (#660), which would
 # strip the mocks' MOCK_* controls. Pass exactly those through the knob
 # the helper provides for this, rather than widening the allowlist.
-CROSS_MODEL_ENV_PASSTHROUGH="MOCK_ARGV_DIR MOCK_STDIN_DIR MOCK_TIMES_DIR MOCK_PREAMBLE MOCK_CODEX_ECHO_FULL MOCK_CODEX_EMPTY MOCK_CODEX_ERRMARK MOCK_CODEX_EXIT MOCK_CODEX_IGNORE_TERM MOCK_CODEX_SLEEP MOCK_CODEX_STDERR MOCK_CODEX_ENV_DUMP"
+CROSS_MODEL_ENV_PASSTHROUGH="MOCK_ARGV_DIR MOCK_STDIN_DIR MOCK_TIMES_DIR MOCK_PREAMBLE MOCK_CODEX_ECHO_FULL MOCK_CODEX_EMPTY MOCK_CODEX_ERRMARK MOCK_CODEX_EXIT MOCK_CODEX_IGNORE_TERM MOCK_CODEX_ORPHAN_PIDFILE MOCK_CODEX_SLEEP MOCK_CODEX_STDERR MOCK_CODEX_ENV_DUMP"
 export CROSS_MODEL_ENV_PASSTHROUGH
 
 setup() {
@@ -77,6 +77,14 @@ setup() {
 # MOCK_AGY_IGNORE_TERM=1: an agy that ignores SIGTERM, so only the
 # helper's escalation to SIGKILL can end it (#313).
 [[ -n "${MOCK_AGY_IGNORE_TERM:-}" ]] && trap '' TERM HUP
+# MOCK_AGY_ORPHAN_PIDFILE=<f>: start a child that ignores SIGTERM and
+# outlives this mock unless its whole process group is killed; its pid
+# goes to <f> (#660). Its fds are detached so it holds no caller pipe.
+if [[ -n "${MOCK_AGY_ORPHAN_PIDFILE:-}" ]]; then
+    ( trap '' TERM HUP; echo "$BASHPID" > "${MOCK_AGY_ORPHAN_PIDFILE}"
+      for ((j = 0; j < 300; j++)); do sleep 0.1; done ) </dev/null >/dev/null 2>&1 &
+    for ((j = 0; j < 50; j++)); do [[ -s "${MOCK_AGY_ORPHAN_PIDFILE}" ]] && break; sleep 0.05; done
+fi
 # Sleep in 0.1s slices so a SIGKILLed mock leaves no long-lived orphan
 # sleep behind. Whole seconds only.
 mock_sleep() { local n="$1" i; for ((i = 0; i < n * 10; i++)); do sleep 0.1; done; }
@@ -2722,6 +2730,14 @@ done
 # MOCK_CODEX_IGNORE_TERM=1: a CLI that ignores SIGTERM, so only an
 # escalation to SIGKILL can end it. Armed before the sleep.
 [[ -n "${MOCK_CODEX_IGNORE_TERM:-}" ]] && trap '' TERM HUP
+# MOCK_CODEX_ORPHAN_PIDFILE=<f>: start a child that ignores SIGTERM and
+# outlives this mock unless its whole process group is killed; its pid
+# goes to <f> (#660). Its fds are detached so it holds no caller pipe.
+if [[ -n "${MOCK_CODEX_ORPHAN_PIDFILE:-}" ]]; then
+    ( trap '' TERM HUP; echo "$BASHPID" > "${MOCK_CODEX_ORPHAN_PIDFILE}"
+      for ((j = 0; j < 300; j++)); do sleep 0.1; done ) </dev/null >/dev/null 2>&1 &
+    for ((j = 0; j < 50; j++)); do [[ -s "${MOCK_CODEX_ORPHAN_PIDFILE}" ]] && break; sleep 0.05; done
+fi
 [[ -n "${MOCK_CODEX_ENV_DUMP:-}" ]] && env > "${MOCK_CODEX_ENV_DUMP}"
 [[ -n "${MOCK_CODEX_SLEEP:-}" ]] && mock_sleep "${MOCK_CODEX_SLEEP}"
 echo "codex-cli 0.155.1 (mock banner)"
@@ -4291,6 +4307,69 @@ test_cli_helper_missing_is_unavailable
 
 extract_fn() { sed -n "/^$1()/,/^}/p" "$2"; }
 
+# A child the CLI started, ignoring SIGTERM, must not outlive the helper:
+# the helpers signal the CLI's whole process group, not just its PID
+# (Codex cross-model review of PR #662). Needs setsid.
+assert_orphan_gone() {
+    local label="$1" pidfile="$2" i pid
+    pid=$(cat "$pidfile" 2>/dev/null || echo "")
+    if [[ -z "$pid" ]]; then
+        echo "  FAIL: ${label}: the mock never started its child"; FAIL=$((FAIL + 1)); return
+    fi
+    for ((i = 0; i < 20; i++)); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+        echo "  FAIL: ${label}: the CLI's TERM-ignoring child survived the helper"; FAIL=$((FAIL + 1))
+    else
+        echo "  PASS: ${label}: the CLI's TERM-ignoring child is gone"; PASS=$((PASS + 1))
+    fi
+}
+
+test_local_helpers_kill_the_cli_process_group() {
+    echo "TEST: the helpers kill a CLI's TERM-ignoring child, on TERM and on a normal exit (#660)"
+    if ! command -v setsid >/dev/null 2>&1; then
+        echo "  SKIP: no setsid on this host"; return
+    fi
+    setup
+    make_mock_agent codex
+    local times="${TMPDIR_BASE}/times"; mkdir -p "$times" "${TMPDIR_BASE}/helper-tmp"
+    local prompt="${TMPDIR_BASE}/prompt.md" findings="${TMPDIR_BASE}/findings.md" i ec
+    echo "review this" > "$prompt"
+
+    # TERM path, codex: the CLI dies on TERM, its child does not.
+    local orphan="${TMPDIR_BASE}/codex-orphan.pid"
+    MOCK_CODEX_ORPHAN_PIDFILE="$orphan" MOCK_CODEX_SLEEP=30 MOCK_TIMES_DIR="$times" \
+        REVIEW_KILL_ESCALATION=1 TMPDIR="${TMPDIR_BASE}/helper-tmp" PATH="${MOCK_BIN}:${PATH}" \
+        bash "$CLI_HELPER_UNDER_TEST" codex "${MOCK_BIN}/codex" "$prompt" "$findings" 1800 \
+        >/dev/null 2>&1 &
+    local helper_pid=$!
+    for ((i = 0; i < 50; i++)); do [[ -s "$orphan" ]] && break; sleep 0.1; done
+    kill -TERM "$helper_pid" 2>/dev/null || true
+    ec=0; wait "$helper_pid" || ec=$?
+    assert_exit_code "codex helper exits 143 on TERM" "143" "$ec"
+    assert_orphan_gone "codex, TERM" "$orphan"
+
+    # Normal exit, codex: the review finished, its leftovers must not run on.
+    orphan="${TMPDIR_BASE}/codex-orphan2.pid"
+    ec=$(MOCK_CODEX_ORPHAN_PIDFILE="$orphan" run_cli_helper codex "$prompt" "$findings" 1800)
+    assert_exit_code "codex review with a leftover child still succeeds" "0" "$ec"
+    assert_orphan_gone "codex, normal exit" "$orphan"
+
+    # TERM path, agy.
+    orphan="${TMPDIR_BASE}/agy-orphan.pid"
+    MOCK_AGY_ORPHAN_PIDFILE="$orphan" MOCK_AGY_STALL=1 MOCK_TIMES_DIR="$times" \
+        REVIEW_KILL_ESCALATION=1 TMPDIR="${TMPDIR_BASE}/helper-tmp" PATH="${MOCK_BIN}:${PATH}" \
+        bash "${SCRIPT_DIR}/../_agy_review.sh" "${MOCK_BIN}/agy" "$prompt" "$findings" 30m \
+        >/dev/null 2>&1 &
+    helper_pid=$!
+    for ((i = 0; i < 50; i++)); do [[ -s "$orphan" ]] && break; sleep 0.1; done
+    kill -TERM "$helper_pid" 2>/dev/null || true
+    ec=0; wait "$helper_pid" || ec=$?
+    assert_exit_code "agy helper exits 143 on TERM" "143" "$ec"
+    assert_orphan_gone "agy, TERM" "$orphan"
+    teardown
+}
+
 test_local_branch_short_flag_not_swallowed() {
     echo "TEST: --branch does not take a following short flag as its base ref (#660)"
     setup
@@ -4461,6 +4540,7 @@ test_local_slugless_worktree_name
 test_local_default_branch_prefers_fresher_origin
 test_local_claude_preamble
 test_local_codex_env_allowlist
+test_local_helpers_kill_the_cli_process_group
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
