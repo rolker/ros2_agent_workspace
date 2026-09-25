@@ -210,7 +210,9 @@ assert_eq() {
 
 assert_contains() {
     local label="$1" pattern="$2" text="$3"
-    if echo "$text" | grep -qE "$pattern"; then
+    # A here-string, not `echo | grep -q`: under pipefail an early grep
+    # exit can SIGPIPE the echo and turn a match into a miss (#660).
+    if grep -qE -- "$pattern" <<< "$text"; then
         echo "  PASS: $label"
         PASS=$((PASS + 1))
     else
@@ -223,7 +225,9 @@ assert_contains() {
 
 assert_not_contains() {
     local label="$1" pattern="$2" text="$3"
-    if echo "$text" | grep -qE "$pattern"; then
+    # A here-string, not `echo | grep -q`: under pipefail an early grep
+    # exit can SIGPIPE the echo and turn a match into a miss (#660).
+    if grep -qE -- "$pattern" <<< "$text"; then
         echo "  FAIL: $label"
         echo "    unexpected pattern found: $pattern"
         echo "    in: $text"
