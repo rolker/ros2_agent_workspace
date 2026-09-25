@@ -481,11 +481,50 @@ confirm no regression. **33 passed, 0 failed** (unchanged).
 | `.agent/scripts/rosdep_local_sources.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; key-conflict detection pass; new exit code 6; header-comment update (discovery + exit codes). **r4**: conflict-detection subprocess reports (rather than silently skips) a read failure; publish loop re-checks existence immediately before writing; canonicalization dedupes package lists; new exit code 7; two test-only env hooks (`ROSDEP_LOCAL_SOURCES_TEST_VANISH`, `...TEST_VANISH_AFTER_CONFLICT`) |
 | `.agent/scripts/rosdep_local_staleness_check.sh` | Source `_worktree_helpers.sh`; use `wt_discover_local_rosdep_yamls` for discovery; header-comment note |
 | `.agent/scripts/bootstrap.sh` | New `elif [ "$BOOTSTRAP_GEN_RC" -eq 6 ]` branch mirroring the existing exit-4 branch (revision r2 decision 2). **r4**: new `elif -eq 7` branch, same pattern |
-| `.agent/scripts/worktree_remove.sh` | **r4**: for a layer worktree, checks each non-symlinked package for a root `rosdep.yaml` before removal; after a successful removal, regenerates the workspace-local rosdep sources dir if any was found (never runs `rosdep update`); a regeneration failure is reported loudly but does not fail the (already-successful) removal |
-| `Makefile` | `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard, feeding both the direct prerequisite and the `FORCE`-diffed `rosdep-local.list` deletion/rename detection; comment reconciling symlink-following with decision 3 |
+| `.agent/scripts/worktree_remove.sh` | **r4**: for a layer worktree, checks each non-symlinked package for a root `rosdep.yaml` before removal; after a successful removal, regenerates the workspace-local rosdep sources dir if any was found (never runs `rosdep update`); a regeneration failure is reported loudly but does not fail the (already-successful) removal. **Cross-model review**: also regenerates when the published list still names the worktree (matched on its `/layers/worktrees/<name>/` segment), and says the cache resolves removed keys until the next `rosdep update` |
+| `Makefile` | `ROSDEP_LOCAL_YAMLS` gains the worktree wildcard, feeding both the direct prerequisite and the `FORCE`-diffed `rosdep-local.list` deletion/rename detection; comment reconciling symlink-following with decision 3. **Cross-model review**: exit 7 now refreshes the cache (`rosdep update`) against the published directory, stamp still left stale |
 | `.agent/scripts/tests/test_rosdep_local_sources.sh` | New cases: worktree-only discovery (registered checkout), deregistered/leftover worktree exclusion, rogue-standalone-repo exclusion (r3), missing-corresponding-main-repo exclusion (r3), symlinked-package skip, symlinked-layer skip, main-vs-worktree conflict, worktree-vs-worktree conflict, identical-declaration dedupe, shape-vs-conflict precedence, Makefile wildcard grep guard, staleness-check worktree glob. **r4**: in-file-duplicate dedupe, conflict-check-time vanish, publish-time vanish, exit-code precedence (4 over 7, 6 over 7), bootstrap.sh exit-7 branch |
 | `.agent/scripts/tests/test_worktree_remove.sh` | **r4**: new `setup_with_layer_worktree` fixture helper; cases for regen-on-removal-with-rosdep-yaml, no-regen-without-one, and a loud-but-non-fatal regeneration failure |
 | `AGENTS.md` | `rosdep_local_sources.sh` Script Reference row: document worktree discovery, the registration/symlink filters, and exit code 6; note the same for `rosdep_local_staleness_check.sh`'s row and `bootstrap.sh`'s Environment Setup mention if their own discovery/exit-code documentation needs it. **r4**: `rosdep_local_sources.sh` row gains exit 7 + the test hooks; `worktree_remove.sh` row gains the regen-on-removal contract |
+
+## Implementation Notes
+
+**Cross-model review in place of an owner read (2026-09-25).** Copilot's quota
+is exhausted this month, so Gemini and Codex (review-code 5e, merged in
+PR #662) reviewed this branch.
+
+- **Round 1 (Codex, 09-24):** (1) a removed worktree's key still
+  resolves from rosdep's cache — by design, since removal never runs
+  `rosdep update`; the script and its AGENTS.md row now say so instead
+  of implying regeneration stops resolution. (2) Regeneration was keyed
+  only on a rosdep.yaml existing at removal time — fixed: it also runs
+  when the published list still names the worktree. (3) Deferred, below.
+- **Round 2 (Gemini + Codex, 2026-09-25):** fixed — the published-list match
+  used the resolved path, which never matched a list generated through a
+  symlinked root (now matched on the worktree-name segment, tested);
+  exit 7 skipped `rosdep update` for every surviving file (now
+  refreshed); the `layers/main` glob gained a guard for a caller without
+  nullglob; the AGENTS.md row misstated where the registration check
+  runs. Not acted on: a YAML integer package name crashing the conflict
+  check cannot happen — the shape gate rejects non-string names first.
+
+**Deferred to the agent_workspace port (owner decision 2026-09-25: merge
+with these open):**
+
+- **Live files, not snapshots.** The published list points at the live
+  rosdep.yaml files, so a file edited or deleted after validation can
+  still reach a manual `rosdep update` (bypassing the shape gate), and a
+  file removed between the existence re-check and publication can leave
+  a dangling line. `make build` re-validates on any change, so the gap
+  is a manual `rosdep update` in between. The fix is to publish the
+  validated bytes as snapshots inside the generated directory. The
+  design dates from #654 and covers `layers/main` too, so it belongs to
+  the port rather than this PR.
+- **Registration is not in the stamp.** The Makefile stamp tracks paths
+  and mtimes, not worktree registration, so a worktree deregistered by
+  hand while its directory stays stays published until something else
+  regenerates. Normal removal (`worktree_remove.sh`, `merge_pr.sh`)
+  regenerates.
 
 ## Principles Self-Check
 
