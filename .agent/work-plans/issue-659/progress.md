@@ -677,3 +677,27 @@ disjoint-lens fresh-context adversarial passes plus this reviewer's own
 independent read) verified all three rounds' fixes hold under skeptical
 re-examination and found nothing new — 0 must-fix, 0 suggestions. **Ship:
 recommended.**
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-25 10:17 -04:00
+**By**: Claude Code Agent (Claude Opus 5.5)
+
+Two rounds of external cross-model review of PR #661 (Codex 09-24; Gemini + Codex 09-25 via review-code 5e from PR #662), in place of Copilot, whose quota is exhausted this month.
+
+**Branch**: feature/issue-659 at `6ec222d7`
+**Commits**: `cd1c7dea`, `6f4a9f41`, `39a01a29`, `76728ab9`, `3918b42a`, `6ec222d7`
+
+### Actions
+- [x] (must-fix, Codex round 1) regeneration after removal was keyed only on a rosdep.yaml existing then; it now also runs when the published list still names the worktree, and the cache-still-resolves consequence of skipping `rosdep update` is stated in the script output and AGENTS.md (`cd1c7dea`)
+- [x] (must-fix, Gemini round 2) that published-list match used the `pwd -P` path and missed a list generated through a symlinked root; now matched on the `/layers/worktrees/<name>/` segment, with a test that fails on the old match (`6f4a9f41`)
+- [x] (must-fix, Codex round 2) exit 7 skipped `rosdep update` for every surviving file; the cache is now refreshed and the stamp still left stale (`39a01a29`)
+- [x] (must-fix, Gemini round 2) `layers/main` glob guard for a caller without nullglob (`76728ab9`)
+- [x] (suggestion, Gemini round 2) AGENTS.md misstated where the registration check runs (`3918b42a`)
+- [x] (not acted on) YAML integer package names cannot reach the conflict check — the shape gate rejects them
+- [x] (deferred to the agent_workspace port, owner decision) live-file sources vs published snapshots; worktree registration not tracked by the Makefile stamp — both recorded in the plan (`6ec222d7`)
+
+### Verification
+- `bash .agent/scripts/tests/test_worktree_remove.sh` → 7 passed / 0 failed; the two new tests each fail against the unfixed code
+- `bash .agent/scripts/tests/test_rosdep_local_sources.sh` → 185 passed / 0 failed
+- pre-commit (incl. shellcheck) ran on every commit
