@@ -428,13 +428,16 @@ echo ""
 echo "✅ Worktree removed successfully"
 
 # The published list may still name this worktree even though no rosdep.yaml
-# was found in it (deleted and committed after the last generation). The
-# generator writes canonical absolute paths, and WORKTREE_DIR was
-# canonicalized with `pwd -P` above, so a prefix match is exact.
+# was found in it (deleted and committed after the last generation). Match
+# on the `/layers/worktrees/<name>/` segment, not the absolute path: the
+# generator writes the root as its caller spelled it (logical `pwd`), while
+# WORKTREE_DIR was resolved with `pwd -P`, so a workspace reached through a
+# symlink would never match a full-path prefix. The name is unique under
+# this root, and the list only holds this root's paths.
 PUBLISHED_LOCAL_LIST="$ROOT_DIR/.rosdep/sources.list.d/30-workspace-local.list"
 if [ "$WORKTREE_TYPE" == "layer" ] && [ -n "$WORKTREE_DIR" ] \
     && [ -f "$PUBLISHED_LOCAL_LIST" ] \
-    && grep -qF "file://$WORKTREE_DIR/" "$PUBLISHED_LOCAL_LIST"; then
+    && grep -qF "/layers/worktrees/$(basename "$WORKTREE_DIR")/" "$PUBLISHED_LOCAL_LIST"; then
     NEEDS_ROSDEP_REGEN=true
 fi
 
