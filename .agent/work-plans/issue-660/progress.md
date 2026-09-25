@@ -78,3 +78,36 @@ issue: 660
 - (Lens B) untrusted-PR gate enforced in the script as well — owner decision: stays in the skill text only
 - (Lens B) claude arm lacks tool lockdown — not used by 5e; kept for upstream reconcilability
 - (governance) instruction-file edits go slightly past the flag-naming lines — noted in the PR description
+
+## Implementation
+**Status**: complete
+**When**: 2026-09-25 09:31 -04:00
+**By**: Claude Code Agent (Claude Opus 5.5)
+
+Hosted-CI fix plus two rounds of external cross-model review of PR #662 (Codex and Gemini via agy 1.2.11, headless, through this PR's own cross_model_review.sh), run in place of an owner read at the owner's request.
+
+**Branch**: feature/issue-660 at `1b9549c`
+**Commits**: `51b8770`, `5af570f`, `69a6907`, `d75e794`, `b5f080a`, `f4632de`, `1e5f9e7`, `67d7bce`, `5818535`, `1b9549c`
+
+### Actions
+- [x] (CI) `--work-dir` + `--no-progress` was checked after CLI discovery, so a runner without codex exited 1 "unavailable" instead of the exit-2 usage error; the check moved up with the other flag checks and its test hides the CLIs (`51b8770`)
+- [x] (must-fix, Codex round 1) `AGENT_KILL_AFTER=0` accepted, but `timeout -k 0` disables the SIGKILL escalation; zero is now refused in the script and both helpers (`5af570f`)
+- [x] (must-fix, Codex round 1) the helpers signalled only the CLI's PID, so a TERM-ignoring child outlived the review; each CLI now leads its own process group (setsid) and all signals go to the group, tested with mocks that start such a child (`69a6907`)
+- [x] (must-fix, Codex round 1) review-code did not forward the issue step 1 resolved; it now passes `--issue <N>` or `--no-progress`, and PR mode accepts a keyword-less PR under `--no-progress` (`d75e794`)
+- [x] (must-fix, Codex round 1) two runs into one issue dir overwrote each other's artifacts; a non-blocking `flock` refuses the second with exit 5 (`b5f080a`)
+- [x] (owner: chase Gemini) Gemini ended empty on a denied RunCommand three runs in a row; agy has no switch that removes its built-in tools, so `_agy_review.sh` now resumes the same conversation once (`--conversation <id>`) with "that was denied, answer in text only", inside the print-timeout budget. Verified live in round 2 (`f4632de`)
+- [x] (must-fix, Codex round 2) `echo | grep -q` under pipefail could make `assert_not_contains` falsely pass; here-string with `--` (`1e5f9e7`)
+- [x] (must-fix, Gemini round 2) the closing-keyword regex missed `Close`/`Closed`/`Fixed`/`Resolved` and `Closes:`; now GitHub's full set, in one function the test runs directly (`67d7bce`)
+- [x] (must-fix, Codex round 2 + Gemini round 2) a TERM between a background launch and its `$!` assignment left the child unrecorded; the agent jobs inherited the lock fd; without setsid the post-exit sweep hit a bare, possibly reused PID — all three fixed (`5818535`)
+- [x] (not acted on, Gemini round 2) shared cleanup reap deadline is intended (all jobs are TERMed at once); two claude-arm findings and the `pkill` note concern upstream-verbatim code unused here; exact `## Approach` matching follows the plan template
+- [x] (housekeeping) plan Implementation Notes record both rounds and the owner decisions (`1b9549c`)
+
+### Verification
+- `bash .agent/scripts/tests/test_cross_model_review.sh` → **722 passed / 0 failed**
+- The hardened `--work-dir` test and the fd-9 test each fail against the unfixed code and pass with the fix
+- `make test-scripts` → all script suites green + 220 pytest passed, exit 0
+- pre-commit (incl. shellcheck) ran on every commit
+
+### Notes
+- Owner decision after round 2: fix the five valid findings, push, no third review round.
+- The launch-window race is not reachable deterministically from a test.
