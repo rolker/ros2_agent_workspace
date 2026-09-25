@@ -249,6 +249,9 @@ wt_discover_local_rosdep_yamls() {
     local yaml
 
     for yaml in "$root_dir"/layers/main/*_ws/src/*/rosdep.yaml; do
+        # Callers set nullglob (see below); the guard keeps a caller that
+        # forgets from emitting the literal pattern as a "file".
+        [ -f "$yaml" ] || continue
         echo "$yaml"
     done
 
