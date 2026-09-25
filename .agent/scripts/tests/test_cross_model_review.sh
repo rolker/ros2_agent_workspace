@@ -4321,8 +4321,10 @@ test_local_work_dir_conflicts_with_no_progress() {
     setup
     cd "${MOCK_REPO}"
     local ec=0 err
-    err=$(PATH="${MOCK_BIN}:${PATH}" bash "${SCRIPT_UNDER_TEST}" --pr 99 --no-progress \
-        --work-dir "${MOCK_REPO}" --agents codex 2>&1 >/dev/null) || ec=$?
+    # No codex CLI anywhere on the search path, as on a hosted runner: the
+    # usage error must win over CLI discovery's exit 1.
+    err=$(HOME="${TMPDIR_BASE}/nohome" PATH="$(HIDDEN_CLI_PATH)" bash "${SCRIPT_UNDER_TEST}" \
+        --pr 99 --no-progress --work-dir "${MOCK_REPO}" --agents codex 2>&1 >/dev/null) || ec=$?
     assert_exit_code "exits 2" "2" "$ec"
     assert_contains "names the conflict" "conflict" "$err"
     [[ ! -e "${MOCK_REPO}/.agent/work-plans/issue-noprogress" ]] \

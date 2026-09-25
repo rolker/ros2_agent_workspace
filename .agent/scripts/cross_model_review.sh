@@ -404,6 +404,17 @@ if [[ -z "$PR_NUMBER" && "$BRANCH_MODE" != true ]]; then
     exit 2
 fi
 
+# --work-dir builds a per-issue dir inside a repo, the one thing
+# --no-progress promises not to create: without an issue it would write
+# `.agent/work-plans/issue-noprogress/` into that repo (#660). An exact
+# --work-plans-dir stays allowed with --no-progress. A flag conflict is a
+# usage error, so it is checked here, before CLI discovery can exit 1 on a
+# host that lacks the requested CLI.
+if [[ -n "$EXPLICIT_WORK_DIR" && "$NO_PROGRESS" == true && -z "$CLI_WORK_PLANS_DIR" ]]; then
+    echo "ERROR: --work-dir and --no-progress conflict: --work-dir writes into <dir>/.agent/work-plans/issue-<N>/. Pass --work-plans-dir <exact-dir> to keep --no-progress artifacts somewhere specific." >&2
+    exit 2
+fi
+
 # --- Agent selection ---
 # --agent <X> (or neither flag: gemini) is the single-agent contract;
 # --agents <list> is the multi-agent contract, even with one entry.
@@ -634,14 +645,6 @@ source "${SCRIPT_DIR}/_resolve_work_plans_dir.sh"
 source "${SCRIPT_DIR}/_resolve_default_branch.sh"
 
 
-# --work-dir builds a per-issue dir inside a repo, the one thing
-# --no-progress promises not to create: without an issue it would write
-# `.agent/work-plans/issue-noprogress/` into that repo (#660). An exact
-# --work-plans-dir stays allowed with --no-progress.
-if [[ -n "$EXPLICIT_WORK_DIR" && "$NO_PROGRESS" == true && -z "$CLI_WORK_PLANS_DIR" ]]; then
-    echo "ERROR: --work-dir and --no-progress conflict: --work-dir writes into <dir>/.agent/work-plans/issue-<N>/. Pass --work-plans-dir <exact-dir> to keep --no-progress artifacts somewhere specific." >&2
-    exit 2
-fi
 if [[ -n "$CLI_WORK_PLANS_DIR" ]]; then
     export WORK_PLANS_DIR_OVERRIDE="$CLI_WORK_PLANS_DIR"
 elif [[ -n "$EXPLICIT_WORK_DIR" ]]; then
